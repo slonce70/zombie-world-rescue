@@ -12,6 +12,10 @@ export class Input {
     this.locked = false;
     this.onLockChange = null;
     this.onUserGesture = null;
+    // мобільний ввід (заповнює touch.js)
+    this.touchMove = { x: 0, z: 0 };
+    this.touchSprint = false;
+    this.touchMode = false;
 
     window.addEventListener('keydown', (e) => {
       if (['Space', 'Tab', 'KeyE'].includes(e.code)) e.preventDefault();

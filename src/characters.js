@@ -117,14 +117,14 @@ export function bakeRig(rig, castAll = false) {
     const shadow = castAll || key === 'torso' || key === 'head';
     bakeGroupMeshes(rig.parts[key], { castShadow: shadow });
   }
-  // прямі меші на тілі (плечі боса тощо)
+  // прямі меші на тілі (плечі боса, кулі сніговика тощо)
   const direct = rig.body.children.filter((c) => c.isMesh);
   if (direct.length) {
     const g = new THREE.Group();
     g.name = 'extras';
     for (const m of direct) g.add(m);
     rig.body.add(g);
-    bakeGroupMeshes(g, { castShadow: castAll });
+    bakeGroupMeshes(g, { castShadow: true });
   }
   return rig;
 }
@@ -139,7 +139,7 @@ export function cloneRig(tpl) {
   });
   return {
     group, body, parts,
-    spec: tpl.spec, height: tpl.height, radius: tpl.radius, ztype: tpl.ztype,
+    spec: tpl.spec, height: tpl.height, radius: tpl.radius, ztype: tpl.ztype, kind: tpl.kind,
     anim: { mode: 'idle', t: 0, phase: Math.random() * 6.28, speed: 0, attackT: -1, dieT: -1, aimPitch: 0 },
     base: tpl.base,
     dieSpin: (Math.random() - 0.5) * 0.8,
@@ -324,6 +324,10 @@ const sstep = (e0, e1, x) => {
 };
 
 export function updateRig(rig, dt) {
+  if (rig.kind === 'snowman') {
+    updateSnowmanRig(rig, dt);
+    return;
+  }
   const a = rig.anim;
   const p = rig.parts;
   const b = rig.base;
@@ -461,7 +465,177 @@ export function makeZombie(type, rng) {
   return cloneRig(arr[idx]);
 }
 
+// ============================================================
+// Сніговик-зомбі: кидає сніжки, тане при смерті
+// ============================================================
+function buildSnowman(rng) {
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  body.name = 'body';
+  root.add(body);
+  // прохолодніший за сніг на землі — щоб силует читався на білому
+  const snowM = toonMat(0xd6e2ef);
+  const coalM = toonMat(0x232a30);
+
+  const bottom = sphere(0.46, snowM, 16, 12);
+  bottom.position.y = 0.45;
+  bottom.castShadow = true;
+  const middle = sphere(0.34, snowM, 14, 10);
+  middle.position.y = 1.02;
+  middle.castShadow = true;
+  body.add(bottom, middle);
+  // вуглинки-ґудзики
+  for (let i = 0; i < 3; i++) {
+    const btn = sphere(0.04, coalM, 6, 5);
+    btn.position.set(0, 0.85 + i * 0.17, -0.31);
+    body.add(btn);
+  }
+  // шарф
+  const scarfM = toonMat(rng.pick([0xd84f4f, 0x8d6bb8, 0x4a8ad4]));
+  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.07, 8, 16), scarfM);
+  scarf.rotation.x = Math.PI / 2;
+  scarf.position.y = 1.32;
+  const scarfTail = box(0.12, 0.3, 0.05, scarfM);
+  scarfTail.position.set(0.14, 1.16, -0.22);
+  scarfTail.rotation.z = 0.2;
+  body.add(scarf, scarfTail);
+
+  // голова
+  const headG = new THREE.Group();
+  headG.name = 'head';
+  headG.position.y = 1.5;
+  const head = sphere(0.27, snowM, 16, 12);
+  head.position.y = 0.12;
+  head.castShadow = true;
+  headG.add(head);
+  // зомбі-очі: одна вуглинка, одне зелене світяче
+  const eye1 = sphere(0.05, coalM, 6, 5);
+  eye1.position.set(-0.1, 0.18, -0.23);
+  const eye2 = sphere(0.065, toonMat(0x7fff6a, 0x44ff22, 0.7), 8, 6);
+  eye2.position.set(0.1, 0.18, -0.22);
+  headG.add(eye1, eye2);
+  // морква (трохи погризена — коротка)
+  const nose = cone(0.05, 0.22, toonMat(0xff8c42), 8);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.set(0, 0.1, -0.33);
+  headG.add(nose);
+  // кривий рот з вуглинок
+  for (let i = 0; i < 4; i++) {
+    const m = sphere(0.025, coalM, 5, 4);
+    m.position.set(-0.09 + i * 0.06, -0.02 + Math.sin(i * 2) * 0.025, -0.24);
+    headG.add(m);
+  }
+  // відерце на голові
+  const bucket = cylinder(0.19, 0.24, 0.22, toonMat(0x46506b), 10);
+  bucket.position.set(0.05, 0.38, 0);
+  bucket.rotation.z = -0.25;
+  headG.add(bucket);
+  body.add(headG);
+
+  // руки-гілки
+  for (const side of [-1, 1]) {
+    const g = new THREE.Group();
+    g.name = side < 0 ? 'armL' : 'armR';
+    g.position.set(0.3 * side, 1.1, 0);
+    const stickM = toonMat(0x6b4a2a);
+    const stick = cylinder(0.025, 0.035, 0.55, stickM, 6);
+    stick.position.set(side * 0.22, 0.05, 0);
+    stick.rotation.z = side * 1.25;
+    const twig = cylinder(0.018, 0.022, 0.2, stickM, 5);
+    twig.position.set(side * 0.4, 0.18, 0);
+    twig.rotation.z = side * 0.5;
+    g.add(stick, twig);
+    body.add(g);
+  }
+  // порожні "ноги" для сумісності з апдейтером
+  for (const n of ['legL', 'legR']) {
+    const g = new THREE.Group();
+    g.name = n;
+    body.add(g);
+  }
+  const rig = {
+    group: root, body,
+    parts: {
+      torso: body.children.find((c) => c.name === 'body') || body, head: headG,
+      armL: body.children.find((c) => c.name === 'armL'),
+      armR: body.children.find((c) => c.name === 'armR'),
+      legL: body.children.find((c) => c.name === 'legL'),
+      legR: body.children.find((c) => c.name === 'legR'),
+    },
+    spec: { scale: 1 },
+    height: 1.95, radius: 0.5,
+    anim: { mode: 'idle', t: 0, phase: Math.random() * 6.28, speed: 0, attackT: -1, dieT: -1, aimPitch: 0 },
+    base: { armL: 0, armR: 0, bodyRotX: 0, bodyY: 0 },
+    dieSpin: (Math.random() - 0.5) * 0.8,
+    kind: 'snowman', ztype: 'snowman',
+  };
+  // торс — фіктивна група (анімуємо body напряму), але названа для клонування
+  rig.parts.torso = new THREE.Group();
+  rig.parts.torso.name = 'torso';
+  body.add(rig.parts.torso);
+  return rig;
+}
+
+function updateSnowmanRig(rig, dt) {
+  const a = rig.anim;
+  a.t += dt;
+  const p = rig.parts;
+  let bodyRotZ = 0, bodyRotX = 0, bodyY = 0;
+  let armL = -0.15, armR = -0.15, headRotZ = 0;
+  switch (a.mode) {
+    case 'idle':
+      a.phase += dt * 1.4;
+      bodyRotZ = Math.sin(a.phase) * 0.04;
+      headRotZ = Math.sin(a.phase * 0.8) * 0.08;
+      break;
+    case 'walk':
+    case 'run': {
+      a.phase += dt * Math.max(1.5, a.speed) * 2.2;
+      bodyRotZ = Math.sin(a.phase) * 0.14; // перевалюється з боку на бік
+      bodyRotX = -0.08;
+      bodyY = Math.abs(Math.sin(a.phase)) * 0.07;
+      armL = -0.15 + Math.sin(a.phase) * 0.2;
+      armR = -0.15 - Math.sin(a.phase) * 0.2;
+      headRotZ = -bodyRotZ * 0.6;
+      break;
+    }
+    case 'attack': {
+      a.attackT += dt / 0.55;
+      const t = Math.min(1, a.attackT);
+      // замах назад і кидок уперед
+      if (t < 0.45) {
+        bodyRotX = lerp_(0, 0.3, t / 0.45);
+        armR = lerp_(-0.15, -1.6, t / 0.45);
+      } else {
+        bodyRotX = lerp_(0.3, -0.35, (t - 0.45) / 0.55);
+        armR = lerp_(-1.6, 1.8, (t - 0.45) / 0.55);
+      }
+      armL = -0.4;
+      break;
+    }
+    case 'die': {
+      a.dieT += dt / 0.9;
+      const t = Math.min(1, a.dieT);
+      // тане: тіло сплющується, голова скочується
+      rig.body.scale.set(1 + t * 0.45, Math.max(0.25, 1 - t * 0.6), 1 + t * 0.45);
+      p.head.position.y = 1.5 + 1.1 * t - 2.6 * t * t;
+      p.head.position.z = -t * 0.9;
+      p.head.rotation.x = -t * 1.8;
+      armL = -1.2 * t;
+      armR = 1.2 * t;
+      break;
+    }
+  }
+  rig.body.rotation.z = bodyRotZ;
+  rig.body.rotation.x = bodyRotX;
+  rig.body.position.y = bodyY;
+  if (p.armL) p.armL.rotation.x = armL;
+  if (p.armR) p.armR.rotation.x = armR;
+  p.head.rotation.z = headRotZ;
+}
+
 function buildZombie(type, rng) {
+  if (type === 'snowman') return buildSnowman(rng);
   const skin = rng.pick(ZOMBIE_SKINS);
   const common = {
     skin,
@@ -513,21 +687,29 @@ function buildZombie(type, rng) {
   return rig;
 }
 
-export function makeBoss() {
-  const rig = makeHumanoid({
+export function makeBoss(frost = false) {
+  const rig = makeHumanoid(frost ? {
+    scale: 2.7, belly: 1.7, armsForward: 0.9, headR: 0.24,
+    skin: 0x8fd0d8, shirt: 0x3a5a8c, pants: 0x2e3a55, shoes: 0x223044,
+    eyeWhite: 0xd9f4ff, eyeL: 0.075, eyeR: 0.075, pupilColor: 0x1a4a8a,
+    mouth: 'open', teeth: true, brow: 0.45, browColor: 0x2e4a60,
+    bellySkin: true, sleeves: 'skin', nose: false,
+  } : {
     scale: 2.7, belly: 1.7, armsForward: 0.9, headR: 0.24,
     skin: 0x5da045, shirt: 0x6b3548, pants: 0x3a3344, shoes: 0x2e2620,
     eyeWhite: 0xffd24a, eyeL: 0.075, eyeR: 0.075, pupilColor: 0xc62828,
     mouth: 'open', teeth: true, brow: 0.45, browColor: 0x2e4620,
     bellySkin: true, sleeves: 'skin', nose: false,
   });
-  // маленька золота корона на величезній голові — кумедно і видно здалеку
-  const gold = toonMat(0xffc933, 0xffa000, 0.25);
+  // маленька корона на величезній голові: золота або льодяна
+  const crownM = frost
+    ? toonMat(0xaee8ff, 0x66ccff, 0.5)
+    : toonMat(0xffc933, 0xffa000, 0.25);
   const crown = new THREE.Group();
-  const band = cylinder(0.14, 0.16, 0.09, gold, 10);
+  const band = cylinder(0.14, 0.16, 0.09, crownM, 10);
   crown.add(band);
   for (let i = 0; i < 5; i++) {
-    const spike = cone(0.035, 0.1, gold, 6);
+    const spike = cone(0.035, frost ? 0.16 : 0.1, crownM, 6);
     const ang = (i / 5) * Math.PI * 2;
     spike.position.set(Math.cos(ang) * 0.13, 0.08, Math.sin(ang) * 0.13);
     crown.add(spike);
@@ -535,8 +717,8 @@ export function makeBoss() {
   crown.position.set(0, 0.42, 0);
   crown.rotation.z = 0.12;
   rig.parts.head.add(crown);
-  // шипи на плечах
-  const spikeM = toonMat(0x4a4458);
+  // шипи на плечах (льодяні для Мороза)
+  const spikeM = frost ? toonMat(0xc9ecf7) : toonMat(0x4a4458);
   for (const side of [-1, 1]) {
     const pad = sphere(0.16, spikeM, 10, 8);
     pad.position.set(0.46 * side, 1.58, 0);
@@ -545,6 +727,15 @@ export function makeBoss() {
     const sp = cone(0.05, 0.16, spikeM, 6);
     sp.position.set(0.46 * side, 1.7, 0);
     rig.body.add(sp);
+  }
+  if (frost) {
+    // бурульки на руках
+    for (const side of [-1, 1]) {
+      const ice = cone(0.06, 0.22, toonMat(0xc9ecf7), 6);
+      ice.position.set(0, -0.55, 0);
+      ice.rotation.x = Math.PI;
+      rig.parts[side < 0 ? 'armL' : 'armR'].add(ice);
+    }
   }
   rig.ztype = 'boss';
   bakeRig(rig);
@@ -679,6 +870,29 @@ export function makeGunMesh(kind) {
     sightR.position.set(0, 0.095, 0.04);
     g.add(body, topRail, barrel, tip, stock, stockPad, mag, grip, sightF, sightR);
     muzzle.position.set(0, 0.015, -0.74);
+  } else if (kind === 'shotgun') {
+    const woodM = toonMat(0x8a5a32);
+    // два стволи поруч
+    for (const side of [-1, 1]) {
+      const barrel = cylinder(0.032, 0.032, 0.52, darkM, 10);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(side * 0.034, 0.02, -0.3);
+      const tip = cylinder(0.038, 0.038, 0.05, accentM, 10);
+      tip.rotation.x = Math.PI / 2;
+      tip.position.set(side * 0.034, 0.02, -0.55);
+      g.add(barrel, tip);
+    }
+    const receiver = box(0.1, 0.1, 0.18, midM);
+    receiver.position.set(0, 0, -0.02);
+    const stock = box(0.07, 0.11, 0.26, woodM);
+    stock.position.set(0, -0.04, 0.18);
+    stock.rotation.x = -0.12;
+    const pump = box(0.09, 0.07, 0.16, woodM);
+    pump.position.set(0, -0.03, -0.32);
+    const sightF = box(0.018, 0.035, 0.025, accentM);
+    sightF.position.set(0, 0.065, -0.5);
+    g.add(receiver, stock, pump, sightF);
+    muzzle.position.set(0, 0.02, -0.58);
   } else {
     const slide = box(0.06, 0.09, 0.28, midM);
     slide.position.z = -0.06;
@@ -721,12 +935,13 @@ export function makeFPArms(gunKind) {
   const handR = sphere(0.06, skinM, 10, 8);
   handR.position.set(0.005, -0.09, 0.05);
   // ліва рука підтримує цівку
+  const longGun = gunKind === 'rifle' || gunKind === 'shotgun';
   const armL = capsule(0.055, 0.28, sleeveM);
   armL.rotation.x = Math.PI / 2 - 0.25;
   armL.rotation.z = 0.5;
-  armL.position.set(-0.12, -0.2, gunKind === 'rifle' ? -0.1 : 0.1);
+  armL.position.set(-0.12, -0.2, longGun ? -0.1 : 0.1);
   const handL = sphere(0.07, skinM, 10, 8);
-  handL.position.set(-0.025, -0.085, gunKind === 'rifle' ? -0.24 : 0.0);
+  handL.position.set(-0.025, -0.085, longGun ? -0.24 : 0.0);
   g.add(armR, handR, armL, handL);
   return { group: g, muzzle: gun.muzzle };
 }

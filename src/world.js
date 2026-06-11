@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { toonMat, bakeGroupMeshes } from './characters.js';
 import { makeFBM, smoothstep, lerp, clamp, distToSeg, closestRaySeg, RNG } from './utils.js';
+import { BIOMES } from './countries.js';
 
 const GKEY = (cx, cz) => (cx + 512) * 4096 + (cz + 512);
 
@@ -31,8 +32,9 @@ for (const line of ROADS) {
 }
 
 export class World {
-  constructor(scene, seed = 1377) {
+  constructor(scene, seed = 1377, biome = null) {
     this.scene = scene;
+    this.biome = biome || BIOMES.summer;
     this.rng = new RNG(seed);
     this.fbmLow = makeFBM(seed, 2);
     this.fbmHi = makeFBM(seed + 7, 2);
@@ -55,6 +57,7 @@ export class World {
     this._buildWarehouse();
     this._buildArena();
     this._buildClouds();
+    if (this.biome.snowfall) this._buildSnowfall();
     this._buildGrid();
     bakeGroupMeshes(this.staticGroup, { castShadow: true, receiveShadow: true });
   }
@@ -103,10 +106,11 @@ export class World {
 
   // ---------- освітлення і небо ----------
   _buildLights() {
-    const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x6a9a50, 0.85);
+    const b = this.biome;
+    const hemi = new THREE.HemisphereLight(b.hemiSky, b.hemiGround, b.hemiIntensity);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff0d6, 1.9);
-    sun.position.set(70, 110, 50);
+    const sun = new THREE.DirectionalLight(b.sunColor, b.sunIntensity);
+    sun.position.set(b.sunPos[0], b.sunPos[1], b.sunPos[2]);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -75;
@@ -120,7 +124,10 @@ export class World {
     this.scene.add(sun);
     this.scene.add(sun.target);
     this.sun = sun;
-    this.scene.fog = new THREE.Fog(0xcfe8ff, 130, 430);
+    this.sunBaseX = b.sunPos[0];
+    this.sunBaseY = b.sunPos[1];
+    this.sunBaseZ = b.sunPos[2];
+    this.scene.fog = new THREE.Fog(b.fogColor, b.fogNear, b.fogFar);
   }
 
   // сонце-тінь слідує за гравцем (з кроком, щоб тіні не мерехтіли)
@@ -131,7 +138,7 @@ export class World {
     const texel = 150 / 2048;
     const sx = Math.round(px / texel) * texel;
     const sz = Math.round(pz / texel) * texel;
-    this.sun.position.set(sx + 70, 110, sz + 50);
+    this.sun.position.set(sx + this.sunBaseX, this.sunBaseY, sz + this.sunBaseZ);
     this.sun.target.position.set(sx, 0, sz);
   }
 
@@ -142,9 +149,9 @@ export class World {
       depthWrite: false,
       fog: false,
       uniforms: {
-        top: { value: new THREE.Color(0x4d9ef7) },
-        horizon: { value: new THREE.Color(0xcfeeff) },
-        bottom: { value: new THREE.Color(0xb8d9c9) },
+        top: { value: new THREE.Color(this.biome.skyTop) },
+        horizon: { value: new THREE.Color(this.biome.skyHorizon) },
+        bottom: { value: new THREE.Color(this.biome.skyBottom) },
       },
       vertexShader: `
         varying vec3 vPos;
@@ -164,14 +171,14 @@ export class World {
     // сонячний диск
     const sunDisc = new THREE.Mesh(
       new THREE.CircleGeometry(38, 24),
-      new THREE.MeshBasicMaterial({ color: 0xfff6c9, fog: false, transparent: true, opacity: 0.95 })
+      new THREE.MeshBasicMaterial({ color: this.biome.sunDisc, fog: false, transparent: true, opacity: 0.95 })
     );
-    sunDisc.position.set(330, 420, 240);
+    sunDisc.position.set(this.biome.sunDiscPos[0], this.biome.sunDiscPos[1], this.biome.sunDiscPos[2]);
     sunDisc.lookAt(0, 0, 0);
     this.scene.add(sunDisc);
     const glow = new THREE.Mesh(
       new THREE.CircleGeometry(70, 24),
-      new THREE.MeshBasicMaterial({ color: 0xfff0b3, fog: false, transparent: true, opacity: 0.25 })
+      new THREE.MeshBasicMaterial({ color: this.biome.sunDisc, fog: false, transparent: true, opacity: 0.25 })
     );
     glow.position.copy(sunDisc.position).multiplyScalar(0.995);
     glow.lookAt(0, 0, 0);
@@ -185,12 +192,12 @@ export class World {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
-    const cGrass1 = new THREE.Color(0x66bd41);
-    const cGrass2 = new THREE.Color(0x4ba332);
-    const cGrass3 = new THREE.Color(0x83cf52);
-    const cDirt = new THREE.Color(0x9b8463);
-    const cPlaza = new THREE.Color(0xb3996f);
-    const cArena = new THREE.Color(0x8d8070);
+    const cGrass1 = new THREE.Color(this.biome.grass1);
+    const cGrass2 = new THREE.Color(this.biome.grass2);
+    const cGrass3 = new THREE.Color(this.biome.grass3);
+    const cDirt = new THREE.Color(this.biome.dirt);
+    const cPlaza = new THREE.Color(this.biome.plaza);
+    const cArena = new THREE.Color(this.biome.arenaGround);
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
@@ -221,8 +228,8 @@ export class World {
     const positions = [];
     const colors = [];
     const cols = [-2.7, -1.9, 1.9, 2.7];
-    const cMain = new THREE.Color(0xa08a66);
-    const cEdge = new THREE.Color(0x77654c);
+    const cMain = new THREE.Color(this.biome.roadMain);
+    const cEdge = new THREE.Color(this.biome.roadEdge);
     const tmp = new THREE.Color();
     const pushV = (x, z, c) => {
       positions.push(x, this.groundH(x, z) + 0.07, z);
@@ -334,8 +341,9 @@ export class World {
       return isForest(x, z) || rng.chance(0.22);
     };
 
-    const oaks = this._scatterPoints(210, 4.5, acceptTree);
-    const pines = this._scatterPoints(130, 4.5, (x, z) => acceptTree(x, z) && this.fbmHi(x * 0.02, z * 0.02) > 0);
+    const pr = this.biome.pineRatio;
+    const oaks = this._scatterPoints(Math.round(340 * (1 - pr)), 4.5, acceptTree);
+    const pines = this._scatterPoints(Math.round(340 * pr), 4.5, (x, z) => acceptTree(x, z) && this.fbmHi(x * 0.02, z * 0.02) > -0.3);
 
     // дуби: стовбур + 3 кулі крони
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 7);
@@ -344,7 +352,7 @@ export class World {
     const crownGeo = new THREE.IcosahedronGeometry(1, 1);
     const crownMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: trunkMat.gradientMap });
     const oakCrowns = new THREE.InstancedMesh(crownGeo, crownMat, oaks.length * 3);
-    const greens = [0x4fae3a, 0x5fc24a, 0x46a046, 0x6fcf52, 0x57b83e];
+    const greens = this.biome.treeGreens;
     const m4 = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const v3 = new THREE.Vector3();
@@ -381,7 +389,7 @@ export class World {
     const pTrunks = new THREE.InstancedMesh(trunkGeo, trunkMat, pines.length);
     const coneGeo = new THREE.ConeGeometry(1, 1, 8);
     const pCones = new THREE.InstancedMesh(coneGeo, crownMat, pines.length * 2);
-    const pineGreens = [0x2e7d4f, 0x35905a, 0x276b44];
+    const pineGreens = this.biome.pineGreens;
     let pi = 0;
     pines.forEach((p, i) => {
       const h = this.groundH(p.x, p.z);
@@ -441,6 +449,7 @@ export class World {
     this.scene.add(rocks);
 
     // квіти біля села та галявин
+    if (!this.biome.flowers) return;
     const flowerPts = this._scatterPoints(260, 1.5, (x, z) => {
       const d = Math.hypot(x, z);
       return d < 130 && this.roadDist(x, z) > 3.5 && this._farFromSites(x, z, 4) && !isForest(x, z);
@@ -492,8 +501,8 @@ export class World {
     const w = opts.w || rng.range(5.5, 7.5);
     const d = opts.d || rng.range(4.6, 6);
     const h = opts.h || rng.range(2.7, 3.2);
-    const wallC = opts.wall || rng.pick([0xf5e6c8, 0xffe0b3, 0xd6e8f7, 0xf7d6d0, 0xe8f0d8]);
-    const roofC = opts.roof || rng.pick([0xc0563b, 0xa84a32, 0x99553f, 0x8a6f4e]);
+    const wallC = opts.wall || rng.pick(this.biome.housePalette);
+    const roofC = opts.roof || rng.pick(this.biome.roofPalette);
     const g = new THREE.Group();
     const gy = this.groundH(x, z);
 
@@ -506,6 +515,12 @@ export class World {
     roof.position.y = 0.4 + h;
     roof.castShadow = true;
     g.add(found, walls, roof);
+    if (this.biome.snow) {
+      // снігова шапка на даху
+      const cap = new THREE.Mesh(this._prismGeo(w + 0.8, h * 0.2, d + 0.8), toonMat(0xf4f9fc));
+      cap.position.y = 0.4 + h + h * 0.42;
+      g.add(cap);
+    }
 
     // димар
     const chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 0.5), toonMat(0xb0654a));
@@ -595,7 +610,7 @@ export class World {
 
     // ліхтарі вздовж південної дороги
     const lampM = toonMat(0x37404f);
-    const lampHeadM = toonMat(0xffd97a, 0xffc233, 0.7);
+    const lampHeadM = toonMat(0xffd97a, 0xffc233, this.biome.lampGlow);
     for (const [lx, lz] of [[10, 130], [2, 90], [10, 50], [-4, 24], [12, 14], [-8, -2]]) {
       const ly = this.groundH(lx, lz);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 8), lampM);
@@ -633,7 +648,7 @@ export class World {
 
     // сіно на схід від села
     const hayM = toonMat(0xe2c044);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < (this.biome.hay ? 7 : 0); i++) {
       const hx = this.rng.range(55, 95), hz = this.rng.range(-15, 30);
       if (this.roadDist(hx, hz) < 5) continue;
       const hy = this.groundH(hx, hz);
@@ -646,7 +661,7 @@ export class World {
     }
 
     // вказівник на в'їзді
-    this._makeSign(12, 162, 'СЕЛО СОНЯЧНЕ', 0);
+    this._makeSign(12, 162, this.biome.signText, 0);
   }
 
   _makeSign(x, z, text, ry = 0) {
@@ -1007,6 +1022,48 @@ export class World {
     }
   }
 
+  // ---------- снігопад ----------
+  _buildSnowfall() {
+    const N = 380;
+    const geo = new THREE.SphereGeometry(0.05, 5, 4);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+    this.snowMesh = new THREE.InstancedMesh(geo, mat, N);
+    this.snowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.snowMesh.frustumCulled = false;
+    this.scene.add(this.snowMesh);
+    this.snowFlakes = [];
+    for (let i = 0; i < N; i++) {
+      this.snowFlakes.push({
+        x: this.rng.range(-35, 35), y: this.rng.range(0, 30), z: this.rng.range(-35, 35),
+        spd: this.rng.range(1.6, 3.4), drift: this.rng.range(0.5, 1.6), ph: this.rng.range(0, 6.28),
+      });
+    }
+    this._snowM4 = new THREE.Matrix4();
+    this._snowQ = new THREE.Quaternion();
+    this._snowS = new THREE.Vector3(1, 1, 1);
+    this._snowV = new THREE.Vector3();
+  }
+
+  _updateSnowfall(dt, px, pz) {
+    if (!this.snowMesh) return;
+    for (let i = 0; i < this.snowFlakes.length; i++) {
+      const f = this.snowFlakes[i];
+      f.y -= f.spd * dt;
+      f.x += Math.sin(this.time * f.drift + f.ph) * dt * 0.8;
+      if (f.y < -2) {
+        f.y = 26 + this.rng.range(0, 6);
+        f.x = this.rng.range(-35, 35);
+        f.z = this.rng.range(-35, 35);
+      }
+      this._snowM4.compose(
+        this._snowV.set(px + f.x, this.groundH(px + f.x, pz + f.z) + f.y, pz + f.z),
+        this._snowQ, this._snowS
+      );
+      this.snowMesh.setMatrixAt(i, this._snowM4);
+    }
+    this.snowMesh.instanceMatrix.needsUpdate = true;
+  }
+
   // ---------- просторова сітка колайдерів ----------
   _buildGrid() {
     this.grid.clear();
@@ -1127,6 +1184,9 @@ export class World {
       wc.open = Math.min(1, wc.open + dt * 1.4);
       wc.lid.rotation.x = wc.open * 1.8;
     }
-    if (playerPos) this.followSun(playerPos.x, playerPos.z);
+    if (playerPos) {
+      this.followSun(playerPos.x, playerPos.z);
+      if (this.snowMesh) this._updateSnowfall(dt, playerPos.x, playerPos.z);
+    }
   }
 }

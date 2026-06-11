@@ -56,6 +56,93 @@ export class Effects {
 
     // кільця (слем боса)
     this.rings = [];
+
+    // снаряди ворогів (сніжки)
+    this.projectiles = [];
+    this.projGeo = new THREE.SphereGeometry(1, 8, 6);
+    this.projMat = toonMat(0xf4f9ff);
+    this.onProjectileHit = null; // (dmg, x, z) => {}
+
+    // гранати
+    this.grenadesLive = [];
+    this.grenadeGeo = new THREE.SphereGeometry(0.13, 10, 8);
+    this.grenadeMat = new THREE.MeshToonMaterial({ color: 0x4d5e40, gradientMap: this.coinMat.gradientMap });
+    this.grenadeHotMat = new THREE.MeshToonMaterial({ color: 0xff5544, emissive: 0xff2200, emissiveIntensity: 0.8, gradientMap: this.coinMat.gradientMap });
+    this.onExplosion = null; // (x, y, z, radius) => {}
+
+    // літаючі цифри шкоди
+    this.dmgPool = [];
+    for (let i = 0; i < 18; i++) {
+      const cv = document.createElement('canvas');
+      cv.width = 128; cv.height = 64;
+      const tex = new THREE.CanvasTexture(cv);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      spr.scale.set(1.5, 0.75, 1);
+      spr.visible = false;
+      scene.add(spr);
+      this.dmgPool.push({ spr, cv, tex, life: 0, vy: 0 });
+    }
+    this._dmgIdx = 0;
+  }
+
+  spawnProjectile(from, target, speed, dmg, size = 0.22) {
+    const m = new THREE.Mesh(this.projGeo, this.projMat);
+    m.scale.setScalar(size);
+    m.position.copy(from);
+    const v = target.clone().sub(from);
+    const d = v.length();
+    v.normalize().multiplyScalar(speed);
+    v.y += d * 0.12; // легка дуга
+    this.scene.add(m);
+    this.projectiles.push({ mesh: m, v, dmg, size, life: 4 });
+  }
+
+  spawnGrenade(pos, vel) {
+    const m = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
+    m.position.copy(pos);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.06), toonMat(0xb8b8b8));
+    band.position.y = 0.13;
+    m.add(band);
+    this.scene.add(m);
+    this.grenadesLive.push({ mesh: m, v: vel.clone(), fuse: 2.0, blink: 0 });
+  }
+
+  _explodeGrenade(g) {
+    const p = g.mesh.position;
+    this.burst(p, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
+    this.burst(p, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
+    this.ring(p, 0xffaa44, 6);
+    this.flashLight.position.copy(p);
+    this.flashLight.intensity = 30;
+    this.flashT = 0.12;
+    this.audio.explosion();
+    if (this.onExplosion) this.onExplosion(p.x, p.y, p.z, 5.5);
+    this.scene.remove(g.mesh);
+  }
+
+  damageNumber(pos, amt, crit = false) {
+    const slot = this.dmgPool[this._dmgIdx];
+    this._dmgIdx = (this._dmgIdx + 1) % this.dmgPool.length;
+    const ctx = slot.cv.getContext('2d');
+    ctx.clearRect(0, 0, 128, 64);
+    ctx.font = `900 ${crit ? 44 : 36}px Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(String(Math.round(amt)), 64, 32);
+    ctx.fillStyle = crit ? '#ffd23f' : '#ffffff';
+    ctx.fillText(String(Math.round(amt)), 64, 32);
+    slot.tex.needsUpdate = true;
+    slot.spr.position.set(
+      pos.x + (Math.random() - 0.5) * 0.5,
+      pos.y + 0.3,
+      pos.z + (Math.random() - 0.5) * 0.5
+    );
+    slot.spr.material.opacity = 1;
+    slot.spr.visible = true;
+    slot.life = 0.75;
+    slot.vy = 2.0;
   }
 
   burst(pos, colorHex, n = 8, opts = {}) {
@@ -119,6 +206,15 @@ export class Effects {
   }
 
   spawnPickup(x, z, type) {
+    if (type === 'grenade') {
+      const gm = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
+      gm.scale.setScalar(1.5);
+      const y0 = this.world.groundH(x, z);
+      gm.position.set(x, y0 + 0.35, z);
+      this.scene.add(gm);
+      this.coins.push({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life: 45 });
+      return;
+    }
     const m = new THREE.Mesh(type === 'medkit' ? this.medGeo : this.ammoGeo, type === 'medkit' ? this.medMat : this.ammoMat);
     if (type === 'medkit') {
       const redM = toonMat(0xd32f2f);
@@ -192,8 +288,76 @@ export class Effects {
       }
     }
 
+    // снаряди ворогів
+    const ppos = this.getPlayerPos ? this.getPlayerPos() : null;
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const pr = this.projectiles[i];
+      pr.life -= dt;
+      pr.v.y -= 7 * dt;
+      // перевірка перешкод на шляху за кадр — сніжки не літають крізь стіни
+      const speed = pr.v.length();
+      const frameDist = speed * dt;
+      let blockedAt = Infinity;
+      if (frameDist > 1e-4) {
+        this._tmpDir.copy(pr.v).divideScalar(speed);
+        blockedAt = this.world.shotBlockDist(pr.mesh.position, this._tmpDir, frameDist + pr.size);
+      }
+      pr.mesh.position.addScaledVector(pr.v, dt);
+      const mp = pr.mesh.position;
+      let hit = blockedAt <= frameDist + pr.size;
+      if (!hit && ppos) {
+        const dx = mp.x - ppos.x, dy = mp.y - (ppos.y + 1.1), dz = mp.z - ppos.z;
+        if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) {
+          if (this.onProjectileHit) this.onProjectileHit(pr.dmg, mp.x, mp.z);
+          hit = true;
+        }
+      }
+      if (!hit && mp.y < this.world.groundH(mp.x, mp.z) + pr.size * 0.5) hit = true;
+      if (hit || pr.life <= 0) {
+        this.burst(mp, 0xf4f9ff, 7, { speed: 2.5, up: 2, life: 0.4, size: 0.9 });
+        this.scene.remove(pr.mesh);
+        this.projectiles.splice(i, 1);
+      }
+    }
+
+    // гранати
+    for (let i = this.grenadesLive.length - 1; i >= 0; i--) {
+      const g = this.grenadesLive[i];
+      g.fuse -= dt;
+      g.v.y -= 14 * dt;
+      g.mesh.position.addScaledVector(g.v, dt);
+      g.mesh.rotation.x += dt * 6;
+      const gy = this.world.groundH(g.mesh.position.x, g.mesh.position.z) + 0.13;
+      if (g.mesh.position.y < gy) {
+        g.mesh.position.y = gy;
+        if (Math.abs(g.v.y) > 2) this.audio.bounce();
+        g.v.y = -g.v.y * 0.42;
+        g.v.x *= 0.65;
+        g.v.z *= 0.65;
+      }
+      // миготить червоним перед вибухом
+      g.blink += dt;
+      if (g.fuse < 0.8) {
+        g.mesh.material = (Math.floor(g.blink * 10) % 2) ? this.grenadeHotMat : this.grenadeMat;
+      }
+      if (g.fuse <= 0) {
+        this._explodeGrenade(g);
+        this.grenadesLive.splice(i, 1);
+      }
+    }
+
+    // цифри шкоди
+    for (const d of this.dmgPool) {
+      if (!d.spr.visible) continue;
+      d.life -= dt;
+      d.spr.position.y += d.vy * dt;
+      d.vy *= 0.94;
+      d.spr.material.opacity = Math.min(1, d.life / 0.3);
+      if (d.life <= 0) d.spr.visible = false;
+    }
+
     // монети/підбирання
-    const pp = this.getPlayerPos ? this.getPlayerPos() : null;
+    const pp = ppos;
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const c = this.coins[i];
       c.t += dt;

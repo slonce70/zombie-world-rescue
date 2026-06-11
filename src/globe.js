@@ -1,5 +1,6 @@
-// Глобальна карта: 3D-глобус, сірі захоплені країни, вибір країни
+// Глобальна карта: 3D-глобус, захоплені країни, прогресія кампанії
 import * as THREE from 'three';
+import { COUNTRIES, nextTarget } from './countries.js';
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
   const phi = (lon + 180) * Math.PI / 180;
@@ -10,8 +11,6 @@ function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
     r * Math.sin(phi) * Math.sin(theta)
   );
 }
-
-const UKRAINE = { id: 'UKR', name: 'Україна', lat: 49.2, lon: 31.4 };
 
 export class Globe {
   constructor(game) {
@@ -76,32 +75,35 @@ export class Globe {
     this.sphere = new THREE.Mesh(new THREE.SphereGeometry(this.R, 96, 64), mat);
     this.group.add(this.sphere);
 
-    // маяк над Україною
+    // маяк над поточною ціллю кампанії
+    this.targetId = nextTarget(this.game.save.liberated || {}) || 'UKR';
+    this.allDone = nextTarget(this.game.save.liberated || {}) === null;
     this.beacon = this._makeBeacon();
     this.group.add(this.beacon);
+    this._aimBeaconAt(this.targetId);
 
-    // початкове обертання: Україна до камери
-    const up = latLonToVec3(UKRAINE.lat, UKRAINE.lon, 1);
-    this.group.rotation.y = -Math.atan2(up.x, up.z);
-    this.group.rotation.x = 0.42; // нахил, щоб Україна була ближче до центру кадру
-    this.baseRotY = this.group.rotation.y;
-    this.targetRotY = this.group.rotation.y;
+    // початкове обертання: ціль до камери
+    this._rotateToCountry(this.targetId, true);
     this.targetRotX = 0.42;
+    this.group.rotation.x = 0.42;
 
     this._bindPointer();
   }
 
+  _rotateToCountry(id, instant = false) {
+    const c = COUNTRIES[id] || COUNTRIES.UKR;
+    const up = latLonToVec3(c.lat, c.lon, 1);
+    this.targetRotY = -Math.atan2(up.x, up.z);
+    if (instant) this.group.rotation.y = this.targetRotY;
+  }
+
   _makeBeacon() {
     const g = new THREE.Group();
-    const pos = latLonToVec3(UKRAINE.lat, UKRAINE.lon, this.R);
     // промінь
     const beam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.012, 0.03, 0.5, 8, 1, true),
       new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })
     );
-    beam.position.copy(pos).multiplyScalar(1.25);
-    beam.lookAt(0, 0, 0);
-    beam.rotateX(Math.PI / 2);
     g.add(beam);
     this.beamMesh = beam;
     // кільце
@@ -109,41 +111,71 @@ export class Globe {
       new THREE.TorusGeometry(0.06, 0.008, 8, 24),
       new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.9 })
     );
-    ring.position.copy(pos).multiplyScalar(1.005);
-    ring.lookAt(0, 0, 0);
     g.add(ring);
     this.ringMesh = ring;
     // підпис
-    const cv = document.createElement('canvas');
-    cv.width = 512; cv.height = 160;
-    const ctx = cv.getContext('2d');
+    this.labelCanvas = document.createElement('canvas');
+    this.labelCanvas.width = 512;
+    this.labelCanvas.height = 160;
+    this.labelTex = new THREE.CanvasTexture(this.labelCanvas);
+    this.labelTex.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.labelTex, transparent: true, depthTest: false }));
+    sprite.scale.set(0.62, 0.2, 1);
+    g.add(sprite);
+    this.labelSprite = sprite;
+    return g;
+  }
+
+  _drawBeaconLabel(title, sub, color = '#ffd23f') {
+    const ctx = this.labelCanvas.getContext('2d');
+    ctx.clearRect(0, 0, 512, 160);
     ctx.fillStyle = 'rgba(20,30,50,0.85)';
     ctx.beginPath();
     ctx.roundRect(20, 14, 472, 100, 24);
     ctx.fill();
-    ctx.strokeStyle = '#ffd23f';
+    ctx.strokeStyle = color;
     ctx.lineWidth = 5;
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 52px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('УКРАЇНА', 256, 62);
-    ctx.fillStyle = '#ffd23f';
+    ctx.fillText(title, 256, 62);
+    ctx.fillStyle = color;
     ctx.font = '34px Arial';
-    ctx.fillText('натисни — почни місію!', 256, 102);
-    // трикутник-хвостик
+    ctx.fillText(sub, 256, 102);
     ctx.fillStyle = 'rgba(20,30,50,0.85)';
     ctx.beginPath();
     ctx.moveTo(236, 112); ctx.lineTo(276, 112); ctx.lineTo(256, 148);
     ctx.fill();
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-    sprite.scale.set(0.62, 0.2, 1);
-    sprite.position.copy(pos).multiplyScalar(1.0).add(pos.clone().normalize().multiplyScalar(0.55));
-    g.add(sprite);
-    this.labelSprite = sprite;
-    return g;
+    this.labelTex.needsUpdate = true;
+  }
+
+  _aimBeaconAt(id) {
+    if (this.allDone) {
+      // вся кампанія пройдена — золотий маяк над останньою країною
+      const last = COUNTRIES[id] || COUNTRIES.UKR;
+      const pos = latLonToVec3(last.lat, last.lon, this.R);
+      this._placeBeacon(pos);
+      this.beamMesh.material.color.setHex(0x58c14c);
+      this.ringMesh.material.color.setHex(0x58c14c);
+      this._drawBeaconLabel('УСІ КРАЇНИ ВІЛЬНІ!', 'ти врятував світ! 🏆', '#58c14c');
+      return;
+    }
+    const c = COUNTRIES[id] || COUNTRIES.UKR;
+    const pos = latLonToVec3(c.lat, c.lon, this.R);
+    this._placeBeacon(pos);
+    this.beamMesh.material.color.setHex(0xffd23f);
+    this.ringMesh.material.color.setHex(0xffd23f);
+    this._drawBeaconLabel(c.name.toUpperCase(), 'натисни — почни місію!');
+  }
+
+  _placeBeacon(pos) {
+    this.beamMesh.position.copy(pos).multiplyScalar(1.25);
+    this.beamMesh.lookAt(0, 0, 0);
+    this.beamMesh.rotateX(Math.PI / 2);
+    this.ringMesh.position.copy(pos).multiplyScalar(1.005);
+    this.ringMesh.lookAt(0, 0, 0);
+    this.labelSprite.position.copy(pos).add(pos.clone().normalize().multiplyScalar(0.55));
   }
 
   async load() {
@@ -216,8 +248,8 @@ export class Globe {
       const id = f.id || f.properties.name;
       let fill = '#8d86a3', stroke = '#6b6485'; // захоплені зомбі — хворобливо-фіолетові
       if (liberated[id]) { fill = '#58c14c'; stroke = '#3e9c36'; }
-      else if (id === 'UKR') {
-        fill = this.hoverId === 'UKR' ? '#ffe06b' : '#f2c94c';
+      else if (id === this.targetId) {
+        fill = this.hoverId === id ? '#ffe06b' : '#f2c94c';
         stroke = '#c99a1f';
       }
       this._paintCountry(ctx, f, fill, stroke, w, h);
@@ -295,14 +327,15 @@ export class Globe {
       tooltip.style.display = 'block';
       tooltip.style.left = (e.clientX + 14) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
-      if (c.id === 'UKR') {
-        tooltip.innerHTML = '🇺🇦 <b>Україна</b> — натисни, щоб грати!';
+      const known = COUNTRIES[c.id];
+      if (c.id === this.targetId) {
+        tooltip.innerHTML = `${known ? known.flag : '⭐'} <b>${known ? known.name : c.name}</b> — натисни, щоб грати!`;
         tooltip.classList.add('available');
       } else if ((this.game.save.liberated || {})[c.id]) {
-        tooltip.innerHTML = `✅ <b>${c.name}</b> — звільнено!`;
-        tooltip.classList.remove('available');
+        tooltip.innerHTML = `✅ <b>${known ? known.name : c.name}</b> — звільнено! Натисни, щоб зіграти ще раз`;
+        tooltip.classList.add('available');
       } else {
-        tooltip.innerHTML = `🔒 <b>${c.name}</b> — спочатку звільни Україну`;
+        tooltip.innerHTML = `🔒 <b>${c.name}</b> — спочатку звільни попередні країни`;
         tooltip.classList.remove('available');
       }
       document.body.style.cursor = 'pointer';
@@ -323,22 +356,26 @@ export class Globe {
     const c = this.pickCountry(hit.uv);
     if (!c) return;
     this.game.audio.ensure();
-    if (c.id === 'UKR') {
+    const playable = c.id === this.targetId || (this.game.save.liberated || {})[c.id];
+    if (playable && COUNTRIES[c.id]) {
       this.game.audio.click();
       document.getElementById('globe-tooltip').style.display = 'none';
       document.body.style.cursor = 'default';
-      this.game.startLevel('UKR');
+      this.game.startLevel(c.id);
     } else {
       this.game.audio.denied();
-      this.game.hud.toast(`🔒 ${c.name}: спочатку звільни Україну!`);
+      this.game.hud.toast(`🔒 ${c.name}: спочатку звільни попередні країни!`);
     }
   }
 
   setLiberated() {
+    const lastTarget = this.targetId;
+    const nt = nextTarget(this.game.save.liberated || {});
+    this.allDone = nt === null;
+    this.targetId = nt || lastTarget;
     this.repaint();
-    // маяк стає прапорцем перемоги
-    this.beamMesh.material.color.setHex(0x58c14c);
-    this.ringMesh.material.color.setHex(0x58c14c);
+    this._aimBeaconAt(this.targetId);
+    this._rotateToCountry(this.targetId);
   }
 
   update(dt) {

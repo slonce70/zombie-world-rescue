@@ -1,5 +1,6 @@
 // HUD: приціл, здоров'я, патрони, монети, місії, мінікарта, банери
 import { ROADS, LAYOUT } from './world.js';
+import { WEAPONS } from './player.js';
 import { clamp } from './utils.js';
 
 export class HUD {
@@ -32,7 +33,11 @@ export class HUD {
       bossFill: $('boss-fill'),
       hordeCounter: $('horde-counter'),
       hordeValue: $('horde-value'),
+      grenades: $('grenades'),
+      grenadesValue: $('grenades-value'),
+      combo: $('combo'),
     };
+    this._lastCombo = 0;
     this.ctx = this.el.minimap.getContext('2d');
     this.bannerT = 0;
     this.hitT = 0;
@@ -50,7 +55,10 @@ export class HUD {
     bus.on('hordeStart', () => this.banner('🧟 ОРДА!', 'Відбий напад!'));
     bus.on('hordeEnd', () => this.banner('🎉 Орду відбито!', '+60 монет 💰'));
     bus.on('bossUnlocked', () => this.banner('👑 АРЕНА ВІДКРИТА!', 'Іди до фіолетового маркера і переможи БОСА!'));
-    bus.on('bossStart', () => this.banner('👑 БОС КРАЇНИ!', 'Звільни Україну!'));
+    bus.on('bossStart', () => {
+      const c = this.game.level && this.game.level.country;
+      this.banner('👑 БОС КРАЇНИ!', c ? `Звільни країну: ${c.name}!` : 'Переможи боса!');
+    });
     bus.on('bossCharge', () => this.toast('⚠️ Бос розганяється — тікай убік!'));
     bus.on('bossSummon', () => this.toast('🧟 Бос кличе підмогу!'));
   }
@@ -86,6 +94,10 @@ export class HUD {
     this.vignetteT = 0.7;
   }
 
+  comboPop() {
+    // плавний поп обробляється в update через _lastCombo
+  }
+
   showBoss(show) {
     this.el.bossbar.classList.toggle('show', show);
   }
@@ -112,8 +124,27 @@ export class HUD {
     const a = p.curAmmo;
     this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
     this.el.ammoReserve.textContent = a.reserve === Infinity ? '∞' : a.reserve;
-    this.el.weaponName.textContent = `${p.cur === 'pistol' ? '🔫' : '🔥'} ${p.weapon.name}`;
+    this.el.weaponName.textContent = `${p.weapon.icon} ${p.weapon.name}`;
     this.el.ammoMag.classList.toggle('low', a.mag <= 4 && p.reloading <= 0);
+
+    // гранати
+    this.el.grenadesValue.textContent = p.grenades;
+    this.el.grenades.classList.toggle('none', p.grenades === 0);
+
+    // комбо
+    const combo = level.combo ? level.combo.n : 0;
+    if (combo >= 3) {
+      this.el.combo.classList.add('show');
+      if (combo !== this._lastCombo) {
+        this.el.combo.textContent = `🔥 x${combo}`;
+        this.el.combo.classList.remove('pop');
+        void this.el.combo.offsetWidth;
+        this.el.combo.classList.add('pop');
+      }
+    } else {
+      this.el.combo.classList.remove('show');
+    }
+    this._lastCombo = combo;
 
     // монети
     this.el.coins.textContent = this.game.save.coins;
@@ -213,10 +244,11 @@ export class HUD {
     ctx.beginPath();
     ctx.arc(C, C, R, 0, 6.29);
     ctx.clip();
-    // фон
+    // фон — за біомом країни
+    const winter = level.country && level.country.biome === 'winterDusk';
     const grad = ctx.createRadialGradient(C, C, 10, C, C, R);
-    grad.addColorStop(0, 'rgba(72, 128, 56, 0.92)');
-    grad.addColorStop(1, 'rgba(48, 92, 40, 0.92)');
+    grad.addColorStop(0, winter ? 'rgba(190, 205, 222, 0.92)' : 'rgba(72, 128, 56, 0.92)');
+    grad.addColorStop(1, winter ? 'rgba(140, 158, 182, 0.92)' : 'rgba(48, 92, 40, 0.92)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, W);
     // межа світу

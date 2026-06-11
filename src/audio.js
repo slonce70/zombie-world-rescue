@@ -8,7 +8,7 @@ export class AudioMan {
     this.muted = false;
     this.mode = null; // 'globe' | 'calm' | 'battle' | 'boss' | null
     this.bpm = 92;
-    this.step = 0;
+    this.musStep = 0;
     this.nextT = 0;
     this._groanCd = 0;
   }
@@ -88,10 +88,49 @@ export class AudioMan {
       this._noise(t, 0.09, 0.5, 'lowpass', 2800, 1, 400);
       this._noise(t, 0.03, 0.35, 'highpass', 3000, 1);
       this._osc('sine', 160, t, 0.08, 0.5, 50);
+    } else if (kind === 'shotgun') {
+      this._noise(t, 0.22, 0.6, 'lowpass', 1100, 1, 140);
+      this._noise(t, 0.06, 0.4, 'highpass', 1800, 1);
+      this._osc('sine', 110, t, 0.18, 0.6, 32);
     } else {
       this._noise(t, 0.12, 0.55, 'lowpass', 1900, 1, 250);
       this._osc('sine', 180, t, 0.1, 0.55, 45);
     }
+  }
+
+  step() {
+    if (!this.ctx) return;
+    this._noise(this.t, 0.05, 0.07, 'lowpass', 350 + Math.random() * 150);
+  }
+
+  shriek(vol = 1, pitch = 1) {
+    if (!this.ctx || (this._shriekCd || 0) > this.t) return;
+    this._shriekCd = this.t + 0.6;
+    const t = this.t;
+    this._osc('sawtooth', 280 * pitch, t, 0.45, 0.25 * Math.min(1, vol), 850 * pitch);
+  }
+
+  bounce() {
+    this._osc('square', 500, this.t, 0.04, 0.1, 300);
+  }
+
+  explosion() {
+    const t = this.t;
+    this._osc('sine', 80, t, 0.6, 0.7, 24);
+    this._noise(t, 0.5, 0.55, 'lowpass', 600, 1, 90);
+    this._noise(t, 0.15, 0.3, 'highpass', 1500, 1);
+  }
+
+  throwWhoosh(vol = 1) {
+    this._noise(this.t, 0.25, 0.18 * Math.min(1, vol), 'bandpass', 600, 2, 1800);
+  }
+
+  comboDing(level = 1) {
+    const t = this.t;
+    const base = 72 + Math.min(level, 6) * 2;
+    this._osc('triangle', midi(base), t, 0.12, 0.25);
+    this._osc('triangle', midi(base + 4), t + 0.07, 0.12, 0.25);
+    this._osc('triangle', midi(base + 7), t + 0.14, 0.25, 0.28);
   }
 
   empty() { this._osc('square', 900, this.t, 0.05, 0.12, 500); }
@@ -273,8 +312,8 @@ export class AudioMan {
     const step16 = (60 / this.bpm) / 4;
     if (this.nextT < this.ctx.currentTime) this.nextT = this.ctx.currentTime + 0.05;
     while (this.nextT < this.ctx.currentTime + 0.3) {
-      this._playStep(this.step % 64, this.nextT);
-      this.step++;
+      this._playStep(this.musStep % 64, this.nextT);
+      this.musStep++;
       this.nextT += step16;
     }
   }

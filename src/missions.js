@@ -91,8 +91,9 @@ export class Missions {
     level.audio.mission();
     level.bus.emit('missionDone', m);
     // орда після короткої паузи (накладання орд — додаємо, не затираємо)
-    if (this.pendingHorde) this.pendingHorde.count += m.horde;
-    else this.pendingHorde = { t: 5, count: m.horde };
+    const count = Math.round(m.horde * ((level.country && level.country.difficulty.counts) || 1));
+    if (this.pendingHorde) this.pendingHorde.count += count;
+    else this.pendingHorde = { t: 5, count };
     level.bus.emit('hordeWarning', 5);
   }
 
@@ -296,9 +297,9 @@ export class Missions {
       } else {
         this.crateOpenedT += dt;
         if (this.crateOpenedT > 0.9) {
-          player.giveRifle();
+          level.game.unlockWeapon(level.country.weaponReward);
           this._complete('warehouse');
-          level.bus.emit('toast', 'Ти отримав АВТОМАТ! Клавіша 2 — перемкнути зброю 🔥');
+          level.bus.emit('toast', level.country.weaponRewardToast);
         }
       }
     }

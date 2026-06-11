@@ -4,7 +4,8 @@ export const SHOP_ITEMS = [
   { id: 'maxhp', icon: '❤️', name: 'Міцність', desc: '+25 макс. здоров’я', price: 120, max: 4 },
   { id: 'speed', icon: '⚡', name: 'Швидкість', desc: '+10% до швидкості', price: 100, max: 3 },
   { id: 'damage', icon: '💥', name: 'Шкода', desc: '+15% до шкоди', price: 150, max: 3 },
-  { id: 'ammo', icon: '🔋', name: 'Патрони', desc: '+90 набоїв автомата', price: 40, max: Infinity },
+  { id: 'ammo', icon: '🔋', name: 'Патрони', desc: '+90 набоїв автомата і +12 дробовика', price: 40, max: Infinity },
+  { id: 'grenade', icon: '💣', name: 'Граната', desc: '+1 граната (G — кинути)', price: 35, max: Infinity },
 ];
 
 export class Shop {
@@ -93,6 +94,7 @@ export class Shop {
       case 'speed': player.speedMult = 1 + 0.1 * save.upgrades.speed; break;
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
       case 'ammo': player.addAmmo(90); break;
+      case 'grenade': player.grenades++; break;
     }
     game.audio.purchase();
     game.saveGame();

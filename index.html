@@ -50,7 +50,10 @@
     <div id="ammo">
       <div id="weapon-name">🔫 Пістолет</div>
       <div id="ammo-nums"><span id="ammo-mag">12</span><span class="ammo-sep">/</span><span id="ammo-reserve">∞</span></div>
+      <div id="grenades">💣 <span id="grenades-value">2</span> <span class="grenade-key">(G)</span></div>
     </div>
+
+    <div id="combo"></div>
 
     <div id="prompt">
       <div id="prompt-text"></div>
@@ -74,6 +77,24 @@
   <div id="vignette"></div>
   <div id="heal-glow"></div>
   <div id="fps"></div>
+
+  <!-- Мобільне керування -->
+  <div id="touch-ui">
+    <div id="joy-base"><div id="joy-knob"></div></div>
+    <div id="touch-right">
+      <button id="tb-fire" class="tb tb-big">🔫</button>
+      <button id="tb-jump" class="tb">⬆️</button>
+      <button id="tb-grenade" class="tb">💣</button>
+      <button id="tb-reload" class="tb">🔄</button>
+      <button id="tb-interact" class="tb">✋</button>
+    </div>
+    <div id="touch-top">
+      <button id="tb-weapon" class="tb tb-small">🔁</button>
+      <button id="tb-camera" class="tb tb-small">📷</button>
+      <button id="tb-shop" class="tb tb-small">🛒</button>
+      <button id="tb-pause" class="tb tb-small">⏸️</button>
+    </div>
+  </div>
 
   <!-- Оверлеї -->
   <div id="overlay-loading" class="overlay show">

@@ -8,8 +8,14 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.6, chaseSpeed: 3.0, aggro: 18, dmg: 8, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.6, chaseSpeed: 5.2, aggro: 30, dmg: 6, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.2, chaseSpeed: 2.3, aggro: 16, dmg: 18, attackR: 2.3, coins: 15, pitch: 0.55 },
+  snowman: {
+    hp: 60, speed: 1.2, chaseSpeed: 2.1, aggro: 30, dmg: 9, attackR: 2.0, coins: 10, pitch: 1.8,
+    ranged: { min: 7, max: 30, hold: 13, cd: 3.4, projSpeed: 15, dmg: 7, size: 0.22 },
+  },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.6, aggro: 999, dmg: 22, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
+
+const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 5.5, projSpeed: 19, dmg: 16, size: 0.5 };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -17,6 +23,8 @@ export class Zombies {
     this.scene = level.scene;
     this.world = level.world;
     this.rng = new RNG(seed);
+    this.diff = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
+    this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
     this.boss = null;
     this.hordeRemaining = 0;
@@ -28,15 +36,16 @@ export class Zombies {
   }
 
   spawn(type, x, z, opts = {}) {
-    const rig = type === 'boss' ? makeBoss() : makeZombie(type, this.rng);
+    const rig = type === 'boss' ? makeBoss(!!opts.frost) : makeZombie(type, this.rng);
     const stats = TYPE_STATS[type];
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
+    const hpScale = type === 'boss' ? 1 : this.diff.hp;
     const z_ = {
       rig, type, stats,
-      hp: stats.hp, maxHp: stats.hp,
+      hp: Math.round(stats.hp * hpScale), maxHp: Math.round(stats.hp * hpScale),
       x, z, y,
       state: opts.horde ? 'chase' : 'wander',
       anchor: opts.anchor || { x, z, r: 10 },
@@ -54,6 +63,11 @@ export class Zombies {
       // бос
       chargeCd: 6, charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
       summonedAt: { 70: false, 40: false },
+      frost: !!opts.frost,
+      // дальній бій (сніговики, Король Мороз)
+      ranged: stats.ranged || (opts.frost ? FROST_RANGED : null),
+      rangedCd: this.rng.range(0.5, 2.5),
+      throwProj: false,
     };
     z_.damage = (amt, dir, headshot) => this._damage(z_, amt, dir, headshot);
     this.list.push(z_);
@@ -71,7 +85,8 @@ export class Zombies {
       for (let i = 0; i < n; i++) {
         const a = this.rng.next() * 6.28;
         const r = this.rng.range(2, 9);
-        const type = this.rng.chance(0.25) ? 'runner' : 'walker';
+        let type = this.rng.chance(0.25) ? 'runner' : 'walker';
+        if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });
@@ -83,6 +98,14 @@ export class Zombies {
       { site: LAYOUT.tower, types: ['tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 101 },
       { site: LAYOUT.warehouse, types: ['tank', 'tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker', 'walker'], gid: 102 },
     ];
+    if (this.extraZombie) {
+      // у зимовій країні частина охорони — сніговики
+      guardSets[0].types[3] = this.extraZombie;
+      guardSets[1].types[4] = this.extraZombie;
+      guardSets[1].types[5] = this.extraZombie;
+      guardSets[2].types[6] = this.extraZombie;
+      guardSets[2].types[7] = this.extraZombie;
+    }
     for (const gs of guardSets) {
       gs.types.forEach((type, i) => {
         const a = (i / gs.types.length) * Math.PI * 2 + this.rng.range(-0.3, 0.3);
@@ -125,8 +148,10 @@ export class Zombies {
 
   spawnBoss(hp = null) {
     const { x, z } = LAYOUT.arena;
-    const b = this.spawn('boss', x, z - 6, { horde: false });
-    if (hp !== null) b.hp = Math.min(b.maxHp, Math.max(150, hp));
+    const cfg = (this.level.country && this.level.country.boss) || { hp: 1300, frost: false };
+    const b = this.spawn('boss', x, z - 6, { horde: false, frost: cfg.frost });
+    b.maxHp = cfg.hp;
+    b.hp = hp !== null ? Math.min(cfg.hp, Math.max(150, hp)) : cfg.hp;
     b.aggroed = true;
     b.state = 'chase';
     return b;
@@ -179,6 +204,9 @@ export class Zombies {
     if (z.state === 'dead' || z.aggroed) return;
     z.aggroed = true;
     if (z.state === 'wander') z.state = 'chase';
+    const p = this.level.player;
+    const d = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
+    if (d < 42) this.level.audio.shriek(1 - clamp(d / 42, 0, 0.85), z.stats.pitch);
   }
 
   _kill(z, dir) {
@@ -238,7 +266,12 @@ export class Zombies {
             z *= (LAYOUT.BOUND - 8) / dB;
           }
           const roll = this.rng.next();
-          const type = roll < 0.6 ? 'walker' : roll < 0.9 ? 'runner' : 'tank';
+          let type;
+          if (this.extraZombie) {
+            type = roll < 0.45 ? 'walker' : roll < 0.7 ? 'runner' : roll < 0.9 ? this.extraZombie : 'tank';
+          } else {
+            type = roll < 0.6 ? 'walker' : roll < 0.9 ? 'runner' : 'tank';
+          }
           this.spawn(type, x, z, { horde: true });
           this.hordePending--;
         }
@@ -268,6 +301,7 @@ export class Zombies {
       const dxP = px - z.x, dzP = pz - z.z;
       const distP = Math.hypot(dxP, dzP);
       const st = z.stats;
+      if (z.rangedCd > 0) z.rangedCd -= dt;
 
       // LOD: далекі неагресивні зомбі майже не оновлюємо
       if (distP > 110 && !z.aggroed) {
@@ -307,7 +341,24 @@ export class Zombies {
           z.state = 'attack';
           z.attackT = 0;
           z.didHit = false;
+          z.throwProj = false;
           setAnim(rig, 'attack');
+        } else if (z.ranged && z.rangedCd <= 0 && distP >= z.ranged.min && distP <= z.ranged.max
+          && z.telegraph <= 0 && z.charging <= 0) {
+          // кидок сніжки, якщо є пряма видимість
+          this._p0.set(z.x, z.y + z.rig.height * 0.75, z.z);
+          this._p1.set(dxP, (player.pos.y + 1.2) - (z.y + z.rig.height * 0.75), dzP).normalize();
+          const block = this.world.shotBlockDist(this._p0, this._p1, distP);
+          if (block > distP - 1.5) {
+            z.state = 'attack';
+            z.attackT = 0;
+            z.didHit = false;
+            z.throwProj = true;
+            z.rangedCd = z.ranged.cd;
+            setAnim(rig, 'attack');
+          } else {
+            z.rangedCd = 0.9;
+          }
         } else if (!z.horde && z.type !== 'boss') {
           // охоронці прив'язані до своєї точки, решта — до відстані від гравця
           const giveUp = z.guard
@@ -322,11 +373,19 @@ export class Zombies {
         z.attackT += dt / 0.55;
         if (!z.didHit && z.attackT > 0.45) {
           z.didHit = true;
-          if (playerAlive && distP < st.attackR * 1.35) {
-            player.takeDamage(st.dmg, z.x, z.z);
+          if (z.throwProj) {
+            z.throwProj = false;
+            if (playerAlive) {
+              const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
+              const target = new THREE.Vector3(px, player.pos.y + 1.25, pz);
+              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size);
+              level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
+            }
+          } else if (playerAlive && distP < st.attackR * 1.35) {
+            player.takeDamage(st.dmg * this.diff.dmg, z.x, z.z);
             level.audio.zattack(1);
             if (z.type === 'boss') {
-              level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xff6644, 5);
+              level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), z.frost ? 0x66ccff : 0xff6644, 5);
               level.audio.slam();
             }
           }
@@ -347,7 +406,8 @@ export class Zombies {
             level.bus.emit('bossSummon');
             for (let i = 0; i < 4; i++) {
               const a = (i / 4) * 6.28;
-              const mz = this.spawn(i % 2 ? 'runner' : 'walker', z.x + Math.cos(a) * 4, z.z + Math.sin(a) * 4, { horde: false });
+              const mtype = z.frost ? (i % 2 ? 'snowman' : 'walker') : (i % 2 ? 'runner' : 'walker');
+              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4, z.z + Math.sin(a) * 4, { horde: false });
               mz.aggroed = true;
               mz.state = 'chase';
             }
@@ -369,7 +429,7 @@ export class Zombies {
           z.z += z.chargeDZ * cs * dt;
           if (playerAlive && Math.hypot(px - z.x, pz - z.z) < 2.6 && !z.didHit) {
             z.didHit = true;
-            player.takeDamage(28, z.x, z.z);
+            player.takeDamage(28 * this.diff.dmg, z.x, z.z);
             level.audio.slam();
           }
           if (z.charging <= 0) {
@@ -410,6 +470,9 @@ export class Zombies {
         if (Math.hypot(z.wx - z.x, z.wz - z.z) < 1) spd = 0;
       }
       if (z.charging > 0 || z.telegraph > 0) spd = 0;
+      // сніговик тримає дистанцію і кидає сніжки (зупиняється лише в зоні кидка)
+      if (z.ranged && z.ranged.hold > 0 && z.state === 'chase'
+        && distP < z.ranged.hold && distP > Math.max(st.attackR * 1.2, z.ranged.min)) spd = 0;
 
       let moving = false;
       if (spd > 0 && targetX !== null) {

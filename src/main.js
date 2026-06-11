@@ -11,6 +11,8 @@ import { HUD } from './hud.js';
 import { Shop } from './shop.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
+import { COUNTRIES, getBiome } from './countries.js';
+import { TouchControls, isTouchDevice } from './touch.js';
 
 const SAVE_KEY = 'zr-save-v1';
 
@@ -38,11 +40,18 @@ class Game {
     this.audio = new AudioMan();
     if (this.params.has('mute') || this.testMode) this.audio.setMuted(true);
     this.save = this._loadSave();
-    if (this.params.has('fresh')) this.save = { coins: 50, upgrades: {}, liberated: {} };
+    if (this.params.has('fresh')) {
+      this.save = { coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {} };
+    }
 
     this.hud = new HUD(this);
     this.shop = new Shop(this);
     this.globe = new Globe(this);
+    this.touch = isTouchDevice() ? new TouchControls(this) : null;
+    if (this.touch) {
+      const startH2 = document.querySelector('#overlay-start h2');
+      if (startH2) startH2.textContent = '👆 ТОРКНИСЬ, ЩОБ ГРАТИ';
+    }
 
     this.state = 'loading';
     this.level = null;
@@ -117,13 +126,18 @@ class Game {
   }
 
   _loadSave() {
+    const defaults = { coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {} };
+    let out = defaults;
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (s && typeof s === 'object') {
-        return Object.assign({ coins: 50, upgrades: {}, liberated: {} }, s);
-      }
+      if (s && typeof s === 'object') out = Object.assign(defaults, s);
     } catch (e) { /* зіпсований сейв — почнемо заново */ }
-    return { coins: 50, upgrades: {}, liberated: {} };
+    // міграція: зброя за вже звільнені країни (старі сейви без weapons)
+    for (const id of Object.keys(out.liberated || {})) {
+      const w = COUNTRIES[id] && COUNTRIES[id].weaponReward;
+      if (w && !out.weapons.includes(w)) out.weapons.push(w);
+    }
+    return out;
   }
 
   saveGame() {
@@ -140,7 +154,8 @@ class Game {
     this.state = 'globe';
     this._showGlobeUI(true);
     this.renderer.setAnimationLoop(() => this._frame());
-    if (this.params.get('country') === 'UKR') this.startLevel('UKR');
+    const c = this.params.get('country');
+    if (c && COUNTRIES[c]) this.startLevel(c);
   }
 
   _showGlobeUI(show) {
@@ -158,16 +173,20 @@ class Game {
   // ---------- рівень ----------
   startLevel(countryId) {
     this._showGlobeUI(false);
+    const country = COUNTRIES[countryId] || COUNTRIES.UKR;
     const level = {
       game: this,
       countryId,
+      country,
       scene: new THREE.Scene(),
       bus: new Bus(),
-      rng: new RNG(this.seed + 1),
+      rng: new RNG(country.seed + 1),
       audio: this.audio,
       stats: { kills: 0, shotsFired: 0, shotsHit: 0, coinsEarned: 0, deaths: 0, time: 0 },
+      combo: { n: 0, t: 0, best: 0 },
+      bossDefeated: false,
     };
-    level.world = new World(level.scene, this.seed);
+    level.world = new World(level.scene, country.seed, getBiome(countryId));
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.addCoins = (n) => {
       this.save.coins += n;
@@ -181,6 +200,8 @@ class Game {
     level.player.health = level.player.maxHealth;
     level.player.speedMult = 1 + (u.speed || 0) * 0.1;
     level.player.damageMult = 1 + (u.damage || 0) * 0.15;
+    // зброя, здобута в попередніх країнах
+    for (const w of this.save.weapons) level.player.giveWeapon(w, false);
 
     level.zombies = new Zombies(level, this.seed + 2);
     level.zombies.populate();
@@ -194,17 +215,57 @@ class Game {
       } else if (type === 'medkit') {
         if (level.player.heal(30)) this.hud.toast('🩹 +30 здоров’я');
         this.audio.heal();
+      } else if (type === 'grenade') {
+        level.player.grenades++;
+        this.audio.pickup();
+        this.hud.toast('💣 +1 граната (G — кинути)');
       } else {
         level.player.addAmmo(30);
         this.audio.pickup();
-        this.hud.toast('🔋 +30 набоїв для автомата');
+        this.hud.toast('🔋 +30 набоїв');
       }
+    };
+    // вибух гранати: шкода зомбі по радіусу
+    level.effects.onExplosion = (x, y, z, r) => {
+      for (const zb of [...level.zombies.list]) {
+        if (zb.state === 'dead') continue;
+        const d = Math.hypot(zb.x - x, zb.z - z);
+        if (d < r) {
+          const dmg = Math.round(135 * (1 - (d / r) * 0.55) * level.player.damageMult);
+          level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          zb.damage(dmg, null, false);
+        }
+      }
+      const pd = Math.hypot(level.player.pos.x - x, level.player.pos.z - z);
+      if (pd < r + 3) level.player.camShake = Math.max(level.player.camShake, 1.2);
+    };
+    // сніжки сніговиків
+    level.effects.onProjectileHit = (dmg, x, z) => {
+      level.player.takeDamage(dmg, x, z);
     };
 
     this.hud.wire(level.bus);
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('bossDied', () => this._onBossDied());
     level.bus.on('hordeEnd', () => level.addCoins(60));
+    // комбо за серії вбивств
+    level.bus.on('zombieKilled', () => {
+      if (level.bossDefeated) return; // «здача» після перемоги не рахується
+      const c = level.combo;
+      c.n++;
+      c.t = 3.2;
+      if (c.n > c.best) c.best = c.n;
+      if (c.n >= 3) this.hud.comboPop(c.n);
+      if (c.n % 5 === 0) {
+        const bonus = c.n * 2;
+        level.addCoins(bonus);
+        this.audio.comboDing(c.n / 5);
+        this.hud.toast(`🔥 КОМБО x${c.n}! +${bonus} монет`);
+      }
+    });
+    level.bus.on('bossStart', () => {
+      document.getElementById('boss-name').textContent = country.boss.name;
+    });
 
     this.level = level;
     this.state = 'level';
@@ -218,7 +279,17 @@ class Game {
     } else {
       this._showOverlay('overlay-start');
     }
-    this.hud.banner('🇺🇦 УКРАЇНА', 'Виконай 3 завдання і переможи БОСА! (Shift — біг)', 4.5);
+    this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, country.banner, 4.5);
+  }
+
+  // нагорода-зброя за країну: видається і запам'ятовується назавжди
+  unlockWeapon(id) {
+    if (!this.level) return;
+    this.level.player.giveWeapon(id);
+    if (!this.save.weapons.includes(id)) {
+      this.save.weapons.push(id);
+      this.saveGame();
+    }
   }
 
   endLevel() {
@@ -288,19 +359,37 @@ class Game {
     // якщо гравця встигли вдарити в момент перемоги — скасовуємо смерть
     this.deathT = -1;
     this._hideOverlay('overlay-death');
-    this.save.liberated.UKR = true;
+    const country = this.level.country;
+    this.save.liberated[country.id] = true;
+    const s = this.level.stats;
+    // рекорди країни
+    const prev = this.save.records[country.id];
+    const isRecord = !prev || s.time < prev.time;
+    if (isRecord) {
+      this.save.records[country.id] = {
+        time: Math.round(s.time), kills: s.kills, deaths: s.deaths,
+        combo: this.level.combo.best,
+      };
+    }
     this.saveGame();
     this.globe.setLiberated();
     this.input.exitLock();
-    const s = this.level.stats;
     const mins = Math.floor(s.time / 60);
     const secs = Math.floor(s.time % 60);
     const acc = s.shotsFired > 0 ? Math.round((s.shotsHit / s.shotsFired) * 100) : 0;
+    document.querySelector('#overlay-victory h1').textContent = country.victoryTitle;
+    document.querySelector('.victory-sub').textContent = `Ти переміг боса «${country.boss.name.replace('👑 ', '')}» і врятував країну!`;
+    const recBadge = isRecord && prev ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+    const bestLine = prev && !isRecord
+      ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд часу</span><span class="stat-val">${Math.floor(prev.time / 60)}:${String(prev.time % 60).padStart(2, '0')}</span></div>`
+      : '';
     document.getElementById('victory-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Час</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Час${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${bestLine}
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${s.kills}</span></div>
+      <div class="stat"><span class="stat-icon">🔥</span><span class="stat-name">Найкраще комбо</span><span class="stat-val">x${this.level.combo.best}</span></div>
       <div class="stat"><span class="stat-icon">🎯</span><span class="stat-name">Точність</span><span class="stat-val">${acc}%</span></div>
-      <div class="stat"><span class="stat-icon">🪙</span><span class="stat-name">Монет здобуто</span><span class="stat-val">${s.coinsEarned}</span></div>
+      <div class="stat"><span class="stat-icon">💰</span><span class="stat-name">Монет здобуто</span><span class="stat-val">${s.coinsEarned}</span></div>
       <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">Смертей</span><span class="stat-val">${s.deaths}</span></div>`;
     // конфеті
     const conf = document.getElementById('confetti');
@@ -355,13 +444,19 @@ class Game {
       const blocked = this.paused || this.shop.isOpen || this.victoryShown;
       if (!blocked) {
         const alive = this.level.player.health > 0;
-        const allowControl = (this.input.locked || this.testMode) && this.deathT < 0 && alive;
+        const allowControl = (this.input.locked || this.testMode || this.input.touchMode)
+          && this.deathT < 0 && alive;
         this.level.player.update(dt, this.input, allowControl);
         this.level.zombies.update(dt);
         this.level.missions.update(dt, this.input, allowControl);
         this.level.world.update(dt, this.level.player.pos);
         this.level.effects.update(dt);
         this.level.stats.time += dt;
+        // комбо згасає без вбивств
+        if (this.level.combo.t > 0) {
+          this.level.combo.t -= dt;
+          if (this.level.combo.t <= 0) this.level.combo.n = 0;
+        }
         this._updateMusic(dt);
         // відлік смерті
         if (this.deathT >= 0) {
@@ -420,6 +515,10 @@ class Game {
         state: g.state,
         coins: g.save.coins,
         fps: g.fps,
+        country: g.level ? g.level.countryId : null,
+        grenades: g.level ? g.level.player.grenades : 0,
+        combo: g.level ? g.level.combo.n : 0,
+        liberated: Object.keys(g.save.liberated),
         player: g.level ? {
           x: g.level.player.pos.x, y: g.level.player.pos.y, z: g.level.player.pos.z,
           health: g.level.player.health, weapons: g.level.player.weapons, cur: g.level.player.cur,
@@ -469,6 +568,8 @@ class Game {
       god: () => { g.level.player.respawnProtect = 1e9; },
       giveCoins: (n) => g.level.addCoins(n),
       giveRifle: () => g.level.player.giveRifle(),
+      giveWeapon: (id) => g.unlockWeapon(id),
+      throwGrenade: () => g.level.player.throwGrenade(),
       killZombiesNear: (x, z, r) => {
         for (const zb of [...g.level.zombies.list]) {
           if (zb.state !== 'dead' && Math.hypot(zb.x - x, zb.z - z) < r) {

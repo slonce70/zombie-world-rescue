@@ -272,6 +272,81 @@ body.in-level #hud { display: block; }
   100% { transform: translateY(105vh) rotate(640deg); }
 }
 
+/* гранати */
+#grenades {
+  margin-top: 4px; color: #cfe8ff; font-weight: 800; font-size: 17px;
+  text-shadow: 0 2px 4px rgba(0,0,0,.8);
+}
+#grenades.none { opacity: 0.45; }
+.grenade-key { color: #8aa3be; font-size: 13px; }
+
+/* комбо */
+#combo {
+  position: absolute; left: 50%; top: 35%; transform: translateX(-50%);
+  color: #ffd23f; font-weight: 900; font-size: 34px; opacity: 0;
+  text-shadow: 0 3px 0 rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+#combo.show { opacity: 1; }
+#combo.pop { animation: combo-pop .25s ease-out; }
+@keyframes combo-pop {
+  0% { transform: translateX(-50%) scale(1.6); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+.record-badge { color: #ffd23f; font-size: 12px; font-weight: 900; margin-left: 6px; }
+.stat.best { background: rgba(255, 210, 63, 0.12); }
+
+/* ================= МОБІЛЬНЕ КЕРУВАННЯ ================= */
+#touch-ui { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 15; }
+#joy-base {
+  display: none; position: fixed; width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.35);
+  pointer-events: none;
+}
+#joy-knob {
+  position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(255,255,255,0.55); box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+#touch-right {
+  position: fixed; right: 14px; bottom: 104px; display: flex; flex-direction: column;
+  gap: 10px; align-items: center; pointer-events: auto;
+}
+/* на тач-пристроях блок зброї зсувається лівіше від кнопок (поза media query) */
+body.touch-mode #ammo { right: 116px; bottom: 14px; }
+body.touch-mode #health { bottom: 14px; left: 12px; }
+#touch-top {
+  position: fixed; right: 14px; top: 235px; display: flex; flex-direction: column;
+  gap: 8px; pointer-events: auto;
+}
+.tb {
+  width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(18, 30, 46, 0.55); font-size: 24px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+}
+.tb.tb-big { width: 84px; height: 84px; font-size: 36px; background: rgba(200, 60, 50, 0.5); border-color: rgba(255,150,130,0.6); }
+.tb.tb-small { width: 46px; height: 46px; font-size: 18px; }
+.tb.active { filter: brightness(1.6); transform: scale(0.93); }
+
+/* компактний HUD на малих екранах */
+@media (max-width: 900px), (max-height: 560px) {
+  #mission-panel { min-width: 180px; max-width: 230px; padding: 8px 10px; }
+  .mission { font-size: 11.5px; padding: 2px 0; }
+  .panel-title { font-size: 10px; margin-bottom: 4px; }
+  #minimap { width: 120px; height: 120px; }
+  #coins { font-size: 16px; padding: 5px 12px; }
+  #health { width: 190px; }
+  #health-bar { height: 18px; }
+  #ammo-nums { font-size: 30px; }
+  #ammo-reserve { font-size: 20px; }
+  #weapon-name { font-size: 13px; }
+  #grenades { font-size: 13px; }
+  #banner-title { font-size: 26px; }
+  #banner-sub { font-size: 14px; }
+  .overlay-card { padding: 20px 22px; }
+  .controls-grid { font-size: 12px; gap: 5px 14px; margin-top: 14px; }
+}
+
 /* ================= МАГАЗИН ================= */
 .shop-card { width: min(680px, 94vw); }
 .shop-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
