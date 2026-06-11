@@ -52,7 +52,7 @@ export const COUNTRIES = {
     weaponReward: 'rifle',
     weaponRewardToast: 'Ти отримав АВТОМАТ! Клавіша 2 — перемкнути зброю 🔥',
     extraZombie: null,
-    boss: { name: '👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ', hp: 1300, frost: false },
+    boss: { name: '👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ', hp: 1800, frost: false },
     banner: 'Виконай 3 завдання і переможи БОСА! (Shift — біг)',
   },
   POL: {
@@ -65,7 +65,7 @@ export const COUNTRIES = {
     weaponReward: 'shotgun',
     weaponRewardToast: 'Ти отримав ДРОБОВИК! Клавіша 3 — зброя для ближнього бою 💥',
     extraZombie: 'snowman',
-    boss: { name: '👑 КОРОЛЬ МОРОЗ', hp: 1800, frost: true },
+    boss: { name: '👑 КОРОЛЬ МОРОЗ', hp: 2400, frost: true },
     banner: 'Зима, сніговики-зомбі та КОРОЛЬ МОРОЗ. Вперед! ❄️',
   },
 };

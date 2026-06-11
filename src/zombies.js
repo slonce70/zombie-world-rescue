@@ -5,17 +5,17 @@ import { makeZombie, makeBoss, updateRig, setAnim, toonMat } from './characters.
 import { clamp, dampAngle, closestRaySeg, RNG } from './utils.js';
 
 const TYPE_STATS = {
-  walker: { hp: 70, speed: 1.6, chaseSpeed: 3.0, aggro: 18, dmg: 8, attackR: 1.8, coins: 5, pitch: 1.0 },
-  runner: { hp: 45, speed: 2.6, chaseSpeed: 5.2, aggro: 30, dmg: 6, attackR: 1.7, coins: 8, pitch: 1.5 },
-  tank: { hp: 230, speed: 1.2, chaseSpeed: 2.3, aggro: 16, dmg: 18, attackR: 2.3, coins: 15, pitch: 0.55 },
+  walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
+  runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
+  tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
   snowman: {
-    hp: 60, speed: 1.2, chaseSpeed: 2.1, aggro: 30, dmg: 9, attackR: 2.0, coins: 10, pitch: 1.8,
-    ranged: { min: 7, max: 30, hold: 13, cd: 3.4, projSpeed: 15, dmg: 7, size: 0.22 },
+    hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
+    ranged: { min: 7, max: 30, hold: 13, cd: 3.0, projSpeed: 16, dmg: 9, size: 0.22 },
   },
-  boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.6, aggro: 999, dmg: 22, attackR: 3.6, coins: 0, pitch: 0.4 },
+  boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
-const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 5.5, projSpeed: 19, dmg: 16, size: 0.5 };
+const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 4.5, projSpeed: 20, dmg: 18, size: 0.5 };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -62,8 +62,8 @@ export class Zombies {
       groupId: opts.groupId ?? -1,
       gone: false,
       // бос
-      chargeCd: 6, charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
-      summonedAt: { 70: false, 40: false },
+      chargeCd: 4, charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
+      summonedAt: { 75: false, 50: false, 25: false },
       frost: !!opts.frost,
       // дальній бій (сніговики, Король Мороз)
       ranged: stats.ranged || (opts.frost ? FROST_RANGED : null),
@@ -489,15 +489,15 @@ export class Zombies {
       // --- бос: чардж і призов ---
       if (z.type === 'boss' && z.state !== 'dead') {
         const frac = (z.hp / z.maxHp) * 100;
-        for (const thr of [70, 40]) {
+        for (const thr of [75, 50, 25]) {
           if (frac <= thr && !z.summonedAt[thr]) {
             z.summonedAt[thr] = true;
             level.audio.bossRoar();
             level.bus.emit('bossSummon');
-            for (let i = 0; i < 4; i++) {
-              const a = (i / 4) * 6.28;
-              const mtype = z.frost ? (i % 2 ? 'snowman' : 'walker') : (i % 2 ? 'runner' : 'walker');
-              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4, z.z + Math.sin(a) * 4, { horde: false });
+            for (let i = 0; i < 6; i++) {
+              const a = (i / 6) * 6.28;
+              const mtype = z.frost ? (i % 2 ? 'snowman' : 'walker') : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5, { horde: false });
               mz.aggroed = true;
               mz.state = 'chase';
             }
@@ -519,12 +519,12 @@ export class Zombies {
           z.z += z.chargeDZ * cs * dt;
           if (playerAlive && Math.hypot(px - z.x, pz - z.z) < 2.6 && !z.didHit) {
             z.didHit = true;
-            player.takeDamage(28 * this.diff.dmg, z.x, z.z);
+            player.takeDamage(34 * this.diff.dmg, z.x, z.z);
             level.audio.slam();
           }
           if (z.charging <= 0) {
             z.didHit = false;
-            z.chargeCd = this.rng.range(6, 9);
+            z.chargeCd = this.rng.range(4.5, 7);
           }
         } else if (z.chargeCd <= 0 && distP > 7 && distP < 32 && z.state === 'chase') {
           z.telegraph = 0.8;
@@ -532,7 +532,7 @@ export class Zombies {
           level.audio.chargeWarn();
           level.bus.emit('bossCharge');
         }
-        const enraged = frac < 25;
+        const enraged = frac < 35;
         if (enraged) z.enraged = true;
         // ліш: бос не покидає околиці арени — повертається і лікується
         const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);

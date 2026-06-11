@@ -153,7 +153,7 @@ await page.evaluate(() => {
 await waitFor(async () => (await state()).bossStarted, 15000, 'бос стартував');
 s = await state();
 check(s.bossStarted, 'бій з Королем Морозом почався');
-check(s.bossHp === 1800, `HP Мороза: ${s.bossHp}`);
+check(s.bossHp === 2400, `HP Мороза: ${s.bossHp}`);
 const bossName = await page.evaluate(() => document.getElementById('boss-name').textContent);
 check(bossName.includes('МОРОЗ'), `ім'я боса на екрані: "${bossName}"`);
 await page.screenshot({ path: 'shots/u2-frost-boss.png' });
@@ -174,8 +174,8 @@ const bossThrew = await waitFor(async () => {
   });
 }, 90000, 'сніжка боса');
 check(bossThrew, 'Мороз кидає великі сніжки');
-// просаджуємо до 65% — має прикликати сніговиків
-await page.evaluate(() => window.__game.test.damageBoss(700));
+// просаджуємо до ~70% — має прикликати сніговиків (поріг 75%)
+await page.evaluate(() => window.__game.test.damageBoss(750));
 await page.waitForTimeout(4000);
 const minions = await page.evaluate(() => {
   const a = window.__game.level.world.layout.arena;

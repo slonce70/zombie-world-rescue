@@ -9,9 +9,9 @@ export class Missions {
     this.level = level;
     this.L = level.world.layout;
     this.missions = [
-      { id: 'rescue', icon: '🆘', title: 'Врятуй людей у хліві', state: 'active', color: 0x4cff7a, reward: 80, horde: 12 },
-      { id: 'tower', icon: '📡', title: 'Полагодь радіовежу', state: 'active', color: 0x44ccff, reward: 100, horde: 16 },
-      { id: 'warehouse', icon: '📦', title: 'Зачисть склад зброї', state: 'active', color: 0xffaa33, reward: 120, horde: 18 },
+      { id: 'rescue', icon: '🆘', title: 'Врятуй людей у хліві', state: 'active', color: 0x4cff7a, reward: 80, horde: 15 },
+      { id: 'tower', icon: '📡', title: 'Полагодь радіовежу', state: 'active', color: 0x44ccff, reward: 100, horde: 20 },
+      { id: 'warehouse', icon: '📦', title: 'Зачисть склад зброї', state: 'active', color: 0xffaa33, reward: 120, horde: 24 },
     ];
     this.beams = {};
     const eff = level.effects;

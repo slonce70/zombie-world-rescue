@@ -113,7 +113,7 @@ await waitFor(async () => (await state()).player.health > 0, 35000, 'відро�
 await page.evaluate(() => window.__game.test.teleport(-10, -168));
 await waitFor(async () => (await state()).bossStarted, 10000, 'бос вдруге');
 s = await state();
-check(s.bossStarted && s.bossHp !== null && s.bossHp <= 900, `бос повернувся з запам'ятованим HP: ${s.bossHp}`);
+check(s.bossStarted && s.bossHp !== null && s.bossHp <= 1400, `бос повернувся з запам'ятованим HP: ${s.bossHp}`);
 
 // === 4. Пауза ===
 console.log('▸ Пауза');

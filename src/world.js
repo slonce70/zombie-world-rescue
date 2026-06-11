@@ -325,7 +325,8 @@ export class World {
     return d;
   }
 
-  // верх підлоги/даху в точці; обирається найвища поверхня, до якої можна "дотягтись" з висоти y
+  // верх підлоги/даху в точці; обирається найвища поверхня, до якої можна "дотягтись" з висоти y.
+  // Дахи зі схилом (slope) — висота росте до гребеня, як у справжнього даху.
   floorAt(x, z, y = 1.5) {
     let best = -Infinity;
     for (const f of this.floors) {
@@ -334,7 +335,10 @@ export class World {
       const lx = c * dx - s * dz;
       const lz = s * dx + c * dz;
       if (Math.abs(lx) < f.w / 2 && Math.abs(lz) < f.d / 2) {
-        if (f.top <= y + 1.0 && f.top > best) best = f.top;
+        const top = f.slope
+          ? f.top + f.slope * (1 - Math.abs(lz) / (f.d / 2))
+          : f.top;
+        if (top <= y + 1.0 && top > best) best = top;
       }
     }
     return best;
@@ -718,7 +722,7 @@ export class World {
 
   // ---------- будинки ----------
   _prismGeo(w, h, d) {
-    // двосхилий дах: гребінь уздовж X
+    // двосхилий дах: гребінь уздовж X (фронтони — нормалями назовні!)
     const hw = w / 2, hd = d / 2;
     const verts = [
       // передній схил (z-)
@@ -727,9 +731,10 @@ export class World {
       // задній схил
       hw, 0, hd, -hw, 0, hd, -hw, h, 0,
       hw, 0, hd, -hw, h, 0, hw, h, 0,
-      // фронтони
-      hw, 0, -hd, hw, 0, hd, hw, h, 0,
-      -hw, 0, hd, -hw, 0, -hd, -hw, h, 0,
+      // фронтон +X (CCW, якщо дивитись з +X)
+      hw, 0, hd, hw, 0, -hd, hw, h, 0,
+      // фронтон -X (CCW, якщо дивитись з -X)
+      -hw, 0, -hd, -hw, 0, hd, -hw, h, 0,
     ];
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
@@ -881,8 +886,8 @@ export class World {
     this.staticGroup.add(g);
     const floorTop = gy + 0.51;
     this.floors.push({ x, z, ry, w: w + 0.5, d: d + 0.5, top: floorTop });
-    // дах — теж поверхня: туди закидає батут, там скарби
-    this.floors.push({ x, z, ry, w: w * 0.9, d: d * 0.9, top: gy + h + 0.56 });
+    // дах — теж поверхня зі схилом: ходиться як по справжньому даху
+    this.floors.push({ x, z, ry, w: w + 0.7, d: d + 0.7, top: gy + 0.46 + h, slope: h * 0.5 });
 
     // колайдери стін (повертаємо локальні координати на ry)
     const top = gy + h + 0.5;
@@ -1064,21 +1069,29 @@ export class World {
     const addFenceRun = (x1, z1, x2, z2) => {
       const len = Math.hypot(x2 - x1, z2 - z1);
       const n = Math.floor(len / 0.55);
+      const heights = [];
       for (let i = 0; i <= n; i++) {
         const t = i / n;
         const fx = lerp(x1, x2, t), fz = lerp(z1, z2, t);
         const fy = this.groundH(fx, fz);
+        heights.push([fx, fz, fy]);
         const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 0.04), fenceM);
         p.position.set(fx, fy + 0.37, fz);
         p.rotation.y = Math.atan2(z2 - z1, x2 - x1);
         this.staticGroup.add(p);
       }
+      // поперечина сегментами між сусідніми стовпчиками — повторює терен, не косить
       const ry = Math.atan2(z2 - z1, x2 - x1);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.07, 0.05), fenceM);
-      const my = this.groundH((x1 + x2) / 2, (z1 + z2) / 2);
-      rail.position.set((x1 + x2) / 2, my + 0.55, (z1 + z2) / 2);
-      rail.rotation.y = -ry;
-      this.staticGroup.add(rail);
+      for (let i = 0; i < n; i++) {
+        const [ax, az, ah] = heights[i];
+        const [bx, bz, bh] = heights[i + 1];
+        const segLen = Math.hypot(bx - ax, bz - az, bh - ah);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(segLen + 0.06, 0.07, 0.05), fenceM);
+        rail.position.set((ax + bx) / 2, (ah + bh) / 2 + 0.55, (az + bz) / 2);
+        rail.rotation.y = -ry;
+        rail.rotation.z = Math.atan2(bh - ah, Math.hypot(bx - ax, bz - az));
+        this.staticGroup.add(rail);
+      }
     };
     addFenceRun(12, 35, 12, 45); addFenceRun(12, 45, 25, 45); addFenceRun(25, 45, 25, 35);
     addFenceRun(-20, 25, -20, 36); addFenceRun(-20, 36, -9, 36);
@@ -1685,8 +1698,8 @@ export class World {
     this._addCollider(x - 5, z, 4.7, gy + H, 4.7);
     this._addCollider(x, z, 4.7, gy + H, 4.7);
     this._addCollider(x + 5, z, 4.7, gy + H, 4.7);
-    // дах ангара — посадковий майданчик для батута
-    this.floors.push({ x, z, ry: 0, w: W - 2, d: D - 2, top: gy + H + 0.25 });
+    // дах ангара — посадковий майданчик для батута (зі схилом)
+    this.floors.push({ x, z, ry: 0, w: W + 0.8, d: D + 0.8, top: gy + H, slope: 1.6 });
 
     // ящики навколо
     const crateM = toonMat(0xb08d57);
