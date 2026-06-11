@@ -181,6 +181,39 @@ export class AudioMan {
     this._osc('square', crit ? 1500 : 1000, t, 0.05, 0.18, crit ? 2200 : 1200);
   }
 
+  // 🛡 дзвін щита: куля відскочила
+  clang() {
+    if (!this.ctx || (this._clangCd || 0) > this.t) return;
+    this._clangCd = this.t + 0.06;
+    const t = this.t;
+    this._osc('square', 2200, t, 0.07, 0.16, 1400);
+    this._noise(t, 0.05, 0.18, 'highpass', 4000, 2);
+  }
+
+  // 💥 щит розлетівся
+  shieldBreak() {
+    const t = this.t;
+    this._noise(t, 0.35, 0.5, 'bandpass', 2400, 1.5, 500);
+    this._osc('square', 900, t, 0.18, 0.3, 220);
+    this._osc('sawtooth', 320, t + 0.08, 0.3, 0.3, 90);
+  }
+
+  // 🚀 пуск ракети
+  rocket() {
+    const t = this.t;
+    this._noise(t, 0.5, 0.5, 'lowpass', 2200, 1, 300);
+    this._osc('sawtooth', 130, t, 0.45, 0.4, 60);
+  }
+
+  // ✨ підняв підсилення
+  powerup() {
+    const t = this.t;
+    [67, 72, 76, 79, 84].forEach((m, i) => {
+      this._osc('square', midi(m), t + i * 0.06, 0.14, 0.16);
+      this._osc('triangle', midi(m + 12), t + i * 0.06, 0.12, 0.1);
+    });
+  }
+
   zgroan(vol = 1, pitch = 1) {
     if (!this.ctx || this._groanCd > this.t) return;
     this._groanCd = this.t + 0.25;

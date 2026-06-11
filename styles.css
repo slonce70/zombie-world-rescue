@@ -102,6 +102,27 @@ body.in-level #hud { display: block; }
 
 /* здоров'я */
 #health { position: absolute; left: 18px; bottom: 18px; width: 290px; }
+/* броня */
+#armor-bar {
+  display: none; height: 12px; margin-bottom: 5px;
+  background: rgba(0,0,0,.55); border: 2px solid var(--ui-border);
+  border-radius: 8px; overflow: hidden;
+}
+#armor-fill {
+  height: 100%; width: 100%; border-radius: 6px;
+  background: linear-gradient(180deg, #9fd8ff, #4a8ad4);
+  transition: width .25s ease;
+}
+/* активні бафи */
+#buffs { display: flex; gap: 8px; margin-bottom: 6px; }
+.buff {
+  display: flex; align-items: center; gap: 3px; padding: 3px 9px;
+  background: rgba(0,0,0,.55); border: 2px solid var(--ui-border); border-radius: 12px;
+  animation: buff-pop .25s ease;
+}
+.buff-icon { font-size: 17px; }
+.buff-t { color: #ffd23f; font-weight: 900; font-size: 14px; }
+@keyframes buff-pop { from { transform: scale(0.6); } to { transform: scale(1); } }
 #health-bar {
   height: 26px; background: rgba(0,0,0,.55); border: 2px solid var(--ui-border);
   border-radius: 14px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.4);
@@ -388,7 +409,7 @@ body.touch-mode #health { bottom: 14px; left: 12px; }
 }
 
 /* ================= МАГАЗИН ================= */
-.shop-card { width: min(680px, 94vw); }
+.shop-card { width: min(940px, 96vw); max-width: min(940px, 96vw); }
 .shop-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .shop-balance { font-size: 24px; font-weight: 900; color: var(--accent); }
 .btn-x {
@@ -397,8 +418,14 @@ body.touch-mode #health { bottom: 14px; left: 12px; }
 }
 .btn-x:hover { background: rgba(255, 90, 90, 0.5); }
 #shop-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px; margin-top: 22px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px; margin-top: 12px;
+  max-height: min(64vh, 620px); overflow-y: auto; padding-right: 6px;
+}
+.shop-cat {
+  grid-column: 1 / -1; text-align: left; color: var(--accent);
+  font-weight: 900; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;
+  margin-top: 6px; border-bottom: 1px solid var(--ui-border); padding-bottom: 4px;
 }
 .shop-item {
   background: rgba(255,255,255,0.07); border: 2px solid var(--ui-border);

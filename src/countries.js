@@ -1,6 +1,8 @@
 // Конфігурація країн кампанії: біоми, карти, складність, нагороди, боси
 import ukraineMap from './maps/ukraine.js';
 import polandMap from './maps/poland.js';
+import germanyMap from './maps/germany.js';
+import franceMap from './maps/france.js';
 
 export const BIOMES = {
   summer: {
@@ -39,6 +41,45 @@ export const BIOMES = {
     lampGlow: 1.5,
     signText: 'СЕЛО ЗИМОВЕ',
   },
+  // 🍂 золота осінь Німеччини
+  autumnGold: {
+    skyTop: 0x4a8fd4, skyHorizon: 0xffe3b8, skyBottom: 0xc9b894,
+    fogColor: 0xe8d9bc, fogNear: 115, fogFar: 400,
+    hemiSky: 0xe8dcc4, hemiGround: 0x9a7a48, hemiIntensity: 0.95,
+    sunColor: 0xffe8c2, sunIntensity: 1.7, sunPos: [90, 85, 60],
+    sunDisc: 0xffdf9e, sunDiscPos: [380, 300, 260],
+    grass1: 0xa8a23e, grass2: 0x8a8a34, grass3: 0xc2b04a,
+    dirt: 0x9a8058, plaza: 0xb0a080, arenaGround: 0x948872,
+    roadMain: 0x8a8076, roadEdge: 0x5f584e,
+    treeGreens: [0xe89a3a, 0xd8742f, 0xc9582c, 0xe2b03d, 0xb85c38],
+    pineGreens: [0x3e6e44, 0x4a7a50, 0x35603c],
+    pineRatio: 0.3, snow: false, snowfall: false, leaffall: true,
+    housePalette: [0xf2ead8, 0xe8dcc4, 0xf5efe0, 0xddd0b8, 0xe8e0cc],
+    roofPalette: [0x6b4a3a, 0x4a3a35, 0x7a4530, 0x5a4a40],
+    flowers: false, hay: true,
+    lampGlow: 0.9,
+    signText: 'МІСТО ЗОЛОТЕ',
+    timber: true, // фахверкові балки на будинках
+  },
+  // 💜 лавандовий Прованс
+  provence: {
+    skyTop: 0x5a9ee8, skyHorizon: 0xffd9c2, skyBottom: 0xc2b8d4,
+    fogColor: 0xe8d4e0, fogNear: 125, fogFar: 420,
+    hemiSky: 0xe8d8e8, hemiGround: 0x8a9a58, hemiIntensity: 0.9,
+    sunColor: 0xffe2cc, sunIntensity: 1.75, sunPos: [80, 95, 55],
+    sunDisc: 0xffd9ad, sunDiscPos: [350, 360, 250],
+    grass1: 0x8ab84a, grass2: 0x6e9e3c, grass3: 0xa8c95a,
+    dirt: 0xb09a72, plaza: 0xc4ae88, arenaGround: 0x9a8e78,
+    roadMain: 0xb0a084, roadEdge: 0x837456,
+    treeGreens: [0x5fae4a, 0x74bd52, 0x8a9a40, 0x6e8a3a, 0x57b83e],
+    pineGreens: [0x4a7a44, 0x3e6e3c, 0x55864c],
+    pineRatio: 0.25, snow: false, snowfall: false,
+    housePalette: [0xf5e2c8, 0xf7d6c2, 0xe8e0d0, 0xd6e0f0, 0xf2e8d4],
+    roofPalette: [0xc0704a, 0xb05e3e, 0xa85636, 0x99553f],
+    flowers: true, hay: false,
+    lampGlow: 0.8,
+    signText: 'МІСТЕЧКО ЛАВАНДОВЕ',
+  },
 };
 
 export const COUNTRIES = {
@@ -52,8 +93,10 @@ export const COUNTRIES = {
     weaponReward: 'rifle',
     weaponRewardToast: 'Ти отримав АВТОМАТ! Клавіша 2 — перемкнути зброю 🔥',
     extraZombie: null,
-    boss: { name: '👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ', hp: 1800, frost: false },
+    shieldGuards: 2,
+    boss: { name: '👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ', hp: 1800, frost: false, style: 'king' },
     banner: 'Виконай 3 завдання і переможи БОСА! (Shift — біг)',
+    food: 'вареник',
   },
   POL: {
     id: 'POL', name: 'Польща', flag: '🇵🇱', seed: 2025,
@@ -65,12 +108,44 @@ export const COUNTRIES = {
     weaponReward: 'shotgun',
     weaponRewardToast: 'Ти отримав ДРОБОВИК! Клавіша 3 — зброя для ближнього бою 💥',
     extraZombie: 'snowman',
-    boss: { name: '👑 КОРОЛЬ МОРОЗ', hp: 2400, frost: true },
+    shieldGuards: 3,
+    boss: { name: '👑 КОРОЛЬ МОРОЗ', hp: 2400, frost: true, style: 'frost' },
     banner: 'Зима, сніговики-зомбі та КОРОЛЬ МОРОЗ. Вперед! ❄️',
+    food: 'пончик',
+  },
+  DEU: {
+    id: 'DEU', name: 'Німеччина', flag: '🇩🇪', seed: 4040,
+    lat: 51.2, lon: 10.4,
+    victoryTitle: '🇩🇪 НІМЕЧЧИНУ ЗВІЛЬНЕНО!',
+    biome: 'autumnGold',
+    map: germanyMap,
+    difficulty: { hp: 1.55, dmg: 1.35, counts: 1.35 },
+    weaponReward: 'smg',
+    weaponRewardToast: 'Ти отримав ШВИДКОСТРІЛ! Клавіша 4 — злива куль 🌀',
+    extraZombie: 'shield',
+    shieldGuards: 4,
+    boss: { name: '👑 ЗАЛІЗНИЙ БАРОН', hp: 3200, frost: false, style: 'iron' },
+    banner: 'Золота осінь, автобан і армія щитоносців. Цілься в спину! 🛡️',
+    food: 'брецель',
+  },
+  FRA: {
+    id: 'FRA', name: 'Франція', flag: '🇫🇷', seed: 5050,
+    lat: 46.6, lon: 2.4,
+    victoryTitle: '🇫🇷 ФРАНЦІЮ ЗВІЛЬНЕНО!',
+    biome: 'provence',
+    map: franceMap,
+    difficulty: { hp: 1.8, dmg: 1.5, counts: 1.45 },
+    weaponReward: 'sniper',
+    weaponRewardToast: 'Ти отримав СНАЙПЕРКУ! Клавіша 6 — пробиває трьох наскрізь 🎯',
+    extraZombie: 'spitter',
+    shieldGuards: 3,
+    boss: { name: '👑 ШЕФ БАГЕТ', hp: 4200, frost: false, style: 'chef' },
+    banner: 'Лаванда, вежа до неба і ШЕФ БАГЕТ. Стережись черствих багетів! 🥖',
+    food: 'круасан',
   },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;

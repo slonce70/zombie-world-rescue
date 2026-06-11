@@ -58,11 +58,15 @@ export class Effects {
     // кільця (слем боса)
     this.rings = [];
 
-    // снаряди ворогів (сніжки)
+    // снаряди ворогів (сніжки, отрута, багети)
     this.projectiles = [];
     this.projGeo = new THREE.SphereGeometry(1, 8, 6);
     this.projMat = toonMat(0xf4f9ff);
     this.onProjectileHit = null; // (dmg, x, z) => {}
+
+    // 🚀 ракети гравця
+    this.rockets = [];
+    this.onWeaponFound = null; // (id) => {}
 
     // гранати
     this.grenadesLive = [];
@@ -139,7 +143,7 @@ export class Effects {
     if (b.hp <= 0) b.fuse = 0.1;
   }
 
-  _explodeAt(pos, radius = 5.5) {
+  _explodeAt(pos, radius = 5.5, dmg = 135) {
     this.burst(pos, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
     this.burst(pos, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
     this.ring(pos, 0xffaa44, radius + 0.5);
@@ -147,7 +151,7 @@ export class Effects {
     this.flashLight.intensity = 30;
     this.flashT = 0.12;
     this.audio.explosion();
-    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius);
+    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg);
     // ланцюгова реакція бочок
     if (this.barrels) {
       for (const ob of this.barrels) {
@@ -275,16 +279,36 @@ export class Effects {
     }
   }
 
-  spawnProjectile(from, target, speed, dmg, size = 0.22) {
-    const m = new THREE.Mesh(this.projGeo, this.projMat);
+  spawnProjectile(from, target, speed, dmg, size = 0.22, color = null) {
+    const m = new THREE.Mesh(this.projGeo, color ? toonMat(color) : this.projMat);
     m.scale.setScalar(size);
+    if (color === 0xd9a35e) m.scale.set(size * 0.45, size * 0.45, size * 1.9); // 🥖 багет — довгий
     m.position.copy(from);
     const v = target.clone().sub(from);
     const d = v.length();
     v.normalize().multiplyScalar(speed);
     v.y += d * 0.12; // легка дуга
+    if (color === 0xd9a35e) m.lookAt(target);
     this.scene.add(m);
-    this.projectiles.push({ mesh: m, v, dmg, size, life: 4 });
+    this.projectiles.push({ mesh: m, v, dmg, size, life: 4, color: color || 0xf4f9ff, spin: color === 0xd9a35e });
+  }
+
+  // 🚀 ракета базуки: летить прямо, вибухає від першого дотику
+  spawnRocket(from, dir, dmg) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), toonMat(0x6b7a4a));
+    body.rotation.x = Math.PI / 2;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 8), toonMat(0xd84f4f));
+    head.rotation.x = -Math.PI / 2;
+    head.position.z = -0.32;
+    const exhaust = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 8), toonMat(0xffaa44, 0xff6a00, 0.9));
+    exhaust.rotation.x = Math.PI / 2;
+    exhaust.position.z = 0.31;
+    g.add(body, head, exhaust);
+    g.position.copy(from);
+    g.lookAt(from.clone().add(dir));
+    this.scene.add(g);
+    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0 });
   }
 
   spawnGrenade(pos, vel) {
@@ -388,13 +412,89 @@ export class Effects {
   }
 
   spawnPickup(x, z, type, life = 45, yOverride = null) {
+    const y0 = yOverride !== null ? yOverride : this.world.groundH(x, z);
     if (type === 'grenade') {
       const gm = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
       gm.scale.setScalar(1.5);
-      const y0 = yOverride !== null ? yOverride : this.world.groundH(x, z);
       gm.position.set(x, y0 + 0.35, z);
       this.scene.add(gm);
       this.coins.push({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
+      return;
+    }
+    // ⚡💪🛡🧲 світні кулі-підсилення
+    const POWERUPS = { speed: 0x4fd8ff, rage: 0xff5d73, bubble: 0xffd23f, magnet: 0xb086f2 };
+    if (POWERUPS[type]) {
+      const g = new THREE.Group();
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 9), toonMat(POWERUPS[type], POWERUPS[type], 0.85));
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(0.38, 0.035, 6, 18),
+        new THREE.MeshBasicMaterial({ color: POWERUPS[type], transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      halo.rotation.x = Math.PI / 2;
+      g.add(orb, halo);
+      g.position.set(x, y0 + 0.55, z);
+      this.scene.add(g);
+      this.coins.push({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life });
+      return;
+    }
+    if (type === 'armor') {
+      // 🦺 бронепластина
+      const g = new THREE.Group();
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.1), toonMat(0x2e4a6e));
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.1, 0.11), toonMat(0x6fc3ff, 0x2288cc, 0.3));
+      g.add(plate, stripe);
+      g.position.set(x, y0 + 0.4, z);
+      this.scene.add(g);
+      this.coins.push({ mesh: g, type, value: 40, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life });
+      return;
+    }
+    if (type === 'rocket') {
+      // ракета для базуки
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), toonMat(0x6b7a4a));
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 8), toonMat(0xd84f4f));
+      head.position.y = 0.35;
+      g.add(body, head);
+      g.rotation.z = 0.5;
+      g.position.set(x, y0 + 0.4, z);
+      this.scene.add(g);
+      this.coins.push({ mesh: g, type, value: 2, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life });
+      return;
+    }
+    if (type === 'bazooka') {
+      // 🚀 ціла базука! Світиться, щоб не пропустити
+      const g = new THREE.Group();
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 1.1, 10), toonMat(0x6b7a4a));
+      tube.rotation.z = Math.PI / 2;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10), toonMat(0xffd23f, 0xffaa00, 0.6));
+      band.rotation.z = Math.PI / 2;
+      band.position.x = -0.2;
+      const mouth = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.16, 10), toonMat(0x3a4252));
+      mouth.rotation.z = Math.PI / 2;
+      mouth.position.x = -0.55;
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(0.7, 0.04, 6, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      halo.rotation.x = Math.PI / 2;
+      g.add(tube, band, mouth, halo);
+      g.position.set(x, y0 + 0.55, z);
+      this.scene.add(g);
+      this.coins.push({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life });
+      return;
+    }
+    if (type === 'food') {
+      // 🥐 смаколик країни: повертає трохи здоров'я
+      const g = new THREE.Group();
+      const bun = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.09, 8, 14, 4.4), toonMat(0xd9a35e));
+      bun.rotation.x = -Math.PI / 2;
+      bun.rotation.z = 0.4;
+      const sugar = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), toonMat(0xfff2c2));
+      sugar.position.set(0.1, 0.08, 0);
+      g.add(bun, sugar);
+      g.position.set(x, y0 + 0.35, z);
+      this.scene.add(g);
+      this.coins.push({ mesh: g, type, value: 15, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
       return;
     }
     const m = new THREE.Mesh(type === 'medkit' ? this.medGeo : this.ammoGeo, type === 'medkit' ? this.medMat : this.ammoMat);
@@ -408,10 +508,9 @@ export class Effects {
       tip.position.y = 0.12;
       m.add(tip);
     }
-    const y = yOverride !== null ? yOverride : this.world.groundH(x, z);
-    m.position.set(x, y + 0.35, z);
+    m.position.set(x, y0 + 0.35, z);
     this.scene.add(m);
-    this.coins.push({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y + 0.3, life });
+    this.coins.push({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
   }
 
   update(dt) {
@@ -495,10 +594,43 @@ export class Effects {
         }
       }
       if (!hit && mp.y < this.world.groundH(mp.x, mp.z) + pr.size * 0.5) hit = true;
+      if (pr.spin) pr.mesh.rotation.x += dt * 9; // багет крутиться в польоті
       if (hit || pr.life <= 0) {
-        this.burst(mp, 0xf4f9ff, 7, { speed: 2.5, up: 2, life: 0.4, size: 0.9 });
+        this.burst(mp, pr.color, 7, { speed: 2.5, up: 2, life: 0.4, size: 0.9 });
         this.scene.remove(pr.mesh);
         this.projectiles.splice(i, 1);
+      }
+    }
+
+    // 🚀 ракети базуки
+    for (let i = this.rockets.length - 1; i >= 0; i--) {
+      const rk = this.rockets[i];
+      rk.life -= dt;
+      const speed = rk.v.length();
+      const frameDist = speed * dt;
+      this._tmpDir.copy(rk.v).divideScalar(speed);
+      // перешкоди світу
+      let hitT = this.world.shotBlockDist(rk.mesh.position, this._tmpDir, frameDist + 0.3);
+      // зомбі на шляху
+      if (this.zombieHitTest) {
+        const zh = this.zombieHitTest(rk.mesh.position, this._tmpDir, frameDist + 0.6);
+        if (zh && zh.t < hitT) hitT = zh.t;
+      }
+      let boom = hitT <= frameDist + 0.3;
+      rk.mesh.position.addScaledVector(rk.v, dt);
+      const rp = rk.mesh.position;
+      if (!boom && rp.y < this.world.groundH(rp.x, rp.z) + 0.15) boom = true;
+      // димний слід
+      rk.smokeT -= dt;
+      if (rk.smokeT <= 0) {
+        rk.smokeT = 0.04;
+        this.burst(rp, 0xd8d8d8, 1, { speed: 0.4, up: 0.8, life: 0.5, size: 0.8 });
+      }
+      if (boom || rk.life <= 0) {
+        this._explodeAt(rp.clone(), 4.5, rk.dmg);
+        this.scene.remove(rk.mesh);
+        disposeObject(rk.mesh);
+        this.rockets.splice(i, 1);
       }
     }
 
@@ -599,10 +731,14 @@ export class Effects {
           ad.landed = true;
           ad.chute.visible = false;
           this.burst(ad.g.position, 0xd8cdbb, 8, { speed: 3, life: 0.5 });
-          // лут навколо ящика
+          // лут навколо ящика + особливий сюрприз
           this.spawnPickup(ad.x + 1.2, ad.z, 'ammo', 90);
           this.spawnPickup(ad.x - 1.2, ad.z, 'medkit', 90);
-          this.spawnPickup(ad.x, ad.z + 1.2, 'grenade', 90);
+          const special = this.rollAirdropSpecial ? this.rollAirdropSpecial() : 'grenade';
+          this.spawnPickup(ad.x, ad.z + 1.4, special, 90);
+          if (special !== 'grenade' && Math.random() < 0.6) {
+            this.spawnPickup(ad.x - 0.5, ad.z - 1.3, 'grenade', 90);
+          }
           for (let i = 0; i < 6; i++) {
             this.spawnCoin(ad.x + (Math.random() - 0.5) * 3, ad.z + (Math.random() - 0.5) * 3, 10, 90);
           }
@@ -690,7 +826,9 @@ export class Effects {
         const dx = pp.x - c.mesh.position.x;
         const dz = pp.z - c.mesh.position.z;
         const d = Math.hypot(dx, dz);
-        const magnetR = c.type === 'coin' ? 5 : 2.2;
+        // 🧲 баф-магніт тягне монети звідусіль
+        const magnetOn = this.getMagnetActive && this.getMagnetActive();
+        const magnetR = c.type === 'coin' ? (magnetOn ? 22 : 5) : 2.2;
         if (d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;

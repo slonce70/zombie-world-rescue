@@ -12,6 +12,9 @@ export class HUD {
       crosshair: $('crosshair'),
       healthFill: $('health-fill'),
       healthText: $('health-text'),
+      armorBar: $('armor-bar'),
+      armorFill: $('armor-fill'),
+      buffs: $('buffs'),
       ammoMag: $('ammo-mag'),
       ammoReserve: $('ammo-reserve'),
       weaponName: $('weapon-name'),
@@ -61,6 +64,12 @@ export class HUD {
     });
     bus.on('bossCharge', () => this.toast('⚠️ Бос розганяється — тікай убік!'));
     bus.on('bossSummon', () => this.toast('🧟 Бос кличе підмогу!'));
+    bus.on('shieldBroken', () => {
+      if (!this._shieldTipShown) {
+        this._shieldTipShown = true;
+        this.toast('🛡 Щит розбито! Тепер щитоносець беззахисний — добивай!');
+      }
+    });
   }
 
   banner(title, sub = '', dur = 3.2) {
@@ -119,6 +128,27 @@ export class HUD {
       this.el.healGlow.style.opacity = Math.max(0, parseFloat(this.el.healGlow.style.opacity || 0) - dt * 1.2);
     }
     this.lastHealth = p.health;
+
+    // броня
+    if (p.armor > 0) {
+      this.el.armorBar.style.display = 'block';
+      this.el.armorFill.style.width = (clamp(p.armor / p.maxArmor, 0, 1) * 100) + '%';
+    } else {
+      this.el.armorBar.style.display = 'none';
+    }
+
+    // активні бафи з таймерами
+    let buffHtml = '';
+    const BUFF_ICONS = { speed: '⚡', rage: '💪', bubble: '🛡', magnet: '🧲' };
+    for (const [k, icon] of Object.entries(BUFF_ICONS)) {
+      if (p.buffs[k] > 0) {
+        buffHtml += `<div class="buff"><span class="buff-icon">${icon}</span><span class="buff-t">${Math.ceil(p.buffs[k])}</span></div>`;
+      }
+    }
+    if (this._lastBuffHtml !== buffHtml) {
+      this.el.buffs.innerHTML = buffHtml;
+      this._lastBuffHtml = buffHtml;
+    }
 
     // патрони
     const a = p.curAmmo;

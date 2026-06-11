@@ -1,6 +1,6 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
-import { makeZombie, makeBoss, updateRig, setAnim, toonMat } from './characters.js';
+import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
 
 import { clamp, dampAngle, closestRaySeg, RNG } from './utils.js';
 
@@ -8,14 +8,23 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
+  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (150 міцності)!
+  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 25, pitch: 0.7, shieldHp: 150 },
   snowman: {
     hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
     ranged: { min: 7, max: 30, hold: 13, cd: 3.0, projSpeed: 16, dmg: 9, size: 0.22 },
+  },
+  // 🤮 плювака: тримає дистанцію і плює отрутою
+  spitter: {
+    hp: 55, speed: 1.5, chaseSpeed: 3.0, aggro: 34, dmg: 9, attackR: 1.8, coins: 12, pitch: 1.3,
+    ranged: { min: 8, max: 26, hold: 12, cd: 3.4, projSpeed: 18, dmg: 12, size: 0.2, color: 0x9be84e },
   },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
 const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 4.5, projSpeed: 20, dmg: 18, size: 0.5 };
+// 🥖 Шеф Багет жбурляє багети
+const BAGUETTE_RANGED = { min: 8, max: 38, hold: 0, cd: 3.6, projSpeed: 19, dmg: 16, size: 0.34, color: 0xd9a35e, stretch: true };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -37,7 +46,8 @@ export class Zombies {
   }
 
   spawn(type, x, z, opts = {}) {
-    const rig = type === 'boss' ? makeBoss(!!opts.frost) : makeZombie(type, this.rng);
+    const bossStyle = opts.style || (opts.frost ? 'frost' : 'king');
+    const rig = type === 'boss' ? makeBoss(bossStyle) : makeZombie(type, this.rng);
     const stats = TYPE_STATS[type];
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
@@ -64,12 +74,25 @@ export class Zombies {
       // бос
       chargeCd: 4, charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
       summonedAt: { 75: false, 50: false, 25: false },
-      frost: !!opts.frost,
-      // дальній бій (сніговики, Король Мороз)
-      ranged: stats.ranged || (opts.frost ? FROST_RANGED : null),
+      frost: bossStyle === 'frost',
+      bossStyle: type === 'boss' ? bossStyle : null,
+      // дальній бій (сніговики, плювака, Король Мороз, Шеф Багет)
+      ranged: stats.ranged
+        || (type === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
+        || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null),
       rangedCd: this.rng.range(0.5, 2.5),
       throwProj: false,
+      // 🛡 щит
+      shieldHp: 0, shieldMax: 0, shieldObj: null,
     };
+    if (type === 'shield') {
+      z_.shieldHp = z_.shieldMax = stats.shieldHp;
+      const shield = makeShieldMesh();
+      // щит висить перед тулубом — закриває з фронту (-Z)
+      shield.group.position.set(0, 1.05, -0.62);
+      rig.body.add(shield.group);
+      z_.shieldObj = shield;
+    }
     z_.damage = (amt, dir, headshot) => this._damage(z_, amt, dir, headshot);
     this.list.push(z_);
     if (type === 'boss') this.boss = z_;
@@ -114,6 +137,11 @@ export class Zombies {
       guardSets[0].types.push('walker');
       guardSets[1].types.push('walker');
       guardSets[2].types.push('runner');
+    }
+    // 🛡 щитоносці охороняють місії (кількість залежить від країни)
+    const shieldN = (this.level.country && this.level.country.shieldGuards) || 0;
+    for (let i = 0; i < shieldN; i++) {
+      guardSets[i % guardSets.length].types.push('shield');
     }
     for (const gs of guardSets) {
       gs.types.forEach((type, i) => {
@@ -202,7 +230,8 @@ export class Zombies {
   spawnBoss(hp = null) {
     const { x, z } = this.L.arena;
     const cfg = (this.level.country && this.level.country.boss) || { hp: 1300, frost: false };
-    const b = this.spawn('boss', x, z - 6, { horde: false, frost: cfg.frost });
+    const style = cfg.style || (cfg.frost ? 'frost' : 'king');
+    const b = this.spawn('boss', x, z - 6, { horde: false, style });
     b.maxHp = cfg.hp;
     b.hp = hp !== null ? Math.min(cfg.hp, Math.max(150, hp)) : cfg.hp;
     b.aggroed = true;
@@ -243,6 +272,45 @@ export class Zombies {
 
   _damage(z, amt, dir, headshot) {
     if (z.state === 'dead') return;
+    // 🛡 щит: фронтальні влучання та вибухи приймає на себе щит
+    if (z.shieldHp > 0) {
+      const fx = -Math.sin(z.rig.group.rotation.y);
+      const fz = -Math.cos(z.rig.group.rotation.y);
+      // dir — напрямок пострілу (від гравця до зомбі); null (вибух) — теж у щит
+      const onShield = !dir || (dir.x * fx + dir.z * fz) < -0.15;
+      if (onShield) {
+        z.shieldHp -= amt;
+        this._aggro(z);
+        for (const o of this.list) {
+          if (o.groupId === z.groupId && o.groupId >= 0 && o.state !== 'dead'
+            && Math.hypot(o.x - z.x, o.z - z.z) < 13) this._aggro(o);
+        }
+        const level = this.level;
+        // перша зустріч зі щитом — підказуємо механіку одразу
+        if (!this._shieldHintShown) {
+          this._shieldHintShown = true;
+          level.bus.emit('toast', '🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!');
+        }
+        const sparkPos = new THREE.Vector3(z.x + fx * 0.75, z.y + 1.15, z.z + fz * 0.75);
+        if (z.shieldHp > 0) {
+          // тріщини проступають у міру пошкоджень (2/3 і 1/3 міцності)
+          z.shieldObj.cracks1.visible = z.shieldHp <= z.shieldMax * 0.67;
+          z.shieldObj.cracks2.visible = z.shieldHp <= z.shieldMax * 0.34;
+          level.effects.burst(sparkPos, 0xc9d4e2, 4, { speed: 2.6, up: 1.5, life: 0.3, size: 0.7 });
+          level.audio.clang();
+        } else {
+          // 💥 щит зламано!
+          z.shieldHp = 0;
+          z.rig.body.remove(z.shieldObj.group);
+          z.shieldObj = null;
+          level.effects.burst(sparkPos, 0x7d8aa0, 14, { speed: 4.5, up: 4, life: 0.7, size: 1.3 });
+          level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.5);
+          level.audio.shieldBreak();
+          level.bus.emit('shieldBroken', z);
+        }
+        return;
+      }
+    }
     z.hp -= amt;
     this._aggro(z);
     // розбудити сусідів по групі (тільки поблизу — не весь склад одразу)
@@ -276,7 +344,7 @@ export class Zombies {
     // лут
     if (z.type !== 'boss') {
       const coins = z.stats.coins;
-      const n = z.type === 'tank' ? 3 : z.type === 'runner' ? 2 : 1;
+      const n = z.type === 'tank' || z.type === 'shield' ? 3 : z.type === 'runner' ? 2 : 1;
       for (let i = 0; i < n; i++) {
         level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
       }
@@ -285,6 +353,10 @@ export class Zombies {
         level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
       } else if (this.rng.chance(0.07)) level.effects.spawnPickup(z.x + 1, z.z, 'medkit');
       else if (this.rng.chance(0.13)) level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
+      else if (this.rng.chance(0.02)) {
+        // рідкісний сюрприз: тимчасове підсилення
+        level.effects.spawnPickup(z.x + 1, z.z, this.rng.pick(['speed', 'rage', 'bubble', 'magnet']));
+      }
     }
     if (z.horde) this.hordeRemaining--;
     if (z.golden) {
@@ -330,9 +402,15 @@ export class Zombies {
             z *= (this.L.BOUND - 8) / dB;
           }
           const roll = this.rng.next();
+          const withShield = (this.level.country && this.level.country.shieldGuards) > 0;
           let type;
-          if (this.extraZombie) {
+          if (this.extraZombie && withShield) {
+            type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie
+              : roll < 0.9 ? 'shield' : 'tank';
+          } else if (this.extraZombie) {
             type = roll < 0.45 ? 'walker' : roll < 0.7 ? 'runner' : roll < 0.9 ? this.extraZombie : 'tank';
+          } else if (withShield) {
+            type = roll < 0.5 ? 'walker' : roll < 0.8 ? 'runner' : roll < 0.9 ? 'shield' : 'tank';
           } else {
             type = roll < 0.6 ? 'walker' : roll < 0.9 ? 'runner' : 'tank';
           }
@@ -468,7 +546,7 @@ export class Zombies {
             if (playerAlive) {
               const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
               const target = new THREE.Vector3(px, player.pos.y + 1.25, pz);
-              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size);
+              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size, z.ranged.color);
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
@@ -496,7 +574,11 @@ export class Zombies {
             level.bus.emit('bossSummon');
             for (let i = 0; i < 6; i++) {
               const a = (i / 6) * 6.28;
-              const mtype = z.frost ? (i % 2 ? 'snowman' : 'walker') : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+              const st = z.bossStyle || 'king';
+              const mtype = st === 'frost' ? (i % 2 ? 'snowman' : 'walker')
+                : st === 'iron' ? (i % 2 ? 'shield' : 'runner')
+                  : st === 'chef' ? (i % 2 ? 'spitter' : 'walker')
+                    : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5, { horde: false });
               mz.aggroed = true;
               mz.state = 'chase';

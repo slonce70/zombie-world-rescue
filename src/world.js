@@ -55,6 +55,7 @@ export class World {
     this._buildFun();
     this._buildClouds();
     if (this.biome.snowfall) this._buildSnowfall();
+    if (this.biome.leaffall) this._buildLeaffall();
     this._buildGrid();
     bakeGroupMeshes(this.staticGroup, { castShadow: true, receiveShadow: true });
   }
@@ -71,8 +72,488 @@ export class World {
     if (lm.includes('castleRuin')) this._lmCastleRuin(P.castleRuin);
     if (lm.includes('railDepot')) this._lmRailDepot(P.railDepot);
     if (lm.includes('garlandTrees')) this._lmGarlands(P.garlandTrees);
+    if (lm.includes('cityGate')) this._lmCityGate(P.cityGate);
+    if (lm.includes('autobahn')) this._lmAutobahn(P.autobahn);
+    if (lm.includes('beerGarden')) this._lmBeerGarden(P.beerGarden);
+    if (lm.includes('eiffelTower')) this._lmEiffelTower(P.eiffelTower);
+    if (lm.includes('cafe')) this._lmCafe(P.cafe);
+    if (lm.includes('lavenderField')) this._lmLavender(P.lavenderField);
+    if (lm.includes('vineyard')) this._lmVineyard(P.vineyard);
+    if (lm.includes('balloon')) this._lmBalloon(P.balloon);
     if (lm.includes('chimneySmoke')) this._lmChimneySmoke();
     if (lm.includes('birds')) this._lmBirds();
+  }
+
+  // 🏛 міська брама: дві вежі, арка-місток нагорі (можна вилізти батутом!)
+  _lmCityGate({ x, z }) {
+    const gy = this.groundH(x, z);
+    const stoneM = toonMat(0xd8cdbb);
+    const trimM = toonMat(0xb0a080);
+    const roofM = toonMat(0x6b4a3a);
+    for (const side of [-1, 1]) {
+      const tx = x + side * 6;
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(4, 9, 4), stoneM);
+      tower.position.set(tx, gy + 4.5, z);
+      tower.castShadow = true;
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(3, 2.6, 4), roofM);
+      cap.position.set(tx, gy + 10.3, z);
+      cap.rotation.y = Math.PI / 4;
+      cap.castShadow = true;
+      this.staticGroup.add(tower, cap);
+      // вікна-бійниці (гравець під'їжджає з півдня, +z — прикрашаємо обидва боки)
+      for (const wy of [3, 6]) {
+        for (const wz of [-2.05, 2.05]) {
+          const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.2), toonMat(0x46506b));
+          win.position.set(tx, gy + wy, z + wz);
+          this.staticGroup.add(win);
+        }
+      }
+      this._addCollider(tx, z, 2.6, gy + 9, 2.4);
+    }
+    // арка-місток зверху (на неї веде батут)
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(9, 1.2, 3.4), trimM);
+    bridge.position.set(x, gy + 8, z);
+    bridge.castShadow = true;
+    this.staticGroup.add(bridge);
+    // зубці на містку (з обох боків)
+    for (let i = -3; i <= 3; i++) {
+      for (const mz of [-1.6, 1.6]) {
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.3), trimM);
+        merlon.position.set(x + i * 1.3, gy + 8.9, z + mz);
+        this.staticGroup.add(merlon);
+      }
+    }
+    // герб над аркою (з боку в'їзду)
+    const crest = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.15, 6), toonMat(0xffd23f, 0xcc8800, 0.2));
+    crest.rotation.x = Math.PI / 2;
+    crest.position.set(x, gy + 6.8, z + 1.8);
+    this.staticGroup.add(crest);
+    // вертикальні прапори-банери на вежах (чорний-червоний-золотий)
+    for (const side of [-1, 1]) {
+      const cols = [0x2a2a2a, 0xd84f4f, 0xffd23f];
+      for (let i = 0; i < 3; i++) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 0.08), toonMat(cols[i]));
+        strip.position.set(x + side * 6, gy + 6.4 - i * 1.1, z + 2.1);
+        this.staticGroup.add(strip);
+      }
+    }
+    // верх брами — поверхня, на якій можна стояти
+    this.floors.push({ x, z, ry: 0, w: 9, d: 3.4, top: gy + 8.6 });
+    this._makeSign(x + 8, z + 4, this.biome.signText, 0.3);
+  }
+
+  // 🚗 автобан: покинуті машини (на дахи можна стрибати!)
+  _lmAutobahn({ z, from, to }) {
+    const carCols = [0xd84f4f, 0x4a8ad4, 0xe2c044, 0x57b83e, 0x8d6bb8, 0xd8d8d8];
+    const rng = this.rng;
+    // білий пунктир по центру
+    for (let x = from + 6; x < to; x += 9) {
+      const dash = new THREE.Mesh(new THREE.BoxGeometry(3, 0.04, 0.3), toonMat(0xf5f5f5));
+      dash.position.set(x, this.groundH(x, z) + 0.12, z);
+      this.staticGroup.add(dash);
+    }
+    // машини врозкид по смугах
+    let i = 0;
+    for (let x = from + 14; x < to - 10; x += rng.range(13, 22)) {
+      const off = rng.range(-2.2, 2.2);
+      const ry = (off > 0 ? 0 : Math.PI) + rng.range(-0.5, 0.5);
+      this._makeCar(x, z + off, ry, carCols[i++ % carCols.length]);
+    }
+    // один шкільний автобус — великий, з даху чудовий огляд
+    this._makeBus(from + (to - from) * 0.55, z - 1, 0.25);
+  }
+
+  _makeCar(x, z, ry, color) {
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.85, 1.7), toonMat(color));
+    body.position.y = 0.75;
+    body.castShadow = true;
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.7, 1.55), toonMat(color));
+    cabin.position.set(-0.1, 1.45, 0);
+    cabin.castShadow = true;
+    const glassM = toonMat(0x9fd8ff, 0x4fb8ff, 0.2);
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 1.4), glassM);
+    windshield.position.set(0.9, 1.45, 0);
+    windshield.rotation.z = -0.35;
+    const rear = windshield.clone();
+    rear.position.x = -1.1;
+    rear.rotation.z = 0.35;
+    g.add(body, cabin, windshield, rear);
+    const wheelM = toonMat(0x2a3138);
+    for (const wx of [-1.2, 1.2]) {
+      for (const wz of [-0.9, 0.9]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.25, 10), wheelM);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wx, 0.38, wz);
+        g.add(wheel);
+      }
+    }
+    g.position.set(x, gy, z);
+    g.rotation.y = ry;
+    this.staticGroup.add(g);
+    this._addCollider(x + Math.cos(ry) * 0.9, z - Math.sin(ry) * 0.9, 1.0, gy + 1.7, 0.9);
+    this._addCollider(x - Math.cos(ry) * 0.9, z + Math.sin(ry) * 0.9, 1.0, gy + 1.7, 0.9);
+    // дах — можна стояти
+    this.floors.push({ x, z, ry, w: 3.6, d: 1.7, top: gy + 1.18 });
+    this.floors.push({ x, z, ry, w: 1.9, d: 1.55, top: gy + 1.8 });
+  }
+
+  _makeBus(x, z, ry) {
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(8.5, 2.4, 2.3), toonMat(0xe2a83d));
+    body.position.y = 1.65;
+    body.castShadow = true;
+    g.add(body);
+    const glassM = toonMat(0x9fd8ff, 0x4fb8ff, 0.2);
+    for (let i = -3; i <= 3; i++) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.1), glassM);
+      win.position.set(i * 1.15, 2.2, -1.18);
+      const win2 = win.clone();
+      win2.position.z = 1.18;
+      g.add(win, win2);
+    }
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(8.55, 0.3, 2.35), toonMat(0x37404f));
+    stripe.position.y = 1.1;
+    g.add(stripe);
+    const wheelM = toonMat(0x2a3138);
+    for (const wx of [-3, 3]) {
+      for (const wz of [-1.1, 1.1]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 10), wheelM);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wx, 0.45, wz);
+        g.add(wheel);
+      }
+    }
+    g.position.set(x, gy, z);
+    g.rotation.y = ry;
+    this.staticGroup.add(g);
+    const cosR = Math.cos(ry), sinR = Math.sin(ry);
+    for (const lx of [-3, 0, 3]) {
+      this._addCollider(x + lx * cosR, z - lx * sinR, 1.45, gy + 2.9, 1.3);
+    }
+    this.floors.push({ x, z, ry, w: 8.5, d: 2.3, top: gy + 2.9 });
+    // драбинка ззаду (підказка, що можна нагору) і лут на даху
+    this.lootSpots.push({ x, z, y: gy + 2.95, type: 'coins' });
+  }
+
+  // 🍺 пивний садок: столи, парасолі, ятка з брецлями
+  _lmBeerGarden({ x, z, r }) {
+    const woodM = toonMat(0x8a5a32);
+    const umbCols = [0xd84f4f, 0xe2c044, 0x4a8ad4];
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.5;
+      const tx = x + Math.cos(a) * (r - 5);
+      const tz = z + Math.sin(a) * (r - 5);
+      const ty = this.groundH(tx, tz);
+      // довгий стіл з лавами
+      const table = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 1.1), woodM);
+      table.position.set(tx, ty + 0.95, tz);
+      table.rotation.y = a;
+      table.castShadow = true;
+      this.staticGroup.add(table);
+      for (const legX of [-1.4, 1.4]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.95, 1.0), woodM);
+        leg.position.set(tx + Math.cos(a) * legX, ty + 0.48, tz + Math.sin(a) * legX);
+        leg.rotation.y = a;
+        this.staticGroup.add(leg);
+      }
+      for (const side of [-1, 1]) {
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 0.4), woodM);
+        bench.position.set(tx - Math.sin(a) * side * 0.95, ty + 0.5, tz + Math.cos(a) * side * 0.95);
+        bench.rotation.y = a;
+        this.staticGroup.add(bench);
+      }
+      // парасоля
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 8), toonMat(0xe8e2d0));
+      pole.position.set(tx, ty + 2.0, tz);
+      const umb = new THREE.Mesh(new THREE.ConeGeometry(2.2, 0.9, 8), toonMat(umbCols[i]));
+      umb.position.set(tx, ty + 3.4, tz);
+      umb.castShadow = true;
+      this.staticGroup.add(pole, umb);
+      this._addCollider(tx, tz, 1.6, ty + 1.05, 1.4);
+      // кухоль на столі (декор)
+      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 8), toonMat(0xe2c044));
+      mug.position.set(tx + 0.5, ty + 1.18, tz);
+      const foam = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), toonMat(0xfff8ef));
+      foam.position.set(tx + 0.5, ty + 1.36, tz);
+      foam.scale.y = 0.5;
+      this.staticGroup.add(mug, foam);
+      // 🥨 брецлі на столах — смаколики!
+      this.lootSpots.push({ x: tx - 0.6, z: tz, y: ty + 1.0, type: 'food' });
+    }
+    // ятка з брецлями
+    const sx = x, sz = z + r - 3;
+    const sy = this.groundH(sx, sz);
+    const stall = new THREE.Group();
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 1.2), woodM);
+    counter.position.y = 0.5;
+    counter.castShadow = true;
+    const canopy = new THREE.Mesh(this._prismGeo(3.0, 0.7, 1.8), toonMat(0xd84f4f));
+    canopy.position.y = 2.3;
+    const stripeC = new THREE.Mesh(this._prismGeo(3.02, 0.4, 1.0), toonMat(0xf5efe0));
+    stripeC.position.y = 2.34;
+    for (const [px, pz] of [[-1.2, -0.5], [1.2, -0.5], [-1.2, 0.5], [1.2, 0.5]]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.3, 0.1), woodM);
+      post.position.set(px, 1.15, pz);
+      stall.add(post);
+    }
+    stall.add(counter, canopy, stripeC);
+    stall.position.set(sx, sy, sz);
+    this.staticGroup.add(stall);
+    this._addCollider(sx, sz, 1.5, sy + 1.1, 1.3);
+    this.lootSpots.push({ x: sx + 0.8, z: sz - 0.9, y: sy + 1.05, type: 'food' });
+    this.lootSpots.push({ x: sx - 0.8, z: sz - 0.9, y: sy + 1.05, type: 'food' });
+  }
+
+  // 🗼 Ейфелева вежа: батутами на самий верх, нагорі — скарб!
+  _lmEiffelTower({ x, z }) {
+    const gy = this.groundH(x, z);
+    const ironM = toonMat(0x6e5a4a);
+    const ironM2 = toonMat(0x7d6850);
+    // 4 вигнуті ноги (сегментами)
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      let px = sx * 5.5, pz = sz * 5.5;
+      for (let seg = 0; seg < 4; seg++) {
+        const t0 = seg / 4, t1 = (seg + 1) / 4;
+        const r0 = 5.5 * (1 - t0 * 0.82), r1 = 5.5 * (1 - t1 * 0.82);
+        const y0 = t0 * 10, y1 = t1 * 10;
+        const mx = (sx * r0 + sx * r1) / 2, mz = (sz * r0 + sz * r1) / 2;
+        const len = Math.hypot(r0 - r1, y1 - y0) + 0.4;
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.55, len, 0.55), ironM);
+        leg.position.set(x + mx, gy + (y0 + y1) / 2, z + mz);
+        const tilt = Math.atan2(r0 - r1, y1 - y0);
+        leg.rotation.z = sx * tilt * 0.7;
+        leg.rotation.x = -sz * tilt * 0.7;
+        leg.castShadow = true;
+        this.staticGroup.add(leg);
+        px = sx * r1; pz = sz * r1;
+      }
+      this._addCollider(x + sx * 4.6, z + sz * 4.6, 0.9, gy + 7, 0.6);
+    }
+    // поперечні балки-хрестовини між ногами (низ)
+    for (const side of [-1, 1]) {
+      const beamA = new THREE.Mesh(new THREE.BoxGeometry(9, 0.35, 0.35), ironM2);
+      beamA.position.set(x, gy + 4.6, z + side * 4.4);
+      const beamB = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 9), ironM2);
+      beamB.position.set(x + side * 4.4, gy + 4.6, z);
+      this.staticGroup.add(beamA, beamB);
+    }
+    // арки внизу
+    for (const side of [-1, 1]) {
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.22, 6, 14, Math.PI), ironM2);
+      arch.position.set(x, gy + 1.2, z + side * 4.5);
+      this.staticGroup.add(arch);
+      const arch2 = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.22, 6, 14, Math.PI));
+      arch2.material = arch.material;
+      arch2.geometry = arch.geometry;
+      arch2.position.set(x + side * 4.5, gy + 1.2, z);
+      arch2.rotation.y = Math.PI / 2;
+      this.staticGroup.add(arch2);
+    }
+    // 1-й ярус (платформа, можна стояти)
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.7, 9.5), ironM);
+    p1.position.set(x, gy + 10.3, z);
+    p1.castShadow = true;
+    this.staticGroup.add(p1);
+    this.floors.push({ x, z, ry: 0, w: 9.5, d: 9.5, top: gy + 10.65 });
+    // перила 1-го ярусу
+    for (const [ox, oz, w, d] of [[0, -4.6, 9.4, 0.15], [0, 4.6, 9.4, 0.15], [-4.6, 0, 0.15, 9.4], [4.6, 0, 0.15, 9.4]]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), ironM2);
+      rail.position.set(x + ox, gy + 11.1, z + oz);
+      this.staticGroup.add(rail);
+    }
+    // середня секція
+    const mid = new THREE.Mesh(new THREE.BoxGeometry(3.6, 8.5, 3.6), ironM);
+    mid.position.set(x, gy + 15, z);
+    mid.castShadow = true;
+    this.staticGroup.add(mid);
+    // 2-й ярус
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.6, 5.5), ironM);
+    p2.position.set(x, gy + 19.3, z);
+    p2.castShadow = true;
+    this.staticGroup.add(p2);
+    this.floors.push({ x, z, ry: 0, w: 5.5, d: 5.5, top: gy + 19.6 });
+    for (const [ox, oz, w, d] of [[0, -2.6, 5.4, 0.15], [0, 2.6, 5.4, 0.15], [-2.6, 0, 0.15, 5.4], [2.6, 0, 0.15, 5.4]]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), ironM2);
+      rail.position.set(x + ox, gy + 20.1, z + oz);
+      this.staticGroup.add(rail);
+    }
+    // шпиль і вогник
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(1.6, 6.5, 4), ironM);
+    spike.position.set(x, gy + 23, z);
+    spike.castShadow = true;
+    this.staticGroup.add(spike);
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6),
+      new THREE.MeshToonMaterial({ color: 0xffd23f, gradientMap: toonMat(0).gradientMap, emissive: 0xffaa00, emissiveIntensity: 1.2 }));
+    beacon.position.set(x, gy + 26.5, z);
+    this.scene.add(beacon);
+    // батут на 1-му ярусі веде на 2-й
+    this.jumpPads.push({ x: x + 2.8, z: z + 2.8, y: gy + 10.65, power: 20, cd: 0 });
+    const padMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.0, 0.18, 18),
+      new THREE.MeshToonMaterial({ color: 0x6fc3ff, emissive: 0x2288cc, emissiveIntensity: 0.5, gradientMap: toonMat(0).gradientMap })
+    );
+    padMesh.position.set(x + 2.8, gy + 10.75, z + 2.8);
+    this.scene.add(padMesh);
+    // 💎 скарб на 2-му ярусі
+    this.lootSpots.push({ x, z, y: gy + 19.65, type: 'coins' });
+    this.lootSpots.push({ x: x + 1, z, y: gy + 19.65, type: 'grenade' });
+    this.lootSpots.push({ x: x - 1, z, y: gy + 19.65, type: 'rage' });
+    this._makeSign(x + 7, z + 7, 'ВЕЖА: СКАРБ НАГОРІ!', 0.5);
+  }
+
+  // ☕ кафе з круасанами
+  _lmCafe({ x, z }) {
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const woodM = toonMat(0x8a5a32);
+    // вітрина-фасад
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(5.5, 3, 0.4), toonMat(0xf5e2c8));
+    wall.position.y = 1.5;
+    wall.castShadow = true;
+    const win = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.5, 0.2), toonMat(0x9fd8ff, 0x4fb8ff, 0.3));
+    win.position.set(-0.4, 1.5, -0.18);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.1, 0.2), toonMat(0x6b4226));
+    door.position.set(2.0, 1.05, -0.18);
+    g.add(wall, win, door);
+    // смугастий навіс
+    const awning = new THREE.Mesh(this._prismGeo(6, 0.8, 2.4), toonMat(0xd84f4f));
+    awning.position.set(0, 2.6, -1.0);
+    const awnStripe = new THREE.Mesh(this._prismGeo(6.04, 0.5, 1.4), toonMat(0xf5efe0));
+    awnStripe.position.set(0, 2.64, -1.0);
+    g.add(awning, awnStripe);
+    g.position.set(x, gy, z);
+    this.staticGroup.add(g);
+    this._addCollider(x, z, 2.8, gy + 3, 2.6);
+    // столики з круасанами перед кафе
+    for (const side of [-1, 1]) {
+      const tx = x + side * 2.2, tz = z - 3.4;
+      const ty = this.groundH(tx, tz);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.08, 10), toonMat(0xf5efe0));
+      top.position.set(tx, ty + 0.95, tz);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.95, 8), toonMat(0x37404f));
+      leg.position.set(tx, ty + 0.5, tz);
+      this.staticGroup.add(top, leg);
+      this._addCollider(tx, tz, 0.75, ty + 1, 0.6);
+      this.lootSpots.push({ x: tx, z: tz, y: ty + 1.0, type: 'food' });
+    }
+    this._makeSign(x - 4, z - 2, 'КАФЕ «У ЗОМБІ»', -0.4);
+  }
+
+  // 💜 лавандове поле
+  _lmLavender({ x, z, w, d }) {
+    const pts = [];
+    for (let gx = -w / 2; gx < w / 2; gx += 1.4) {
+      for (let gz = -d / 2; gz < d / 2; gz += 1.4) {
+        const px = x + gx + this.rng.range(-0.4, 0.4);
+        const pz = z + gz + this.rng.range(-0.4, 0.4);
+        if (this.roadDist(px, pz) < 4) continue;
+        pts.push([px, pz]);
+      }
+    }
+    const stemGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.7, 5);
+    const stems = new THREE.InstancedMesh(stemGeo, toonMat(0x5e7050), pts.length);
+    const headGeo = new THREE.CapsuleGeometry(0.09, 0.3, 3, 6);
+    const headMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap });
+    const heads = new THREE.InstancedMesh(headGeo, headMat, pts.length);
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const v = new THREE.Vector3();
+    const s = new THREE.Vector3(1, 1, 1);
+    const col = new THREE.Color();
+    const purples = [0x8d6bb8, 0x9d7bd0, 0x7a5aa8, 0xa888e0];
+    pts.forEach(([px, pz], i) => {
+      const gy = this.groundH(px, pz);
+      m4.compose(v.set(px, gy + 0.35, pz), q.identity(), s.set(1, 1, 1));
+      stems.setMatrixAt(i, m4);
+      m4.compose(v.set(px, gy + 0.85, pz), q.identity(), s.set(1, 1, 1));
+      heads.setMatrixAt(i, m4);
+      heads.setColorAt(i, col.setHex(this.rng.pick(purples)));
+    });
+    heads.castShadow = true;
+    this.scene.add(stems, heads);
+  }
+
+  // 🍇 виноградник: рівні ряди лоз
+  _lmVineyard({ x, z }) {
+    const postM = toonMat(0x6e4f2f);
+    const vineM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap });
+    const rows = 4, len = 24;
+    const blobs = [];
+    for (let r = 0; r < rows; r++) {
+      const rz = z - 9 + r * 6;
+      for (let lx = -len / 2; lx <= len / 2; lx += 6) {
+        const px = x + lx;
+        const py = this.groundH(px, rz);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.7, 0.12), postM);
+        post.position.set(px, py + 0.85, rz);
+        this.staticGroup.add(post);
+      }
+      // дріт
+      const wy0 = this.groundH(x - len / 2, rz);
+      const wy1 = this.groundH(x + len / 2, rz);
+      const wire = new THREE.Mesh(new THREE.BoxGeometry(len, 0.04, 0.04), postM);
+      wire.position.set(x, (wy0 + wy1) / 2 + 1.45, rz);
+      wire.rotation.z = Math.atan2(wy1 - wy0, len);
+      this.staticGroup.add(wire);
+      for (let lx = -len / 2 + 1.5; lx < len / 2; lx += 2.2) {
+        blobs.push([x + lx, rz]);
+      }
+    }
+    const blobGeo = new THREE.IcosahedronGeometry(0.55, 1);
+    const vines = new THREE.InstancedMesh(blobGeo, vineM, blobs.length);
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const v = new THREE.Vector3();
+    const s = new THREE.Vector3();
+    const col = new THREE.Color();
+    const vineCols = [0x57a83e, 0x4a9636, 0x68b84a];
+    blobs.forEach(([px, pz], i) => {
+      const gy = this.groundH(px, pz);
+      q.setFromEuler(new THREE.Euler(0, this.rng.next() * 6.28, 0));
+      m4.compose(v.set(px, gy + 1.1, pz), q, s.set(1, 0.85, 0.55));
+      vines.setMatrixAt(i, m4);
+      vines.setColorAt(i, col.setHex(this.rng.pick(vineCols)));
+    });
+    vines.castShadow = true;
+    this.scene.add(vines);
+    // грона винограду (декор) — фіолетові кульки під лозами
+    for (let i = 0; i < 10; i++) {
+      const [px, pz] = blobs[Math.floor(this.rng.next() * blobs.length)];
+      const grape = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), toonMat(0x6b4a9e));
+      grape.position.set(px + this.rng.range(-0.3, 0.3), this.groundH(px, pz) + 0.75, pz + this.rng.range(-0.2, 0.2));
+      grape.scale.y = 1.4;
+      this.staticGroup.add(grape);
+    }
+  }
+
+  // 🎈 повітряна куля пливе колами над картою
+  _lmBalloon({ x, z }) {
+    const g = new THREE.Group();
+    const envM = new THREE.MeshToonMaterial({ color: 0xd84f4f, gradientMap: toonMat(0).gradientMap });
+    const env = new THREE.Mesh(new THREE.SphereGeometry(3.2, 14, 12), envM);
+    env.scale.y = 1.15;
+    // смуги
+    for (let i = 0; i < 4; i++) {
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(3.05, 0.18, 6, 18), toonMat(i % 2 ? 0xffd23f : 0xf5efe0));
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.y = -0.8 + i * 0.9;
+      stripe.scale.setScalar(1 - Math.abs(i - 1.5) * 0.12);
+      g.add(stripe);
+    }
+    const basket = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.4), toonMat(0x8a5a32));
+    basket.position.y = -4.6;
+    for (const [rx, rz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) {
+      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 4), toonMat(0x5e4530));
+      rope.position.set(rx, -3.8, rz);
+      g.add(rope);
+    }
+    g.add(env, basket);
+    g.position.set(x, 40, z);
+    this.scene.add(g);
+    this.balloon = { g, cx: x, cz: z, ph: 0 };
   }
 
   // 🌻 соняшникове поле
@@ -986,6 +1467,29 @@ export class World {
     addWindow(-w / 2 - 0.03, 0.4 + h * 0.55, 0, Math.PI / 2);
     addWindow(w / 2 + 0.03, 0.4 + h * 0.55, 0, Math.PI / 2);
 
+    // фахверкові балки (німецький стиль)
+    if (this.biome.timber) {
+      const beamM = toonMat(0x4a3a2c);
+      for (const bz of [-d / 2 - 0.05, d / 2 + 0.05]) {
+        for (const bx of [-w / 2 + 0.15, 0, w / 2 - 0.15]) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, h, 0.1), beamM);
+          post.position.set(bx, 0.4 + h / 2, bz);
+          g.add(post);
+        }
+        const beamTop = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, 0.1), beamM);
+        beamTop.position.set(0, 0.4 + h - 0.1, bz);
+        const beamMid = new THREE.Mesh(new THREE.BoxGeometry(w, 0.14, 0.1), beamM);
+        beamMid.position.set(0, 0.4 + h * 0.32, bz);
+        const diag = new THREE.Mesh(new THREE.BoxGeometry(w * 0.4, 0.13, 0.1), beamM);
+        diag.position.set(-w / 4, 0.4 + h * 0.16, bz);
+        diag.rotation.z = 0.45;
+        const diag2 = diag.clone();
+        diag2.position.x = w / 4;
+        diag2.rotation.z = -0.45;
+        g.add(beamTop, beamMid, diag, diag2);
+      }
+    }
+
     g.position.set(x, gy, z);
     g.rotation.y = ry;
     this.staticGroup.add(g);
@@ -1480,7 +1984,7 @@ export class World {
       );
       pad.position.set(jp.x, gy + 0.16, jp.z);
       this.scene.add(ring, pad);
-      this.jumpPads.push({ x: jp.x, z: jp.z, power: jp.power || 14, cd: 0, pad });
+      this.jumpPads.push({ x: jp.x, z: jp.z, y: gy, power: jp.power || 14, cd: 0, pad });
     }
     // секретний лут на дахах (dy — висота над тереном)
     for (const sl of fun.secretLoot || []) {
@@ -1848,6 +2352,54 @@ export class World {
     this._snowV = new THREE.Vector3();
   }
 
+  // ---------- 🍂 листопад (осінній біом) ----------
+  _buildLeaffall() {
+    const N = Math.round(this.quality.snow * 0.6);
+    const geo = new THREE.BoxGeometry(0.22, 0.02, 0.16);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.leafMesh = new THREE.InstancedMesh(geo, mat, N);
+    this.leafMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.leafMesh.frustumCulled = false;
+    this.scene.add(this.leafMesh);
+    this.leaves = [];
+    const cols = [0xe89a3a, 0xd8742f, 0xc9582c, 0xe2b03d, 0xb85c38];
+    const col = new THREE.Color();
+    for (let i = 0; i < N; i++) {
+      this.leaves.push({
+        x: this.rng.range(-35, 35), y: this.rng.range(0, 25), z: this.rng.range(-35, 35),
+        spd: this.rng.range(0.8, 1.8), drift: this.rng.range(0.8, 2.2), ph: this.rng.range(0, 6.28),
+      });
+      this.leafMesh.setColorAt(i, col.setHex(cols[i % cols.length]));
+    }
+    this._leafM4 = new THREE.Matrix4();
+    this._leafQ = new THREE.Quaternion();
+    this._leafE = new THREE.Euler();
+    this._leafS = new THREE.Vector3(1, 1, 1);
+    this._leafV = new THREE.Vector3();
+  }
+
+  _updateLeaffall(dt, px, pz) {
+    if (!this.leafMesh) return;
+    for (let i = 0; i < this.leaves.length; i++) {
+      const f = this.leaves[i];
+      f.y -= f.spd * dt;
+      f.x += Math.sin(this.time * f.drift + f.ph) * dt * 1.6;
+      if (f.y < -2) {
+        f.y = 22 + this.rng.range(0, 5);
+        f.x = this.rng.range(-35, 35);
+        f.z = this.rng.range(-35, 35);
+      }
+      this._leafE.set(this.time * f.drift + f.ph, f.ph, Math.sin(this.time * 2 + f.ph) * 0.8);
+      this._leafQ.setFromEuler(this._leafE);
+      this._leafM4.compose(
+        this._leafV.set(px + f.x, this.groundH(px + f.x, pz + f.z) + f.y, pz + f.z),
+        this._leafQ, this._leafS
+      );
+      this.leafMesh.setMatrixAt(i, this._leafM4);
+    }
+    this.leafMesh.instanceMatrix.needsUpdate = true;
+  }
+
   _updateSnowfall(dt, px, pz) {
     if (!this.snowMesh) return;
     for (let i = 0; i < this.snowFlakes.length; i++) {
@@ -2034,9 +2586,20 @@ export class World {
         if (wR) wR.rotation.z = -flap;
       }
     }
+    // повітряна куля пливе колами
+    if (this.balloon) {
+      this.balloon.ph += dt * 0.05;
+      const b = this.balloon;
+      b.g.position.set(
+        b.cx + Math.cos(b.ph) * 55,
+        40 + Math.sin(this.time * 0.4) * 2.5,
+        b.cz + Math.sin(b.ph) * 55
+      );
+    }
     if (playerPos) {
       this.followSun(playerPos.x, playerPos.z);
       if (this.snowMesh) this._updateSnowfall(dt, playerPos.x, playerPos.z);
+      if (this.leafMesh) this._updateLeaffall(dt, playerPos.x, playerPos.z);
     }
   }
 }

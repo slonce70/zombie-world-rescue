@@ -634,6 +634,82 @@ function updateSnowmanRig(rig, dt) {
   p.head.rotation.z = headRotZ;
 }
 
+// ============================================================
+// Щит щитоносця: металеві двері з тріщинами (2 стадії пошкоджень).
+// НЕ запікається — кріпиться до клона після spawn, щоб тріщини були індивідуальні.
+// ============================================================
+// Шаблон будується один раз і запікається у 3 меші (основа + 2 стадії тріщин),
+// клонується на кожного щитоносця — інакше 20 щитів = сотні draw calls.
+let shieldTpl = null;
+function buildShieldTpl() {
+  const base = new THREE.Group();
+  const steelM = toonMat(0x7d8aa0);
+  const rimM = toonMat(0x55617a);
+  const plate = box(1.15, 1.45, 0.09, steelM);
+  base.add(plate);
+  // окантовка
+  for (const sy of [-0.69, 0.69]) {
+    const rim = box(1.2, 0.1, 0.11, rimM);
+    rim.position.y = sy;
+    base.add(rim);
+  }
+  for (const sx of [-0.55, 0.55]) {
+    const rim = box(0.1, 1.45, 0.11, rimM);
+    rim.position.x = sx;
+    base.add(rim);
+  }
+  // заклепки
+  const rivetM = toonMat(0xb8c4d4);
+  for (const [rx, ry] of [[-0.45, 0.58], [0.45, 0.58], [-0.45, -0.58], [0.45, -0.58]]) {
+    const rivet = sphere(0.04, rivetM, 6, 5);
+    rivet.position.set(rx, ry, -0.06);
+    base.add(rivet);
+  }
+  // знак "СТОП-рука" по центру (кумедний)
+  const sign = cylinder(0.22, 0.22, 0.02, toonMat(0xd84f4f), 12);
+  sign.rotation.x = Math.PI / 2;
+  sign.position.z = -0.06;
+  base.add(sign);
+  const palm = box(0.12, 0.18, 0.02, toonMat(0xf5efe0));
+  palm.position.z = -0.075;
+  base.add(palm);
+  bakeGroupMeshes(base, { castShadow: true });
+  // тріщини: стадія 1 (з'являються при 2/3 міцності)
+  const crackM = toonMat(0x2a3138);
+  const cracks1 = new THREE.Group();
+  cracks1.name = 'cracks1';
+  for (const [cx, cy, rot, len] of [[-0.2, 0.3, 0.6, 0.5], [0.05, 0.12, -0.3, 0.4], [-0.35, -0.1, 1.2, 0.35]]) {
+    const c = box(len, 0.035, 0.02, crackM);
+    c.position.set(cx, cy, -0.057);
+    c.rotation.z = rot;
+    cracks1.add(c);
+  }
+  bakeGroupMeshes(cracks1);
+  // тріщини: стадія 2 (1/3 — щит ледь тримається)
+  const cracks2 = new THREE.Group();
+  cracks2.name = 'cracks2';
+  for (const [cx, cy, rot, len] of [[0.25, -0.3, 0.9, 0.55], [0.1, 0.45, -0.8, 0.45], [-0.1, -0.5, 0.25, 0.5], [0.38, 0.25, 1.4, 0.35], [-0.3, 0.55, -1.1, 0.3]]) {
+    const c = box(len, 0.04, 0.02, crackM);
+    c.position.set(cx, cy, -0.06);
+    c.rotation.z = rot;
+    cracks2.add(c);
+  }
+  bakeGroupMeshes(cracks2);
+  const g = new THREE.Group();
+  g.add(base, cracks1, cracks2);
+  return g;
+}
+
+export function makeShieldMesh() {
+  if (!shieldTpl) shieldTpl = buildShieldTpl();
+  const g = shieldTpl.clone(true);
+  const cracks1 = g.children.find((c) => c.name === 'cracks1');
+  const cracks2 = g.children.find((c) => c.name === 'cracks2');
+  cracks1.visible = false;
+  cracks2.visible = false;
+  return { group: g, cracks1, cracks2 };
+}
+
 function buildZombie(type, rng) {
   if (type === 'snowman') return buildSnowman(rng);
   const skin = rng.pick(ZOMBIE_SKINS);
@@ -662,6 +738,40 @@ function buildZombie(type, rng) {
       scale: 1.35, belly: 1.65, armsForward: 0.9, headR: 0.22,
       bellySkin: true, eyeL: 0.055, eyeR: 0.075,
     }));
+  } else if (type === 'shield') {
+    // щитоносець: кремезний будівельник з каскою, руки тримають щит
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.12, belly: 1.3, armsForward: 1.05, headR: 0.25,
+      shirt: 0xc97f2f, pants: 0x3e4a55,
+      eyeL: 0.07, eyeR: 0.07, brow: 0.45,
+    }));
+    // будівельна каска
+    const helmM = toonMat(0xffd23f);
+    const helm = sphere(0.27, helmM, 14, 10);
+    helm.position.y = 0.24;
+    helm.scale.set(1.05, 0.7, 1.05);
+    const brim = cylinder(0.3, 0.32, 0.04, helmM, 14);
+    brim.position.y = 0.18;
+    rig.parts.head.add(helm, brim);
+  } else if (type === 'spitter') {
+    // плювака: худий, отруйно-зелений, з величезним ротом
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 0.98, belly: 0.7, armsForward: 0.45, lean: -0.18,
+      skin: 0xa3d94e, shirt: 0x4a6e3a, headR: 0.3,
+      eyeL: 0.095, eyeR: 0.06, eyeWhite: 0xe8ffc8, pupilColor: 0x2e5a1e,
+      mouth: 'open', teeth: false, tongue: true, brow: 0.5,
+    }));
+    // роздутий зоб з отрутою
+    const sacM = toonMat(0xc4e86a, 0x86d14e, 0.35);
+    const sac = sphere(0.16, sacM, 10, 8);
+    sac.position.set(0, -0.08, -0.18);
+    sac.scale.set(1, 1.2, 0.9);
+    rig.parts.head.add(sac);
+    // крапля отрути на підборідді
+    const drip = cone(0.04, 0.1, sacM, 6);
+    drip.rotation.x = Math.PI;
+    drip.position.set(0.06, -0.18, -0.22);
+    rig.parts.head.add(drip);
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,
@@ -687,48 +797,99 @@ function buildZombie(type, rng) {
   return rig;
 }
 
-export function makeBoss(frost = false) {
-  const rig = makeHumanoid(frost ? {
-    scale: 2.7, belly: 1.7, armsForward: 0.9, headR: 0.24,
-    skin: 0x8fd0d8, shirt: 0x3a5a8c, pants: 0x2e3a55, shoes: 0x223044,
-    eyeWhite: 0xd9f4ff, eyeL: 0.075, eyeR: 0.075, pupilColor: 0x1a4a8a,
-    mouth: 'open', teeth: true, brow: 0.45, browColor: 0x2e4a60,
-    bellySkin: true, sleeves: 'skin', nose: false,
-  } : {
-    scale: 2.7, belly: 1.7, armsForward: 0.9, headR: 0.24,
+const BOSS_SPECS = {
+  king: {
     skin: 0x5da045, shirt: 0x6b3548, pants: 0x3a3344, shoes: 0x2e2620,
-    eyeWhite: 0xffd24a, eyeL: 0.075, eyeR: 0.075, pupilColor: 0xc62828,
-    mouth: 'open', teeth: true, brow: 0.45, browColor: 0x2e4620,
-    bellySkin: true, sleeves: 'skin', nose: false,
-  });
-  // маленька корона на величезній голові: золота або льодяна
-  const crownM = frost
-    ? toonMat(0xaee8ff, 0x66ccff, 0.5)
-    : toonMat(0xffc933, 0xffa000, 0.25);
-  const crown = new THREE.Group();
-  const band = cylinder(0.14, 0.16, 0.09, crownM, 10);
-  crown.add(band);
-  for (let i = 0; i < 5; i++) {
-    const spike = cone(0.035, frost ? 0.16 : 0.1, crownM, 6);
-    const ang = (i / 5) * Math.PI * 2;
-    spike.position.set(Math.cos(ang) * 0.13, 0.08, Math.sin(ang) * 0.13);
-    crown.add(spike);
+    eyeWhite: 0xffd24a, pupilColor: 0xc62828, browColor: 0x2e4620,
+  },
+  frost: {
+    skin: 0x8fd0d8, shirt: 0x3a5a8c, pants: 0x2e3a55, shoes: 0x223044,
+    eyeWhite: 0xd9f4ff, pupilColor: 0x1a4a8a, browColor: 0x2e4a60,
+  },
+  iron: {
+    skin: 0x9aa3ad, shirt: 0x4a5160, pants: 0x37404f, shoes: 0x2a3138,
+    eyeWhite: 0xffb84a, pupilColor: 0xb33a1e, browColor: 0x37404f,
+  },
+  chef: {
+    skin: 0x9fce62, shirt: 0xf2efe4, pants: 0x46506b, shoes: 0x2e2620,
+    eyeWhite: 0xfff4d6, pupilColor: 0x6e3a1a, browColor: 0x5a4030,
+  },
+};
+
+export function makeBoss(style = 'king') {
+  if (style === true) style = 'frost'; // сумісність зі старим прапорцем frost
+  if (!BOSS_SPECS[style]) style = 'king';
+  const colors = BOSS_SPECS[style];
+  const rig = makeHumanoid(Object.assign({
+    scale: 2.7, belly: 1.7, armsForward: 0.9, headR: 0.24,
+    eyeL: 0.075, eyeR: 0.075,
+    mouth: 'open', teeth: true, brow: 0.45,
+    bellySkin: style !== 'iron', sleeves: 'skin', nose: false,
+  }, colors));
+  if (style === 'chef') {
+    // ковпак шеф-кухаря замість корони
+    const hatM = toonMat(0xf7f4ea);
+    const hatBand = cylinder(0.2, 0.22, 0.12, hatM, 12);
+    hatBand.position.set(0, 0.36, 0);
+    const hatTop = sphere(0.24, hatM, 12, 9);
+    hatTop.position.set(0, 0.52, 0);
+    hatTop.scale.set(1, 0.85, 1);
+    const hatPuff = sphere(0.13, hatM, 8, 6);
+    hatPuff.position.set(0.14, 0.58, 0.05);
+    rig.parts.head.add(hatBand, hatTop, hatPuff);
+    // вуса
+    const mouM = toonMat(0x5a4030);
+    for (const side of [-1, 1]) {
+      const mou = box(0.12, 0.04, 0.03, mouM);
+      mou.position.set(side * 0.09, 0.06, -0.21);
+      mou.rotation.z = side * 0.35;
+      rig.parts.head.add(mou);
+    }
+    // фартух з плямою
+    const apron = box(0.62, 0.55, 0.04, toonMat(0xf2efe4));
+    apron.position.set(0, 0.28, -0.44);
+    const stain = sphere(0.09, toonMat(0xc9605a), 8, 6);
+    stain.position.set(0.1, 0.32, -0.47);
+    stain.scale.set(1, 1.3, 0.3);
+    rig.parts.torso.add(apron, stain);
+    // багет у руці
+    const baguetteM = toonMat(0xd9a35e);
+    const baguette = capsule(0.07, 0.55, baguetteM, 4, 8);
+    baguette.position.set(0, -0.62, 0);
+    rig.parts.armL.add(baguette);
+  } else {
+    // корона: золота / льодяна / залізна
+    const crownM = style === 'frost'
+      ? toonMat(0xaee8ff, 0x66ccff, 0.5)
+      : style === 'iron'
+        ? toonMat(0x6e7a8a, 0x222a36, 0.15)
+        : toonMat(0xffc933, 0xffa000, 0.25);
+    const crown = new THREE.Group();
+    const band = cylinder(0.14, 0.16, 0.09, crownM, 10);
+    crown.add(band);
+    for (let i = 0; i < 5; i++) {
+      const spike = cone(0.035, style === 'frost' ? 0.16 : 0.1, crownM, 6);
+      const ang = (i / 5) * Math.PI * 2;
+      spike.position.set(Math.cos(ang) * 0.13, 0.08, Math.sin(ang) * 0.13);
+      crown.add(spike);
+    }
+    crown.position.set(0, 0.42, 0);
+    crown.rotation.z = 0.12;
+    rig.parts.head.add(crown);
   }
-  crown.position.set(0, 0.42, 0);
-  crown.rotation.z = 0.12;
-  rig.parts.head.add(crown);
-  // шипи на плечах (льодяні для Мороза)
-  const spikeM = frost ? toonMat(0xc9ecf7) : toonMat(0x4a4458);
+  // шипи на плечах (льодяні для Мороза, броньовані для Барона)
+  const spikeM = style === 'frost' ? toonMat(0xc9ecf7)
+    : style === 'iron' ? toonMat(0x7d8aa0) : toonMat(0x4a4458);
   for (const side of [-1, 1]) {
-    const pad = sphere(0.16, spikeM, 10, 8);
+    const pad = sphere(style === 'iron' ? 0.2 : 0.16, spikeM, 10, 8);
     pad.position.set(0.46 * side, 1.58, 0);
     pad.scale.set(1.2, 0.7, 1.2);
     rig.body.add(pad);
-    const sp = cone(0.05, 0.16, spikeM, 6);
+    const sp = cone(0.05, style === 'iron' ? 0.22 : 0.16, spikeM, 6);
     sp.position.set(0.46 * side, 1.7, 0);
     rig.body.add(sp);
   }
-  if (frost) {
+  if (style === 'frost') {
     // бурульки на руках
     for (const side of [-1, 1]) {
       const ice = cone(0.06, 0.22, toonMat(0xc9ecf7), 6);
@@ -737,9 +898,76 @@ export function makeBoss(frost = false) {
       rig.parts[side < 0 ? 'armL' : 'armR'].add(ice);
     }
   }
+  if (style === 'iron') {
+    // нагрудна броня з заклепками
+    const plateM = toonMat(0x6e7a8a);
+    const plate = box(0.66, 0.5, 0.1, plateM);
+    plate.position.set(0, 0.36, -0.42);
+    rig.parts.torso.add(plate);
+    const rivetM = toonMat(0xb8c4d4);
+    for (const [rx, ry] of [[-0.22, 0.5], [0.22, 0.5], [-0.22, 0.2], [0.22, 0.2]]) {
+      const rv = sphere(0.035, rivetM, 6, 5);
+      rv.position.set(rx, ry, -0.46);
+      rig.parts.torso.add(rv);
+    }
+  }
   rig.ztype = 'boss';
   bakeRig(rig);
   return rig;
+}
+
+// ============================================================
+// Спорядження героя (видиме у виді 3-ї особи)
+// ============================================================
+export function attachHeroGear(rig, kind) {
+  if (kind === 'vest') {
+    const vestM = toonMat(0x2e4a6e);
+    const front = box(0.42, 0.46, 0.1, vestM);
+    front.position.set(0, 0.36, -0.24);
+    const backP = box(0.42, 0.46, 0.08, vestM);
+    backP.position.set(0, 0.36, 0.22);
+    const pocketM = toonMat(0x223a55);
+    for (const px of [-0.12, 0.12]) {
+      const pocket = box(0.14, 0.14, 0.04, pocketM);
+      pocket.position.set(px, 0.28, -0.3);
+      rig.parts.torso.add(pocket);
+    }
+    const strapM = toonMat(0x1a2c40);
+    for (const side of [-1, 1]) {
+      const strap = box(0.1, 0.06, 0.5, strapM);
+      strap.position.set(side * 0.16, 0.6, 0);
+      rig.parts.torso.add(strap);
+    }
+    rig.parts.torso.add(front, backP);
+    return [front, backP];
+  }
+  if (kind === 'helmet') {
+    const helmM = toonMat(0x556b3a);
+    const helm = sphere(0.3, helmM, 14, 10);
+    helm.position.y = 0.22;
+    helm.scale.set(1.03, 0.78, 1.03);
+    const rim = cylinder(0.31, 0.33, 0.05, helmM, 14);
+    rim.position.y = 0.13;
+    const star = cylinder(0.06, 0.06, 0.02, toonMat(0xffd23f), 5);
+    star.rotation.x = Math.PI / 2;
+    star.position.set(0, 0.26, -0.27);
+    rig.parts.head.add(helm, rim, star);
+    return [helm, rim, star];
+  }
+  if (kind === 'sneakers') {
+    const shoeM = toonMat(0xff8c42, 0xcc5500, 0.3);
+    const out = [];
+    for (const leg of [rig.parts.legL, rig.parts.legR]) {
+      const shoe = box(0.2, 0.14, 0.34, shoeM);
+      shoe.position.set(0, -0.83, -0.06);
+      const stripe = box(0.22, 0.05, 0.1, toonMat(0xffffff));
+      stripe.position.set(0, -0.8, -0.2);
+      leg.add(shoe, stripe);
+      out.push(shoe, stripe);
+    }
+    return out;
+  }
+  return [];
 }
 
 export function makeHero() {
@@ -893,6 +1121,119 @@ export function makeGunMesh(kind) {
     sightF.position.set(0, 0.065, -0.5);
     g.add(receiver, stock, pump, sightF);
     muzzle.position.set(0, 0.02, -0.58);
+  } else if (kind === 'smg') {
+    const tealM = toonMat(0x3fae9c, 0x1a6e60, 0.12);
+    const body = box(0.065, 0.1, 0.34, midM);
+    body.position.z = -0.08;
+    const shroud = cylinder(0.034, 0.034, 0.22, tealM, 10);
+    shroud.rotation.x = Math.PI / 2;
+    shroud.position.set(0, 0.02, -0.33);
+    const barrel = cylinder(0.018, 0.018, 0.1, darkM, 8);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.02, -0.48);
+    const mag = box(0.045, 0.24, 0.07, darkM);
+    mag.position.set(0, -0.16, -0.1);
+    mag.rotation.x = 0.12;
+    const grip = box(0.05, 0.12, 0.06, darkM);
+    grip.position.set(0, -0.1, 0.06);
+    grip.rotation.x = -0.25;
+    const stockBar = box(0.03, 0.03, 0.18, lightM);
+    stockBar.position.set(0, 0.02, 0.18);
+    const stockPad = box(0.05, 0.1, 0.04, tealM);
+    stockPad.position.set(0, 0, 0.28);
+    const sightF = box(0.016, 0.035, 0.02, tealM);
+    sightF.position.set(0, 0.08, -0.3);
+    g.add(body, shroud, barrel, mag, grip, stockBar, stockPad, sightF);
+    muzzle.position.set(0, 0.02, -0.54);
+  } else if (kind === 'magnum') {
+    const steelM = toonMat(0xb8c4d4);
+    const woodM = toonMat(0x7a4a28);
+    const barrel = box(0.05, 0.07, 0.34, steelM);
+    barrel.position.set(0, 0.03, -0.22);
+    const under = cylinder(0.02, 0.02, 0.3, steelM, 8);
+    under.rotation.x = Math.PI / 2;
+    under.position.set(0, -0.012, -0.2);
+    const drum = cylinder(0.052, 0.052, 0.09, darkM, 8);
+    drum.rotation.x = Math.PI / 2;
+    drum.position.set(0, 0.005, -0.02);
+    const frame = box(0.04, 0.1, 0.14, steelM);
+    frame.position.set(0, 0.0, 0.02);
+    const grip = box(0.05, 0.14, 0.07, woodM);
+    grip.position.set(0, -0.1, 0.07);
+    grip.rotation.x = -0.32;
+    const hammer = box(0.02, 0.05, 0.03, darkM);
+    hammer.position.set(0, 0.075, 0.07);
+    const sightF = box(0.014, 0.035, 0.02, accentM);
+    sightF.position.set(0, 0.085, -0.36);
+    g.add(barrel, under, drum, frame, grip, hammer, sightF);
+    muzzle.position.set(0, 0.03, -0.42);
+  } else if (kind === 'sniper') {
+    const camoM = toonMat(0x5e7050);
+    const body = box(0.06, 0.09, 0.5, camoM);
+    body.position.z = -0.1;
+    const barrel = cylinder(0.02, 0.02, 0.55, darkM, 10);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.02, -0.62);
+    const brake = cylinder(0.034, 0.034, 0.09, accentM, 8);
+    brake.rotation.x = Math.PI / 2;
+    brake.position.set(0, 0.02, -0.88);
+    // оптичний приціл
+    const scope = cylinder(0.035, 0.035, 0.22, darkM, 10);
+    scope.rotation.x = Math.PI / 2;
+    scope.position.set(0, 0.1, -0.1);
+    const lens = cylinder(0.04, 0.04, 0.02, toonMat(0x9fd8ff, 0x4fb8ff, 0.6), 10);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0, 0.1, -0.22);
+    const mount1 = box(0.02, 0.05, 0.03, midM);
+    mount1.position.set(0, 0.06, -0.16);
+    const mount2 = box(0.02, 0.05, 0.03, midM);
+    mount2.position.set(0, 0.06, -0.04);
+    const mag = box(0.05, 0.12, 0.1, darkM);
+    mag.position.set(0, -0.1, -0.14);
+    const stock = box(0.055, 0.12, 0.24, camoM);
+    stock.position.set(0, -0.03, 0.22);
+    stock.rotation.x = -0.1;
+    const cheek = box(0.05, 0.04, 0.14, accentM);
+    cheek.position.set(0, 0.045, 0.22);
+    const grip = box(0.05, 0.11, 0.06, darkM);
+    grip.position.set(0, -0.1, 0.07);
+    grip.rotation.x = -0.3;
+    // сошки
+    for (const side of [-1, 1]) {
+      const leg = cylinder(0.012, 0.012, 0.16, lightM, 6);
+      leg.position.set(side * 0.05, -0.1, -0.42);
+      leg.rotation.z = side * 0.4;
+      g.add(leg);
+    }
+    g.add(body, barrel, brake, scope, lens, mount1, mount2, mag, stock, cheek, grip);
+    muzzle.position.set(0, 0.02, -0.94);
+  } else if (kind === 'bazooka') {
+    const oliveM = toonMat(0x6b7a4a);
+    const tube = cylinder(0.075, 0.075, 0.85, oliveM, 12);
+    tube.rotation.x = Math.PI / 2;
+    tube.position.set(0, 0.05, -0.1);
+    const mouth = cylinder(0.105, 0.085, 0.14, darkM, 12);
+    mouth.rotation.x = Math.PI / 2;
+    mouth.position.set(0, 0.05, -0.58);
+    const back = cylinder(0.085, 0.1, 0.12, darkM, 12);
+    back.rotation.x = Math.PI / 2;
+    back.position.set(0, 0.05, 0.38);
+    // бойова частина ракети визирає
+    const warhead = cone(0.06, 0.16, accentM, 10);
+    warhead.rotation.x = -Math.PI / 2;
+    warhead.position.set(0, 0.05, -0.62);
+    const grip = box(0.05, 0.14, 0.07, darkM);
+    grip.position.set(0, -0.08, 0.02);
+    grip.rotation.x = -0.2;
+    const grip2 = box(0.05, 0.1, 0.06, darkM);
+    grip2.position.set(0, -0.06, -0.22);
+    const sight = box(0.02, 0.09, 0.03, lightM);
+    sight.position.set(0, 0.16, -0.2);
+    const band1 = cylinder(0.08, 0.08, 0.05, toonMat(0xffd23f), 12);
+    band1.rotation.x = Math.PI / 2;
+    band1.position.set(0, 0.05, -0.35);
+    g.add(tube, mouth, back, warhead, grip, grip2, sight, band1);
+    muzzle.position.set(0, 0.05, -0.68);
   } else {
     const slide = box(0.06, 0.09, 0.28, midM);
     slide.position.z = -0.06;
@@ -935,7 +1276,7 @@ export function makeFPArms(gunKind) {
   const handR = sphere(0.06, skinM, 10, 8);
   handR.position.set(0.005, -0.09, 0.05);
   // ліва рука підтримує цівку
-  const longGun = gunKind === 'rifle' || gunKind === 'shotgun';
+  const longGun = ['rifle', 'shotgun', 'smg', 'sniper', 'bazooka'].includes(gunKind);
   const armL = capsule(0.055, 0.28, sleeveM);
   armL.rotation.x = Math.PI / 2 - 0.25;
   armL.rotation.z = 0.5;

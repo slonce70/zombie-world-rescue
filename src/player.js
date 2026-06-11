@@ -1,15 +1,20 @@
-// Гравець: рух, камера FP/TP, зброя, стрільба
+// Гравець: рух, камера FP/TP, зброя, стрільба, броня, бафи
 import * as THREE from 'three';
-import { makeHero, makeGunMesh, makeFPArms, updateRig, setAnim } from './characters.js';
+import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim } from './characters.js';
 
 import { clamp, damp, lerp } from './utils.js';
 
 export const WEAPONS = {
   pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, infinite: true },
-  rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, infinite: false },
-  shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, infinite: false, pellets: 7 },
+  rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, infinite: false, reserve: 120, cap: 240 },
+  shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, infinite: false, pellets: 7, reserve: 24, cap: 60 },
+  smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, infinite: false, reserve: 160, cap: 320 },
+  magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 18, cap: 48 },
+  sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 10, cap: 30 },
+  bazooka: { name: 'Базука', icon: '🚀', dmg: 50, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
 };
-const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun'];
+export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
+const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka' };
 
 export class Player {
   constructor(level) {
@@ -33,14 +38,21 @@ export class Player {
     this.speedMult = 1;
     this.damageMult = 1;
     this.respawnProtect = 0;
+    // броня: поглинає 60% шкоди, поки є
+    this.armor = 0;
+    this.maxArmor = 50;
+    this.helmetMult = 1; // шолом: множник вхідної шкоди
+    this.jumpPower = 7.6;
+    this.gearAttached = {};
+    // тимчасові бафи (секунди, що лишились)
+    this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
 
     this.weapons = ['pistol'];
     this.cur = 'pistol';
-    this.ammo = {
-      pistol: { mag: WEAPONS.pistol.mag, reserve: Infinity },
-      rifle: { mag: WEAPONS.rifle.mag, reserve: 120 },
-      shotgun: { mag: WEAPONS.shotgun.mag, reserve: 24 },
-    };
+    this.ammo = {};
+    for (const w of WEAPON_SLOTS) {
+      this.ammo[w] = { mag: WEAPONS[w].mag, reserve: WEAPONS[w].infinite ? Infinity : WEAPONS[w].reserve };
+    }
     this.grenades = 2;
     this.grenadeCd = 0;
     this.stepT = 0;
@@ -144,8 +156,35 @@ export class Player {
   }
 
   addAmmo(n) {
-    this.ammo.rifle.reserve = Math.min(240, this.ammo.rifle.reserve + n);
-    this.ammo.shotgun.reserve = Math.min(60, this.ammo.shotgun.reserve + Math.ceil(n / 7.5));
+    // патрони для всієї вогнепальної зброї пропорційно (ракети — окремо)
+    const ratio = { rifle: 1, smg: 1.4, shotgun: 1 / 7.5, magnum: 1 / 6, sniper: 1 / 10 };
+    for (const [w, k] of Object.entries(ratio)) {
+      this.ammo[w].reserve = Math.min(WEAPONS[w].cap, this.ammo[w].reserve + Math.ceil(n * k));
+    }
+  }
+
+  addRockets(n) {
+    this.ammo.bazooka.reserve = Math.min(WEAPONS.bazooka.cap, this.ammo.bazooka.reserve + n);
+  }
+
+  // куплене спорядження: ефекти + видимі речі на герої (3-тя особа)
+  applyGear(upgrades) {
+    const vest = upgrades.vest || 0;
+    this.maxArmor = 50 + vest * 50;
+    this.helmetMult = upgrades.helmet ? 0.85 : 1;
+    this.jumpPower = upgrades.sneakers ? 8.6 : 7.6;
+    for (const kind of ['vest', 'helmet', 'sneakers']) {
+      if ((upgrades[kind] || 0) > 0 && !this.gearAttached[kind]) {
+        attachHeroGear(this.rig, kind);
+        this.gearAttached[kind] = true;
+      }
+    }
+  }
+
+  addArmor(n) {
+    if (this.armor >= this.maxArmor) return false;
+    this.armor = Math.min(this.maxArmor, this.armor + n);
+    return true;
   }
 
   startReload() {
@@ -183,9 +222,15 @@ export class Player {
         mz += input.touchMove.z;
       }
     }
+    // бафи згасають
+    for (const k in this.buffs) {
+      if (this.buffs[k] > 0) this.buffs[k] -= dt;
+    }
+
     const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
     const sprint = moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
-    const speed = 5.6 * this.speedMult * (sprint ? 1.55 : 1);
+    const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
+    const speed = 5.6 * this.speedMult * buffSpeed * (sprint ? 1.55 : 1);
     let tx = 0, tz = 0;
     if (moving) {
       const len = Math.max(1, Math.hypot(mx, mz));
@@ -206,7 +251,7 @@ export class Player {
 
     // стрибок і гравітація
     if (allowControl && input.pressed('Space') && this.onGround) {
-      this.vel.y = 7.6;
+      this.vel.y = this.jumpPower;
       this.onGround = false;
     }
     this.vel.y -= 21 * dt;
@@ -230,7 +275,8 @@ export class Player {
     for (const jp of world.jumpPads) {
       if (jp.cd > 0) jp.cd -= dt;
       if (this.onGround && jp.cd <= 0
-        && Math.hypot(this.pos.x - jp.x, this.pos.z - jp.z) < 1.35) {
+        && Math.hypot(this.pos.x - jp.x, this.pos.z - jp.z) < 1.35
+        && Math.abs(this.pos.y - (jp.y !== undefined ? jp.y : this.pos.y)) < 2.2) {
         this.vel.y = jp.power;
         this.onGround = false;
         jp.cd = 0.6;
@@ -244,9 +290,9 @@ export class Player {
 
     // --- перемикання ---
     if (allowControl) {
-      if (input.pressed('Digit1')) this.switchWeapon('pistol');
-      if (input.pressed('Digit2')) this.switchWeapon('rifle');
-      if (input.pressed('Digit3')) this.switchWeapon('shotgun');
+      for (const [code, w] of Object.entries(SLOT_KEYS)) {
+        if (input.pressed(code)) this.switchWeapon(w);
+      }
       if (input.pressed('KeyQ')) {
         // швидке перемикання по колу
         const have = this.weapons;
@@ -404,19 +450,39 @@ export class Player {
     a.mag--;
     this.shootCd = 60 / w.rpm;
     this.gunKick = 1;
-    this.pitch = clamp(this.pitch + w.recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
-    this.yaw += (Math.random() - 0.5) * w.recoil * 0.4;
     level.audio.shot(this.cur);
     level.stats.shotsFired++;
+    const dmgMult = this.damageMult * (this.buffs.rage > 0 ? 2 : 1);
+    // віддача підкидає приціл ПІСЛЯ пострілу — куля летить туди, куди цілився
+    const applyRecoil = () => {
+      this.pitch = clamp(this.pitch + w.recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
+      this.yaw += (Math.random() - 0.5) * w.recoil * 0.4;
+    };
 
-    // промені з камери через приціл (дробовик — кілька шротин)
-    const origin = this._shootOrigin.copy(this.camera.position);
-    const MAX_D = w.pellets ? 45 : 140;
-    const pellets = w.pellets || 1;
-    const spreadMult = (this.bobAmp > 0.5 ? 1.6 : 1);
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
     level.effects.muzzleFlash(this._muzzlePos);
+
+    // точка пострілу: від 1-ї особи — поточні очі (камера оновлюється в кінці кадру
+    // і після телепорту може відставати), від 3-ї — камера через приціл
+    const origin = this.firstPerson
+      ? this._shootOrigin.set(this.pos.x, this.pos.y + 1.62, this.pos.z)
+      : this._shootOrigin.copy(this.camera.position);
+
+    // 🚀 базука: летить ракета, шкода — вибухом
+    if (w.rocket) {
+      const dir = this.forwardVec(this._shootDir).clone().normalize();
+      level.effects.spawnRocket(origin.clone().addScaledVector(dir, 0.7), dir, w.dmg);
+      level.audio.rocket();
+      this.camShake = Math.max(this.camShake, 0.5);
+      applyRecoil();
+      return;
+    }
+
+    // промені через приціл (дробовик — кілька шротин)
+    const MAX_D = w.pellets ? 45 : 140;
+    const pellets = w.pellets || 1;
+    const spreadMult = (this.bobAmp > 0.5 ? 1.6 : 1);
 
     let anyHit = false;
     let anyHeadshot = false;
@@ -434,7 +500,7 @@ export class Player {
       // вибухові бочки і м'яч — теж цілі
       const bHit = level.effects.barrelHitTest(origin, dir, MAX_D);
       if (bHit && bHit.t < blockT && (!hit || bHit.t < hit.t)) {
-        level.effects.damageBarrel(bHit.barrel, w.dmg * this.damageMult);
+        level.effects.damageBarrel(bHit.barrel, w.dmg * dmgMult);
         const bp = this._shootEnd.copy(origin).addScaledVector(dir, bHit.t);
         level.effects.burst(bp, 0xff5544, 4, { speed: 2, life: 0.3 });
         if (i < 3) level.effects.tracer(this._muzzlePos, bp);
@@ -454,7 +520,7 @@ export class Player {
         if (i < 2) level.effects.burst(endPoint, 0xb09a72, 4, { speed: 2, life: 0.35, size: 0.7 });
       } else if (hit) {
         endPoint = hit.point;
-        const dmg = w.dmg * this.damageMult * (hit.headshot ? 2 : 1);
+        let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
         hit.zombie.damage(dmg, dir, hit.headshot);
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;
@@ -464,11 +530,37 @@ export class Player {
         if (i < 3) level.effects.burst(hit.point, 0x86d14e, 6, { speed: 2.6, life: 0.45 });
         anyHit = true;
         anyHeadshot = anyHeadshot || hit.headshot;
+
+        // 🎯 снайперка: куля пробиває кілька зомбі наскрізь
+        if (w.pierce) {
+          let pierceLeft = w.pierce - 1;
+          let from = hit.point.clone().addScaledVector(dir, 0.5);
+          let travelled = hit.t;
+          while (pierceLeft > 0 && travelled < MAX_D) {
+            const next = level.zombies.hitTest(from, dir, MAX_D - travelled);
+            if (!next) break;
+            const wallT = this.world.shotBlockDist(from, dir, next.t);
+            if (wallT < next.t) break;
+            dmg *= 0.7;
+            next.zombie.damage(dmg, dir, next.headshot);
+            const acc2 = dmgByZombie.get(next.zombie) || { total: 0, point: next.point, crit: false };
+            acc2.total += dmg;
+            acc2.point = next.point;
+            acc2.crit = acc2.crit || next.headshot;
+            dmgByZombie.set(next.zombie, acc2);
+            level.effects.burst(next.point, 0x86d14e, 4, { speed: 2.4, life: 0.4 });
+            endPoint = next.point;
+            travelled += next.t + 0.5;
+            from = next.point.clone().addScaledVector(dir, 0.5);
+            pierceLeft--;
+          }
+        }
       } else {
         endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
       }
       if (i < 3) level.effects.tracer(this._muzzlePos, endPoint);
     }
+    applyRecoil();
     for (const [, acc] of dmgByZombie) {
       level.effects.damageNumber(acc.point, acc.total, acc.crit);
     }
@@ -481,6 +573,19 @@ export class Player {
 
   takeDamage(amt, fromX, fromZ) {
     if (this.respawnProtect > 0 || this.health <= 0) return;
+    // 🛡 бульбашка: повна невразливість, поки діє баф
+    if (this.buffs.bubble > 0) {
+      this.level.bus.emit('bubbleBlock');
+      return;
+    }
+    amt *= this.helmetMult; // ⛑ шолом зменшує всю шкоду
+    // 🦺 броня поглинає 60% шкоди, поки не зламається
+    if (this.armor > 0) {
+      const absorb = Math.min(this.armor, amt * 0.6);
+      this.armor -= absorb;
+      amt -= absorb;
+      this.level.bus.emit('armorHit');
+    }
     this.health -= amt;
     this.camShake = 1;
     const dx = this.pos.x - fromX, dz = this.pos.z - fromZ;

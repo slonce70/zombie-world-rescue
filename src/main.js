@@ -29,8 +29,14 @@ const TIPS = [
   'Дробовик — король ближнього бою. Клавіша 3!',
   'На льоду ковзько — гальмуй заздалегідь! ⛸',
   'Комбо-серії вбивств дають бонусні монети 🔥',
-  'Шукай аеродропи 🪂 — у них найкращі припаси!',
+  'Шукай аеродропи 🪂 — там навіть БАЗУКА буває!',
   'Клавіша V — подивись на свого героя збоку!',
+  'Щит щитоносця 🛡 не проб’єш у лоб — обійди ззаду або зламай!',
+  'У магазині (B) є нова зброя, бронежилет і шолом!',
+  'Світні кулі — підсилення: ⚡швидкість, 💪лють, 🛡бульбашка, 🧲магніт!',
+  'Бронежилет 🦺 поглинає шкоду — поповнюй пластинами!',
+  'Снайперка 🎯 пробиває трьох зомбі наскрізь — шикуй їх у чергу!',
+  'Смаколики 🥐 на столиках повертають здоров’я!',
 ];
 
 class Game {
@@ -265,10 +271,14 @@ class Game {
     const u = this.save.upgrades;
     level.player.maxHealth = 100 + (u.maxhp || 0) * 25;
     level.player.health = level.player.maxHealth;
-    level.player.speedMult = 1 + (u.speed || 0) * 0.1;
+    level.player.speedMult = (1 + (u.speed || 0) * 0.1) * (u.sneakers ? 1.08 : 1);
     level.player.damageMult = 1 + (u.damage || 0) * 0.15;
+    // спорядження: бронежилет, шолом, кросівки (видно на герої)
+    level.player.applyGear(u);
+    if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах
     for (const w of this.save.weapons) level.player.giveWeapon(w, false);
+    if (this.save.weapons.includes('bazooka')) level.player.addRockets(2);
 
     level.zombies = new Zombies(level, this.seed + 2);
     level.zombies.populate();
@@ -293,11 +303,30 @@ class Game {
     if (fun.soccerBall) level.effects.addBall(fun.soccerBall.x, fun.soccerBall.z);
     if (fun.animals) level.effects.addAnimals(fun.animals);
     level.effects.onAirdrop = () => {
-      this.hud.toast('🪂 Аеродроп! Припаси падають поблизу — шукай блакитний промінь!');
+      this.hud.toast(this.save.weapons.includes('bazooka')
+        ? '🪂 Аеродроп! Припаси падають поблизу — шукай блакитний промінь!'
+        : '🪂 Аеродроп! Кажуть, у таких ящиках буває БАЗУКА… 🚀');
       this.audio.mission();
+    };
+    // особливий вміст аеродропа
+    level.effects.rollAirdropSpecial = () => {
+      if (!this.save.weapons.includes('bazooka')) return 'bazooka';
+      const roll = Math.random();
+      if (roll < 0.3) return 'rocket';
+      if (roll < 0.5) return 'armor';
+      if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
+      return 'grenade';
     };
 
     level.effects.getPlayerPos = () => level.player.pos;
+    level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
+    level.effects.zombieHitTest = (origin, dir, maxD) => level.zombies.hitTest(origin, dir, maxD);
+    const BUFF_INFO = {
+      speed: { dur: 20, msg: '⚡ ТУРБО-ШВИДКІСТЬ на 20 секунд!' },
+      rage: { dur: 15, msg: '💪 ПОДВІЙНА ШКОДА на 15 секунд!' },
+      bubble: { dur: 8, msg: '🛡 НЕВРАЗЛИВІСТЬ на 8 секунд!' },
+      magnet: { dur: 25, msg: '🧲 МАГНІТ МОНЕТ на 25 секунд!' },
+    };
     level.effects.onPickup = (type, value) => {
       if (type === 'coin') {
         level.addCoins(value);
@@ -309,19 +338,41 @@ class Game {
         level.player.grenades++;
         this.audio.pickup();
         this.hud.toast('💣 +1 граната (G — кинути)');
+      } else if (type === 'food') {
+        level.player.heal(15);
+        this.audio.heal();
+        this.hud.toast(`😋 Смачний ${level.country.food || 'смаколик'}! +15 здоров’я`);
+      } else if (type === 'armor') {
+        level.player.addArmor(value || 40);
+        this.audio.pickup();
+        this.hud.toast('🛡️ +40 броні!');
+      } else if (type === 'rocket') {
+        level.player.addRockets(value || 2);
+        this.audio.pickup();
+        this.hud.toast('🧨 +2 ракети для базуки!');
+      } else if (type === 'bazooka') {
+        this.unlockWeapon('bazooka');
+        level.player.addRockets(3);
+        this.audio.powerup();
+        this.hud.banner('🚀 БАЗУКА!', 'Клавіша 7 — рознеси їх усіх! (+3 ракети)');
+      } else if (BUFF_INFO[type]) {
+        level.player.buffs[type] = BUFF_INFO[type].dur;
+        this.audio.powerup();
+        this.hud.toast(BUFF_INFO[type].msg);
       } else {
         level.player.addAmmo(30);
         this.audio.pickup();
         this.hud.toast('🔋 +30 набоїв');
       }
     };
-    // вибух гранати: шкода зомбі по радіусу
-    level.effects.onExplosion = (x, y, z, r) => {
+    // вибух (граната 135, ракета базуки 50): шкода зомбі по радіусу
+    level.effects.onExplosion = (x, y, z, r, baseDmg = 135) => {
       for (const zb of [...level.zombies.list]) {
         if (zb.state === 'dead') continue;
         const d = Math.hypot(zb.x - x, zb.z - z);
         if (d < r) {
-          const dmg = Math.round(135 * (1 - (d / r) * 0.55) * level.player.damageMult);
+          const rage = level.player.buffs.rage > 0 ? 2 : 1;
+          const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * level.player.damageMult * rage);
           level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
           zb.damage(dmg, null, false);
         }
@@ -372,14 +423,18 @@ class Game {
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, country.banner, 4.5);
   }
 
-  // нагорода-зброя за країну: видається і запам'ятовується назавжди
+  // нагорода-зброя за країну: видається і запам'ятовується назавжди.
+  // Якщо зброя вже куплена в магазині — компенсація монетами.
   unlockWeapon(id) {
     if (!this.level) return;
-    this.level.player.giveWeapon(id);
-    if (!this.save.weapons.includes(id)) {
-      this.save.weapons.push(id);
-      this.saveGame();
+    if (this.save.weapons.includes(id)) {
+      this.level.addCoins(300);
+      this.hud.toast('🪙 Така зброя в тебе вже є — тримай +300 монет!');
+      return;
     }
+    this.level.player.giveWeapon(id);
+    this.save.weapons.push(id);
+    this.saveGame();
   }
 
   endLevel() {
@@ -613,6 +668,9 @@ class Game {
           x: g.level.player.pos.x, y: g.level.player.pos.y, z: g.level.player.pos.z,
           health: g.level.player.health, weapons: g.level.player.weapons, cur: g.level.player.cur,
           firstPerson: g.level.player.firstPerson,
+          armor: g.level.player.armor, maxArmor: g.level.player.maxArmor,
+          buffs: { ...g.level.player.buffs },
+          rockets: g.level.player.ammo.bazooka.reserve + g.level.player.ammo.bazooka.mag,
         } : null,
         missions: g.level ? g.level.missions.missions.map((m) => ({ id: m.id, state: m.state })) : null,
         bossStarted: g.level ? g.level.missions.bossStarted : false,
@@ -660,6 +718,9 @@ class Game {
       giveRifle: () => g.level.player.giveRifle(),
       giveWeapon: (id) => g.unlockWeapon(id),
       throwGrenade: () => g.level.player.throwGrenade(),
+      spawnZombie: (type, x, z) => g.level.zombies.spawn(type, x, z, {}),
+      airdropNow: () => { g.level.effects.airdropT = 0.05; },
+      shopBuy: (id) => g.shop.buy(id),
       killZombiesNear: (x, z, r) => {
         for (const zb of [...g.level.zombies.list]) {
           if (zb.state !== 'dead' && Math.hypot(zb.x - x, zb.z - z) < r) {
