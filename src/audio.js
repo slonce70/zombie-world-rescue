@@ -125,6 +125,40 @@ export class AudioMan {
     this._noise(this.t, 0.25, 0.18 * Math.min(1, vol), 'bandpass', 600, 2, 1800);
   }
 
+  boing() {
+    if (!this.ctx) return;
+    const t = this.t;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(650, t + 0.18);
+    o.frequency.exponentialRampToValueAtTime(420, t + 0.3);
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    o.connect(g).connect(this.sfxGain);
+    o.start(t); o.stop(t + 0.4);
+  }
+
+  cluck() {
+    if (!this.ctx || (this._cluckCd || 0) > this.t) return;
+    this._cluckCd = this.t + 0.4;
+    const t = this.t;
+    this._osc('square', 820, t, 0.06, 0.09, 500);
+    this._osc('square', 700, t + 0.09, 0.08, 0.08, 420);
+  }
+
+  goldenJingle() {
+    const t = this.t;
+    [79, 83, 86, 91, 95].forEach((m, i) => {
+      this._osc('triangle', midi(m), t + i * 0.09, 0.25, 0.28);
+    });
+  }
+
+  kick() {
+    this._osc('sine', 140, this.t, 0.09, 0.3, 70);
+  }
+
   comboDing(level = 1) {
     const t = this.t;
     const base = 72 + Math.min(level, 6) * 2;

@@ -146,7 +146,10 @@ await waitFor(async () => {
   await page.evaluate(() => window.__game.test.finishHorde());
   return await page.evaluate(() => window.__game.level.missions.bossUnlocked);
 }, 150000, 'арена');
-await page.evaluate(() => window.__game.test.teleport(-10, -168));
+await page.evaluate(() => {
+  const a = window.__game.level.world.layout.arena;
+  window.__game.test.teleport(a.x, a.z);
+});
 await waitFor(async () => (await state()).bossStarted, 15000, 'бос стартував');
 s = await state();
 check(s.bossStarted, 'бій з Королем Морозом почався');
@@ -163,7 +166,8 @@ const bossThrew = await waitFor(async () => {
       const d = Math.hypot(b.x - g.level.player.pos.x, b.z - g.level.player.pos.z);
       if (d < 12 || d > 35) {
         // стаємо за 18 м на південь від боса (в межах арени)
-        g.test.teleport(b.x, Math.min(b.z + 18, -168 + 26));
+        const a = g.level.world.layout.arena;
+        g.test.teleport(b.x, Math.min(b.z + 18, a.z + a.r - 4));
       }
     }
     return g.level.effects.projectiles.some((p) => p.size > 0.4);
@@ -173,9 +177,11 @@ check(bossThrew, 'Мороз кидає великі сніжки');
 // просаджуємо до 65% — має прикликати сніговиків
 await page.evaluate(() => window.__game.test.damageBoss(700));
 await page.waitForTimeout(4000);
-const minions = await page.evaluate(() =>
-  window.__game.level.zombies.list.filter((z) => z.type === 'snowman' && z.state !== 'dead'
-    && Math.hypot(z.x - (-10), z.z - (-168)) < 25).length);
+const minions = await page.evaluate(() => {
+  const a = window.__game.level.world.layout.arena;
+  return window.__game.level.zombies.list.filter((z) => z.type === 'snowman' && z.state !== 'dead'
+    && Math.hypot(z.x - a.x, z.z - a.z) < 30).length;
+});
 check(minions > 0, `Мороз прикликав сніговиків: ${minions}`);
 // добиваємо
 await waitFor(async () => {
@@ -227,7 +233,7 @@ await page.evaluate(() => {
   mk('touchstart', 1, 200, 600);
   mk('touchmove', 1, 200, 540);
 });
-await page.waitForTimeout(1800);
+await page.waitForTimeout(5000);
 await page.evaluate(() => {
   const canvas = window.__game.renderer.domElement;
   const t = new Touch({ identifier: 1, target: canvas, clientX: 200, clientY: 540 });

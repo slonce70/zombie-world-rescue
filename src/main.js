@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Input } from './input.js';
 import { AudioMan } from './audio.js';
-import { World, LAYOUT } from './world.js';
+import { World } from './world.js';
 import { Player } from './player.js';
 import { Zombies } from './zombies.js';
 import { Missions } from './missions.js';
@@ -15,6 +15,23 @@ import { COUNTRIES, getBiome } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 
 const SAVE_KEY = 'zr-save-v1';
+
+const QUALITY_MODES = ['auto', 'high', 'fast'];
+const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
+const TIPS = [
+  'Тримай Shift, щоб бігти від орди!',
+  'Гранати (G) вибухають і червоні бочки — ланцюгова реакція!',
+  'Зазирай у будинки з відчиненими дверима — там лут. Але обережно…',
+  'Золотий зомбі ⭐ тікає від тебе. Дожени — отримаєш джекпот!',
+  'Батути 🔵 закидають на дахи. Там сховані скарби!',
+  'Медик з хліва лікує тебе, коли стоїш поруч 💚',
+  'Хедшот робить подвійну шкоду. Цілься в голову!',
+  'Дробовик — король ближнього бою. Клавіша 3!',
+  'На льоду ковзько — гальмуй заздалегідь! ⛸',
+  'Комбо-серії вбивств дають бонусні монети 🔥',
+  'Шукай аеродропи 🪂 — у них найкращі припаси!',
+  'Клавіша V — подивись на свого героя збоку!',
+];
 
 class Game {
   constructor() {
@@ -110,6 +127,15 @@ class Game {
       this._hideOverlay('overlay-victory');
       this.endLevel();
     });
+    // перемикач якості
+    document.getElementById('btn-quality').addEventListener('click', () => {
+      const i = QUALITY_MODES.indexOf(this.save.quality || 'auto');
+      this.save.quality = QUALITY_MODES[(i + 1) % QUALITY_MODES.length];
+      this.saveGame();
+      this._applyQuality();
+      this.audio.click();
+    });
+    this._applyQuality();
 
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
@@ -144,6 +170,23 @@ class Game {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* ignore */ }
   }
 
+  _applyQuality() {
+    const q = this.save.quality || 'auto';
+    document.getElementById('btn-quality').textContent = `⚙️ Якість: ${QUALITY_LABELS[q]}`;
+    if (q === 'fast') this.pixelRatio = 1.0;
+    else if (q === 'high') this.pixelRatio = Math.min(devicePixelRatio, 1.75);
+    else this.pixelRatio = Math.min(devicePixelRatio, 1.5);
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.renderer.setSize(innerWidth, innerHeight);
+  }
+
+  _qualityWorldOpts() {
+    const q = this.save.quality || 'auto';
+    return q === 'fast'
+      ? { shadow: 1024, snow: 160 }
+      : { shadow: 2048, snow: 380 };
+  }
+
   async _boot() {
     try {
       await this.globe.load();
@@ -171,9 +214,33 @@ class Game {
   _hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
 
   // ---------- рівень ----------
-  startLevel(countryId) {
-    this._showGlobeUI(false);
+  async startLevel(countryId) {
+    if (this._startingLevel) return;
+    this._startingLevel = true;
+    try {
+      await this._buildLevel(countryId);
+    } catch (e) {
+      // не блокуємо гру назавжди — повертаємось на глобус
+      console.error('Помилка побудови рівня', e);
+      this.level = null;
+      this.state = 'globe';
+      this._showGlobeUI(true);
+      this.hud.toast('😵 Ой! Щось пішло не так. Спробуй ще раз.');
+    } finally {
+      this._hideOverlay('overlay-level-loading');
+      this._startingLevel = false;
+    }
+  }
+
+  async _buildLevel(countryId) {
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
+    // екран завантаження рівня з порадою
+    document.getElementById('ll-title').textContent = `${country.flag} ${country.name.toUpperCase()}`;
+    document.getElementById('ll-tip').textContent = '💡 ' + TIPS[Math.floor(Math.random() * TIPS.length)];
+    this._showOverlay('overlay-level-loading');
+    this._showGlobeUI(false);
+    // даємо браузеру намалювати екран завантаження
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const level = {
       game: this,
       countryId,
@@ -186,7 +253,7 @@ class Game {
       combo: { n: 0, t: 0, best: 0 },
       bossDefeated: false,
     };
-    level.world = new World(level.scene, country.seed, getBiome(countryId));
+    level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.addCoins = (n) => {
       this.save.coins += n;
@@ -206,6 +273,29 @@ class Game {
     level.zombies = new Zombies(level, this.seed + 2);
     level.zombies.populate();
     level.missions = new Missions(level);
+
+    // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
+    for (const ls of level.world.lootSpots) {
+      if (ls.type === 'coins') {
+        for (let i = 0; i < 5; i++) {
+          level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
+        }
+      } else {
+        level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
+      }
+    }
+    for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+
+    // приколи карти: бочки, м'яч, тварини, аеродроп
+    const fun = country.map.fun || {};
+    for (const [bx, bz] of fun.barrels || []) level.effects.addBarrel(bx, bz);
+    if (fun.barrels && fun.barrels.length) level.world._buildGrid();
+    if (fun.soccerBall) level.effects.addBall(fun.soccerBall.x, fun.soccerBall.z);
+    if (fun.animals) level.effects.addAnimals(fun.animals);
+    level.effects.onAirdrop = () => {
+      this.hud.toast('🪂 Аеродроп! Припаси падають поблизу — шукай блакитний промінь!');
+      this.audio.mission();
+    };
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.onPickup = (type, value) => {
@@ -337,7 +427,7 @@ class Game {
     for (const zb of [...this.level.zombies.list]) {
       if (zb.state !== 'dead') zb.damage(99999, null, false);
     }
-    const { x, z } = LAYOUT.arena;
+    const { x, z } = this.level.world.layout.arena;
     const eff = this.level.effects;
     const world = this.level.world;
     // салют
@@ -420,8 +510,8 @@ class Game {
         fpsEl.style.display = 'block';
         fpsEl.textContent = this.fps + ' FPS';
       }
-      // адаптивна роздільність: довго < 48 fps → знижуємо рендер-масштаб
-      if (this.fps < 48 && this.state === 'level') {
+      // адаптивна роздільність: довго < 48 fps → знижуємо рендер-масштаб (лише в режимі Авто)
+      if ((this.save.quality || 'auto') === 'auto' && this.fps < 48 && this.state === 'level') {
         if (++this._lowFpsSec >= 3 && this.pixelRatio > 1.0) {
           this.pixelRatio = Math.max(1.0, this.pixelRatio - 0.25);
           this.renderer.setPixelRatio(this.pixelRatio);
@@ -466,7 +556,7 @@ class Game {
           if (this.deathT <= 0) {
             this._hideOverlay('overlay-death');
             this.level.player.respawn();
-            this.level.zombies.clearNear(LAYOUT.SPAWN.x, LAYOUT.SPAWN.z, 30);
+            this.level.zombies.clearNear(this.level.world.layout.SPAWN.x, this.level.world.layout.SPAWN.z, 30);
             this.deathT = -1;
             if (!this.testMode && !this.input.locked) this._showOverlay('overlay-start');
           }

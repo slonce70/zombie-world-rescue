@@ -1,5 +1,5 @@
 // HUD: приціл, здоров'я, патрони, монети, місії, мінікарта, банери
-import { ROADS, LAYOUT } from './world.js';
+
 import { WEAPONS } from './player.js';
 import { clamp } from './utils.js';
 
@@ -254,14 +254,14 @@ export class HUD {
     // межа світу
     const [bx, by] = toMap(0, 0);
     ctx.beginPath();
-    ctx.arc(bx, by, LAYOUT.BOUND * k, 0, 6.29);
+    ctx.arc(bx, by, level.world.layout.BOUND * k, 0, 6.29);
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 3;
     ctx.stroke();
     // дороги
     ctx.strokeStyle = 'rgba(185, 160, 120, 0.9)';
     ctx.lineWidth = 4;
-    for (const line of ROADS) {
+    for (const line of level.world.roads) {
       ctx.beginPath();
       for (let i = 0; i < line.length; i++) {
         const [mx, my] = toMap(line[i][0], line[i][1]);
@@ -273,6 +273,20 @@ export class HUD {
     // зомбі поблизу
     for (const z of level.zombies.list) {
       if (z.state === 'dead') continue;
+      if (z.golden) {
+        // золотий видно завжди — полювання за скарбом!
+        let [gx, gy] = toMap(z.x, z.z);
+        const gdx = gx - C, gdy = gy - C;
+        const gd = Math.hypot(gdx, gdy);
+        if (gd > R - 10) {
+          gx = C + (gdx / gd) * (R - 10);
+          gy = C + (gdy / gd) * (R - 10);
+        }
+        ctx.font = '13px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⭐', gx, gy + 5);
+        continue;
+      }
       const d = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
       if (d > VIEW) continue;
       const [mx, my] = toMap(z.x, z.z);

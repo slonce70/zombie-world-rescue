@@ -122,6 +122,20 @@ export function rayAABB(o, d, box) {
   return tmin;
 }
 
+// Повне звільнення GPU-ресурсів об'єкта (унікальні геометрії/текстури)
+export function disposeObject(root) {
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+        if (!m) return;
+        if (m.map) m.map.dispose();
+        m.dispose();
+      });
+    }
+  });
+}
+
 export class Bus {
   constructor() { this.m = new Map(); }
   on(e, f) {

@@ -1,7 +1,7 @@
 // Гравець: рух, камера FP/TP, зброя, стрільба
 import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeFPArms, updateRig, setAnim } from './characters.js';
-import { LAYOUT } from './world.js';
+
 import { clamp, damp, lerp } from './utils.js';
 
 export const WEAPONS = {
@@ -16,12 +16,13 @@ export class Player {
     this.level = level;
     const { scene, world } = level;
     this.world = world;
+    this.L = world.layout;
 
     this.camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.08, 1200);
     scene.add(this.camera);
 
-    const gy = world.groundH(LAYOUT.SPAWN.x, LAYOUT.SPAWN.z);
-    this.pos = new THREE.Vector3(LAYOUT.SPAWN.x, gy, LAYOUT.SPAWN.z);
+    const gy = world.groundH(this.L.SPAWN.x, this.L.SPAWN.z);
+    this.pos = new THREE.Vector3(this.L.SPAWN.x, gy, this.L.SPAWN.z);
     this.vel = new THREE.Vector3();
     this.yaw = 0; // дивимось на північ (-Z), до села
     this.pitch = 0;
@@ -86,6 +87,8 @@ export class Player {
     this.camShake = 0;
     this.fovTarget = 75;
     this._camPos = new THREE.Vector3();
+    this._camO = new THREE.Vector3();
+    this._camD = new THREE.Vector3();
     this._camInit = false;
     this._fwd = new THREE.Vector3();
     this._right = new THREE.Vector3();
@@ -193,7 +196,11 @@ export class Player {
       tx = (fx * -mz + rx * mx) * speed;
       tz = (fz * -mz + rz * mx) * speed;
     }
-    const accel = this.onGround ? 14 : 4;
+    // лід: на замерзлому озері керування "пливе" — ковзаємо за інерцією
+    const ice = this.world.iceZone;
+    const onIce = this.onGround && ice
+      && Math.hypot(this.pos.x - ice.x, this.pos.z - ice.z) < ice.r;
+    const accel = this.onGround ? (onIce ? 2.3 : 14) : 4;
     this.vel.x = damp(this.vel.x, tx, accel, dt);
     this.vel.z = damp(this.vel.z, tz, accel, dt);
 
@@ -207,7 +214,7 @@ export class Player {
     this.pos.y += this.vel.y * dt;
     this.pos.z += this.vel.z * dt;
 
-    const gh = world.groundH(this.pos.x, this.pos.z);
+    const gh = Math.max(world.groundH(this.pos.x, this.pos.z), world.floorAt(this.pos.x, this.pos.z, this.pos.y));
     if (this.pos.y <= gh) {
       this.pos.y = gh;
       this.vel.y = 0;
@@ -215,9 +222,25 @@ export class Player {
     } else if (this.pos.y > gh + 0.05) {
       this.onGround = false;
     }
-    const solved = world.collide(this.pos.x, this.pos.z, 0.45);
+    const solved = world.collide(this.pos.x, this.pos.z, 0.45, this.pos.y);
     this.pos.x = solved.x;
     this.pos.z = solved.z;
+
+    // --- батути ---
+    for (const jp of world.jumpPads) {
+      if (jp.cd > 0) jp.cd -= dt;
+      if (this.onGround && jp.cd <= 0
+        && Math.hypot(this.pos.x - jp.x, this.pos.z - jp.z) < 1.35) {
+        this.vel.y = jp.power;
+        this.onGround = false;
+        jp.cd = 0.6;
+        this.level.audio.boing();
+        this.level.effects.burst(
+          new THREE.Vector3(jp.x, this.pos.y + 0.3, jp.z), 0x6fc3ff, 8,
+          { speed: 3, up: 4, life: 0.5 }
+        );
+      }
+    }
 
     // --- перемикання ---
     if (allowControl) {
@@ -332,6 +355,18 @@ export class Player {
       let cx = pivotX - fx * dist;
       let cy = pivotY - fy * dist + 0.25;
       let cz = pivotZ - fz * dist;
+      // кламп: камера не пролазить крізь стіни/дерева (важливо в приміщеннях)
+      const ddx = cx - pivotX, ddy = cy - pivotY, ddz = cz - pivotZ;
+      const dLen = Math.hypot(ddx, ddy, ddz);
+      this._camO.set(pivotX, pivotY, pivotZ);
+      this._camD.set(ddx / dLen, ddy / dLen, ddz / dLen);
+      const blockT = this.world.shotBlockDist(this._camO, this._camD, dLen + 0.3);
+      if (blockT < dLen) {
+        const t = Math.max(0.6, blockT - 0.35);
+        cx = pivotX + this._camD.x * t;
+        cy = pivotY + this._camD.y * t;
+        cz = pivotZ + this._camD.z * t;
+      }
       const minY = this.world.groundH(cx, cz) + 0.35;
       if (cy < minY) cy = minY;
       if (!this._camInit) {
@@ -396,6 +431,23 @@ export class Player {
       const hit = level.zombies ? level.zombies.hitTest(origin, dir, MAX_D) : null;
       const blockT = this.world.shotBlockDist(origin, dir, hit ? hit.t : MAX_D);
 
+      // вибухові бочки і м'яч — теж цілі
+      const bHit = level.effects.barrelHitTest(origin, dir, MAX_D);
+      if (bHit && bHit.t < blockT && (!hit || bHit.t < hit.t)) {
+        level.effects.damageBarrel(bHit.barrel, w.dmg * this.damageMult);
+        const bp = this._shootEnd.copy(origin).addScaledVector(dir, bHit.t);
+        level.effects.burst(bp, 0xff5544, 4, { speed: 2, life: 0.3 });
+        if (i < 3) level.effects.tracer(this._muzzlePos, bp);
+        continue;
+      }
+      const ballHit = level.effects.ballHitTest(origin, dir, MAX_D);
+      if (ballHit && ballHit.t < blockT && (!hit || ballHit.t < hit.t)) {
+        level.effects.kickBall(dir, 9);
+        const bp = this._shootEnd.copy(origin).addScaledVector(dir, ballHit.t);
+        if (i < 3) level.effects.tracer(this._muzzlePos, bp);
+        continue;
+      }
+
       let endPoint;
       if (blockT < (hit ? hit.t : Infinity)) {
         endPoint = this._shootEnd.copy(origin).addScaledVector(dir, blockT);
@@ -451,8 +503,8 @@ export class Player {
   }
 
   respawn() {
-    const gy = this.world.groundH(LAYOUT.SPAWN.x, LAYOUT.SPAWN.z);
-    this.pos.set(LAYOUT.SPAWN.x, gy, LAYOUT.SPAWN.z);
+    const gy = this.world.groundH(this.L.SPAWN.x, this.L.SPAWN.z);
+    this.pos.set(this.L.SPAWN.x, gy, this.L.SPAWN.z);
     this.vel.set(0, 0, 0);
     this.yaw = 0;
     this.pitch = 0;

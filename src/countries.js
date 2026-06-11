@@ -1,4 +1,6 @@
-// Конфігурація країн кампанії: біоми, складність, нагороди, боси
+// Конфігурація країн кампанії: біоми, карти, складність, нагороди, боси
+import ukraineMap from './maps/ukraine.js';
+import polandMap from './maps/poland.js';
 
 export const BIOMES = {
   summer: {
@@ -21,9 +23,9 @@ export const BIOMES = {
   },
   winterDusk: {
     skyTop: 0x35508c, skyHorizon: 0xff9e63, skyBottom: 0x8893b8,
-    fogColor: 0xb9c4dd, fogNear: 100, fogFar: 380,
-    hemiSky: 0xa8bce0, hemiGround: 0x8d9bb5, hemiIntensity: 0.75,
-    sunColor: 0xffb877, sunIntensity: 1.5, sunPos: [110, 55, 80],
+    fogColor: 0xc9bdd4, fogNear: 100, fogFar: 380,
+    hemiSky: 0xbfd4f2, hemiGround: 0x8fa8c8, hemiIntensity: 1.05,
+    sunColor: 0xfff0dd, sunIntensity: 1.35, sunPos: [110, 55, 80],
     sunDisc: 0xffc080, sunDiscPos: [420, 150, 300],
     grass1: 0xe9f1f7, grass2: 0xd3e2ee, grass3: 0xf7fbfe,
     dirt: 0x8e8a92, plaza: 0xa9a8b4, arenaGround: 0xb9c4d4,
@@ -45,6 +47,7 @@ export const COUNTRIES = {
     lat: 49.2, lon: 31.4,
     victoryTitle: '🇺🇦 УКРАЇНУ ЗВІЛЬНЕНО!',
     biome: 'summer',
+    map: ukraineMap,
     difficulty: { hp: 1, dmg: 1, counts: 1 },
     weaponReward: 'rifle',
     weaponRewardToast: 'Ти отримав АВТОМАТ! Клавіша 2 — перемкнути зброю 🔥',
@@ -57,6 +60,7 @@ export const COUNTRIES = {
     lat: 52.1, lon: 19.4,
     victoryTitle: '🇵🇱 ПОЛЬЩУ ЗВІЛЬНЕНО!',
     biome: 'winterDusk',
+    map: polandMap,
     difficulty: { hp: 1.3, dmg: 1.2, counts: 1.2 },
     weaponReward: 'shotgun',
     weaponRewardToast: 'Ти отримав ДРОБОВИК! Клавіша 3 — зброя для ближнього бою 💥',

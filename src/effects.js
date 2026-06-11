@@ -1,6 +1,7 @@
-// Частинки, трасери, монети, підбирання, промені-маркери
+// Частинки, трасери, монети, підбирання, промені-маркери, бочки, м'яч, аеродроп, тварини
 import * as THREE from 'three';
 import { toonMat } from './characters.js';
+import { closestRaySeg, disposeObject } from './utils.js';
 
 export class Effects {
   constructor(scene, world, audio) {
@@ -85,6 +86,195 @@ export class Effects {
     this._dmgIdx = 0;
   }
 
+  // ---------- 🧨 вибухові бочки ----------
+  addBarrel(x, z) {
+    if (!this.barrels) this.barrels = [];
+    const gy = this.world.groundH(x, z);
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.15, 12), toonMat(0xc0392b));
+    body.position.y = 0.58;
+    body.castShadow = true;
+    for (const sy of [0.25, 0.9]) {
+      const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.1, 12), toonMat(0xffd23f));
+      stripe.position.y = sy;
+      g.add(stripe);
+    }
+    const skullCv = document.createElement('canvas');
+    skullCv.width = 64; skullCv.height = 64;
+    const sc = skullCv.getContext('2d');
+    sc.font = '44px serif';
+    sc.textAlign = 'center';
+    sc.fillText('💥', 32, 48);
+    const tex = new THREE.CanvasTexture(skullCv);
+    const decal = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    decal.scale.set(0.6, 0.6, 1);
+    decal.position.set(0, 0.6, 0);
+    g.add(body, decal);
+    g.position.set(x, gy, z);
+    this.scene.add(g);
+    const collider = { x, z, r: 0.6 };
+    this.world.colliders.push(collider);
+    this.barrels.push({ x, z, y: gy, hp: 25, mesh: g, collider, exploded: false, fuse: -1 });
+  }
+
+  barrelHitTest(origin, dir, maxT) {
+    if (!this.barrels) return null;
+    let best = null;
+    const p0 = new THREE.Vector3(), p1 = new THREE.Vector3();
+    for (const b of this.barrels) {
+      if (b.exploded) continue;
+      p0.set(b.x, b.y + 0.1, b.z);
+      p1.set(b.x, b.y + 1.15, b.z);
+      const res = closestRaySeg(origin, dir, p0, p1);
+      if (res.dist < 0.55 && res.t > 0.3 && res.t < maxT && (!best || res.t < best.t)) {
+        best = { barrel: b, t: res.t };
+      }
+    }
+    return best;
+  }
+
+  damageBarrel(b, dmg) {
+    if (b.exploded || b.fuse >= 0) return;
+    b.hp -= dmg;
+    if (b.hp <= 0) b.fuse = 0.1;
+  }
+
+  _explodeAt(pos, radius = 5.5) {
+    this.burst(pos, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
+    this.burst(pos, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
+    this.ring(pos, 0xffaa44, radius + 0.5);
+    this.flashLight.position.copy(pos);
+    this.flashLight.intensity = 30;
+    this.flashT = 0.12;
+    this.audio.explosion();
+    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius);
+    // ланцюгова реакція бочок
+    if (this.barrels) {
+      for (const ob of this.barrels) {
+        if (ob.exploded || ob.fuse >= 0) continue;
+        if (Math.hypot(ob.x - pos.x, ob.z - pos.z) < radius + 1) ob.fuse = 0.18;
+      }
+    }
+  }
+
+  // ---------- ⚽ футбольний м'яч ----------
+  addBall(x, z) {
+    const cv = document.createElement('canvas');
+    cv.width = 128; cv.height = 128;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#f5f5f5';
+    c.fillRect(0, 0, 128, 128);
+    c.fillStyle = '#2a3138';
+    for (let i = 0; i < 8; i++) {
+      const bx = (i * 47) % 128, by = (i * 31 + 20) % 128;
+      c.beginPath();
+      c.arc(bx, by, 13, 0, 6.29);
+      c.fill();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 16, 12),
+      new THREE.MeshToonMaterial({ map: tex, gradientMap: toonMat(0).gradientMap })
+    );
+    mesh.castShadow = true;
+    mesh.position.set(x, this.world.groundH(x, z) + 0.45, z);
+    this.scene.add(mesh);
+    this.ball = { mesh, v: new THREE.Vector3() };
+  }
+
+  ballHitTest(origin, dir, maxT) {
+    if (!this.ball) return null;
+    const p = this.ball.mesh.position;
+    const p0 = new THREE.Vector3(p.x, p.y - 0.2, p.z);
+    const p1 = new THREE.Vector3(p.x, p.y + 0.2, p.z);
+    const res = closestRaySeg(origin, dir, p0, p1);
+    if (res.dist < 0.55 && res.t > 0.3 && res.t < maxT) return { t: res.t };
+    return null;
+  }
+
+  kickBall(dir, power) {
+    if (!this.ball) return;
+    this.ball.v.x += dir.x * power;
+    this.ball.v.z += dir.z * power;
+    this.ball.v.y += Math.max(1.5, dir.y * power + 2.5);
+    this.audio.kick();
+  }
+
+  // ---------- 🪂 аеродроп ----------
+  _spawnAirdrop(px, pz) {
+    const a = Math.random() * Math.PI * 2;
+    let x = px + Math.cos(a) * 26;
+    let z = pz + Math.sin(a) * 26;
+    const dB = Math.hypot(x, z);
+    const bound = this.world.layout.BOUND;
+    if (dB > bound - 12) {
+      x *= (bound - 14) / dB;
+      z *= (bound - 14) / dB;
+    }
+    const g = new THREE.Group();
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.2), toonMat(0xb08d57));
+    crate.castShadow = true;
+    const band = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.2, 1.25), toonMat(0x6fc3ff));
+    const chute = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.6, 10, 1, true), new THREE.MeshToonMaterial({
+      color: 0xff8c42, gradientMap: toonMat(0).gradientMap, side: THREE.DoubleSide,
+    }));
+    chute.position.y = 3.2;
+    g.add(crate, band, chute);
+    const gy = this.world.groundH(x, z);
+    g.position.set(x, gy + 55, z);
+    this.scene.add(g);
+    const beam = this.makeBeam(x, z, 0x6fc3ff, '🪂');
+    this.airdrop = { g, chute, x, z, gy, beam, landed: false, lifeAfter: 60 };
+    if (this.onAirdrop) this.onAirdrop();
+  }
+
+  // ---------- 🐔/🐇 тварини ----------
+  addAnimals(kind, n = 6) {
+    this.animals = [];
+    for (let i = 0; i < n; i++) {
+      const g = new THREE.Group();
+      if (kind === 'chickens') {
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), toonMat(0xf5f0e0));
+        body.position.y = 0.26;
+        body.scale.set(1, 0.9, 1.25);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), toonMat(0xf5f0e0));
+        head.position.set(0, 0.5, -0.2);
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 6), toonMat(0xff8c42));
+        beak.rotation.x = -Math.PI / 2;
+        beak.position.set(0, 0.48, -0.32);
+        const comb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.12), toonMat(0xd84f4f));
+        comb.position.set(0, 0.62, -0.18);
+        const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 6), toonMat(0xe8e2d0));
+        tail.position.set(0, 0.36, 0.26);
+        g.add(body, head, beak, comb, tail);
+      } else {
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), toonMat(0xb8bcc4));
+        body.position.y = 0.22;
+        body.scale.set(1, 0.95, 1.35);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), toonMat(0xc4c8d0));
+        head.position.set(0, 0.42, -0.22);
+        for (const side of [-1, 1]) {
+          const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.2, 3, 6), toonMat(0xc4c8d0));
+          ear.position.set(side * 0.06, 0.62, -0.22);
+          ear.rotation.z = side * 0.18;
+          g.add(ear);
+        }
+        const tail = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), toonMat(0xf5f5f5));
+        tail.position.set(0, 0.3, 0.3);
+        g.add(body, head, tail);
+      }
+      const hx = (Math.random() - 0.5) * 70;
+      const hz = (Math.random() - 0.5) * 70;
+      g.position.set(hx, this.world.groundH(hx, hz), hz);
+      this.scene.add(g);
+      this.animals.push({
+        g, kind, hx, hz, x: hx, z: hz, tx: hx, tz: hz,
+        t: Math.random() * 3, ph: Math.random() * 6,
+      });
+    }
+  }
+
   spawnProjectile(from, target, speed, dmg, size = 0.22) {
     const m = new THREE.Mesh(this.projGeo, this.projMat);
     m.scale.setScalar(size);
@@ -108,15 +298,7 @@ export class Effects {
   }
 
   _explodeGrenade(g) {
-    const p = g.mesh.position;
-    this.burst(p, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
-    this.burst(p, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
-    this.ring(p, 0xffaa44, 6);
-    this.flashLight.position.copy(p);
-    this.flashLight.intensity = 30;
-    this.flashT = 0.12;
-    this.audio.explosion();
-    if (this.onExplosion) this.onExplosion(p.x, p.y, p.z, 5.5);
+    this._explodeAt(g.mesh.position, 5.5);
     this.scene.remove(g.mesh);
   }
 
@@ -196,23 +378,23 @@ export class Effects {
     this.rings.push({ mesh: m, t: 0, maxR });
   }
 
-  spawnCoin(x, z, value = 5) {
+  spawnCoin(x, z, value = 5, life = 45, yOverride = null) {
     const m = new THREE.Mesh(this.coinGeo, this.coinMat);
-    const y = this.world.groundH(x, z);
+    const y = yOverride !== null ? yOverride : this.world.groundH(x, z);
     m.position.set(x, y + 0.4, z);
     m.rotation.x = Math.PI / 2 - 0.3;
     this.scene.add(m);
-    this.coins.push({ mesh: m, type: 'coin', value, t: Math.random() * 6, vy: 2.5, baseY: y + 0.35, life: 45 });
+    this.coins.push({ mesh: m, type: 'coin', value, t: Math.random() * 6, vy: 2.5, baseY: y + 0.35, life });
   }
 
-  spawnPickup(x, z, type) {
+  spawnPickup(x, z, type, life = 45, yOverride = null) {
     if (type === 'grenade') {
       const gm = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
       gm.scale.setScalar(1.5);
-      const y0 = this.world.groundH(x, z);
+      const y0 = yOverride !== null ? yOverride : this.world.groundH(x, z);
       gm.position.set(x, y0 + 0.35, z);
       this.scene.add(gm);
-      this.coins.push({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life: 45 });
+      this.coins.push({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
       return;
     }
     const m = new THREE.Mesh(type === 'medkit' ? this.medGeo : this.ammoGeo, type === 'medkit' ? this.medMat : this.ammoMat);
@@ -226,10 +408,10 @@ export class Effects {
       tip.position.y = 0.12;
       m.add(tip);
     }
-    const y = this.world.groundH(x, z);
+    const y = yOverride !== null ? yOverride : this.world.groundH(x, z);
     m.position.set(x, y + 0.35, z);
     this.scene.add(m);
-    this.coins.push({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y + 0.3, life: 45 });
+    this.coins.push({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y + 0.3, life });
   }
 
   update(dt) {
@@ -346,6 +528,134 @@ export class Effects {
       }
     }
 
+    // бочки: запалені ґноти і вибухи
+    if (this.barrels) {
+      for (const b of this.barrels) {
+        if (b.exploded || b.fuse < 0) continue;
+        b.fuse -= dt;
+        if (b.fuse <= 0) {
+          b.exploded = true;
+          this._explodeAt(new THREE.Vector3(b.x, b.y + 0.6, b.z), 5.5);
+          this.scene.remove(b.mesh);
+          disposeObject(b.mesh);
+          this.world.removeCollider(b.collider);
+        }
+      }
+    }
+
+    // м'яч
+    if (this.ball) {
+      const bl = this.ball;
+      bl.v.y -= 13 * dt;
+      bl.mesh.position.addScaledVector(bl.v, dt);
+      const bg = Math.max(
+        this.world.groundH(bl.mesh.position.x, bl.mesh.position.z),
+        this.world.floorAt(bl.mesh.position.x, bl.mesh.position.z, bl.mesh.position.y)
+      ) + 0.45;
+      if (bl.mesh.position.y < bg) {
+        bl.mesh.position.y = bg;
+        bl.v.y = Math.abs(bl.v.y) > 1.5 ? -bl.v.y * 0.55 : 0;
+        bl.v.x *= 0.94;
+        bl.v.z *= 0.94;
+      }
+      const solved = this.world.collide(bl.mesh.position.x, bl.mesh.position.z, 0.45);
+      if (solved.x !== bl.mesh.position.x || solved.z !== bl.mesh.position.z) {
+        bl.v.x *= -0.5;
+        bl.v.z *= -0.5;
+        bl.mesh.position.x = solved.x;
+        bl.mesh.position.z = solved.z;
+      }
+      // удар ногою — підбіг впритул
+      if (ppos) {
+        const dx = bl.mesh.position.x - ppos.x;
+        const dz = bl.mesh.position.z - ppos.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 1.0 && d > 0.01) {
+          bl.v.x = (dx / d) * 8;
+          bl.v.z = (dz / d) * 8;
+          bl.v.y = 3.5;
+          this.audio.kick();
+        }
+      }
+      // котиться
+      bl.mesh.rotation.x += bl.v.z * dt / 0.45;
+      bl.mesh.rotation.z -= bl.v.x * dt / 0.45;
+      bl.v.x *= (1 - 0.4 * dt);
+      bl.v.z *= (1 - 0.4 * dt);
+    }
+
+    // аеродроп
+    if (this.airdropT === undefined) this.airdropT = 80;
+    if (!this.airdrop) {
+      this.airdropT -= dt;
+      if (this.airdropT <= 0 && ppos) this._spawnAirdrop(ppos.x, ppos.z);
+    } else {
+      const ad = this.airdrop;
+      if (!ad.landed) {
+        ad.g.position.y -= 7 * dt;
+        ad.g.rotation.y += dt * 0.5;
+        if (ad.g.position.y <= ad.gy + 0.5) {
+          ad.g.position.y = ad.gy + 0.5;
+          ad.landed = true;
+          ad.chute.visible = false;
+          this.burst(ad.g.position, 0xd8cdbb, 8, { speed: 3, life: 0.5 });
+          // лут навколо ящика
+          this.spawnPickup(ad.x + 1.2, ad.z, 'ammo', 90);
+          this.spawnPickup(ad.x - 1.2, ad.z, 'medkit', 90);
+          this.spawnPickup(ad.x, ad.z + 1.2, 'grenade', 90);
+          for (let i = 0; i < 6; i++) {
+            this.spawnCoin(ad.x + (Math.random() - 0.5) * 3, ad.z + (Math.random() - 0.5) * 3, 10, 90);
+          }
+        }
+      } else {
+        ad.lifeAfter -= dt;
+        if (ad.lifeAfter <= 0) {
+          this.scene.remove(ad.g);
+          disposeObject(ad.g);
+          ad.beam.remove();
+          this.airdrop = null;
+          this.airdropT = 120 + Math.random() * 50;
+        }
+      }
+    }
+
+    // тварини: блукають, тікають від гравця і зомбі
+    if (this.animals) {
+      for (const an of this.animals) {
+        an.t -= dt;
+        let spd = 1.2;
+        let fleeing = false;
+        if (ppos) {
+          const dx = an.x - ppos.x, dz = an.z - ppos.z;
+          const d = Math.hypot(dx, dz);
+          if (d < 5 && d > 0.01) {
+            an.tx = an.x + (dx / d) * 8;
+            an.tz = an.z + (dz / d) * 8;
+            spd = 4.6;
+            fleeing = true;
+            if (an.kind === 'chickens') this.audio.cluck();
+          }
+        }
+        if (!fleeing && an.t <= 0) {
+          an.t = 2 + Math.random() * 3;
+          an.tx = an.hx + (Math.random() - 0.5) * 24;
+          an.tz = an.hz + (Math.random() - 0.5) * 24;
+        }
+        const mx = an.tx - an.x, mz = an.tz - an.z;
+        const md = Math.hypot(mx, mz);
+        if (md > 0.5) {
+          an.x += (mx / md) * spd * dt;
+          an.z += (mz / md) * spd * dt;
+          const solved = this.world.collide(an.x, an.z, 0.25);
+          an.x = solved.x;
+          an.z = solved.z;
+          an.g.rotation.y = Math.atan2(-mx, -mz);
+          an.ph += dt * spd * 5;
+        }
+        an.g.position.set(an.x, this.world.groundH(an.x, an.z) + Math.abs(Math.sin(an.ph)) * 0.08, an.z);
+      }
+    }
+
     // цифри шкоди
     for (const d of this.dmgPool) {
       if (!d.spr.visible) continue;
@@ -386,7 +696,7 @@ export class Effects {
           c.mesh.position.x += dx * pull;
           c.mesh.position.z += dz * pull;
         }
-        if (d < 1.0) {
+        if (d < 1.0 && Math.abs(c.mesh.position.y - (pp.y + 0.6)) < 1.8) {
           if (this.onPickup) this.onPickup(c.type, c.value);
           this.scene.remove(c.mesh);
           this.coins.splice(i, 1);
@@ -443,6 +753,7 @@ export class Effects {
       },
       remove: () => {
         this.scene.remove(g);
+        disposeObject(g);
       },
     };
     return handle;

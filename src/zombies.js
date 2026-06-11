@@ -1,7 +1,7 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
-import { makeZombie, makeBoss, updateRig, setAnim } from './characters.js';
-import { LAYOUT } from './world.js';
+import { makeZombie, makeBoss, updateRig, setAnim, toonMat } from './characters.js';
+
 import { clamp, dampAngle, closestRaySeg, RNG } from './utils.js';
 
 const TYPE_STATS = {
@@ -22,6 +22,7 @@ export class Zombies {
     this.level = level;
     this.scene = level.scene;
     this.world = level.world;
+    this.L = level.world.layout;
     this.rng = new RNG(seed);
     this.diff = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
     this.extraZombie = (level.country && level.country.extraZombie) || null;
@@ -76,12 +77,14 @@ export class Zombies {
   }
 
   populate() {
+    const density = (this.level.country && this.level.country.map && this.level.country.map.zombieDensity) || 1;
     // блукаючі групи
     const groups = [
       [-40, 60, 3], [60, -40, 3], [-80, 12, 3], [28, 84, 3],
       [-52, -112, 3], [150, -20, 3],
     ];
-    groups.forEach(([gx, gz, n], gi) => {
+    groups.forEach(([gx, gz, baseN], gi) => {
+      const n = Math.max(1, Math.round(baseN * density));
       for (let i = 0; i < n; i++) {
         const a = this.rng.next() * 6.28;
         const r = this.rng.range(2, 9);
@@ -94,9 +97,9 @@ export class Zombies {
     });
     // охорона місій
     const guardSets = [
-      { site: LAYOUT.rescue, types: ['tank', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 100 },
-      { site: LAYOUT.tower, types: ['tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 101 },
-      { site: LAYOUT.warehouse, types: ['tank', 'tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker', 'walker'], gid: 102 },
+      { site: this.L.rescue, types: ['tank', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 100 },
+      { site: this.L.tower, types: ['tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 101 },
+      { site: this.L.warehouse, types: ['tank', 'tank', 'runner', 'runner', 'walker', 'walker', 'walker', 'walker', 'walker'], gid: 102 },
     ];
     if (this.extraZombie) {
       // у зимовій країні частина охорони — сніговики
@@ -105,6 +108,12 @@ export class Zombies {
       guardSets[1].types[5] = this.extraZombie;
       guardSets[2].types[6] = this.extraZombie;
       guardSets[2].types[7] = this.extraZombie;
+    }
+    if (density >= 1.2) {
+      // щільніші карти — більша охорона
+      guardSets[0].types.push('walker');
+      guardSets[1].types.push('walker');
+      guardSets[2].types.push('runner');
     }
     for (const gs of guardSets) {
       gs.types.forEach((type, i) => {
@@ -115,10 +124,41 @@ export class Zombies {
         this.spawn(type, x, z, {
           anchor: { x: gs.site.x, z: gs.site.z, r: gs.site.r },
           guard: true, groupId: gs.gid,
-          zone: gs.site === LAYOUT.warehouse ? 'warehouse' : null,
+          zone: gs.site === this.L.warehouse ? 'warehouse' : null,
         });
       });
     }
+    // 🏆 золотий зомбі-втікач
+    if (this.level.country && this.level.country.map.fun && this.level.country.map.fun.goldenZombie) {
+      this.spawnGolden();
+    }
+  }
+
+  spawnGolden() {
+    // десь на околиці, далеко від місій
+    let x = 0, z = 0;
+    for (let tries = 0; tries < 20; tries++) {
+      const a = this.rng.next() * Math.PI * 2;
+      const r = this.rng.range(80, 150);
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+      let ok = true;
+      for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
+        const s = this.L[key];
+        if (Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
+      }
+      if (ok) break;
+    }
+    const z_ = this.spawn('walker', x, z, {});
+    z_.golden = true;
+    z_.hp = z_.maxHp = 80;
+    z_.anchor = { x, z, r: 30 };
+    // золоте покриття: один матеріал поверх запечених кольорів
+    const goldM = toonMat(0xffd23f, 0xcc8800, 0.35);
+    z_.rig.group.traverse((o) => {
+      if (o.isMesh) o.material = goldM;
+    });
+    return z_;
   }
 
   countAliveInZone(zone) {
@@ -146,8 +186,21 @@ export class Zombies {
     this.hordePending += count;
   }
 
+  // сплячий зомбі-сюрприз у будинку: прокидається, коли гравець поруч
+  spawnSurprise(x, z) {
+    const type = this.extraZombie && this.rng.chance(0.4) ? this.extraZombie : 'walker';
+    const z_ = this.spawn(type, x, z, {});
+    z_.sleeping = true;
+    z_.anchor = { x, z, r: 2 };
+    // стоїть на підлозі будинку, а не на терені під нею
+    z_.y = Math.max(this.world.groundH(x, z), this.world.floorAt(x, z, 99));
+    z_.rig.group.position.y = z_.y;
+    setAnim(z_.rig, 'idle');
+    return z_;
+  }
+
   spawnBoss(hp = null) {
-    const { x, z } = LAYOUT.arena;
+    const { x, z } = this.L.arena;
     const cfg = (this.level.country && this.level.country.boss) || { hp: 1300, frost: false };
     const b = this.spawn('boss', x, z - 6, { horde: false, frost: cfg.frost });
     b.maxHp = cfg.hp;
@@ -202,6 +255,8 @@ export class Zombies {
 
   _aggro(z) {
     if (z.state === 'dead' || z.aggroed) return;
+    if (z.golden) { z.state = 'flee'; return; } // золотий не нападає — тікає
+    z.sleeping = false;
     z.aggroed = true;
     if (z.state === 'wander') z.state = 'chase';
     const p = this.level.player;
@@ -232,6 +287,15 @@ export class Zombies {
       else if (this.rng.chance(0.13)) level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
     }
     if (z.horde) this.hordeRemaining--;
+    if (z.golden) {
+      // 🏆 джекпот!
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
+      }
+      level.audio.goldenJingle();
+      level.bus.emit('toast', '🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!');
+    }
     if (z.type === 'boss') {
       this.boss = null;
       // фонтан монет за боса
@@ -261,9 +325,9 @@ export class Zombies {
           let x = px + Math.cos(a) * r;
           let z = pz + Math.sin(a) * r;
           const dB = Math.hypot(x, z);
-          if (dB > LAYOUT.BOUND - 5) {
-            x *= (LAYOUT.BOUND - 8) / dB;
-            z *= (LAYOUT.BOUND - 8) / dB;
+          if (dB > this.L.BOUND - 5) {
+            x *= (this.L.BOUND - 8) / dB;
+            z *= (this.L.BOUND - 8) / dB;
           }
           const roll = this.rng.next();
           let type;
@@ -303,6 +367,26 @@ export class Zombies {
       const st = z.stats;
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
+      // золотий зомбі: побачив гравця — тікає
+      if (z.golden && z.state !== 'dead') {
+        if (playerAlive && distP < 26) z.state = 'flee';
+        else if (z.state === 'flee' && distP > 42) z.state = 'wander';
+      }
+
+      // сплячий сюрприз: чекає, поки гравець підійде впритул
+      if (z.sleeping) {
+        if (playerAlive && distP < 4.5) {
+          z.sleeping = false;
+          this._aggro(z);
+          z.state = 'chase';
+          level.audio.shriek(1, st.pitch * 1.4);
+          level.bus.emit('toast', '😱 СЮРПРИЗ! У будинку ховався зомбі!');
+        } else {
+          updateRig(rig, dt * 0.35); // спить — ледь погойдується
+          continue;
+        }
+      }
+
       // LOD: далекі неагресивні зомбі майже не оновлюємо
       if (distP > 110 && !z.aggroed) {
         // охоронці, що відійшли, повертаються додому миттєво (поза екраном)
@@ -338,11 +422,17 @@ export class Zombies {
           z.state = 'wander';
           z.aggroed = z.horde;
         } else if (distP < st.attackR && z.telegraph <= 0 && z.charging <= 0) {
-          z.state = 'attack';
-          z.attackT = 0;
-          z.didHit = false;
-          z.throwProj = false;
-          setAnim(rig, 'attack');
+          // мелі тільки з прямою видимістю — крізь стіни бити не можна
+          this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
+          this._p1.set(dxP, (player.pos.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
+          const meleeBlock = this.world.shotBlockDist(this._p0, this._p1, distP);
+          if (meleeBlock > distP - 0.35) {
+            z.state = 'attack';
+            z.attackT = 0;
+            z.didHit = false;
+            z.throwProj = false;
+            setAnim(rig, 'attack');
+          }
         } else if (z.ranged && z.rangedCd <= 0 && distP >= z.ranged.min && distP <= z.ranged.max
           && z.telegraph <= 0 && z.charging <= 0) {
           // кидок сніжки, якщо є пряма видимість
@@ -445,8 +535,8 @@ export class Zombies {
         const enraged = frac < 25;
         if (enraged) z.enraged = true;
         // ліш: бос не покидає околиці арени — повертається і лікується
-        const dArena = Math.hypot(z.x - LAYOUT.arena.x, z.z - LAYOUT.arena.z);
-        if (!z.leashed && dArena > LAYOUT.arena.r + 14) z.leashed = true;
+        const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);
+        if (!z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;
         else if (z.leashed && dArena < 8) z.leashed = false;
         if (z.leashed) {
           z.telegraph = 0;
@@ -457,9 +547,13 @@ export class Zombies {
 
       // --- рух ---
       let targetX = null, targetZ = null, spd = 0;
-      if (z.state === 'chase') {
+      if (z.state === 'flee') {
+        targetX = z.x - dxP;
+        targetZ = z.z - dzP;
+        spd = 6.2;
+      } else if (z.state === 'chase') {
         if (z.type === 'boss' && z.leashed) {
-          targetX = LAYOUT.arena.x; targetZ = LAYOUT.arena.z;
+          targetX = this.L.arena.x; targetZ = this.L.arena.z;
         } else {
           targetX = px; targetZ = pz;
         }
@@ -502,7 +596,7 @@ export class Zombies {
       const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
       z.x = solved.x;
       z.z = solved.z;
-      z.y = this.world.groundH(z.x, z.z);
+      z.y = Math.max(this.world.groundH(z.x, z.z), this.world.floorAt(z.x, z.z, z.y));
 
       // --- поворот і анімація ---
       let faceX = 0, faceZ = 0;

@@ -1,12 +1,13 @@
 // Місії: порятунок людей, ремонт вежі, зачистка складу, фінальний бос
 import * as THREE from 'three';
 import { makeCivilian, updateRig, setAnim } from './characters.js';
-import { LAYOUT } from './world.js';
+
 import { clamp, dampAngle } from './utils.js';
 
 export class Missions {
   constructor(level) {
     this.level = level;
+    this.L = level.world.layout;
     this.missions = [
       { id: 'rescue', icon: '🆘', title: 'Врятуй людей у хліві', state: 'active', color: 0x4cff7a, reward: 80, horde: 12 },
       { id: 'tower', icon: '📡', title: 'Полагодь радіовежу', state: 'active', color: 0x44ccff, reward: 100, horde: 16 },
@@ -14,9 +15,9 @@ export class Missions {
     ];
     this.beams = {};
     const eff = level.effects;
-    this.beams.rescue = eff.makeBeam(LAYOUT.rescue.x, LAYOUT.rescue.z - 6, 0x4cff7a, '🆘');
-    this.beams.tower = eff.makeBeam(LAYOUT.tower.x + 4, LAYOUT.tower.z + 4, 0x44ccff, '📡');
-    this.beams.warehouse = eff.makeBeam(LAYOUT.warehouse.x - 2, LAYOUT.warehouse.z - 7.5, 0xffaa33, '📦');
+    this.beams.rescue = eff.makeBeam(this.L.rescue.x, this.L.rescue.z - 6, 0x4cff7a, '🆘');
+    this.beams.tower = eff.makeBeam(this.L.tower.x + 4, this.L.tower.z + 4, 0x44ccff, '📡');
+    this.beams.warehouse = eff.makeBeam(this.L.warehouse.x - 2, this.L.warehouse.z - 7.5, 0xffaa33, '📦');
     this.bossBeam = null;
 
     this.civilians = [];
@@ -42,7 +43,7 @@ export class Missions {
       if (this.bossStarted && level.zombies.boss) {
         this.bossHpLeft = level.zombies.despawnBoss();
         this.bossStarted = false;
-        this.bossBeam = level.effects.makeBeam(LAYOUT.arena.x, LAYOUT.arena.z, 0xff44aa, '👑');
+        this.bossBeam = level.effects.makeBeam(this.L.arena.x, this.L.arena.z, 0xff44aa, '👑');
         level.bus.emit('toast', '👑 Бос повернувся на арену й чекає на реванш!');
       }
     });
@@ -74,10 +75,10 @@ export class Missions {
   getMarkers() {
     // для мінікарти
     const mk = [];
-    if (this.get('rescue').state === 'active') mk.push({ x: LAYOUT.rescue.x, z: LAYOUT.rescue.z, color: '#4cff7a', icon: '🆘' });
-    if (this.get('tower').state === 'active') mk.push({ x: LAYOUT.tower.x, z: LAYOUT.tower.z, color: '#44ccff', icon: '📡' });
-    if (this.get('warehouse').state === 'active') mk.push({ x: LAYOUT.warehouse.x, z: LAYOUT.warehouse.z, color: '#ffaa33', icon: '📦' });
-    if (this.bossUnlocked && !this.bossStarted) mk.push({ x: LAYOUT.arena.x, z: LAYOUT.arena.z, color: '#ff44aa', icon: '👑' });
+    if (this.get('rescue').state === 'active') mk.push({ x: this.L.rescue.x, z: this.L.rescue.z, color: '#4cff7a', icon: '🆘' });
+    if (this.get('tower').state === 'active') mk.push({ x: this.L.tower.x, z: this.L.tower.z, color: '#44ccff', icon: '📡' });
+    if (this.get('warehouse').state === 'active') mk.push({ x: this.L.warehouse.x, z: this.L.warehouse.z, color: '#ffaa33', icon: '📦' });
+    if (this.bossUnlocked && !this.bossStarted) mk.push({ x: this.L.arena.x, z: this.L.arena.z, color: '#ff44aa', icon: '👑' });
     return mk;
   }
 
@@ -98,7 +99,7 @@ export class Missions {
   }
 
   spawnCivilians() {
-    const { x, z } = LAYOUT.rescue;
+    const { x, z } = this.L.rescue;
     const kinds = ['medic', 'granny', 'kid'];
     kinds.forEach((kind, i) => {
       const rig = makeCivilian(kind, this.level.rng);
@@ -124,8 +125,8 @@ export class Missions {
       let spd = 0, tx = null, tz = null;
       if (c.state === 'exit') {
         c.exitT += dt;
-        tx = LAYOUT.rescue.x + (c.angle - 3) * 1.2;
-        tz = LAYOUT.rescue.z - 8;
+        tx = this.L.rescue.x + (c.angle - 3) * 1.2;
+        tz = this.L.rescue.z - 8;
         spd = 3;
         if (c.exitT > 2.2) c.state = 'follow';
       } else {
@@ -309,13 +310,13 @@ export class Missions {
       && !level.zombies.hordeActive && !this.pendingHorde) {
       this.allDone = true;
       this.bossUnlocked = true;
-      this.bossBeam = level.effects.makeBeam(LAYOUT.arena.x, LAYOUT.arena.z, 0xff44aa, '👑');
+      this.bossBeam = level.effects.makeBeam(this.L.arena.x, this.L.arena.z, 0xff44aa, '👑');
       level.audio.bossRoar();
       level.bus.emit('bossUnlocked');
     }
     if (this.bossUnlocked && !this.bossStarted && player.health > 0) {
-      const d = Math.hypot(px - LAYOUT.arena.x, pz - LAYOUT.arena.z);
-      if (d < LAYOUT.arena.r - 4) {
+      const d = Math.hypot(px - this.L.arena.x, pz - this.L.arena.z);
+      if (d < this.L.arena.r - 4) {
         this.bossStarted = true;
         if (this.bossBeam) { this.bossBeam.remove(); this.bossBeam = null; }
         level.zombies.spawnBoss(this.bossHpLeft);
@@ -324,8 +325,8 @@ export class Missions {
         // гарантовані припаси по периметру арени
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2 + 0.5;
-          const sx = LAYOUT.arena.x + Math.cos(a) * (LAYOUT.arena.r - 7);
-          const sz = LAYOUT.arena.z + Math.sin(a) * (LAYOUT.arena.r - 7);
+          const sx = this.L.arena.x + Math.cos(a) * (this.L.arena.r - 7);
+          const sz = this.L.arena.z + Math.sin(a) * (this.L.arena.r - 7);
           level.effects.spawnPickup(sx, sz, i % 3 === 0 ? 'medkit' : 'ammo');
         }
       }
@@ -336,7 +337,7 @@ export class Missions {
 
   _towerWave(n, onlyWalkers) {
     const level = this.level;
-    const { x, z } = LAYOUT.tower;
+    const { x, z } = this.L.tower;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + 0.4;
       const type = onlyWalkers ? 'walker' : (i % 3 === 0 ? 'runner' : 'walker');
