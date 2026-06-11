@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>🧟 Операція: Порятунок Світу</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Екран глобуса -->
+  <div id="globe-ui">
+    <div class="globe-top">
+      <h1>🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span></h1>
+      <p class="globe-sub">Зомбі захопили планету! Звільняй країни одну за одною.</p>
+    </div>
+    <div class="globe-bottom">
+      <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
+      <p class="globe-hint">🖱️ Обертай глобус мишкою · Натисни на жовту країну</p>
+    </div>
+  </div>
+  <div id="globe-tooltip"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="crosshair">
+      <span class="ch-line ch-t"></span><span class="ch-line ch-b"></span>
+      <span class="ch-line ch-l"></span><span class="ch-line ch-r"></span>
+      <span class="ch-dot"></span>
+    </div>
+    <div id="hitmarker">✕</div>
+
+    <div id="mission-panel">
+      <div class="panel-title">📋 ЗАВДАННЯ</div>
+      <div id="mission-list"></div>
+    </div>
+
+    <div id="topright">
+      <div id="coins"><span class="coin-icon">₴</span><span id="coins-value">0</span></div>
+      <canvas id="minimap" width="200" height="200"></canvas>
+    </div>
+
+    <div id="health">
+      <div id="health-bar"><div id="health-fill"></div></div>
+      <div id="health-text">100 / 100</div>
+    </div>
+
+    <div id="ammo">
+      <div id="weapon-name">🔫 Пістолет</div>
+      <div id="ammo-nums"><span id="ammo-mag">12</span><span class="ammo-sep">/</span><span id="ammo-reserve">∞</span></div>
+    </div>
+
+    <div id="prompt">
+      <div id="prompt-text"></div>
+      <div id="prompt-bar"><div id="prompt-fill"></div></div>
+    </div>
+
+    <div id="bossbar">
+      <div id="boss-name">👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ</div>
+      <div id="boss-bar-bg"><div id="boss-fill"></div></div>
+    </div>
+
+    <div id="horde-counter">🧟 Орда: <span id="horde-value">0</span></div>
+
+    <div id="banner">
+      <div id="banner-title"></div>
+      <div id="banner-sub"></div>
+    </div>
+    <div id="toasts"></div>
+  </div>
+
+  <div id="vignette"></div>
+  <div id="heal-glow"></div>
+  <div id="fps"></div>
+
+  <!-- Оверлеї -->
+  <div id="overlay-loading" class="overlay show">
+    <div class="overlay-card">
+      <div class="spinner">🌍</div>
+      <h2>Завантаження...</h2>
+    </div>
+  </div>
+
+  <div id="overlay-start" class="overlay">
+    <div class="overlay-card clickable">
+      <h2>🖱️ КЛІКНИ, ЩОБ ГРАТИ</h2>
+      <div class="controls-grid">
+        <span><b>WASD</b> — рух</span>
+        <span><b>Мишка</b> — огляд і стрільба</span>
+        <span><b>Shift</b> — біг</span>
+        <span><b>Space</b> — стрибок</span>
+        <span><b>E</b> — взаємодія</span>
+        <span><b>R</b> — перезарядка</span>
+        <span><b>1-2</b> — зброя</span>
+        <span><b>V</b> — вид 1-ї/3-ї особи</span>
+        <span><b>B</b> — магазин</span>
+        <span><b>M</b> — звук вкл/викл</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-pause" class="overlay">
+    <div class="overlay-card">
+      <h2>⏸️ ПАУЗА</h2>
+      <div class="btn-row">
+        <button id="btn-resume" class="btn btn-primary">▶️ Продовжити</button>
+        <button id="btn-pause-globe" class="btn">🌍 На глобус</button>
+      </div>
+      <div class="controls-grid small">
+        <span><b>WASD</b> — рух</span>
+        <span><b>Shift</b> — біг</span>
+        <span><b>Space</b> — стрибок</span>
+        <span><b>E</b> — взаємодія</span>
+        <span><b>R</b> — перезарядка</span>
+        <span><b>1-2</b> — зброя</span>
+        <span><b>V</b> — вид камери</span>
+        <span><b>B</b> — магазин</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-death" class="overlay">
+    <div class="overlay-card death-card">
+      <h2>💀 Зомбі тебе схопили!</h2>
+      <p>Не хвилюйся — прогрес місій зберігся.</p>
+      <div id="death-countdown" class="countdown">3</div>
+    </div>
+  </div>
+
+  <div id="overlay-victory" class="overlay">
+    <div id="confetti"></div>
+    <div class="overlay-card victory-card">
+      <h1>🇺🇦 УКРАЇНУ ЗВІЛЬНЕНО!</h1>
+      <p class="victory-sub">Ти переміг Зомбі-Короля і врятував країну!</p>
+      <div id="victory-stats"></div>
+      <button id="btn-victory-globe" class="btn btn-primary big">🌍 На глобус</button>
+    </div>
+  </div>
+
+  <!-- Магазин -->
+  <div id="shop" class="overlay">
+    <div class="overlay-card shop-card">
+      <div class="shop-header">
+        <h2>🛒 МАГАЗИН</h2>
+        <div class="shop-balance"><span class="coin-icon">₴</span> <span id="shop-coins">0</span></div>
+        <button id="shop-close" class="btn-x">✕</button>
+      </div>
+      <div id="shop-grid"></div>
+      <p class="shop-hint">Клавіша <b>B</b> — відкрити/закрити магазин</p>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
