@@ -94,7 +94,7 @@ export class HostNet {
     switch (d.t) {
       case 'lvlready': {
         this.readyGuests.add(from);
-        this.session.transport.send(from, this.captureState());
+        this.session.transport.send(from, this.captureState(), true);
         return true;
       }
       case 'p': {
@@ -142,7 +142,7 @@ export class HostNet {
         } else {
           const trp = this.remotes.get(target);
           if (trp && trp.health <= 0) {
-            this.session.transport.send(target, { t: 'revived', by: reviverNick });
+            this.session.transport.send(target, { t: 'revived', by: reviverNick }, true);
           }
         }
         return true;
@@ -295,7 +295,7 @@ export class HostNet {
 
   // хост сам когось підняв
   sendRevive(pid) {
-    this.session.transport.send(pid, { t: 'revived', by: this.session.nick });
+    this.session.transport.send(pid, { t: 'revived', by: this.session.nick }, true);
   }
 
   spawnNetGrenade(pos, vel) {

@@ -45,6 +45,7 @@ const SHELL = [
   './src/net/client.js',
   './src/net/remoteplayer.js',
   './src/net/league.js',
+  './src/net/lobby.js',
   './src/ui/coopui.js',
   './src/ui/leagueui.js',
 ];

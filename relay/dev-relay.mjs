@@ -16,6 +16,49 @@ const rooms = new Map(); // code -> { sockets: Map<id, ws>, nextId, hostTimer }
 
 // 🏆 локальна Ліга в пам'яті — щоб розробка повністю працювала офлайн
 const league = new Map(); // `${cid}|${mode}|${country}` -> {nick, score, team, ts}
+
+// 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
+const LOBBY_TTL = 40_000;
+const lobbyPlayers = new Map(); // cid -> {nick, ts}
+const lobbyRooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
+
+function lobbyView(now) {
+  for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
+  for (const [code, r] of lobbyRooms) if (now - r.ts > LOBBY_TTL) lobbyRooms.delete(code);
+  return {
+    online: lobbyPlayers.size,
+    players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
+    rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
+      .map(([code, r]) => ({ code, host: r.host, mode: r.mode, country: r.country, n: r.n, state: r.state, build: r.build })),
+  };
+}
+
+function lobbyPing(d) {
+  const now = Date.now();
+  const cid = String(d.cid || '').slice(0, 40);
+  if (cid.length < 8) return null;
+  const nick = String(d.nick || 'Гравець').slice(0, 12);
+  lobbyPlayers.set(cid, { nick, ts: now });
+  if (d.close) {
+    const code = String(d.close).toUpperCase().slice(0, 8);
+    const r = lobbyRooms.get(code);
+    if (r && r.cid === cid) lobbyRooms.delete(code);
+  }
+  if (d.room && d.room.code) {
+    const code = String(d.room.code).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    if (code) {
+      lobbyRooms.set(code, {
+        cid, host: nick,
+        mode: ['campaign', 'storm', 'arena'].includes(d.room.mode) ? d.room.mode : 'campaign',
+        country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
+        n: Math.min(4, Math.max(1, d.room.n | 0)),
+        state: d.room.state === 'game' ? 'game' : 'lobby',
+        build: d.room.build | 0, ts: now,
+      });
+    }
+  }
+  return lobbyView(now);
+}
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -36,7 +79,7 @@ function leagueTop(mode, country, cid) {
 
 const httpServer = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (!url.pathname.startsWith('/league/')) {
+  if (!url.pathname.startsWith('/league/') && !url.pathname.startsWith('/lobby/')) {
     res.writeHead(200, CORS);
     res.end('zr-dev-relay ok');
     return;
@@ -44,6 +87,27 @@ const httpServer = createServer((req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS);
     res.end();
+    return;
+  }
+  if (url.pathname === '/lobby/state') {
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(lobbyView(Date.now())));
+    return;
+  }
+  if (url.pathname === '/lobby/ping' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (ch) => { body += ch; });
+    req.on('end', () => {
+      try {
+        const view = lobbyPing(JSON.parse(body));
+        if (!view) { res.writeHead(400, CORS); res.end('{"error":"bad"}'); return; }
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify(view));
+      } catch (e) {
+        res.writeHead(400, CORS);
+        res.end('{"error":"bad"}');
+      }
+    });
     return;
   }
   if (url.pathname === '/league/top') {
@@ -113,6 +177,32 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
+    // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах (як у воркері)
+    if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
+      const per = new Map();
+      for (const it of msg.m) {
+        if (!it || it.d === undefined) continue;
+        if (it.to === 0) {
+          for (const pid of room.sockets.keys()) {
+            if (pid === id) continue;
+            if (!per.has(pid)) per.set(pid, []);
+            per.get(pid).push(it.d);
+          }
+        } else {
+          const pid = it.to | 0;
+          if (pid === id || !room.sockets.has(pid)) continue;
+          if (!per.has(pid)) per.set(pid, []);
+          per.get(pid).push(it.d);
+        }
+      }
+      for (const [pid, list] of per) {
+        const sock = room.sockets.get(pid);
+        if (sock && sock.readyState === 1) {
+          sock.send(JSON.stringify(list.length === 1 ? { from: id, d: list[0] } : { from: id, b: list }));
+        }
+      }
+      return;
+    }
     if (msg == null || msg.d === undefined) return;
     const env = JSON.stringify({ from: id, d: msg.d });
     if (msg.to === 0) {

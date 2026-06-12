@@ -27,7 +27,7 @@ export class GuestNet {
   attach(spec) {
     this.spec = spec;
     this.level.players = null; // на гості AI не працює
-    this.session.transport.send(1, { t: 'lvlready' });
+    this.session.transport.send(1, { t: 'lvlready' }, true);
   }
 
   send(d) { this.session.transport.send(1, d); }
@@ -65,7 +65,7 @@ export class GuestNet {
       this._readyT = (this._readyT || 0) - dt;
       if (this._readyT <= 0) {
         this._readyT = 1.2;
-        this.session.transport.send(1, { t: 'lvlready' });
+        this.session.transport.send(1, { t: 'lvlready' }, true);
       }
     }
     for (const rp of this.remotes.values()) rp.update(dt);
@@ -334,7 +334,7 @@ export class GuestNet {
   connectionBack() {
     this.lost = false;
     // після реконекту хост надішле свіжий state у відповідь на lvlready
-    this.session.transport.send(1, { t: 'lvlready' });
+    this.session.transport.send(1, { t: 'lvlready' }, true);
   }
 
   dispose() {

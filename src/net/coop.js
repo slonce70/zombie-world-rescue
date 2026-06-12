@@ -89,7 +89,7 @@ export class CoopSession {
       t: 'hello', ...this.myInfo(),
       build: this.game.constructor.APP_VERSION ?? window.__APP_VERSION,
       proto: PROTO_VERSION,
-    });
+    }, true);
     // чекаємо welcome
     await new Promise((resolve, reject) => {
       this._joinResolve = resolve;
@@ -100,8 +100,8 @@ export class CoopSession {
   }
 
   leave() {
-    if (this.role === 'guest') this.transport.send(1, { t: 'bye' });
-    else this.transport.broadcast({ t: 'end', why: 'closed' });
+    if (this.role === 'guest') this.transport.send(1, { t: 'bye' }, true);
+    else this.transport.broadcast({ t: 'end', why: 'closed' }, true);
     this.transport.close();
     this._reset();
   }
@@ -117,12 +117,12 @@ export class CoopSession {
   // ---------- лобі (хост) ----------
   setCountry(countryId) {
     this.countryId = countryId;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode });
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode }, true);
   }
 
   setMode(mode) {
     this.mode = mode;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode });
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode }, true);
   }
 
   // хост тисне СТАРТ
@@ -135,7 +135,7 @@ export class CoopSession {
     const arena = this.mode === 'arena';
     const realCountry = arena ? 'UKR' : countryId;
     const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena };
-    this.transport.broadcast({ t: 'start', ...spec });
+    this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
     game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena });
@@ -199,15 +199,15 @@ export class CoopSession {
   _hostHello(from, d) {
     const appV = window.__APP_VERSION;
     if (d.proto !== PROTO_VERSION || d.build !== appV) {
-      this.transport.send(from, { t: 'reject', why: 'build', hostBuild: appV });
+      this.transport.send(from, { t: 'reject', why: 'build', hostBuild: appV }, true);
       return;
     }
     if (this.state === 'level' && !this.roster.has(from)) {
       // приєднання посеред рівня: пускаємо! (стан долетить батчем)
-      if (this.roster.size >= 4) { this.transport.send(from, { t: 'reject', why: 'full' }); return; }
+      if (this.roster.size >= 4) { this.transport.send(from, { t: 'reject', why: 'full' }, true); return; }
     }
     if (this.roster.size >= 4 && !this.roster.has(from)) {
-      this.transport.send(from, { t: 'reject', why: 'full' });
+      this.transport.send(from, { t: 'reject', why: 'full' }, true);
       return;
     }
     let nick = cleanNick(d.nick) || `Гравець ${from}`;
@@ -217,14 +217,14 @@ export class CoopSession {
       t: 'welcome', pid: from, countryId: this.countryId,
       roster: this._rosterList(),
       inLevel: this.state === 'level',
-    });
+    }, true);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
     this.game.hud.toast(`🤝 ${nick} приєднався!`);
     this.game.audio.click();
     if (this.state === 'level' && this.net) {
       // гість серед бою: шлемо start і чекаємо lvlready
-      this.transport.send(from, { t: 'start', ...this.net.spec });
+      this.transport.send(from, { t: 'start', ...this.net.spec }, true);
       this.net.addGuest(from);
     }
   }
@@ -238,7 +238,7 @@ export class CoopSession {
   }
 
   _broadcastRoster() {
-    this.transport.broadcast({ t: 'roster', list: this._rosterList() });
+    this.transport.broadcast({ t: 'roster', list: this._rosterList() }, true);
   }
 
   _onPeer(id, on) {
@@ -274,7 +274,7 @@ export class CoopSession {
         this.transport.send(1, {
           t: 'hello', ...this.myInfo(),
           build: window.__APP_VERSION, proto: PROTO_VERSION, resume: 1,
-        });
+        }, true);
         if (this.net) this.net.connectionBack();
         return;
       } catch (e) { /* ще спроба */ }

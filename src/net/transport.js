@@ -1,8 +1,13 @@
 // Транспорт кооперативу: один WebSocket до relay-сервера.
 // Relay тупий: пересилає {to, d} → {from, d}, кімната = код. Хост має id 1.
 // URL relay: ?relay=... → localStorage zr-relay → DEFAULT_RELAY (Cloudflare Worker).
+//
+// 📦 Батчинг: вихідні повідомлення збираються в пачку і летять раз на ~100мс
+// (або миттєво для службових). Це втричі менше запитів до Durable Object —
+// тобто втричі дешевша кімната — а плавність тримає клієнтська інтерполяція.
 
 const DEFAULT_RELAY = 'wss://zr-relay.slonce70.workers.dev';
+const BATCH_MS = 100;
 
 export function relayUrl() {
   const p = new URLSearchParams(location.search).get('relay');
@@ -12,6 +17,11 @@ export function relayUrl() {
     if (s) return s;
   } catch (e) { /* ignore */ }
   return DEFAULT_RELAY;
+}
+
+// ws(s):// → http(s):// — для HTTP-ендпоінтів воркера (Ліга, Лобі)
+export function apiBase() {
+  return relayUrl().replace(/^ws/, 'http').replace(/\/+$/, '');
 }
 
 export class Transport {
@@ -26,11 +36,19 @@ export class Transport {
     this.onOpen = null;      // ({you, isHost, peers})
     this.onClose = null;     // (reason)
     this._closing = false;
+    // батчинг
+    this._q = [];
+    this._timer = null;
+    this._lastFlush = 0;
+    // лічильники для тестів/діагностики
+    this.txFlushes = 0;      // фактичні ws.send
+    this.txMsgs = 0;         // логічні повідомлення
   }
 
   connect(room, { create = false, resume = 0 } = {}) {
     this._closing = false;
     this.room = room;
+    this._q.length = 0;
     const base = relayUrl().replace(/\/+$/, '');
     if (base.includes('YOUR-ACCOUNT')) return Promise.reject(new Error('norelay'));
     const url = `${base}/ws?room=${encodeURIComponent(room)}${create ? '&create=1' : ''}${resume ? `&resume=${resume}` : ''}`;
@@ -68,11 +86,19 @@ export class Transport {
           if (this.onPeer) this.onPeer(msg.id, msg.on);
           return;
         }
-        if (msg.from !== undefined && this.onMessage) this.onMessage(msg.from, msg.d);
+        if (msg.from === undefined || !this.onMessage) return;
+        // пачка від relay: {from, b: [d, d, …]} — у порядку надсилання
+        if (Array.isArray(msg.b)) {
+          for (const d of msg.b) this.onMessage(msg.from, d);
+        } else if (msg.d !== undefined) {
+          this.onMessage(msg.from, msg.d);
+        }
       };
       ws.onclose = () => {
         const was = this.connected;
         this.connected = false;
+        this._clearTimer();
+        this._q.length = 0;
         if (!settled) { settled = true; clearTimeout(timer); reject(new Error('closed')); }
         else if (was && !this._closing && this.onClose) this.onClose('lost');
       };
@@ -80,17 +106,47 @@ export class Transport {
     });
   }
 
-  send(to, data) {
-    if (this.ws && this.ws.readyState === 1) {
-      this.ws.send(JSON.stringify({ to, d: data }));
+  // urgent=true — службові (hello/welcome/start/state…): пачка летить одразу
+  send(to, data, urgent = false) {
+    if (!this.ws || this.ws.readyState !== 1) return;
+    this._q.push([to, data]);
+    this.txMsgs++;
+    const now = performance.now();
+    if (urgent || now - this._lastFlush >= BATCH_MS) {
+      this._flush();
+      return;
+    }
+    // у фоновій вкладці таймер троттлиться, але там флаш підхоплює
+    // наступний send (хост шле снапшоти 12 разів/с — пачка не застрягне)
+    if (!this._timer) {
+      this._timer = setTimeout(() => this._flush(), Math.max(10, BATCH_MS - (now - this._lastFlush)));
     }
   }
 
-  broadcast(data) { this.send(0, data); }
+  broadcast(data, urgent = false) { this.send(0, data, urgent); }
+
+  _clearTimer() {
+    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+  }
+
+  _flush() {
+    this._clearTimer();
+    if (!this._q.length) return;
+    if (!this.ws || this.ws.readyState !== 1) { this._q.length = 0; return; }
+    this._lastFlush = performance.now();
+    const payload = this._q.length === 1
+      ? { to: this._q[0][0], d: this._q[0][1] }
+      : { t: 'b', m: this._q.map(([to, d]) => ({ to, d })) };
+    this.ws.send(JSON.stringify(payload));
+    this.txFlushes++;
+    this._q.length = 0;
+  }
 
   close() {
     this._closing = true;
+    this._flush();
     this.connected = false;
+    this._clearTimer();
     if (this.ws) { try { this.ws.close(); } catch (e) { /* ignore */ } }
     this.ws = null;
   }

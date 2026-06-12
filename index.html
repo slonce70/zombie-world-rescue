@@ -286,20 +286,46 @@
 
   <!-- Кооп: вхід -->
   <div id="overlay-coop" class="overlay">
-    <div class="overlay-card panel-card coop-card">
+    <div class="overlay-card panel-card coop-card coop-card-wide">
       <div class="panel-header">
         <h2>🤝 ГРАТИ РАЗОМ</h2>
         <button class="btn-x panel-close" data-close="overlay-coop">✕</button>
       </div>
-      <p class="panel-sub">Грай з другом онлайн! Один створює кімнату, інші вводять код.</p>
-      <label class="coop-label" for="coop-nick">Твій нік</label>
-      <input id="coop-nick" class="coop-input" maxlength="12" placeholder="Гравець" autocomplete="off">
-      <div id="coop-error" class="coop-error"></div>
-      <button id="btn-coop-create" class="btn btn-primary big coop-wide">🏠 СТВОРИТИ КІМНАТУ</button>
-      <div class="coop-or">— або введи код друга —</div>
-      <div class="coop-join-row">
-        <input id="coop-code" class="coop-input coop-code" maxlength="6" placeholder="КОД" autocomplete="off">
-        <button id="btn-coop-join" class="btn big">🚪 ПРИЄДНАТИСЯ</button>
+
+      <!-- крок 1: нік -->
+      <div id="coop-step-nick">
+        <p class="panel-sub">Як тебе звати? Цей нік побачать інші гравці.</p>
+        <label class="coop-label" for="coop-nick">Твій нік</label>
+        <input id="coop-nick" class="coop-input" maxlength="12" placeholder="Гравець" autocomplete="off">
+        <div id="coop-nick-error" class="coop-error"></div>
+        <button id="btn-coop-nick" class="btn btn-primary big coop-wide">✅ ДАЛІ</button>
+      </div>
+
+      <!-- крок 2: дії + хто онлайн -->
+      <div id="coop-step-main" style="display:none">
+        <div class="coop-columns">
+          <div class="coop-left">
+            <div class="coop-me">Ти: <b id="coop-me-nick"></b>
+              <button id="btn-coop-rename" class="coop-rename" title="Змінити нік">✏️</button>
+            </div>
+            <button id="btn-coop-create" class="btn btn-primary big coop-wide">🏠 СТВОРИТИ КІМНАТУ</button>
+            <label class="coop-public"><input type="checkbox" id="coop-public" checked>
+              🌍 Показати кімнату всім</label>
+            <div class="coop-or">— або введи код друга —</div>
+            <div class="coop-join-row">
+              <input id="coop-code" class="coop-input coop-code" maxlength="6" placeholder="КОД" autocomplete="off">
+              <button id="btn-coop-join" class="btn big">🚪 ЗАЙТИ</button>
+            </div>
+            <div id="coop-error" class="coop-error"></div>
+          </div>
+          <div class="coop-right">
+            <div class="coop-online-head"><span class="online-dot"></span> Онлайн: <b id="coop-online-n">…</b></div>
+            <div class="coop-side-title">🚪 Відкриті кімнати</div>
+            <div id="coop-rooms" class="coop-rooms"></div>
+            <div class="coop-side-title">😀 Хто в мережі</div>
+            <div id="coop-players" class="coop-players"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -314,6 +340,8 @@
       <div class="lobby-code-box">
         <div class="lobby-code-label">Код кімнати — продиктуй другу:</div>
         <div id="lobby-code" class="lobby-code">····</div>
+        <label id="lobby-public-row" class="coop-public"><input type="checkbox" id="lobby-public" checked>
+          🌍 Кімнату видно всім у списку</label>
       </div>
       <div id="lobby-roster"></div>
       <div class="lobby-section">Режим</div>

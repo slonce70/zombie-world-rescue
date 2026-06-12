@@ -23,6 +23,12 @@ export default {
       const id = env.LEAGUE.idFromName('league');
       return env.LEAGUE.get(id).fetch(request);
     }
+    // 🟢 Лобі: онлайн і відкриті кімнати
+    if (url.pathname.startsWith('/lobby/')) {
+      if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+      const id = env.LOBBY.idFromName('lobby');
+      return env.LOBBY.get(id).fetch(request);
+    }
     if (url.pathname !== '/ws') return new Response('zr-relay ok', { status: 200 });
     const code = (url.searchParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     if (!code) return new Response('bad room', { status: 400 });
@@ -104,11 +110,38 @@ export class Room {
   async webSocketMessage(ws, raw) {
     let msg;
     try { msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); } catch { return; }
-    if (!msg || msg.d === undefined) return;
     const att = ws.deserializeAttachment();
     if (!att) return;
-    const env = JSON.stringify({ from: att.id, d: msg.d });
     const peers = this._peers();
+    // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах, кожному — одне ws-повідомлення
+    if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
+      const per = new Map(); // pid -> [d, …] у порядку надсилання
+      for (const it of msg.m) {
+        if (!it || it.d === undefined) continue;
+        if (it.to === 0) {
+          for (const pid of peers.keys()) {
+            if (pid === att.id) continue;
+            if (!per.has(pid)) per.set(pid, []);
+            per.get(pid).push(it.d);
+          }
+        } else {
+          const pid = it.to | 0;
+          if (pid === att.id || !peers.has(pid)) continue;
+          if (!per.has(pid)) per.set(pid, []);
+          per.get(pid).push(it.d);
+        }
+      }
+      for (const [pid, list] of per) {
+        const sock = peers.get(pid);
+        if (!sock) continue;
+        this._safeSend(sock, JSON.stringify(
+          list.length === 1 ? { from: att.id, d: list[0] } : { from: att.id, b: list }
+        ));
+      }
+      return;
+    }
+    if (!msg || msg.d === undefined) return;
+    const env = JSON.stringify({ from: att.id, d: msg.d });
     if (msg.to === 0) {
       for (const [pid, sock] of peers) if (pid !== att.id) this._safeSend(sock, env);
     } else {
@@ -142,6 +175,91 @@ export class Room {
       try { sock.close(1000, 'hostgone'); } catch (e) { /* ignore */ }
     }
     await this.state.storage.deleteAll();
+  }
+}
+
+
+// ============================================================
+// 🟢 Лобі: один DO на весь світ. Хто зараз у мультиплеєрі + відкриті кімнати.
+// Все в пам'яті: клієнти пінгують кожні ~8с, записи живуть 40с — якщо DO
+// перезапуститься, картина відновиться за один пінг. Нічого не платимо за сховище.
+// ============================================================
+const LOBBY_TTL = 40_000;
+const LOBBY_MODES = new Set(['campaign', 'storm', 'arena']);
+
+export class Lobby {
+  constructor(state) {
+    this.state = state;
+    this.players = new Map(); // cid -> {nick, ts}
+    this.rooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
+  }
+
+  _prune(now) {
+    for (const [cid, p] of this.players) if (now - p.ts > LOBBY_TTL) this.players.delete(cid);
+    for (const [code, r] of this.rooms) if (now - r.ts > LOBBY_TTL) this.rooms.delete(code);
+  }
+
+  _view(now) {
+    this._prune(now);
+    const players = [];
+    for (const p of this.players.values()) {
+      players.push(p.nick);
+      if (players.length >= 60) break;
+    }
+    const rooms = [...this.rooms.entries()]
+      .sort((a, b) => b[1].ts - a[1].ts)
+      .slice(0, 20)
+      .map(([code, r]) => ({
+        code, host: r.host, mode: r.mode, country: r.country,
+        n: r.n, state: r.state, build: r.build,
+      }));
+    return { online: this.players.size, players, rooms };
+  }
+
+  json(obj, status = 200) {
+    return new Response(JSON.stringify(obj), {
+      status,
+      headers: { 'Content-Type': 'application/json', ...CORS },
+    });
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const now = Date.now();
+    try {
+      if (url.pathname === '/lobby/state') return this.json(this._view(now));
+      if (url.pathname === '/lobby/ping' && request.method === 'POST') {
+        const d = await request.json();
+        const cid = String(d.cid || '').slice(0, 40);
+        if (cid.length < 8) return this.json({ error: 'bad' }, 400);
+        this.players.set(cid, { nick: cleanNickSrv(d.nick), ts: now });
+        if (this.players.size > 500) this._prune(now);
+        // хост закрив кімнату — прибираємо одразу, не чекаючи TTL
+        if (d.close) {
+          const code = String(d.close).toUpperCase().slice(0, 8);
+          const r = this.rooms.get(code);
+          if (r && r.cid === cid) this.rooms.delete(code);
+        }
+        // хост анонсує публічну кімнату
+        if (d.room && d.room.code) {
+          const code = String(d.room.code).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+          const mode = LOBBY_MODES.has(d.room.mode) ? d.room.mode : 'campaign';
+          if (code) {
+            this.rooms.set(code, {
+              cid, host: cleanNickSrv(d.nick), mode,
+              country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
+              n: Math.min(4, Math.max(1, d.room.n | 0)),
+              state: d.room.state === 'game' ? 'game' : 'lobby',
+              build: d.room.build | 0, ts: now,
+            });
+          }
+        }
+        return this.json(this._view(now));
+      }
+    } catch (e) {
+      return this.json({ error: 'bad' }, 400);
+    }
+    return this.json({ error: 'notfound' }, 404);
   }
 }
 
