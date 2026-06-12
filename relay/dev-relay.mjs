@@ -130,7 +130,12 @@ const httpServer = createServer((req, res) => {
       if (!saves.has(cid)) return jsonRes(res, { error: 'none' }, 404);
       for (const [code, c] of saveLinks) if (c === cid) return jsonRes(res, { code });
       let code = '';
-      for (let i = 0; i < 8; i++) code += LINK_ALPHABET[Math.floor(Math.random() * LINK_ALPHABET.length)];
+      do {
+        code = '';
+        const buf = new Uint32Array(8);
+        crypto.getRandomValues(buf);
+        for (const b of buf) code += LINK_ALPHABET[b % LINK_ALPHABET.length];
+      } while (saveLinks.has(code));
       saveLinks.set(code, cid);
       jsonRes(res, { code });
     }, res);

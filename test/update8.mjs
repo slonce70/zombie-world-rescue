@@ -85,13 +85,16 @@ const climb = await page.evaluate(async () => {
   g.level.player.yaw = 0;
   await slp(300);
   const y0 = g.level.player.pos.y;
-  for (let i = 0; i < 10; i++) {
+  // headless-кадри бувають рідкі — стрибаємо до результату, а не рівно 10 разів
+  let y1 = y0;
+  for (let i = 0; i < 30 && y1 < y0 + 3.6; i++) {
     g.test.key('KeyW', true);
     g.input.justPressed.add('Space');
     await slp(560);
+    y1 = g.level.player.pos.y;
   }
   g.test.key('KeyW', false);
-  return { y0, y1: g.level.player.pos.y };
+  return { y0, y1 };
 });
 check(climb.y1 > climb.y0 + 3.5, `на піраміду можна вилізти стрибками (y +${(climb.y1 - climb.y0).toFixed(1)}м)`);
 

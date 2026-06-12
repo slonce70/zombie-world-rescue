@@ -306,6 +306,14 @@ const SAVE_PUT_COOLDOWN = 15_000;
 const CLAIM_MAX_PER_MIN = 10;       // анти-перебір кодів з однієї IP
 const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789'; // без схожих O/0, I/1, G/6, Q
 
+function randomCode(n) {
+  const buf = new Uint32Array(n);
+  crypto.getRandomValues(buf);
+  let s = '';
+  for (let i = 0; i < n; i++) s += LINK_ALPHABET[buf[i] % LINK_ALPHABET.length];
+  return s;
+}
+
 export class SaveVault {
   constructor(state) {
     this.state = state;
@@ -382,9 +390,15 @@ export class SaveVault {
         if (!has.length) return this.json({ error: 'none' }, 404);
         const old = this.sql.exec('SELECT code FROM links WHERE cid = ?', cid).toArray();
         if (old.length) return this.json({ code: old[0].code });
+        // колізія не сміє ВКРАСТИ чужий код: перевіряємо зайнятість, без REPLACE
         let code = '';
-        for (let i = 0; i < 8; i++) code += LINK_ALPHABET[Math.floor(Math.random() * LINK_ALPHABET.length)];
-        this.sql.exec('INSERT OR REPLACE INTO links (code, cid, ts) VALUES (?, ?, ?)', code, cid, now);
+        for (let attempt = 0; attempt < 5 && !code; attempt++) {
+          const candidate = randomCode(8);
+          const clash = this.sql.exec('SELECT code FROM links WHERE code = ?', candidate).toArray();
+          if (!clash.length) code = candidate;
+        }
+        if (!code) return this.json({ error: 'busy' }, 503);
+        this.sql.exec('INSERT INTO links (code, cid, ts) VALUES (?, ?, ?)', code, cid, now);
         return this.json({ code });
       }
       // новий пристрій вводить код → отримує cid і сейв (код лишається дійсним)

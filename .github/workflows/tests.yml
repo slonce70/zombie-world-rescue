@@ -26,6 +26,21 @@ jobs:
         run: node test/version-check.mjs
       - name: Cloud save (хмарний сейв, фільтр ніків, краш-екран)
         run: node test/cloudsave.mjs
-      # повний e2e кампанії НЕ ганяємо: безкоштовний раннер рендерить софтверно
-      # і не вкладається у 20 хв (локально тест іде ~4 хв) — він лишається
-      # обовʼязковим локальним прогоном перед релізом
+
+  # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
+  # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start static server
+        run: python3 -m http.server 8741 &
+      - name: E2E кампанія UKR
+        run: node test/e2e.mjs
