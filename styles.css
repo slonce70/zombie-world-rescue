@@ -877,3 +877,10 @@ body.touch-mode .touch-controls-hint { display: block; }
   .globe-side .globe-act { font-size: 11px; padding: 6px 9px; text-align: center; }
   .globe-play { font-size: 15px; padding: 11px 20px; }
 }
+
+/* 💾 панель «Мій прогрес» і аварійний екран */
+.progress-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+.progress-row .coop-input { width: 210px; text-transform: uppercase; letter-spacing: 3px; text-align: center; }
+.cloud-status { min-height: 20px; color: #bcd2e2; font-weight: 700; font-size: 14px; margin: 6px 0 2px; }
+.cloud-code { font-size: 30px; font-weight: 900; letter-spacing: 5px; color: #ffd54a; min-width: 150px; }
+#crash-info { max-height: 90px; overflow: hidden; color: #8aa0b5; font-size: 11px; white-space: pre-wrap; text-align: left; margin: 10px 0; }

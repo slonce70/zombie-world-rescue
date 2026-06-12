@@ -4,8 +4,14 @@
 //
 // Деплой:  cd worker && npx wrangler deploy
 // Адреса потім вписується у src/net/transport.js (DEFAULT_RELAY).
+import { cleanNickSrv } from './nick.mjs';
 
 const MAX_PLAYERS = 4;
+const MAX_WS_BYTES = 65536;   // ліміт одного ws-повідомлення (звичайна пачка — сотні байт)
+const MAX_BATCH_ITEMS = 128;  // ліміт елементів у пачці
+const MAX_BODY_BYTES = 4096;  // ліміт тіла POST для Ліги/Лобі
+const RATE_WINDOW_MS = 10_000;
+const RATE_MAX_MSGS = 400;    // ~40 повідомлень/с — у 4 рази більше за чесний максимум
 
 // CORS: гра живе на github.io, Ліга — тут
 const CORS = {
@@ -29,6 +35,12 @@ export default {
       const id = env.LOBBY.idFromName('lobby');
       return env.LOBBY.get(id).fetch(request);
     }
+    // 💾 Хмарний сейв
+    if (url.pathname.startsWith('/save/')) {
+      if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+      const id = env.SAVE.idFromName('save');
+      return env.SAVE.get(id).fetch(request);
+    }
     if (url.pathname !== '/ws') return new Response('zr-relay ok', { status: 200 });
     const code = (url.searchParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     if (!code) return new Response('bad room', { status: 400 });
@@ -41,6 +53,15 @@ export class Room {
   constructor(state) {
     this.state = state;
     // Hibernation API: сокети живуть, DO спить — простій кімнати безкоштовний
+    this._rate = new Map(); // id -> {n, t0}; обнуляється при гібернації — це ок
+  }
+
+  // true = перебір: понад RATE_MAX_MSGS за вікно — флудера відключаємо
+  _overRate(id) {
+    const now = Date.now();
+    let r = this._rate.get(id);
+    if (!r || now - r.t0 > RATE_WINDOW_MS) { r = { n: 0, t0: now }; this._rate.set(id, r); }
+    return ++r.n > RATE_MAX_MSGS;
   }
 
   _peers() {
@@ -108,15 +129,20 @@ export class Room {
   }
 
   async webSocketMessage(ws, raw) {
+    if ((typeof raw === 'string' ? raw.length : raw.byteLength) > MAX_WS_BYTES) return;
     let msg;
     try { msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw)); } catch { return; }
     const att = ws.deserializeAttachment();
     if (!att) return;
+    if (this._overRate(att.id)) {
+      try { ws.close(1008, 'flood'); } catch (e) { /* ignore */ }
+      return;
+    }
     const peers = this._peers();
     // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах, кожному — одне ws-повідомлення
     if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
       const per = new Map(); // pid -> [d, …] у порядку надсилання
-      for (const it of msg.m) {
+      for (const it of msg.m.slice(0, MAX_BATCH_ITEMS)) {
         if (!it || it.d === undefined) continue;
         if (it.to === 0) {
           for (const pid of peers.keys()) {
@@ -157,9 +183,10 @@ export class Room {
     peers.delete(att.id);
     for (const [, sock] of peers) this._safeSend(sock, JSON.stringify({ t: 'peer', id: att.id, on: false }));
     if (att.id === 1) {
-      // хост зник: даємо 90с на реконект, потім закриваємо кімнату алармом
+      // хост зник: реконекту хоста немає, тому грейс короткий — щоб гості
+      // не висіли в «чекаємо хоста» довше за 30с
       await this.state.storage.put('hostGoneAt', Date.now());
-      await this.state.storage.setAlarm(Date.now() + 90_000);
+      await this.state.storage.setAlarm(Date.now() + 30_000);
     }
   }
 
@@ -226,6 +253,9 @@ export class Lobby {
   async fetch(request) {
     const url = new URL(request.url);
     const now = Date.now();
+    if ((parseInt(request.headers.get('content-length'), 10) || 0) > MAX_BODY_BYTES) {
+      return this.json({ error: 'big' }, 413);
+    }
     try {
       if (url.pathname === '/lobby/state') return this.json(this._view(now));
       if (url.pathname === '/lobby/ping' && request.method === 'POST') {
@@ -265,20 +295,130 @@ export class Lobby {
 
 
 // ============================================================
+// 💾 Хмарний сейв: один DO на весь світ, SQLite. Прогрес гравця лежить за його
+// cid (довгий випадковий рядок із localStorage — він і є «пароль»). У кожного
+// cid є ПОСТІЙНИЙ код відновлення (8 знаків): запиши його раз — і повернеш
+// прогрес на будь-якому пристрої навіть після чищення браузера.
+// ============================================================
+const SAVE_MAX_BYTES = 24 * 1024;   // сейв ~2-3 КБ, стеля з запасом
+const SAVE_BODY_BYTES = 32 * 1024;
+const SAVE_PUT_COOLDOWN = 15_000;
+const CLAIM_MAX_PER_MIN = 10;       // анти-перебір кодів з однієї IP
+const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789'; // без схожих O/0, I/1, G/6, Q
+
+export class SaveVault {
+  constructor(state) {
+    this.state = state;
+    this.sql = state.storage.sql;
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS saves (
+      cid TEXT PRIMARY KEY, data TEXT NOT NULL, ts INTEGER NOT NULL
+    )`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS links (
+      code TEXT PRIMARY KEY, cid TEXT NOT NULL, ts INTEGER NOT NULL
+    )`);
+    this._lastPut = new Map(); // cid -> ts (анти-спам, у пам'яті — ок)
+    this._claims = new Map();  // ip -> {n, t0} (анти-перебір кодів)
+  }
+
+  _claimAllowed(ip) {
+    const now = Date.now();
+    let r = this._claims.get(ip);
+    if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; this._claims.set(ip, r); }
+    if (this._claims.size > 2000) this._claims.clear();
+    return ++r.n <= CLAIM_MAX_PER_MIN;
+  }
+
+  json(obj, status = 200) {
+    return new Response(JSON.stringify(obj), {
+      status,
+      headers: { 'Content-Type': 'application/json', ...CORS },
+    });
+  }
+
+  _cid(raw) {
+    const cid = String(raw || '').slice(0, 40);
+    return cid.length >= 8 ? cid : null;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if ((parseInt(request.headers.get('content-length'), 10) || 0) > SAVE_BODY_BYTES) {
+      return this.json({ error: 'big' }, 413);
+    }
+    const now = Date.now();
+    try {
+      // зберегти прогрес: {cid, data: "<рядок JSON сейва>"}
+      if (url.pathname === '/save/put' && request.method === 'POST') {
+        const d = await request.json();
+        const cid = this._cid(d.cid);
+        const data = typeof d.data === 'string' ? d.data : '';
+        if (!cid || !data || data.length > SAVE_MAX_BYTES) return this.json({ error: 'bad' }, 400);
+        JSON.parse(data); // не-JSON не приймаємо (кине → catch → 400)
+        const last = this._lastPut.get(cid) || 0;
+        if (now - last < SAVE_PUT_COOLDOWN) return this.json({ error: 'slow' }, 429);
+        this._lastPut.set(cid, now);
+        if (this._lastPut.size > 5000) this._lastPut.clear();
+        this.sql.exec(
+          `INSERT INTO saves (cid, data, ts) VALUES (?, ?, ?)
+           ON CONFLICT (cid) DO UPDATE SET data = excluded.data, ts = excluded.ts`,
+          cid, data, now
+        );
+        return this.json({ ok: true, ts: now });
+      }
+      // забрати свій прогрес (новий пристрій із тим самим cid або відновлення)
+      if (url.pathname === '/save/get') {
+        const cid = this._cid(url.searchParams.get('cid'));
+        if (!cid) return this.json({ error: 'bad' }, 400);
+        const rows = this.sql.exec('SELECT data, ts FROM saves WHERE cid = ?', cid).toArray();
+        if (!rows.length) return this.json({ error: 'none' }, 404);
+        return this.json({ data: rows[0].data, ts: rows[0].ts });
+      }
+      // постійний код відновлення: {cid} → {code} (один на гравця, не згорає)
+      if (url.pathname === '/save/link' && request.method === 'POST') {
+        const d = await request.json();
+        const cid = this._cid(d.cid);
+        if (!cid) return this.json({ error: 'bad' }, 400);
+        const has = this.sql.exec('SELECT cid FROM saves WHERE cid = ?', cid).toArray();
+        if (!has.length) return this.json({ error: 'none' }, 404);
+        const old = this.sql.exec('SELECT code FROM links WHERE cid = ?', cid).toArray();
+        if (old.length) return this.json({ code: old[0].code });
+        let code = '';
+        for (let i = 0; i < 8; i++) code += LINK_ALPHABET[Math.floor(Math.random() * LINK_ALPHABET.length)];
+        this.sql.exec('INSERT OR REPLACE INTO links (code, cid, ts) VALUES (?, ?, ?)', code, cid, now);
+        return this.json({ code });
+      }
+      // новий пристрій вводить код → отримує cid і сейв (код лишається дійсним)
+      if (url.pathname === '/save/claim' && request.method === 'POST') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'x';
+        if (!this._claimAllowed(ip)) return this.json({ error: 'slow' }, 429);
+        const d = await request.json();
+        const code = String(d.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+        if (code.length !== 8) return this.json({ error: 'bad' }, 400);
+        const rows = this.sql.exec('SELECT cid FROM links WHERE code = ?', code).toArray();
+        if (!rows.length) return this.json({ error: 'none' }, 404);
+        const cid = rows[0].cid;
+        const save = this.sql.exec('SELECT data, ts FROM saves WHERE cid = ?', cid).toArray();
+        if (!save.length) return this.json({ error: 'none' }, 404);
+        return this.json({ cid, data: save[0].data, ts: save[0].ts });
+      }
+    } catch (e) {
+      return this.json({ error: 'bad' }, 400);
+    }
+    return this.json({ error: 'notfound' }, 404);
+  }
+}
+
+
+// ============================================================
 // 🏆 Ліга рекордів: один DO на весь світ, SQLite-таблиця рекордів.
 // Кращий результат на гравця (cid) у кожному режимі+країні.
 // ============================================================
 const MODES = { storm: 'desc', arena: 'asc' }; // як сортувати score
 
-function cleanNickSrv(raw) {
-  let s = String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
-  if (s.length > 12) s = s.slice(0, 12);
-  return s || 'Гравець';
-}
-
 export class League {
-  constructor(state) {
+  constructor(state, env) {
     this.state = state;
+    this.env = env;
     this.sql = state.storage.sql;
     this.sql.exec(`CREATE TABLE IF NOT EXISTS entries (
       cid TEXT NOT NULL, mode TEXT NOT NULL, country TEXT NOT NULL,
@@ -297,6 +437,9 @@ export class League {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if ((parseInt(request.headers.get('content-length'), 10) || 0) > MAX_BODY_BYTES) {
+      return this.json({ error: 'big' }, 413);
+    }
     try {
       if (url.pathname === '/league/submit' && request.method === 'POST') {
         return this.submit(await request.json());
@@ -304,10 +447,12 @@ export class League {
       if (url.pathname === '/league/top') {
         return this.top(url.searchParams);
       }
-      // адмін: повне скидання таблиці (секрет простий — гра сімейна)
+      // адмін: повне скидання таблиці. Ключ — ТІЛЬКИ секрет оточення
+      // (npx wrangler secret put ADMIN_KEY); без секрета ендпоінт вимкнено.
       if (url.pathname === '/league/reset' && request.method === 'POST') {
+        const adminKey = this.env && this.env.ADMIN_KEY;
         const d = await request.json();
-        if (d.key !== 'zr-admin-slonce-2026') return this.json({ error: 'no' }, 403);
+        if (!adminKey || d.key !== adminKey) return this.json({ error: 'no' }, 403);
         this.sql.exec('DELETE FROM entries');
         return this.json({ ok: true });
       }

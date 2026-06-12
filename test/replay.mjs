@@ -62,12 +62,16 @@ check(s.state === 'level', 'рівень №2 завантажено');
 check(s.zombies >= 35, `зомбі знову на карті: ${s.zombies}`);
 await page.waitForTimeout(2000);
 await page.screenshot({ path: 'shots/replay-level2.png' });
-// швидка перевірка що рендер живий (зомбі рухаються, постріл працює)
+// швидка перевірка що рендер живий (зомбі рухаються, постріл працює).
+// headless-RAF буває 1-3 fps — пульсуємо мишею, поки постріл не пройде
 await page.evaluate(() => { window.__game.test.god(); window.__game.test.teleport(-85, -45); window.__game.test.aimAtNearestZombie(); });
 await page.waitForTimeout(400);
-await page.evaluate(() => window.__game.test.mouse(true));
-await page.waitForTimeout(300);
-await page.evaluate(() => window.__game.test.mouse(false));
+await waitFor(async () => {
+  await page.evaluate(() => window.__game.test.mouse(true));
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.__game.test.mouse(false));
+  return (await state()).stats.shotsFired > 0;
+}, 10000, 'постріл');
 s = await state();
 check(s.stats.shotsFired > 0, 'стрільба працює у повторному рівні');
 await speedrun();

@@ -118,6 +118,18 @@ export class CoopUI {
       if (n > 1) game.hud.toast(`⚔️ Вас ${n} — зомбі сильніші ×${n}! Тримайтесь разом!`);
       this.lobbyNet.refresh(); // у списку кімнат стане «⚔️ у грі»
     };
+    // гість більше не заручник мовчазного хоста: з очікування можна вийти
+    const netLeave = document.getElementById('btn-net-leave');
+    if (netLeave) {
+      netLeave.addEventListener('click', () => {
+        game._hideOverlay('overlay-net-wait');
+        this.session.leave();
+        if (game.state === 'level') game.endLevel();
+        game.hud.toast('🚪 Ти вийшов з кімнати');
+        this._syncPolling();
+        this.updateRoomChip();
+      });
+    }
     this.session.onEnd = (reason, wasLevel) => {
       game._hideOverlay('overlay-lobby');
       if (wasLevel && game.state === 'level') {

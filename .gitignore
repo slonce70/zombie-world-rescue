@@ -3,3 +3,4 @@ shots/
 .DS_Store
 index-alt.html.bak
 .claude/
+worker/.dev.vars

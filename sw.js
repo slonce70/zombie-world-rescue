@@ -46,8 +46,10 @@ const SHELL = [
   './src/net/remoteplayer.js',
   './src/net/league.js',
   './src/net/lobby.js',
+  './src/net/cloudsave.js',
   './src/ui/coopui.js',
   './src/ui/leagueui.js',
+  './src/ui/saveui.js',
 ];
 
 self.addEventListener('install', (e) => {

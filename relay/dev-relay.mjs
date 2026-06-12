@@ -7,15 +7,21 @@
 // Хост завжди отримує id 1. Кімната живе, поки живий хост (грейс 90с на реконект).
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { cleanNickSrv } from '../worker/nick.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
 const MAX_PLAYERS = 4;
-const HOST_GRACE_MS = 90_000;
+const HOST_GRACE_MS = 30_000;
 
 const rooms = new Map(); // code -> { sockets: Map<id, ws>, nextId, hostTimer }
 
 // 🏆 локальна Ліга в пам'яті — щоб розробка повністю працювала офлайн
 const league = new Map(); // `${cid}|${mode}|${country}` -> {nick, score, team, ts}
+
+// 💾 локальний хмарний сейв у пам'яті (дзеркало SaveVault DO з воркера)
+const saves = new Map();     // cid -> {data, ts}
+const saveLinks = new Map(); // code -> cid (постійний код відновлення)
+const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789';
 
 // 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
 const LOBBY_TTL = 40_000;
@@ -37,7 +43,7 @@ function lobbyPing(d) {
   const now = Date.now();
   const cid = String(d.cid || '').slice(0, 40);
   if (cid.length < 8) return null;
-  const nick = String(d.nick || 'Гравець').slice(0, 12);
+  const nick = cleanNickSrv(d.nick);
   lobbyPlayers.set(cid, { nick, ts: now });
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);
@@ -77,11 +83,67 @@ function leagueTop(mode, country, cid) {
   return { top: rows, me };
 }
 
+function readBody(req, cb, res) {
+  let body = '';
+  req.on('data', (ch) => { body += ch; });
+  req.on('end', () => {
+    try { cb(JSON.parse(body)); } catch (e) {
+      res.writeHead(400, CORS);
+      res.end('{"error":"bad"}');
+    }
+  });
+}
+
+function jsonRes(res, obj, status = 200) {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS });
+  res.end(JSON.stringify(obj));
+}
+
 const httpServer = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (!url.pathname.startsWith('/league/') && !url.pathname.startsWith('/lobby/')) {
+  if (!url.pathname.startsWith('/league/') && !url.pathname.startsWith('/lobby/') && !url.pathname.startsWith('/save/')) {
     res.writeHead(200, CORS);
     res.end('zr-dev-relay ok');
+    return;
+  }
+  // 💾 хмарний сейв (як SaveVault у воркері)
+  if (url.pathname === '/save/put' && req.method === 'POST') {
+    readBody(req, (d) => {
+      const cid = String(d.cid || '').slice(0, 40);
+      if (cid.length < 8 || typeof d.data !== 'string' || !d.data) return jsonRes(res, { error: 'bad' }, 400);
+      try { JSON.parse(d.data); } catch (e) { return jsonRes(res, { error: 'bad' }, 400); }
+      saves.set(cid, { data: d.data, ts: Date.now() });
+      jsonRes(res, { ok: true, ts: Date.now() });
+    }, res);
+    return;
+  }
+  if (url.pathname === '/save/get') {
+    const cid = String(url.searchParams.get('cid') || '');
+    const s = saves.get(cid);
+    if (!s) return jsonRes(res, { error: 'none' }, 404);
+    jsonRes(res, { data: s.data, ts: s.ts });
+    return;
+  }
+  if (url.pathname === '/save/link' && req.method === 'POST') {
+    readBody(req, (d) => {
+      const cid = String(d.cid || '');
+      if (!saves.has(cid)) return jsonRes(res, { error: 'none' }, 404);
+      for (const [code, c] of saveLinks) if (c === cid) return jsonRes(res, { code });
+      let code = '';
+      for (let i = 0; i < 8; i++) code += LINK_ALPHABET[Math.floor(Math.random() * LINK_ALPHABET.length)];
+      saveLinks.set(code, cid);
+      jsonRes(res, { code });
+    }, res);
+    return;
+  }
+  if (url.pathname === '/save/claim' && req.method === 'POST') {
+    readBody(req, (d) => {
+      const code = String(d.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      const cid = saveLinks.get(code);
+      const s = cid && saves.get(cid);
+      if (!s) return jsonRes(res, { error: 'none' }, 404);
+      jsonRes(res, { cid, data: s.data, ts: s.ts });
+    }, res);
     return;
   }
   if (req.method === 'OPTIONS') {
@@ -125,7 +187,7 @@ const httpServer = createServer((req, res) => {
         const key = `${d.cid}|${d.mode}|${String(d.country).toUpperCase()}`;
         const cur = league.get(key);
         const better = !cur || (d.mode === 'arena' ? d.score < cur.score : d.score > cur.score);
-        if (better) league.set(key, { nick: String(d.nick).slice(0, 12), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
+        if (better) league.set(key, { nick: cleanNickSrv(d.nick), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify(leagueTop(d.mode, String(d.country).toUpperCase(), d.cid)));
       } catch (e) {

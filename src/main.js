@@ -20,11 +20,35 @@ import { BossRush } from './bossrush.js';
 import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
+import { SaveUI } from './ui/saveui.js';
 import { submitScore } from './net/league.js';
+import { CloudSave } from './net/cloudsave.js';
+
+// 🚑 Аварійний екран: непіймана помилка → зрозумілий екран із кнопкою
+// перезавантаження замість мовчазно замерзлої гри. Сейв не страждає.
+let crashShown = false;
+function showCrash(msg) {
+  if (crashShown) return;
+  crashShown = true;
+  try {
+    const info = document.getElementById('crash-info');
+    if (info) info.textContent = String(msg || 'невідома помилка').slice(0, 300);
+    const ov = document.getElementById('overlay-crash');
+    if (ov) ov.classList.add('show');
+    const b = document.getElementById('btn-crash-reload');
+    if (b) b.onclick = () => location.reload();
+    document.exitPointerLock && document.exitPointerLock();
+  } catch (e) { /* зовсім погано — хоч не зациклюємось */ }
+}
+window.addEventListener('error', (e) => showCrash(e.message));
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  showCrash(r && (r.stack || r.message) || r);
+});
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -93,6 +117,7 @@ class Game {
     if (this.params.has('mute') || this.testMode) this.audio.setMuted(true);
     this.save = this._loadSave();
     if (this.params.has('fresh')) this.save = this._newSave();
+    this.cloud = new CloudSave(this);
     this.progress = new Progress(this);
     this.quests = new DailyQuests(this);
 
@@ -101,6 +126,7 @@ class Game {
     this.globe = new Globe(this);
     this.coop = new CoopUI(this);
     this.league = new LeagueUI(this);
+    this.saveui = new SaveUI(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
@@ -247,7 +273,11 @@ class Game {
         if (this.level && this.level.net) this._frame(true);
       };
     } catch (e) { /* без воркера гра просто живе на rAF */ }
-    window.__game = this;
+    // дебаг-API лише для тестів і локальної розробки: на проді читерські
+    // хендли (spawnZombie, god…) не світяться у кожній консолі
+    if (this.testMode || ['localhost', '127.0.0.1'].includes(location.hostname)) {
+      window.__game = this;
+    }
     this._boot();
   }
 
@@ -297,6 +327,7 @@ class Game {
 
   saveGame() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* ignore */ }
+    if (this.cloud) this.cloud.schedulePush();
   }
 
   _applyQuality() {
@@ -326,6 +357,7 @@ class Game {
     this.state = 'globe';
     this._showGlobeUI(true);
     this._initVersionCheck();
+    this.cloud.bootSync(); // тихо: пуш прогресу або підхоплення хмарного сейва
     this.renderer.setAnimationLoop(() => {
       this._lastRaf = performance.now();
       this._frame(false);

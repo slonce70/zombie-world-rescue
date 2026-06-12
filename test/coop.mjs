@@ -145,13 +145,19 @@ try {
     const p = window.__game.level.player.pos;
     return { x: p.x, z: p.z };
   });
+  // свіжий базлайн прямо перед спавном + полінг: headless-кадри бувають 1-3fps,
+  // фіксованих 700мс на снапшот не вистачає
+  const beforeSpawn = await B.evaluate(() => window.__game.test.coopState().aliveZombies);
   await A.evaluate((gp) => {
     window.__game.test.god();
     window.__game.test.spawnZombie('walker', gp.x + 5, gp.z);
   }, gPos);
-  await sleep(700);
-  const guestSeesNew = await B.evaluate(() => window.__game.test.coopState().aliveZombies);
-  check('новий зомбі долетів до гостя', guestSeesNew > sB.aliveZombies, `тепер ${guestSeesNew}`);
+  let guestSeesNew = beforeSpawn;
+  for (let i = 0; i < 20 && guestSeesNew <= beforeSpawn; i++) {
+    await sleep(400);
+    guestSeesNew = await B.evaluate(() => window.__game.test.coopState().aliveZombies);
+  }
+  check('новий зомбі долетів до гостя', guestSeesNew > beforeSpawn, `${beforeSpawn} → ${guestSeesNew}`);
 
   const killsBefore = await B.evaluate(() => window.__game.test.state().stats.kills);
   // гість розстрілює найближчого зомбі

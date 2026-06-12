@@ -14,6 +14,10 @@ class_name = "League"
 name = "LOBBY"
 class_name = "Lobby"
 
+[[durable_objects.bindings]]
+name = "SAVE"
+class_name = "SaveVault"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
@@ -25,3 +29,7 @@ new_sqlite_classes = ["League"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["Lobby"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["SaveVault"]

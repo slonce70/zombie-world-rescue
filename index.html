@@ -25,6 +25,7 @@
       <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
       <button id="btn-league" class="btn globe-act league-btn">🏆 Ліга</button>
       <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
+      <button id="btn-progress" class="btn globe-act">💾 Прогрес</button>
     </div>
     <div class="globe-bottom">
       <div class="globe-play-row">
@@ -260,6 +261,41 @@
     </div>
   </div>
 
+  <!-- Мій прогрес: хмарний сейв, код відновлення, файл-копія -->
+  <div id="overlay-progress" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>💾 МІЙ ПРОГРЕС</h2>
+        <button class="btn-x panel-close" data-close="overlay-progress">✕</button>
+      </div>
+      <p class="panel-sub">Прогрес сам летить у хмару. Запиши свій код відновлення — і повернеш гру на будь-якому пристрої!</p>
+      <div id="cloud-status" class="cloud-status"></div>
+      <div class="progress-row">
+        <button id="btn-cloud-code" class="btn">🔑 Мій код відновлення</button>
+        <div id="cloud-code" class="cloud-code"></div>
+      </div>
+      <div class="progress-row">
+        <input id="cloud-code-input" class="coop-input" maxlength="9" placeholder="КОД (8 знаків)" autocomplete="off">
+        <button id="btn-cloud-claim" class="btn">📥 Відновити за кодом</button>
+      </div>
+      <div class="progress-row">
+        <button id="btn-save-export" class="btn">⬇️ Копія у файл</button>
+        <button id="btn-save-import" class="btn">⬆️ Відновити з файлу</button>
+        <input id="save-file-input" type="file" accept=".json,application/json" style="display:none">
+      </div>
+    </div>
+  </div>
+
+  <!-- Аварійний екран: несподівана помилка більше не «мовчазно замерзла гра» -->
+  <div id="overlay-crash" class="overlay">
+    <div class="overlay-card death-card">
+      <h2>😵 ОЙ! ЩОСЬ ЗЛАМАЛОСЬ</h2>
+      <p class="panel-sub">Гра спіткнулась, але твій прогрес у безпеці. Перезавантаж — і граймо далі!</p>
+      <pre id="crash-info"></pre>
+      <button id="btn-crash-reload" class="btn btn-primary big">🔄 Перезавантажити</button>
+    </div>
+  </div>
+
   <!-- Гардероб -->
   <div id="overlay-wardrobe" class="overlay">
     <div class="overlay-card panel-card wide">
@@ -373,6 +409,7 @@
       <div class="spinner">📡</div>
       <h2>Звʼязок з хостом…</h2>
       <p id="net-wait-sub">Хост відволікся — чекаємо…</p>
+      <button id="btn-net-leave" class="btn">🌍 Вийти на глобус</button>
     </div>
   </div>
 
