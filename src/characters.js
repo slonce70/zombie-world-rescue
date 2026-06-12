@@ -58,7 +58,7 @@ function getBakedMat() {
   return bakedMat;
 }
 
-export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = false } = {}) {
+export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = false, outline = 0 } = {}) {
   const meshes = [];
   group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   if (!meshes.length) return null;
@@ -86,9 +86,12 @@ export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = fal
     geos.push(g);
     total += n;
   }
-  const pos = new Float32Array(total * 3);
-  const nor = new Float32Array(total * 3);
-  const col = new Float32Array(total * 3);
+  // 🖍️ мультяшна обводка: вивернута роздута копія в ТІЙ САМІЙ геометрії —
+  // жодного зайвого draw call, лише трохи вершин
+  const copies = outline > 0 ? 2 : 1;
+  const pos = new Float32Array(total * 3 * copies);
+  const nor = new Float32Array(total * 3 * copies);
+  const col = new Float32Array(total * 3 * copies);
   let off = 0;
   for (const g of geos) {
     pos.set(g.attributes.position.array, off * 3);
@@ -96,6 +99,23 @@ export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = fal
     col.set(g.attributes.color.array, off * 3);
     off += g.attributes.position.count;
     g.dispose();
+  }
+  if (outline > 0) {
+    const base = total * 3;
+    for (let t = 0; t < total; t += 3) {
+      // обернений порядок вершин трикутника → видно лише «зсередини» (inverted hull)
+      for (let k = 0; k < 3; k++) {
+        const src = (t + (k === 1 ? 2 : k === 2 ? 1 : 0)) * 3;
+        const dst = base + (t + k) * 3;
+        pos[dst] = pos[src] + nor[src] * outline;
+        pos[dst + 1] = pos[src + 1] + nor[src + 1] * outline;
+        pos[dst + 2] = pos[src + 2] + nor[src + 2] * outline;
+        nor[dst] = -nor[src];
+        nor[dst + 1] = -nor[src + 1];
+        nor[dst + 2] = -nor[src + 2];
+        col[dst] = 0.045; col[dst + 1] = 0.045; col[dst + 2] = 0.06;
+      }
+    }
   }
   const mg = new THREE.BufferGeometry();
   mg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -113,9 +133,10 @@ const PART_NAMES = ['legL', 'legR', 'armL', 'armR', 'torso', 'head'];
 
 // Запікає всі анімовані частини ріга (7 draw calls на персонажа)
 export function bakeRig(rig, castAll = false) {
+  const outline = 0.028 / Math.max(0.7, rig.spec ? rig.spec.scale : 1); // у світі ~3см
   for (const key of PART_NAMES) {
     const shadow = castAll || key === 'torso' || key === 'head';
-    bakeGroupMeshes(rig.parts[key], { castShadow: shadow });
+    bakeGroupMeshes(rig.parts[key], { castShadow: shadow, outline });
   }
   // прямі меші на тілі (плечі боса, кулі сніговика тощо)
   const direct = rig.body.children.filter((c) => c.isMesh);
@@ -124,7 +145,7 @@ export function bakeRig(rig, castAll = false) {
     g.name = 'extras';
     for (const m of direct) g.add(m);
     rig.body.add(g);
-    bakeGroupMeshes(g, { castShadow: true });
+    bakeGroupMeshes(g, { castShadow: true, outline });
   }
   return rig;
 }
@@ -183,7 +204,9 @@ export function makeHumanoid(spec) {
     const foot = box(0.17, 0.12, 0.3, shoesM);
     foot.position.set(0, -0.84, -0.05);
     foot.castShadow = false;
-    g.add(leg, foot);
+    const sole = box(0.19, 0.045, 0.33, toonMat(0x2a2622));
+    sole.position.set(0, -0.92, -0.05);
+    g.add(leg, foot, sole);
     body.add(g);
     parts[side < 0 ? 'legL' : 'legR'] = g;
   }
@@ -216,18 +239,23 @@ export function makeHumanoid(spec) {
     const arm = capsule(0.085, 0.46, s.sleeves === 'skin' ? skinM : shirtM);
     arm.position.y = -0.3;
     arm.castShadow = castAll;
-    const hand = sphere(0.1, skinM, 12, 9);
+    const cuff = cylinder(0.095, 0.095, 0.06, s.sleeves === 'skin' ? skinM : shirtM, 10);
+    cuff.position.y = -0.52;
+    const hand = sphere(0.105, skinM, 12, 9);
     hand.position.y = -0.6;
-    g.add(arm, hand);
+    g.add(arm, cuff, hand);
     g.rotation.x = s.armsForward;
     body.add(g);
     parts[side < 0 ? 'armL' : 'armR'] = g;
   }
 
-  // Голова
+  // Голова (з шиєю)
   const headG = new THREE.Group();
   headG.name = 'head';
   headG.position.y = 1.74;
+  const neck = cylinder(0.09, 0.11, 0.14, skinM, 10);
+  neck.position.y = -0.06;
+  headG.add(neck);
   const head = sphere(s.headR, skinM, 20, 16);
   head.position.y = 0.14;
   head.castShadow = true;
@@ -243,7 +271,9 @@ export function makeHumanoid(spec) {
     eye.position.set(0.105 * side, 0.2, fz);
     const pupil = sphere(er * 0.45, pupilM, 8, 6);
     pupil.position.set(0.105 * side + (s.crossEyed ? -0.018 * side : 0), 0.2, fz - er * 0.75);
-    headG.add(eye, pupil);
+    const glint = sphere(er * 0.16, eyeWhiteM, 6, 5);
+    glint.position.set(0.105 * side + er * 0.16, 0.2 + er * 0.2, fz - er * 0.95);
+    headG.add(eye, pupil, glint);
     if (s.brow !== 0) {
       const brow = box(0.11, 0.025, 0.03, toonMat(s.browColor));
       brow.position.set(0.105 * side, 0.2 + er + 0.035, fz - 0.02);
@@ -351,6 +381,8 @@ export function updateRig(rig, dt) {
       const spd = Math.max(0.5, a.speed);
       a.phase += dt * spd * (2.6 / Math.sqrt(rig.spec.scale));
       const amp = a.mode === 'run' ? 0.85 : 0.55;
+      // нахил уперед на бігу — динаміка!
+      bodyRotX = b.bodyRotX + (a.mode === 'run' ? 0.14 : 0.05);
       const sw = Math.sin(a.phase);
       legL = sw * amp;
       legR = -sw * amp;
@@ -461,6 +493,20 @@ export function updateRig(rig, dt) {
       }
       break;
     }
+    case 'ride': { // 🛴 на самокаті: стоїть на дошці, руки на кермі
+      const steer = a.steer || 0;
+      legL = 0.45;  // передня нога
+      legR = -0.2;  // задня нога
+      armL = 1.1 - steer * 0.15;
+      armR = 1.1 + steer * 0.15;
+      a.armLZ = 0.3; a.armRZ = -0.3;
+      bodyRotZ = -steer * 0.16;
+      bodyRotX = b.bodyRotX - 0.06;
+      headRotZ = -steer * 0.1;
+      a.phase += dt * 2;
+      bodyY = Math.sin(a.phase) * 0.008;
+      break;
+    }
     case 'aim': { // герой у виді від 3-ї особи зі зброєю
       const spd = Math.max(0.5, a.speed);
       if (a.speed > 0.3) {
@@ -470,6 +516,7 @@ export function updateRig(rig, dt) {
         legL = sw * amp;
         legR = -sw * amp;
         bodyY = Math.abs(Math.cos(a.phase)) * 0.045 * amp;
+        bodyRotX = b.bodyRotX + (a.speed > 6 ? 0.1 : 0.04);
       } else {
         a.phase += dt * 1.6;
         bodyY = Math.sin(a.phase * 2) * 0.008;
@@ -488,7 +535,7 @@ export function updateRig(rig, dt) {
   if (a.mode === 'aim') {
     p.armL.rotation.z = 0.55; // ліва рука підтримує зброю
     p.armR.rotation.z = -0.12;
-  } else if (a.mode === 'dance' && a.armLZ !== undefined) {
+  } else if ((a.mode === 'dance' || a.mode === 'ride') && a.armLZ !== undefined) {
     p.armL.rotation.z = a.armLZ;
     p.armR.rotation.z = a.armRZ;
   } else {
@@ -518,6 +565,7 @@ export function makeZombie(type, rng) {
   if (!arr[idx]) {
     const rig = buildZombie(type, rng);
     bakeRig(rig);
+    if (rig._postBake) rig._postBake(rig);
     arr[idx] = rig;
   }
   return cloneRig(arr[idx]);
@@ -753,8 +801,18 @@ function buildShieldTpl() {
     cracks2.add(c);
   }
   bakeGroupMeshes(cracks2);
+  // тріщини: стадія 3 (щит от-от розлетиться — павутина по всій площі)
+  const cracks3 = new THREE.Group();
+  cracks3.name = 'cracks3';
+  for (const [cx, cy, rot, len] of [[0, 0, 0.45, 0.9], [-0.15, 0.2, -1.2, 0.7], [0.3, 0.5, 0.2, 0.5], [-0.4, -0.4, -0.5, 0.6], [0.2, -0.55, 1.1, 0.45], [-0.45, 0.45, 0.85, 0.4], [0.45, -0.05, -0.95, 0.5]]) {
+    const c = box(len, 0.045, 0.02, crackM);
+    c.position.set(cx, cy, -0.062);
+    c.rotation.z = rot;
+    cracks3.add(c);
+  }
+  bakeGroupMeshes(cracks3);
   const g = new THREE.Group();
-  g.add(base, cracks1, cracks2);
+  g.add(base, cracks1, cracks2, cracks3);
   return g;
 }
 
@@ -763,9 +821,11 @@ export function makeShieldMesh() {
   const g = shieldTpl.clone(true);
   const cracks1 = g.children.find((c) => c.name === 'cracks1');
   const cracks2 = g.children.find((c) => c.name === 'cracks2');
+  const cracks3 = g.children.find((c) => c.name === 'cracks3');
   cracks1.visible = false;
   cracks2.visible = false;
-  return { group: g, cracks1, cracks2 };
+  cracks3.visible = false;
+  return { group: g, cracks1, cracks2, cracks3 };
 }
 
 function buildZombie(type, rng) {
@@ -784,6 +844,20 @@ function buildZombie(type, rng) {
     brow: 0.3,
     sleeves: 'skin',
     nose: false,
+  };
+  // пошарпаність: латки на одязі і чубчик волосся — додаються після збирання
+  const addZombieWear = (r) => {
+    const patchM = toonMat(0x3a3430);
+    for (let i = 0; i < 2; i++) {
+      const patch = box(0.12 + rng.next() * 0.08, 0.1 + rng.next() * 0.06, 0.03, patchM);
+      patch.position.set(rng.range(-0.16, 0.16), rng.range(0.18, 0.5), rng.chance(0.5) ? -0.26 : 0.24);
+      patch.rotation.z = rng.range(-0.5, 0.5);
+      r.parts.torso.add(patch);
+    }
+    const tuft = box(0.06, 0.09, 0.05, toonMat(0x4a5a3a));
+    tuft.position.set(rng.range(-0.1, 0.1), 0.4, rng.range(-0.05, 0.05));
+    tuft.rotation.z = rng.range(-0.4, 0.4);
+    r.parts.head.add(tuft);
   };
   let rig;
   if (type === 'runner') {
@@ -830,6 +904,77 @@ function buildZombie(type, rng) {
     drip.rotation.x = Math.PI;
     drip.position.set(0.06, -0.18, -0.22);
     rig.parts.head.add(drip);
+  } else if (type === 'gunner') {
+    // 🔫 стрілець: хитрий зомбі з кепкою і пістолетом
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.0, belly: 0.85, armsForward: 0.9, lean: -0.08,
+      shirt: 0x5a7fb0, eyeL: 0.06, eyeR: 0.08, brow: 0.4,
+    }));
+    // кепка задом наперед
+    const capM = toonMat(0x3e4a55);
+    const capTop = sphere(0.27, capM, 14, 10);
+    capTop.position.y = 0.21;
+    capTop.scale.set(1, 0.6, 1);
+    const brim = box(0.28, 0.035, 0.17, capM);
+    brim.position.set(0, 0.25, 0.29); // козирок назад!
+    rig.parts.head.add(capTop, brim);
+    // пістолет у правій руці
+    const gunM = toonMat(0x4a5160);
+    const barrel = box(0.07, 0.07, 0.3, gunM);
+    barrel.position.set(0, -0.62, -0.18);
+    const grip = box(0.06, 0.16, 0.08, toonMat(0x33271c));
+    grip.position.set(0, -0.66, -0.02);
+    rig.parts.armR.add(barrel, grip);
+  } else if (type === 'ironclad') {
+    // 🦾 броньовик: кремезний, повільний, у залізному нагруднику (чіпляється після запікання)
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.22, belly: 1.45, armsForward: 0.85, headR: 0.24,
+      shirt: 0x4a4458, eyeL: 0.06, eyeR: 0.06, brow: 0.5,
+    }));
+    // нагрудник додаємо ПІСЛЯ bakeRig окремими групами — щоб ламався на клонах
+    rig._postBake = (r) => {
+      const ironM = toonMat(0x5d6a80);
+      const trimM = toonMat(0x8a96aa);
+      const plate = new THREE.Group();
+      plate.name = 'chestPlate';
+      const front = box(0.56, 0.62, 0.13, ironM);
+      front.position.set(0, 0.34, -0.3);
+      const backP = box(0.56, 0.62, 0.11, ironM);
+      backP.position.set(0, 0.34, 0.28);
+      plate.add(front, backP);
+      const ridge = box(0.1, 0.6, 0.04, trimM);
+      ridge.position.set(0, 0.34, -0.37);
+      plate.add(ridge);
+      for (const side of [-1, 1]) {
+        const shoulder = box(0.16, 0.1, 0.42, trimM);
+        shoulder.position.set(side * 0.24, 0.62, 0);
+        plate.add(shoulder);
+      }
+      for (const [rx, ry] of [[-0.2, 0.5], [0.2, 0.5], [-0.2, 0.16], [0.2, 0.16]]) {
+        const rivet = sphere(0.035, trimM, 6, 5);
+        rivet.position.set(rx, ry, -0.37);
+        plate.add(rivet);
+      }
+      bakeGroupMeshes(plate, { castShadow: true });
+      // тріщини нагрудника (2 стадії)
+      const crackM = toonMat(0x232830);
+      const mkCracks = (name, list) => {
+        const g = new THREE.Group();
+        g.name = name;
+        for (const [cx, cy, rot, len] of list) {
+          const c = box(len, 0.03, 0.02, crackM);
+          c.position.set(cx, cy, -0.375);
+          c.rotation.z = rot;
+          g.add(c);
+        }
+        bakeGroupMeshes(g);
+        g.visible = false;
+        return g;
+      };
+      const cr1 = mkCracks('chestCracks1', [[-0.12, 0.42, 0.5, 0.25], [0.1, 0.26, -0.4, 0.22], [-0.16, 0.18, 1.1, 0.2]]);
+      const cr2 = mkCracks('chestCracks2', [[0.14, 0.45, 0.9, 0.3], [0, 0.3, -0.9, 0.3], [-0.1, 0.5, 0.2, 0.26], [0.16, 0.14, 1.3, 0.22]]);
+      r.parts.torso.add(plate, cr1, cr2);
+    };
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,
@@ -852,6 +997,7 @@ function buildZombie(type, rng) {
     rig.parts.torso.add(patch);
   }
   rig.ztype = type;
+  addZombieWear(rig);
   return rig;
 }
 
@@ -1554,6 +1700,7 @@ export function makeFPArms(gunKind) {
   const handL = sphere(0.07, skinM, 10, 8);
   handL.position.set(-0.025, -0.085, longGun ? -0.24 : 0.0);
   g.add(armR, handR, armL, handL);
+  bakeGroupMeshes(g, { outline: 0.01 });
   return { group: g, muzzle: gun.muzzle };
 }
 

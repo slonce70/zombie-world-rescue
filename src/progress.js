@@ -7,22 +7,22 @@ import { RNG } from './utils.js';
 export const PASS_REWARDS = {
   2: { type: 'coins', n: 100, icon: '💰', name: '100 монет' },
   3: { type: 'dance', id: 'spin', icon: '🌪️', name: 'Танець «Дзиґа»' },
-  4: { type: 'gadget', id: 'tramp', n: 2, icon: '🦘', name: '2 кишенькові батути' },
+  4: { type: 'gadget', id: 'tramp', icon: '🦘', name: 'Гаджет «Кишеньковий батут»' },
   5: { type: 'skin', id: 'ninja', icon: '🥷', name: 'Скін «Ніндзя»' },
   6: { type: 'coins', n: 150, icon: '💰', name: '150 монет' },
   7: { type: 'tracer', id: 'gold', icon: '✨', name: 'Золоті кулі' },
-  8: { type: 'gadget', id: 'wall', n: 3, icon: '🧱', name: '3 барикади' },
+  8: { type: 'gadget', id: 'wall', icon: '🧱', name: 'Гаджет «Барикада»' },
   9: { type: 'dance', id: 'robot', icon: '🤖', name: 'Танець «Робот»' },
   10: { type: 'skin', id: 'astro', icon: '👨‍🚀', name: 'Скін «Космонавт»' },
   11: { type: 'coins', n: 200, icon: '💰', name: '200 монет' },
-  12: { type: 'gadget', id: 'tramp', n: 3, icon: '🦘', name: '3 батути' },
+  12: { type: 'coins', n: 200, icon: '💰', name: '200 монет' },
   13: { type: 'dance', id: 'wave', icon: '🌊', name: 'Танець «Хвиля»' },
   14: { type: 'skin', id: 'pirate', icon: '🏴‍☠️', name: 'Скін «Пірат»' },
   15: { type: 'coins', n: 250, icon: '💰', name: '250 монет' },
   16: { type: 'tracer', id: 'rainbow', icon: '🌈', name: 'Веселкові кулі' },
-  17: { type: 'gadget', id: 'wall', n: 4, icon: '🧱', name: '4 барикади' },
+  17: { type: 'coins', n: 250, icon: '💰', name: '250 монет' },
   18: { type: 'coins', n: 300, icon: '💰', name: '300 монет' },
-  19: { type: 'gadget', id: 'tramp', n: 4, icon: '🦘', name: '4 батути' },
+  19: { type: 'coins', n: 350, icon: '💰', name: '350 монет' },
   20: { type: 'skin', id: 'robot', icon: '🤖', name: 'Скін «Робот»' },
 };
 export const PASS_MAX_LEVEL = 20;
@@ -88,7 +88,14 @@ export class Progress {
     if (r.type === 'coins') {
       game.save.coins += r.n;
     } else if (r.type === 'gadget') {
-      game.save.gadgets[r.id] = (game.save.gadgets[r.id] || 0) + r.n;
+      if (game.save.gadgetsOwned.includes(r.id)) {
+        game.save.coins += 150;
+        sub = 'Нагорода: гаджет уже є — тримай 💰 150 монет!';
+      } else {
+        game.save.gadgetsOwned.push(r.id);
+        if (!game.save.activeGadget) game.save.activeGadget = r.id;
+        sub += ' — клавіша F!';
+      }
     } else if (r.type === 'skin') {
       if (!game.save.skins.includes(r.id)) game.save.skins.push(r.id);
       sub += ' — одягни в Гардеробі 🎒';

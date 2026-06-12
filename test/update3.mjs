@@ -45,20 +45,20 @@ const shieldFront = await page.evaluate(() => {
   const dir = { x: dx / d, y: 0, z: dz / d };
   z.rig.group.rotation.y = Math.atan2(dx, dz); // дивиться на гравця (фронт -Z → atan2(-(-dx), -(-dz)))
   const before = { shield: z.shieldHp, hp: z.hp };
-  z.damage(30, dir, false);
-  const after30 = { shield: z.shieldHp, hp: z.hp, cracks1: z.shieldObj.cracks1.visible, cracks2: z.shieldObj.cracks2.visible };
-  z.damage(70, dir, false); // 150-100 = 50 → тріщини обох стадій
+  z.damage(100, dir, false); // 500-100 = 400 (80%) — без тріщин
   const after100 = { shield: z.shieldHp, hp: z.hp, cracks1: z.shieldObj.cracks1.visible, cracks2: z.shieldObj.cracks2.visible };
-  z.damage(60, dir, false); // щит ламається
+  z.damage(150, dir, false); // 250 (50%) → стадії 1 і 2
+  const after250 = { shield: z.shieldHp, hp: z.hp, cracks1: z.shieldObj.cracks1.visible, cracks2: z.shieldObj.cracks2.visible };
+  z.damage(260, dir, false); // щит ламається
   const broken = { shield: z.shieldHp, hp: z.hp, objGone: !z.shieldObj, state: z.state };
   z.damage(25, dir, false); // тепер тіло (20 HP) — смерть
-  return { before, after30, after100, broken, dead: z.state === 'dead', maxHp: z.maxHp };
+  return { before, after100, after250, broken, dead: z.state === 'dead', maxHp: z.maxHp };
 });
-check(shieldFront.before.shield === 150, `щит має 150 міцності (${shieldFront.before.shield})`);
+check(shieldFront.before.shield === 500, `щит має 500 міцності (${shieldFront.before.shield})`);
 check(shieldFront.maxHp === 20, `тіло має 20 HP (${shieldFront.maxHp})`);
-check(shieldFront.after30.shield === 120 && shieldFront.after30.hp === 20, `фронтальний постріл б'є щит, не тіло (щит 120: ${shieldFront.after30.shield}, HP: ${shieldFront.after30.hp})`);
-check(!shieldFront.after30.cracks1, 'при 120/150 тріщин ще нема');
-check(shieldFront.after100.cracks1 && shieldFront.after100.cracks2, `при 50/150 видно обидві стадії тріщин (${shieldFront.after100.cracks1}, ${shieldFront.after100.cracks2})`);
+check(shieldFront.after100.shield === 400 && shieldFront.after100.hp === 20, `фронтальний постріл б'є щит, не тіло (щит 400: ${shieldFront.after100.shield}, HP: ${shieldFront.after100.hp})`);
+check(!shieldFront.after100.cracks1, 'при 400/500 тріщин ще нема');
+check(shieldFront.after250.cracks1 && shieldFront.after250.cracks2, `при 250/500 видно дві стадії тріщин (${shieldFront.after250.cracks1}, ${shieldFront.after250.cracks2})`);
 check(shieldFront.broken.shield === 0 && shieldFront.broken.objGone, 'щит зламано і знято з зомбі');
 check(shieldFront.broken.hp === 20 && shieldFront.broken.state !== 'dead', 'після зламу щита тіло ще ціле');
 check(shieldFront.dead, 'без щита 25 шкоди вбивають (20 HP)');
@@ -76,7 +76,7 @@ const shieldRear = await page.evaluate(() => {
   z.damage(25, dir, false);
   return { shield: z.shieldHp, dead: z.state === 'dead' };
 });
-check(shieldRear.shield === 150 && shieldRear.dead, `постріл у спину минає щит і вбиває (щит ${shieldRear.shield})`);
+check(shieldRear.shield === 500 && shieldRear.dead, `постріл у спину минає щит і вбиває (щит ${shieldRear.shield})`);
 
 // вибух приймає щит
 const shieldBoom = await page.evaluate(() => {
@@ -88,7 +88,7 @@ const shieldBoom = await page.evaluate(() => {
   z.damage(80, null, false); // null dir = вибух
   return { before, after: z.shieldHp, hp: z.hp };
 });
-check(shieldBoom.after === 70 && shieldBoom.hp === 20, `вибух б'є у щит (150→${shieldBoom.after}), тіло ціле`);
+check(shieldBoom.after === 420 && shieldBoom.hp === 20, `вибух б'є у щит (500→${shieldBoom.after}), тіло ціле`);
 await page.screenshot({ path: 'shots/u3-shield-zombie.png' });
 
 // ============ 🪂 АЕРОДРОП З БАЗУКОЮ ============
@@ -112,7 +112,7 @@ check(s.player.weapons.includes('bazooka'), 'базука в арсеналі');
 check(s.player.rockets >= 3, `ракети нараховано (${s.player.rockets})`);
 
 // ============ 🚀 ПОСТРІЛ БАЗУКОЮ ============
-console.log('▸ Базука: 50 шкоди вибухом');
+console.log('▸ Базука: могутній вибух');
 const bazookaShot = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
@@ -138,7 +138,7 @@ const bazookaResult = await page.evaluate(() => {
   return z ? { hp: z.hp, maxHp: z.maxHp } : null;
 });
 check(bazookaResult && bazookaResult.hp < bazookaResult.maxHp - 30,
-  `вибух ракети завдав ~50 шкоди (${bazookaResult ? bazookaResult.maxHp + '→' + Math.round(bazookaResult.hp) : 'ціль зникла'})`);
+  `вибух ракети зносить ціль (${bazookaResult ? bazookaResult.maxHp + '→' + Math.round(bazookaResult.hp) : 'ціль зникла'})`);
 await page.screenshot({ path: 'shots/u3-bazooka.png' });
 
 // ============ 🛒 МАГАЗИН 2.0 ============

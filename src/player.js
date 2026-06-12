@@ -1,6 +1,6 @@
 // Гравець: рух, камера FP/TP, зброя, стрільба, броня, бафи
 import * as THREE from 'three';
-import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim } from './characters.js';
+import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, bakeGroupMeshes } from './characters.js';
 
 import { clamp, damp, lerp } from './utils.js';
 
@@ -11,7 +11,7 @@ export const WEAPONS = {
   smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, infinite: false, reserve: 160, cap: 320 },
   magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 18, cap: 48 },
   sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 10, cap: 30 },
-  bazooka: { name: 'Базука', icon: '🚀', dmg: 50, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
+  bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
 };
 export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
 const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka' };
@@ -46,12 +46,16 @@ export class Player {
     this.gearAttached = {};
     // тимчасові бафи (секунди, що лишились)
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
+    this.gadgetShield = 0; // 🛡️ гаджет-щит: поглинає шкоду повністю, поки не розіб'ється
 
     // 💃 емоції-танці та 🛴 їзда на самокаті
     this.emoting = null;
     this._emoteWasFP = true;
     this._danceSpin = 0;
     this.riding = null;
+    this.rideSpeed = 0;   // 🛴 поточна швидкість самоката (м/с, мінус — задній хід)
+    this._rideSteer = 0;  // плавний нахил керма для анімації
+    this.scoped = false; // 🔭 оптика снайперки (ПКМ або кнопка)
 
     this.weapons = ['pistol'];
     this.cur = 'pistol';
@@ -73,6 +77,7 @@ export class Player {
     this.tpGuns = {};
     for (const w of WEAPON_SLOTS) {
       const gun = makeGunMesh(w);
+      bakeGroupMeshes(gun.group, { outline: 0.012 }); // контур + 1 draw call
       gun.group.rotation.x = -Math.PI / 2; // у руці: ствол уздовж -Y руки
       gun.group.position.set(0, -0.62, -0.05);
       gun.group.scale.setScalar(1.35); // більший — щоб читався з-за спини
@@ -134,6 +139,7 @@ export class Player {
     if (!this.weapons.includes(w) || this.cur === w) return;
     this.cur = w;
     this.reloading = 0;
+    this.scoped = false;
     this.shootCd = Math.max(this.shootCd, 0.25);
     this._applyView();
     this.level.audio.click();
@@ -234,11 +240,22 @@ export class Player {
     const world = this.world;
     if (this.respawnProtect > 0) this.respawnProtect -= dt;
 
+    // --- 🔭 оптика снайперки ---
+    const wantScope = (input.rmbDown || input.touchScope)
+      && this.cur === 'sniper' && this.firstPerson
+      && this.reloading <= 0 && !this.emoting && !this.riding && this.health > 0;
+    if (wantScope !== this.scoped) {
+      this.scoped = wantScope;
+      this.level.audio.click();
+      // у приціл не видно власної гвинтівки
+      this.fpArms.sniper.group.visible = this.firstPerson && this.cur === 'sniper' && !this.scoped;
+    }
+
     // --- огляд ---
     if (allowControl) {
       const { dx, dy } = input.consumeMouse();
-      const sens = 0.0023;
-      this.yaw -= dx * sens;
+      const sens = this.scoped ? 0.0008 : 0.0023; // в оптиці рухи плавніші
+      if (!this.riding) this.yaw -= dx * sens; // на самокаті кермо — тільки A/D
       this.pitch = clamp(this.pitch - dy * sens, -1.45, 1.45);
     } else {
       input.consumeMouse();
@@ -263,27 +280,44 @@ export class Player {
     }
 
     const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
-    const sprint = moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
-    const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
-    const rideMult = this.riding ? 1.85 : 1;
-    const speed = 5.6 * this.speedMult * buffSpeed * rideMult * (sprint ? 1.55 : 1);
-    let tx = 0, tz = 0;
-    if (moving) {
-      const len = Math.max(1, Math.hypot(mx, mz));
-      mx /= len; mz /= len;
-      // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
+    const sprint = !this.riding && moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
+    if (this.riding) {
+      // 🛴 фізика самоката: W — газ, S — гальмо/назад, A/D — кермо. Вбік не ковзає!
+      const gas = -mz;       // W = вперед
+      const steer = -mx;     // A = ліворуч
+      if (gas > 0.05) this.rideSpeed = Math.min(12.5, this.rideSpeed + 9.5 * dt);
+      else if (gas < -0.05) this.rideSpeed = Math.max(-3.5, this.rideSpeed - 13 * dt);
+      else this.rideSpeed = Math.abs(this.rideSpeed) < 0.25 ? 0 : this.rideSpeed - Math.sign(this.rideSpeed) * 5.5 * dt;
+      // кермо працює тільки в русі (як справжнє), на задньому ході — навпаки
+      const turnK = Math.min(1, Math.abs(this.rideSpeed) / 4.5) * (this.rideSpeed >= 0 ? 1 : -1);
+      this.yaw += steer * 1.75 * dt * turnK;
+      this._rideSteer = damp(this._rideSteer, steer * Math.min(1, Math.abs(this.rideSpeed) / 3), 7, dt);
       const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
-      const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
-      tx = (fx * -mz + rx * mx) * speed;
-      tz = (fz * -mz + rz * mx) * speed;
+      this.vel.x = fx * this.rideSpeed;
+      this.vel.z = fz * this.rideSpeed;
+    } else {
+      this.rideSpeed = 0;
+      this._rideSteer = damp(this._rideSteer, 0, 7, dt);
+      const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
+      const speed = 5.6 * this.speedMult * buffSpeed * (sprint ? 1.55 : 1);
+      let tx = 0, tz = 0;
+      if (moving) {
+        const len = Math.max(1, Math.hypot(mx, mz));
+        mx /= len; mz /= len;
+        // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
+        const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+        const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+        tx = (fx * -mz + rx * mx) * speed;
+        tz = (fz * -mz + rz * mx) * speed;
+      }
+      // лід: на замерзлому озері керування "пливе" — ковзаємо за інерцією
+      const ice = this.world.iceZone;
+      const onIce = this.onGround && ice
+        && Math.hypot(this.pos.x - ice.x, this.pos.z - ice.z) < ice.r;
+      const accel = this.onGround ? (onIce ? 2.3 : 14) : 4;
+      this.vel.x = damp(this.vel.x, tx, accel, dt);
+      this.vel.z = damp(this.vel.z, tz, accel, dt);
     }
-    // лід: на замерзлому озері керування "пливе" — ковзаємо за інерцією
-    const ice = this.world.iceZone;
-    const onIce = this.onGround && ice
-      && Math.hypot(this.pos.x - ice.x, this.pos.z - ice.z) < ice.r;
-    const accel = this.onGround ? (onIce ? 2.3 : 14) : 4;
-    this.vel.x = damp(this.vel.x, tx, accel, dt);
-    this.vel.z = damp(this.vel.z, tz, accel, dt);
 
     // стрибок і гравітація
     if (allowControl && input.pressed('Space') && this.onGround) {
@@ -303,9 +337,14 @@ export class Player {
     } else if (this.pos.y > gh + 0.05) {
       this.onGround = false;
     }
+    const preX = this.pos.x, preZ = this.pos.z;
     const solved = world.collide(this.pos.x, this.pos.z, 0.45, this.pos.y);
     this.pos.x = solved.x;
     this.pos.z = solved.z;
+    // 🛴 врізались у перешкоду — самокат різко гальмує
+    if (this.riding && Math.hypot(solved.x - preX, solved.z - preZ) > 0.04) {
+      this.rideSpeed *= 0.35;
+    }
 
     // --- батути ---
     for (const jp of world.jumpPads) {
@@ -404,7 +443,7 @@ export class Player {
     this.bobPhase += dt * (4 + hSpeed * 1.15);
     this.gunKick = Math.max(0, this.gunKick - dt * 7);
     this.camShake = Math.max(0, this.camShake - dt * 3);
-    this.fovTarget = sprint ? 82 : 75;
+    this.fovTarget = this.scoped ? 24 : sprint ? 82 : 75;
     this.camera.fov = damp(this.camera.fov, this.fovTarget, 8, dt);
     this.camera.updateProjectionMatrix();
 
@@ -477,6 +516,14 @@ export class Player {
   _updateRigs(dt, hSpeed, moving, sprint) {
     if (!this.firstPerson) {
       this.rig.group.position.set(this.pos.x, this.pos.y, this.pos.z);
+      if (this.riding) {
+        // 🛴 стоїть на дошці, руки на кермі, нахил у поворот
+        this.rig.group.rotation.y = this.yaw;
+        this.rig.anim.steer = this._rideSteer;
+        setAnim(this.rig, 'ride');
+        updateRig(this.rig, dt);
+        return;
+      }
       if (this.emoting) {
         // 💃 танець: «Дзиґа» крутиться всім тілом
         if (this.emoting === 'spin') this._danceSpin += dt * 7;
@@ -556,6 +603,13 @@ export class Player {
         if (i < 3) level.effects.tracer(this._muzzlePos, bp);
         continue;
       }
+      const wHit = level.gadgets ? level.gadgets.wallHitTest(origin, dir, MAX_D) : null;
+      if (wHit && wHit.t < blockT && (!hit || wHit.t < hit.t)) {
+        level.gadgets.damageWall(wHit.wall, w.dmg * dmgMult);
+        const wp = this._shootEnd.copy(origin).addScaledVector(dir, wHit.t);
+        if (i < 3) level.effects.tracer(this._muzzlePos, wp);
+        continue;
+      }
       const ballHit = level.effects.ballHitTest(origin, dir, MAX_D);
       if (ballHit && ballHit.t < blockT && (!hit || ballHit.t < hit.t)) {
         level.effects.kickBall(dir, 9);
@@ -627,6 +681,14 @@ export class Player {
     if (this.buffs.bubble > 0) {
       this.level.bus.emit('bubbleBlock');
       return;
+    }
+    // 🛡️ гаджет-щит приймає удар на себе повністю
+    if (this.gadgetShield > 0) {
+      const absorb = Math.min(this.gadgetShield, amt);
+      this.gadgetShield -= absorb;
+      amt -= absorb;
+      this.level.audio.clang();
+      if (amt <= 0) return;
     }
     amt *= this.helmetMult; // ⛑ шолом зменшує всю шкоду
     // 🦺 броня поглинає 60% шкоди, поки не зламається

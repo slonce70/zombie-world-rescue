@@ -70,6 +70,13 @@
       <span id="wp-label">🆘 120м</span>
     </div>
 
+    <div id="scope">
+      <div class="scope-cross scope-h"></div>
+      <div class="scope-cross scope-v"></div>
+      <div class="scope-tick scope-t1"></div>
+      <div class="scope-tick scope-t2"></div>
+    </div>
+
     <div id="combo"></div>
 
     <div id="prompt">
@@ -113,6 +120,7 @@
       <button id="tb-jump" class="tb">⬆️</button>
       <button id="tb-fire" class="tb tb-big">🔫</button>
     </div>
+    <button id="tb-scope" class="tb">🔭</button>
   </div>
 
   <!-- Оверлеї -->
@@ -146,7 +154,8 @@
         <span><b>R</b> — перезарядка</span>
         <span><b>1-7</b> — зброя (Q — наступна)</span>
         <span><b>G</b> — 💣 граната</span>
-        <span><b>F</b> — 🦘 батут · <b>C</b> — 🧱 барикада</span>
+        <span><b>F</b> — 🧰 гаджет (щит/відновлення/батут/барикада)</span>
+        <span><b>ПКМ</b> — 🔭 приціл снайперки</span>
         <span><b>N</b> — 💃 танець</span>
         <span><b>V</b> — вид 1-ї/3-ї особи</span>
         <span><b>B</b> — магазин · <b>M</b> — звук</span>
@@ -249,6 +258,7 @@
         <div class="shop-balance"><span class="coin-icon">₴</span> <span id="shop-coins">0</span></div>
         <button id="shop-close" class="btn-x">✕</button>
       </div>
+      <div id="shop-tabs"></div>
       <div id="shop-grid"></div>
       <p class="shop-hint">Клавіша <b>B</b> — відкрити/закрити магазин</p>
     </div>

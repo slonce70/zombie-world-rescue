@@ -160,10 +160,10 @@ export class StormMode {
     // типи: чим більше країн звільнено, тим різноманітніші зомбі
     const lib = level.game.save.liberated || {};
     const pool = ['walker', 'walker', 'runner'];
-    if (this.wave >= 2) pool.push('runner', 'tank');
+    if (this.wave >= 2) pool.push('runner', 'tank', 'gunner');
     if (lib.POL || this.wave >= 3) pool.push('snowman');
     if (lib.DEU || this.wave >= 4) pool.push('shield');
-    if (lib.FRA || this.wave >= 5) pool.push('spitter');
+    if (lib.FRA || this.wave >= 5) pool.push('spitter', 'ironclad');
     const p = level.player.pos;
     const rng = level.zombies.rng;
     for (let i = 0; i < n; i++) {

@@ -36,7 +36,7 @@ await loadCountry('UKR');
 let st = await state();
 check(st.xp === 0 && st.passLevel === 1, `новий сейв: 0 XP, рівень 1 (${st.xp}, ${st.passLevel})`);
 check(st.skins.length === 1 && st.skins[0] === 'classic', 'на старті лише скін «Класик»');
-check(st.gadgets.tramp === 0 && st.gadgets.wall === 0, 'гаджетів немає');
+check(st.gadgets.owned.length === 0, 'гаджетів немає');
 
 // вбивство дає XP
 await page.evaluate(() => {
@@ -59,7 +59,7 @@ st = await state();
 check(st.passLevel >= 5, `усього 780+ XP → рівень ≥5 (${st.passLevel})`);
 check(st.dances.includes('spin'), 'рівень 3 дав танець «Дзиґа»');
 check(st.skins.includes('ninja'), 'рівень 5 дав скін «Ніндзя»');
-check(st.gadgets.tramp >= 2, `рівень 4 дав батути (${st.gadgets.tramp})`);
+check(st.gadgets.owned.includes('tramp'), `рівень 4 відкрив гаджет-батут (${st.gadgets.owned})`);
 
 // збереження: XP лишився після перезавантаження
 await page.goto(`${BASE}/?test&country=UKR`);
@@ -236,25 +236,20 @@ const rideRes = await page.evaluate(async () => {
   await new Promise((r) => setTimeout(r, 200));
   const riding = !!g.level.player.riding;
   const tp = !g.level.player.firstPerson;
-  // таран: сплячий зомбі прямо по курсу
-  const p = g.level.player;
-  const z = g.test.spawnZombie('walker', p.pos.x - Math.sin(p.yaw) * 6, p.pos.z - Math.cos(p.yaw) * 6);
-  z.sleeping = true;
-  const hpBefore = z.hp;
-  // розганяємось уперед
+  // з оновлення 5 самокат їде по-справжньому: газ W, без тарана
   g.test.key('KeyW', true);
   const t0 = performance.now();
-  while (performance.now() - t0 < 5000 && z.hp >= hpBefore) {
+  while (performance.now() - t0 < 12000 && g.level.player.rideSpeed < 4) {
     await new Promise((r) => setTimeout(r, 150));
   }
   g.test.key('KeyW', false);
-  const rammed = z.hp < hpBefore;
+  const accelerated = g.level.player.rideSpeed >= 4;
   g.test.dismountScooter();
-  return { riding, tp, rammed, dismounted: !g.level.player.riding };
+  return { riding, tp, accelerated, dismounted: !g.level.player.riding };
 });
 check(rideRes.riding, 'герой сідає на самокат (E)');
 check(rideRes.tp, 'на самокаті — вид від 3-ї особи');
-check(rideRes.rammed, 'таран б\'є зомбі');
+check(rideRes.accelerated, 'самокат розганяється газом (W)');
 check(rideRes.dismounted, 'E — зійти із самоката');
 
 // ============ 🦘🧱 ГАДЖЕТИ ============
@@ -263,23 +258,24 @@ await loadCountry('UKR');
 await page.evaluate(() => window.__game.test.god());
 const gadgetRes = await page.evaluate(() => {
   const g = window.__game;
-  g.test.giveGadgets(2, 2);
+  g.test.unlockGadget('tramp');
   const padsBefore = g.test.state().jumpPads;
-  const okTramp = g.test.placeTramp();
+  const okTramp = g.test.useGadget(); // F: батут
   const padsAfter = g.test.state().jumpPads;
-  const okWall = g.test.placeWall();
+  const cdAfter = g.level.gadgets.cd;
+  g.test.unlockGadget('wall');
+  g.test.gadgetCdReset();
+  const okWall = g.test.useGadget(); // F: барикада
   const walls = g.test.state().walls;
   return {
-    okTramp, okWall,
+    okTramp, okWall, cdAfter,
     padAdded: padsAfter === padsBefore + 1,
     wallCount: walls.length,
-    trampLeft: g.save.gadgets.tramp,
-    wallLeft: g.save.gadgets.wall,
   };
 });
 check(gadgetRes.okTramp && gadgetRes.padAdded, 'батут ставиться і працює як джамп-пад');
+check(gadgetRes.cdAfter > 0, `після гаджета йде перезарядка (${Math.round(gadgetRes.cdAfter)}с)`);
 check(gadgetRes.okWall && gadgetRes.wallCount === 1, 'барикада ставиться');
-check(gadgetRes.trampLeft === 1 && gadgetRes.wallLeft === 1, 'витрачається 1 заряд');
 
 // барикада блокує зомбі і ламається
 const wallRes = await page.evaluate(async () => {
@@ -413,19 +409,18 @@ console.log('▸ Магазин: гаджети і пес');
 await loadCountry('UKR');
 const shopRes = await page.evaluate(() => {
   const g = window.__game;
-  g.test.giveCoins(1000);
+  g.test.giveCoins(2000);
   g.test.shopBuy('tramp');
   g.test.shopBuy('wall');
   g.test.shopBuy('dog');
   return {
-    tramp: g.save.gadgets.tramp,
-    wall: g.save.gadgets.wall,
+    owned: [...g.save.gadgetsOwned],
     dog: g.save.upgrades.dog,
     pet: !!g.level.pet,
   };
 });
-check(shopRes.tramp === 1, `батут купується (${shopRes.tramp})`);
-check(shopRes.wall === 1, `барикада купується (${shopRes.wall})`);
+check(shopRes.owned.includes('tramp'), `батут купується назавжди (${shopRes.owned})`);
+check(shopRes.owned.includes('wall'), `барикада купується назавжди (${shopRes.owned})`);
 check(shopRes.dog === 1 && shopRes.pet, 'пес купується і одразу з\'являється');
 
 // ============ ПІДСУМОК ============

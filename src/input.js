@@ -7,6 +7,7 @@ export class Input {
     this.justPressed = new Set();
     this.mouseDown = false;
     this.justClicked = false;
+    this.rmbDown = false; // права кнопка — оптичний приціл
     this.dx = 0;
     this.dy = 0;
     this.locked = false;
@@ -15,6 +16,7 @@ export class Input {
     // мобільний ввід (заповнює touch.js)
     this.touchMove = { x: 0, z: 0 };
     this.touchSprint = false;
+    this.touchScope = false;
     this.touchMode = false;
 
     window.addEventListener('keydown', (e) => {
@@ -28,6 +30,7 @@ export class Input {
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.mouseDown = false;
+      this.rmbDown = false;
     });
 
     dom.addEventListener('mousedown', (e) => {
@@ -35,11 +38,14 @@ export class Input {
         this.mouseDown = true;
         this.justClicked = true;
       }
+      if (e.button === 2) this.rmbDown = true;
       if (this.onUserGesture) this.onUserGesture();
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.mouseDown = false;
+      if (e.button === 2) this.rmbDown = false;
     });
+    dom.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
       if (this.locked) {
         this.dx += e.movementX || 0;

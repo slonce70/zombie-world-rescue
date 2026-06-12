@@ -14,13 +14,13 @@ import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
-import { Megabox, Pet, Vehicles, Gadgets } from './extras.js';
+import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 4;
+const APP_VERSION = 5;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
@@ -46,11 +46,16 @@ const TIPS = [
   'Шукай 🦙 МЕГАБОКС — фіолетовий промінь видно здалеку!',
   'Клавіша N — переможний танець. Спробуй після боса! 💃',
   'Самокат 🛴 збиває зомбі на повній швидкості!',
-  'Постав барикаду (C) — зомбі застрягнуть, а ти стріляй! 🧱',
-  'Кишеньковий батут (F) закине тебе на будь-який дах! 🦘',
+  'Гаджет (F) обирається в Гардеробі: щит, відновлення, батут чи барикада! 🧰',
+  'Барикаду 🧱 можна розстріляти або забрати назад (E)',
   'Песик Дружок 🐶 збирає монети і чує сюрпризи в будинках',
   'Виконуй щоденні завдання 📅 — монети й зірковий досвід!',
   'Грай у ⛈️ ШТОРМ після звільнення країни — там рекорди!',
+  'Права кнопка миші — оптика снайперки 🔭',
+  'Броньовик 🦾 у залізному нагруднику — цілься в ГОЛОВУ!',
+  'Зомбі-стрілець 🔫 б\'є здалеку — ховайся за будинки!',
+  'Базука 🚀 тепер НАЙСИЛЬНІША зброя — бережи ракети для товстунів!',
+  'На самокаті: W — газ, S — гальмо, A/D — кермо 🛴',
 ];
 
 class Game {
@@ -210,7 +215,7 @@ class Game {
       coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {},
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
-      gadgets: { tramp: 0, wall: 0 }, megaPity: 0, quests: null, stormBest: {},
+      gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
     };
   }
 
@@ -222,7 +227,15 @@ class Game {
       if (s && typeof s === 'object') {
         out = Object.assign(defaults, s);
         // вкладені об'єкти і списки могли прийти зі старого сейва неповними
-        out.gadgets = Object.assign({ tramp: 0, wall: 0 }, out.gadgets || {});
+        if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
+        // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
+        if (out.gadgets) {
+          if (out.gadgets.tramp > 0 && !out.gadgetsOwned.includes('tramp')) out.gadgetsOwned.push('tramp');
+          if (out.gadgets.wall > 0 && !out.gadgetsOwned.includes('wall')) out.gadgetsOwned.push('wall');
+          delete out.gadgets;
+        }
+        if (out.activeGadget && !out.gadgetsOwned.includes(out.activeGadget)) out.activeGadget = null;
+        if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
@@ -352,6 +365,11 @@ class Game {
     for (const [id, meta] of Object.entries(DANCES)) {
       html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
     }
+    html += '</div><div class="ward-section">Гаджет — береш ОДИН із собою (F)</div><div class="ward-grid">';
+    for (const [id, meta] of Object.entries(GADGETS)) {
+      const meta2 = { icon: meta.icon, name: meta.name, desc: `${meta.desc} (купи в магазині)` };
+      html += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
+    }
     html += '</div><div class="ward-section">Сліди куль</div><div class="ward-grid">';
     for (const [id, meta] of Object.entries(TRACERS)) {
       html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
@@ -364,6 +382,7 @@ class Game {
         const { kind, id } = el.dataset;
         if (kind === 'skin') save.activeSkin = id;
         else if (kind === 'dance') save.activeDance = id;
+        else if (kind === 'gadget') save.activeGadget = id;
         else if (kind === 'tracer') {
           save.activeTracer = id;
           if (this.level) this.level.effects.tracerStyle = id === 'classic' ? null : id;
@@ -595,6 +614,10 @@ class Game {
     };
     // вибух (граната 135, ракета базуки 50): шкода зомбі по радіусу
     level.effects.onExplosion = (x, y, z, r, baseDmg = 135) => {
+      // вибух трощить і барикади поблизу
+      for (const w of [...level.gadgets.walls]) {
+        if (Math.hypot(w.x - x, w.z - z) < r) level.gadgets.damageWall(w, baseDmg);
+      }
       for (const zb of [...level.zombies.list]) {
         if (zb.state === 'dead') continue;
         const d = Math.hypot(zb.x - x, zb.z - z);
@@ -712,10 +735,13 @@ class Game {
         title = '💰 ФОНТАН МОНЕТ!';
         sub = 'Збирай скоріше! (наступний бокс щасливіший 😉)';
       } else if (roll < 0.83) {
-        save.gadgets.tramp += 2;
-        save.gadgets.wall += 2;
-        title = '🦘🧱 НАБІР ГАДЖЕТІВ!';
-        sub = '+2 батути і +2 барикади (F і C)';
+        if (level) {
+          level.player.grenades += 3;
+          level.player.addRockets(2);
+          level.player.addAmmo(120);
+        }
+        title = '🧨 БОЙОВИЙ НАБІР!';
+        sub = '+3 гранати, +2 ракети і гора патронів!';
       } else {
         for (const k of ['speed', 'rage', 'bubble', 'magnet']) level.player.buffs[k] = 20;
         title = '🌈 УСІ ПІДСИЛЕННЯ!';
@@ -1032,7 +1058,10 @@ class Game {
         dances: [...g.save.dances],
         activeSkin: g.save.activeSkin,
         activeDance: g.save.activeDance,
-        gadgets: { ...g.save.gadgets },
+        gadgets: { owned: [...g.save.gadgetsOwned], active: g.save.activeGadget, cd: g.level ? g.level.gadgets.cd : 0 },
+        gadgetShield: g.level ? g.level.player.gadgetShield : 0,
+        scoped: g.level ? g.level.player.scoped : false,
+        rideSpeed: g.level ? g.level.player.rideSpeed : 0,
         megaPity: g.save.megaPity,
         quests: g.quests.list.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
         megabox: g.level && g.level.megabox ? { x: g.level.megabox.x, z: g.level.megabox.z, opened: g.level.megabox.opened } : null,
@@ -1114,13 +1143,15 @@ class Game {
       addXp: (n) => g.progress.addXp(n),
       megaForce: (roll) => { g._megaForce = roll; },
       openMegabox: () => g.level.megabox && g.level.megabox.open(),
-      placeTramp: () => g.level.gadgets.placeTramp(),
-      placeWall: () => g.level.gadgets.placeWall(),
-      giveGadgets: (t, w) => {
-        g.save.gadgets.tramp += t;
-        g.save.gadgets.wall += w;
+      placeTramp: () => g.level.gadgets._placeTramp(),
+      placeWall: () => g.level.gadgets._placeWall(),
+      unlockGadget: (id) => {
+        if (!g.save.gadgetsOwned.includes(id)) g.save.gadgetsOwned.push(id);
+        g.save.activeGadget = id;
         g.saveGame();
       },
+      useGadget: () => g.level.gadgets.use(),
+      gadgetCdReset: () => { g.level.gadgets.cd = 0; },
       dance: () => g.level.player.emote(),
       stopDance: () => g.level.player.stopEmote(),
       mountScooter: (i = 0) => {

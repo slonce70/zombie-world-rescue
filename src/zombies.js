@@ -9,7 +9,7 @@ const TYPE_STATS = {
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
   // 🛡 щитоносець: тіло слабке, але спершу зламай щит (150 міцності)!
-  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 25, pitch: 0.7, shieldHp: 150 },
+  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 500 },
   snowman: {
     hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
     ranged: { min: 7, max: 30, hold: 13, cd: 3.0, projSpeed: 16, dmg: 9, size: 0.22 },
@@ -19,6 +19,13 @@ const TYPE_STATS = {
     hp: 55, speed: 1.5, chaseSpeed: 3.0, aggro: 34, dmg: 9, attackR: 1.8, coins: 12, pitch: 1.3,
     ranged: { min: 8, max: 26, hold: 12, cd: 3.4, projSpeed: 18, dmg: 12, size: 0.2, color: 0x9be84e },
   },
+  // 🔫 зомбі-стрілець: тримає дистанцію і стріляє з пістолета (10 шкоди за постріл)
+  gunner: {
+    hp: 55, speed: 1.5, chaseSpeed: 3.0, aggro: 32, dmg: 8, attackR: 1.7, coins: 14, pitch: 1.25,
+    ranged: { min: 7, max: 30, hold: 13, cd: 2.6, projSpeed: 30, dmg: 10, size: 0.11, color: 0xffe08a },
+  },
+  // 🦾 броньовик: залізний нагрудник 600 міцності, повільний; голова вразлива!
+  ironclad: { hp: 60, speed: 0.85, chaseSpeed: 1.7, aggro: 22, dmg: 5, attackR: 2.1, coins: 35, pitch: 0.5, chestHp: 600 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -94,6 +101,17 @@ export class Zombies {
       rig.body.add(shield.group);
       z_.shieldObj = shield;
     }
+    if (type === 'ironclad') {
+      // 🦾 нагрудник: окрема група на тулубі (клонована з шаблоном)
+      z_.chestHp = z_.chestMax = stats.chestHp;
+      rig.body.traverse((o) => {
+        if (o.name === 'chestPlate') z_.chestObj = o;
+        if (o.name === 'chestCracks1') { z_.chestCracks1 = o; o.visible = false; }
+        if (o.name === 'chestCracks2') { z_.chestCracks2 = o; o.visible = false; }
+      });
+    } else {
+      z_.chestHp = 0;
+    }
     z_.damage = (amt, dir, headshot) => this._damage(z_, amt, dir, headshot);
     this.list.push(z_);
     if (type === 'boss') this.boss = z_;
@@ -114,6 +132,7 @@ export class Zombies {
         const r = this.rng.range(2, 9);
         let type = this.rng.chance(0.25) ? 'runner' : 'walker';
         if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
+        else if (this.rng.chance(0.1)) type = 'gunner'; // 🔫 стрілець трапляється всюди
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });
@@ -143,6 +162,11 @@ export class Zombies {
     const shieldN = (this.level.country && this.level.country.shieldGuards) || 0;
     for (let i = 0; i < shieldN; i++) {
       guardSets[i % guardSets.length].types.push('shield');
+    }
+    // 🦾 у складних країнах склад охороняють броньовики
+    if (this.diff.hp >= 1.5) {
+      guardSets[2].types.push('ironclad');
+      guardSets[1].types.push('ironclad');
     }
     for (const gs of guardSets) {
       gs.types.forEach((type, i) => {
@@ -294,9 +318,10 @@ export class Zombies {
         }
         const sparkPos = new THREE.Vector3(z.x + fx * 0.75, z.y + 1.15, z.z + fz * 0.75);
         if (z.shieldHp > 0) {
-          // тріщини проступають у міру пошкоджень (2/3 і 1/3 міцності)
-          z.shieldObj.cracks1.visible = z.shieldHp <= z.shieldMax * 0.67;
-          z.shieldObj.cracks2.visible = z.shieldHp <= z.shieldMax * 0.34;
+          // тріщини проступають у міру пошкоджень (3 стадії)
+          z.shieldObj.cracks1.visible = z.shieldHp <= z.shieldMax * 0.75;
+          z.shieldObj.cracks2.visible = z.shieldHp <= z.shieldMax * 0.5;
+          if (z.shieldObj.cracks3) z.shieldObj.cracks3.visible = z.shieldHp <= z.shieldMax * 0.25;
           level.effects.burst(sparkPos, 0xc9d4e2, 4, { speed: 2.6, up: 1.5, life: 0.3, size: 0.7 });
           level.audio.clang();
         } else {
@@ -311,6 +336,37 @@ export class Zombies {
         }
         return;
       }
+    }
+    // 🦾 нагрудник броньовика: ловить усе, КРІМ влучань у голову
+    if (z.chestHp > 0 && !headshot) {
+      z.chestHp -= amt;
+      this._aggro(z);
+      for (const o of this.list) {
+        if (o.groupId === z.groupId && o.groupId >= 0 && o.state !== 'dead'
+          && Math.hypot(o.x - z.x, o.z - z.z) < 13) this._aggro(o);
+      }
+      const level = this.level;
+      if (!this._ironHintShown) {
+        this._ironHintShown = true;
+        level.bus.emit('toast', '🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!');
+      }
+      const sparkPos = new THREE.Vector3(z.x, z.y + 1.2, z.z);
+      if (z.chestHp > 0) {
+        if (z.chestCracks1) z.chestCracks1.visible = z.chestHp <= z.chestMax * 0.6;
+        if (z.chestCracks2) z.chestCracks2.visible = z.chestHp <= z.chestMax * 0.3;
+        level.effects.burst(sparkPos, 0xc9d4e2, 3, { speed: 2.4, up: 1.4, life: 0.3, size: 0.65 });
+        level.audio.clang();
+      } else {
+        z.chestHp = 0;
+        if (z.chestObj) z.chestObj.visible = false;
+        if (z.chestCracks1) z.chestCracks1.visible = false;
+        if (z.chestCracks2) z.chestCracks2.visible = false;
+        level.effects.burst(sparkPos, 0x7d8aa0, 12, { speed: 4, up: 3.5, life: 0.7, size: 1.2 });
+        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.2);
+        level.audio.shieldBreak();
+        level.bus.emit('chestBroken', z);
+      }
+      return;
     }
     z.hp -= amt;
     this._aggro(z);
@@ -404,8 +460,11 @@ export class Zombies {
           }
           const roll = this.rng.next();
           const withShield = (this.level.country && this.level.country.shieldGuards) > 0;
+          const hard = this.diff.hp >= 1.5; // DEU/FRA — броньовики в ордах
           let type;
-          if (this.extraZombie && withShield) {
+          if (this.rng.chance(0.08)) type = 'gunner';
+          else if (hard && this.rng.chance(0.09)) type = 'ironclad';
+          else if (this.extraZombie && withShield) {
             type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie
               : roll < 0.9 ? 'shield' : 'tank';
           } else if (this.extraZombie) {

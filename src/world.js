@@ -1217,8 +1217,18 @@ export class World {
       // фронтон -X (CCW, якщо дивитись з -X)
       -hw, 0, -hd, -hw, 0, hd, -hw, h, 0,
     ];
+    // внутрішній бік: ті самі трикутники з оберненим порядком — дах не «просвічується»,
+    // коли камера або гравець опиняються під ним
+    const inner = [];
+    for (let i = 0; i < verts.length; i += 9) {
+      inner.push(
+        verts[i], verts[i + 1], verts[i + 2],
+        verts[i + 6], verts[i + 7], verts[i + 8],
+        verts[i + 3], verts[i + 4], verts[i + 5]
+      );
+    }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([...verts, ...inner], 3));
     geo.computeVertexNormals();
     return geo;
   }

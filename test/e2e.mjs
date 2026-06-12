@@ -186,6 +186,9 @@ await page.keyboard.press('KeyB');
 await page.waitForTimeout(800);
 await shot('e2e-40-shop');
 const coinsBefore = (await state()).coins;
+// магазин тепер із вкладками — відкриваємо потрібну
+await page.click('.shop-tab:has-text("Прокачування")');
+await page.waitForTimeout(300);
 await page.click('.shop-item[data-id="maxhp"]');
 await page.waitForTimeout(400);
 s = await state();

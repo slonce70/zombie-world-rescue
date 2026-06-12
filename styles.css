@@ -582,3 +582,32 @@ body.touch-mode #waypoint { font-size: 13px; }
 /* шторм */
 .storm-sub { color: #d8c2f2; font-weight: 700; }
 #storm-stats { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+
+/* ================= ОНОВЛЕННЯ 5 ================= */
+/* 🔭 оптичний приціл снайперки */
+#scope {
+  position: fixed; inset: 0; display: none; pointer-events: none; z-index: 12;
+  background: radial-gradient(circle at 50% 50%, transparent 0%, transparent 31%,
+    rgba(5, 10, 16, 0.55) 36%, rgba(3, 6, 10, 0.97) 44%, #02050a 52%);
+}
+#scope.show { display: block; }
+.scope-cross { position: absolute; background: rgba(20, 30, 40, 0.85); }
+.scope-h { left: 50%; top: 50%; width: min(62vh, 62vw); height: 2px; transform: translate(-50%, -50%); }
+.scope-v { left: 50%; top: 50%; width: 2px; height: min(62vh, 62vw); transform: translate(-50%, -50%); }
+.scope-tick { position: absolute; left: 50%; width: 14px; height: 2px; background: rgba(20, 30, 40, 0.85); transform: translateX(-50%); }
+.scope-t1 { top: calc(50% + 7vh); }
+.scope-t2 { top: calc(50% + 12vh); }
+/* кнопка оптики на мобільному — біля кнопки вогню, лише коли в руках снайперка */
+#tb-scope { position: fixed; right: 100px; bottom: 84px; display: none; pointer-events: auto; }
+#tb-scope.avail { display: block; }
+#tb-scope.on { background: rgba(255, 210, 63, 0.45); border-color: var(--accent); }
+
+/* вкладки магазину */
+#shop-tabs { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.shop-tab {
+  padding: 8px 16px; border-radius: 12px; border: 2px solid var(--ui-border);
+  background: rgba(255,255,255,0.06); color: #cfe0f5; font-weight: 800; font-size: 14px;
+  cursor: pointer; font-family: var(--font);
+}
+.shop-tab:hover { border-color: var(--accent); }
+.shop-tab.on { background: rgba(255, 210, 63, 0.16); border-color: var(--accent); color: var(--accent); }

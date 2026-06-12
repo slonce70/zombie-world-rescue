@@ -135,6 +135,15 @@ for (const id of ['medkit', 'speed', 'damage', 'ammo']) {
   const before = await page.evaluate(() => window.__game.save.coins);
   // medkit при повному HP не продається — спершу пошкодимось
   if (id === 'medkit') await page.evaluate(() => { window.__game.level.player.health = 40; });
+  // вкладки: шукаємо товар по всіх категоріях
+  await page.evaluate((itemId) => {
+    const tabs = [...document.querySelectorAll('.shop-tab')];
+    for (const t of tabs) {
+      t.click();
+      if (document.querySelector(`.shop-item[data-id="${itemId}"]`)) return;
+    }
+  }, id);
+  await page.waitForTimeout(250);
   await page.click(`.shop-item[data-id="${id}"]`);
   await page.waitForTimeout(250);
   const after = await page.evaluate(() => window.__game.save.coins);

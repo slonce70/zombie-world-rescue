@@ -225,30 +225,10 @@ export class Vehicles {
     const p = level.player;
     if (this.riding) {
       const r = this.riding;
-      // самокат під ногами героя
+      // самокат під ногами героя, нахиляється в поворот разом із ним
       r.sc.group.position.set(p.pos.x, p.pos.y, p.pos.z);
-      r.sc.group.rotation.set(0, p.yaw, 0);
-      const spd = Math.hypot(p.vel.x, p.vel.z);
-      for (const w of r.sc.wheels) w.rotation.x -= spd * dt * 6;
-      // 🧟 таран зомбі!
-      if (spd > 5) {
-        for (const z of level.zombies.list) {
-          if (z.state === 'dead' || (z._ramCd || 0) > 0) continue;
-          if (Math.hypot(z.x - p.pos.x, z.z - p.pos.z) < 1.5) {
-            z._ramCd = 0.6;
-            const dirX = (z.x - p.pos.x) || 0.1, dirZ = (z.z - p.pos.z) || 0.1;
-            const dl = Math.hypot(dirX, dirZ);
-            z.x += (dirX / dl) * 2.2;
-            z.z += (dirZ / dl) * 2.2;
-            z.damage(60 * p.damageMult, new THREE.Vector3(dirX / dl, 0, dirZ / dl), false);
-            level.audio.bell();
-            level.effects.burst(new THREE.Vector3(z.x, z.y + 1, z.z), 0x4fd8ff, 8, { speed: 3, up: 3, life: 0.5 });
-          }
-        }
-      }
-      for (const z of level.zombies.list) {
-        if ((z._ramCd || 0) > 0) z._ramCd -= dt;
-      }
+      r.sc.group.rotation.set(0, p.yaw, -(p._rideSteer || 0) * 0.14);
+      for (const w of r.sc.wheels) w.rotation.x -= p.rideSpeed * dt * 6;
       // зійти: E
       if (allowControl && input.pressed('KeyE')) {
         input.justPressed.delete('KeyE');
@@ -278,12 +258,13 @@ export class Vehicles {
     this.riding = r;
     r.taken = true;
     p.riding = r;
+    p.rideSpeed = 0;
     this._wasFP = p.firstPerson;
     p.firstPerson = false; // на самокаті видно героя збоку
     p._applyView();
     r.sc.group.rotation.z = 0;
     this.level.audio.bell();
-    this.level.bus.emit('toast', '🛴 Жми вперед і збивай зомбі! E — зійти');
+    this.level.bus.emit('toast', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти');
   }
 
   dismount() {
@@ -292,6 +273,7 @@ export class Vehicles {
     if (!r) return;
     this.riding = null;
     p.riding = null;
+    p.rideSpeed = 0;
     r.taken = false;
     r.x = p.pos.x + Math.sin(p.yaw) * 1.2;
     r.z = p.pos.z + Math.cos(p.yaw) * 1.2;
@@ -306,23 +288,77 @@ export class Vehicles {
 }
 
 // ============================================================
-// 🦘🧱 Гаджети: кишеньковий батут (F) і барикада (C)
+// 🧰 Гаджети: обираєш ОДИН перед боєм (Гардероб), клавіша F, перезарядка
 // ============================================================
+export const GADGETS = {
+  shield: { name: 'Щит', icon: '🛡️', cd: 30, price: 300, desc: 'Поглинає 255 шкоди, поки не розіб\'ється' },
+  heal: { name: 'Відновлення', icon: '💚', cd: 25, price: 250, desc: '+50 здоров\'я миттєво' },
+  tramp: { name: 'Кишеньковий батут', icon: '🦘', cd: 20, price: 150, desc: 'Постав і застрибни на дах' },
+  wall: { name: 'Барикада', icon: '🧱', cd: 25, price: 200, desc: 'Стіна на 100 міцності (E — забрати)' },
+};
+
 export class Gadgets {
   constructor(level) {
     this.level = level;
+    this.cd = 0;
     this.tramps = [];
     this.walls = [];
     this._thunkCd = 0;
+    // 🛡 бульбашка гаджет-щита довкола героя
+    this.shieldMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.25, 18, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0x4fd8ff, transparent: true, opacity: 0.22,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      })
+    );
+    this.shieldMesh.visible = false;
+    level.scene.add(this.shieldMesh);
   }
+
+  get active() { return this.level.game.save.activeGadget; }
 
   update(dt, input, allowControl) {
     const level = this.level;
     const p = level.player;
-    if (allowControl && p.health > 0) {
-      if (input.pressed('KeyF')) this.placeTramp();
-      if (input.pressed('KeyC')) this.placeWall();
+    if (this.cd > 0) this.cd -= dt;
+    if (allowControl && p.health > 0 && input.pressed('KeyF')) this.use();
+
+    // бульбашка щита слідує за героєм і тане з міцністю
+    if (p.gadgetShield > 0) {
+      this.shieldMesh.visible = true;
+      this.shieldMesh.position.set(p.pos.x, p.pos.y + 1.1, p.pos.z);
+      this.shieldMesh.material.opacity = 0.1 + 0.2 * (p.gadgetShield / 255);
+      this.shieldMesh.rotation.y += dt * 0.4;
+    } else if (this.shieldMesh.visible) {
+      this.shieldMesh.visible = false;
+      level.effects.burst(new THREE.Vector3(p.pos.x, p.pos.y + 1.1, p.pos.z), 0x4fd8ff, 12, { speed: 3.5, up: 2, life: 0.6 });
+      level.audio.shieldBreak();
     }
+
+    // E біля своєї барикади — забрати назад
+    if (allowControl && input.pressed('KeyE')) {
+      for (let i = this.walls.length - 1; i >= 0; i--) {
+        const w = this.walls[i];
+        if (Math.hypot(p.pos.x - w.x, p.pos.z - w.z) < 3.2) {
+          input.justPressed.delete('KeyE');
+          this._removeWall(i, false);
+          level.bus.emit('toast', '🧱 Барикаду забрано назад');
+          level.audio.pickup();
+          break;
+        }
+      }
+    }
+    // підказка біля своєї барикади
+    if (!level.missions.prompt) {
+      for (const w of this.walls) {
+        if (Math.hypot(p.pos.x - w.x, p.pos.z - w.z) < 3.2) {
+          level.missions.prompt = { text: '🧱 Натисни E — забрати барикаду', hold: false };
+          break;
+        }
+      }
+    }
+
     // зомбі гатять по барикадах
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -339,44 +375,78 @@ export class Gadgets {
           level.audio.kick();
           level.effects.burst(new THREE.Vector3(w.x, w.y + 1, w.z), 0xb08a5a, 3, { speed: 2, up: 2, life: 0.4, size: 0.6 });
         }
-        // тріщини: барикада темніє і хилиться
         w.mesh.rotation.x = (1 - w.hp / 100) * 0.12;
-        if (w.hp <= 0) this._breakWall(i);
+        if (w.hp <= 0) this._removeWall(i, true);
       }
     }
+  }
+
+  // F — застосувати обраний гаджет
+  use() {
+    const level = this.level;
+    const game = level.game;
+    const id = this.active;
+    if (!id) {
+      level.bus.emit('toast', '🧰 Обери гаджет у Гардеробі на глобусі!');
+      return false;
+    }
+    if (this.cd > 0) {
+      level.bus.emit('toast', `${GADGETS[id].icon} Ще ${Math.ceil(this.cd)}с перезарядки…`);
+      game.audio.denied();
+      return false;
+    }
+    const p = level.player;
+    let ok = false;
+    if (id === 'shield') {
+      p.gadgetShield = 255;
+      level.audio.powerup();
+      level.bus.emit('toast', '🛡️ Щит увімкнено: поглине 255 шкоди!');
+      ok = true;
+    } else if (id === 'heal') {
+      if (p.health >= p.maxHealth) {
+        level.bus.emit('toast', 'Здоров\'я і так повне! 💪');
+        game.audio.denied();
+        return false;
+      }
+      p.heal(50);
+      level.audio.heal();
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
+      level.bus.emit('toast', '💚 +50 здоров\'я!');
+      ok = true;
+    } else if (id === 'tramp') {
+      ok = this._placeTramp();
+    } else if (id === 'wall') {
+      ok = this._placeWall();
+    }
+    if (ok) {
+      this.cd = GADGETS[id].cd;
+      level.bus.emit('gadgetUsed', id);
+    }
+    return ok;
   }
 
   _placePos(dist) {
     const p = this.level.player;
     const x = p.pos.x - Math.sin(p.yaw) * dist;
     const z = p.pos.z - Math.cos(p.yaw) * dist;
-    // не можна ставити в стіну
     const solved = this.level.world.collide(x, z, 0.7);
     if (Math.hypot(solved.x - x, solved.z - z) > 0.4) return null;
     return { x, z, y: this.level.world.groundH(x, z) };
   }
 
-  placeTramp() {
-    const game = this.level.game;
-    if ((game.save.gadgets.tramp || 0) <= 0) {
-      this.level.bus.emit('toast', '🦘 Немає батутів! Купи в магазині (B)');
-      return false;
-    }
+  _placeTramp() {
     const pos = this._placePos(2.1);
     if (!pos) {
       this.level.bus.emit('toast', 'Тут не можна поставити батут 🙈');
       return false;
     }
-    game.save.gadgets.tramp--;
-    game.saveGame();
     const mesh = makeTrampolineMesh();
     mesh.position.set(pos.x, pos.y, pos.z);
     this.level.scene.add(mesh);
     const pad = { x: pos.x, z: pos.z, y: pos.y, power: 15, cd: 0 };
     this.level.world.jumpPads.push(pad);
     this.tramps.push({ mesh, pad });
-    // не більше 4 батутів — найстаріший зникає
-    if (this.tramps.length > 4) {
+    if (this.tramps.length > 3) {
       const old = this.tramps.shift();
       this.level.scene.remove(old.mesh);
       const idx = this.level.world.jumpPads.indexOf(old.pad);
@@ -387,26 +457,18 @@ export class Gadgets {
     return true;
   }
 
-  placeWall() {
+  _placeWall() {
     const level = this.level;
-    const game = level.game;
-    if ((game.save.gadgets.wall || 0) <= 0) {
-      level.bus.emit('toast', '🧱 Немає барикад! Купи в магазині (B)');
-      return false;
-    }
     const pos = this._placePos(2.6);
     if (!pos) {
       level.bus.emit('toast', 'Тут не можна поставити барикаду 🙈');
       return false;
     }
-    game.save.gadgets.wall--;
-    game.saveGame();
     const yaw = level.player.yaw;
     const mesh = makeBarricadeMesh();
     mesh.position.set(pos.x, pos.y, pos.z);
     mesh.rotation.y = yaw;
     level.scene.add(mesh);
-    // 3 круглі колайдери вздовж стіни
     const colliders = [];
     for (const off of [-0.85, 0, 0.85]) {
       const cx = pos.x + Math.cos(yaw) * off;
@@ -416,20 +478,50 @@ export class Gadgets {
       colliders.push(col);
     }
     level.world._buildGrid();
-    this.walls.push({ mesh, colliders, hp: 100, x: pos.x, z: pos.z, y: pos.y });
+    this.walls.push({ mesh, colliders, hp: 100, x: pos.x, z: pos.z, y: pos.y, yaw });
     level.audio.door();
     return true;
   }
 
-  _breakWall(i) {
+  // куля гравця може влучити в барикаду (і зруйнувати її)
+  wallHitTest(origin, dir, maxD) {
+    let best = null;
+    for (const w of this.walls) {
+      for (const c of w.colliders) {
+        // вертикальний циліндр r=0.55, висота 1.8
+        const dx = c.x - origin.x, dz = c.z - origin.z;
+        const t = dx * dir.x + dz * dir.z;
+        if (t < 0.3 || t > maxD) continue;
+        const px = origin.x + dir.x * t, pz = origin.z + dir.z * t;
+        const py = origin.y + dir.y * t;
+        if (Math.hypot(px - c.x, pz - c.z) < 0.55 && py > w.y - 0.2 && py < w.y + 1.9) {
+          if (!best || t < best.t) best = { t, wall: w };
+        }
+      }
+    }
+    return best;
+  }
+
+  damageWall(w, dmg) {
+    w.hp -= dmg;
+    this.level.effects.burst(new THREE.Vector3(w.x, w.y + 1, w.z), 0xb08a5a, 4, { speed: 2.4, up: 2, life: 0.4, size: 0.7 });
+    if (w.hp <= 0) {
+      const i = this.walls.indexOf(w);
+      if (i >= 0) this._removeWall(i, true);
+    }
+  }
+
+  _removeWall(i, broken) {
     const level = this.level;
     const w = this.walls[i];
     this.walls.splice(i, 1);
     level.scene.remove(w.mesh);
     level.world.colliders = level.world.colliders.filter((c) => !w.colliders.includes(c));
     level.world._buildGrid();
-    level.effects.burst(new THREE.Vector3(w.x, w.y + 1, w.z), 0xb08a5a, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
-    level.audio.shieldBreak();
-    level.bus.emit('toast', '🧱 Барикаду зламали!');
+    if (broken) {
+      level.effects.burst(new THREE.Vector3(w.x, w.y + 1, w.z), 0xb08a5a, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
+      level.audio.shieldBreak();
+      level.bus.emit('toast', '🧱 Барикаду зламали!');
+    }
   }
 }

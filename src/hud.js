@@ -48,6 +48,8 @@ export class HUD {
       xpFill: $('xp-fill'),
       gadgetChips: $('gadget-chips'),
       missionPanel: $('mission-panel'),
+      scope: $('scope'),
+      tbScope: $('tb-scope'),
     };
     this._lastCombo = 0;
     this._lastCoins = -1;
@@ -212,16 +214,25 @@ export class HUD {
       this.el.xpFill.style.width = (prog.levelFrac() * 100) + '%';
     }
 
-    // чипи гаджетів (🦘 батут F, 🧱 барикада C)
-    const gd = this.game.save.gadgets || {};
-    const gHtml = (gd.tramp || gd.wall)
-      ? `<span class="${gd.tramp ? '' : 'none'}">🦘 ${gd.tramp || 0} (F)</span> · <span class="${gd.wall ? '' : 'none'}">🧱 ${gd.wall || 0} (C)</span>`
-      : '';
+    // чип активного гаджета (F) з перезарядкою
+    const gadgets = level.gadgets;
+    const activeG = this.game.save.activeGadget;
+    let gHtml = '';
+    if (activeG && gadgets) {
+      const icon = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱' }[activeG];
+      gHtml = gadgets.cd > 0
+        ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}с</span>`
+        : `${icon} ГОТОВО (F)`;
+    }
     if (this._lastGadgetHtml !== gHtml) {
       this.el.gadgetChips.innerHTML = gHtml;
       this._lastGadgetHtml = gHtml;
+      const btn = document.getElementById('tb-gadget');
+      if (btn && activeG) {
+        btn.childNodes[0].textContent = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱' }[activeG];
+      }
       const badge = document.getElementById('tb-gadget-n');
-      if (badge) badge.textContent = (gd.tramp || 0) + (gd.wall || 0);
+      if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
     }
 
     // стрілка-вказівник до поточної цілі
@@ -230,6 +241,20 @@ export class HUD {
     // приціл: розліт
     const spread = 6 + p.gunKick * 14 + p.bobAmp * 6;
     this.el.crosshair.style.setProperty('--gap', spread + 'px');
+
+    // 🔭 оптика снайперки
+    const scopeOn = !!p.scoped;
+    if (scopeOn !== this._lastScope) {
+      this._lastScope = scopeOn;
+      this.el.scope.classList.toggle('show', scopeOn);
+      this.el.crosshair.style.display = scopeOn ? 'none' : '';
+      if (this.el.tbScope) this.el.tbScope.classList.toggle('on', scopeOn);
+    }
+    if (this.el.tbScope && this.game.input.touchMode) {
+      const avail = p.cur === 'sniper' && p.firstPerson;
+      this.el.tbScope.classList.toggle('avail', avail);
+      if (!avail && this.game.input.touchScope) this.game.input.touchScope = false;
+    }
 
     // місії
     const list = level.missions.getHudList();
