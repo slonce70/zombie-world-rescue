@@ -133,6 +133,20 @@ export class HostNet {
         level.zombies.clearNear(L.SPAWN.x, L.SPAWN.z, 30);
         return true;
       }
+      case 'revdone': {
+        // гість підняв когось: перевіряємо, що ціль і досі лежить, і повідомляємо її
+        const target = d.target | 0;
+        const reviverNick = (this.session.roster.get(from) || {}).nick || 'Друг';
+        if (target === 1) {
+          this.game.applyRevive(reviverNick);
+        } else {
+          const trp = this.remotes.get(target);
+          if (trp && trp.health <= 0) {
+            this.session.transport.send(target, { t: 'revived', by: reviverNick });
+          }
+        }
+        return true;
+      }
       case 'fountain': {
         for (let i = 0; i < 14; i++) {
           const a = (i / 14) * Math.PI * 2;
@@ -276,6 +290,11 @@ export class HostNet {
   onLocalShot(weapon, endPoint) {
     if (this._hostShotCd > 0) return;
     this.ev('sh', 1, weaponToIdx(weapon), endPoint ? [r1(endPoint.x), r1(endPoint.y), r1(endPoint.z)] : 0);
+  }
+
+  // хост сам когось підняв
+  sendRevive(pid) {
+    this.session.transport.send(pid, { t: 'revived', by: this.session.nick });
   }
 
   spawnNetGrenade(pos, vel) {

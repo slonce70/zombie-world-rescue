@@ -21,7 +21,7 @@ import { CoopUI } from './ui/coopui.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -923,9 +923,70 @@ class Game {
       this._endStormRun();
       return;
     }
-    this.deathT = 3.5;
+    const coop = !!this.level.net;
+    // кооп: лежиш 20с — друг може підняти; соло — швидкий респавн
+    this.deathT = coop ? 20 : 3.5;
+    const card = document.querySelector('#overlay-death p');
+    if (card) {
+      card.textContent = coop
+        ? '💚 Друг може підбігти і підняти тебе (E)! Або відродишся біля бази.'
+        : 'Не хвилюйся — прогрес місій зберігся.';
+    }
     this.audio.defeat();
     this._showOverlay('overlay-death');
+  }
+
+  // 🤝 друг підняв: встаємо на місці з половиною здоровʼя
+  applyRevive(byNick = null) {
+    if (!this.level || this.deathT < 0) return;
+    const p = this.level.player;
+    if (p.health > 0) return;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    p.health = Math.ceil(p.maxHealth * 0.5);
+    p.respawnProtect = 2;
+    p.vel.set(0, 0, 0);
+    this.audio.heal();
+    this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 14, { speed: 2.5, up: 3, life: 0.8 });
+    this.hud.banner('💚 ТЕБЕ ПІДНЯЛИ!', byNick ? `${byNick} прийшов на допомогу — до бою!` : 'Дякуй другу і до бою!');
+  }
+
+  // 🤝 підняття пораненого тіммейта: тримай E біля тіла 3 секунди
+  _updateRevive(dt, allowControl) {
+    const level = this.level;
+    const me = level.player;
+    if (me.health <= 0) { this._revProg = 0; return; }
+    let target = null;
+    for (const rp of level.net.remotes.values()) {
+      if (rp.health > 0) continue;
+      const d = Math.hypot(rp.pos.x - me.pos.x, rp.pos.z - me.pos.z);
+      if (d < 2.8) { target = rp; break; }
+    }
+    if (!target) {
+      this._revProg = 0;
+      this._revTarget = null;
+      return;
+    }
+    if (this._revTarget !== target.pid) {
+      this._revTarget = target.pid;
+      this._revProg = 0;
+    }
+    if (allowControl && this.input.down('KeyE')) {
+      this._revProg = Math.min(1, (this._revProg || 0) + dt / 3);
+      if (this._revProg >= 1) {
+        this._revProg = 0;
+        level.net.sendRevive(target.pid);
+      }
+    } else {
+      this._revProg = Math.max(0, (this._revProg || 0) - dt * 0.7);
+    }
+    if (!level.missions.prompt) {
+      level.missions.prompt = {
+        text: `💚 Тримай E — підніми ${target.nick}!`,
+        hold: true,
+        progress: this._revProg || 0,
+      };
+    }
   }
 
   _endStormRun() {
@@ -1112,6 +1173,7 @@ class Game {
           this.level.megabox.update(dt, this.input, allowControl);
         }
         this.level.gadgets.update(dt, this.input, allowControl);
+        if (this.level.net) this._updateRevive(dt, allowControl);
         if (this.level.pet) this.level.pet.update(dt);
         this.level.world.update(dt, this.level.player.pos);
         this.level.effects.update(dt);

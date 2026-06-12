@@ -464,6 +464,7 @@ export class Zombies {
       }
       level.audio.goldenJingle();
       level.bus.emit('toast', '🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!');
+      level.netEv('toast', '🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!');
     }
     if (z.type === 'boss') {
       this.boss = null;

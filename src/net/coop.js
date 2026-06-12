@@ -48,6 +48,7 @@ export class CoopSession {
       skin: save.activeSkin || 'classic',
       tracer: save.activeTracer || 'classic',
       dance: save.activeDance || 'shuffle',
+      dog: (save.upgrades.dog || 0) > 0 ? 1 : 0,
     };
   }
 
@@ -201,7 +202,7 @@ export class CoopSession {
     }
     let nick = cleanNick(d.nick) || `Гравець ${from}`;
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
-    this.roster.set(from, { pid: from, nick, skin: d.skin, tracer: d.tracer, dance: d.dance });
+    this.roster.set(from, { pid: from, nick, skin: d.skin, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId,
       roster: this._rosterList(),
@@ -220,7 +221,9 @@ export class CoopSession {
 
   _rosterList() {
     const out = [];
-    for (const [pid, r] of this.roster) out.push({ pid, nick: r.nick || this.nick, skin: r.skin, tracer: r.tracer });
+    for (const [pid, r] of this.roster) {
+      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, tracer: r.tracer, dog: r.dog || 0 });
+    }
     return out;
   }
 

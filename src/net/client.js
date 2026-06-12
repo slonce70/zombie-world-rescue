@@ -55,6 +55,7 @@ export class GuestNet {
   sendUse(kind, extra = {}) { this.send({ t: 'use', kind, ...extra }); }
   sendGadget(kind, x, z, yaw) { this.send({ t: 'gadget', kind, x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, yaw: Math.round(yaw * 100) / 100 }); }
   sendRespawned() { this.send({ t: 'respawned' }); }
+  sendRevive(pid) { this.send({ t: 'revdone', target: pid }); }
   sendFountain(x, z) { this.send({ t: 'fountain', x: Math.round(x), z: Math.round(z) }); }
 
   // ---------- цикл ----------
@@ -123,6 +124,10 @@ export class GuestNet {
       case 'healed': {
         const p = this.level.player;
         if (p) p.heal(d.amt);
+        return true;
+      }
+      case 'revived': {
+        this.game.applyRevive(d.by || null);
         return true;
       }
       default: return false;

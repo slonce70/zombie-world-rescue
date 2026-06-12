@@ -1,7 +1,7 @@
 // Віддалений гравець: ріг героя зі скіном, нік над головою, смужка HP,
 // зброя в руці, плавна інтерполяція позиції зі снапшотів.
 import * as THREE from 'three';
-import { makeHero, makeGunMesh, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
+import { makeHero, makeGunMesh, makeDog, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
 import { damp, dampAngle } from '../utils.js';
 import { PF, idxToWeapon } from './protocol.js';
 
@@ -94,6 +94,15 @@ export class RemotePlayer {
     this._hasFirst = false;
     this._speed = 0;
     this._danceSpin = 0;
+
+    // 🐶 песик власника видно всім (косметика, біжить за хазяїном локально)
+    this.dog = null;
+    if (info.dog) {
+      this.dog = makeDog();
+      this.dog.x = 0; this.dog.z = 0; this.dog.yaw = 0;
+      this.dog.group.visible = false;
+      level.scene.add(this.dog.group);
+    }
   }
 
   // прийшов снапшот
@@ -153,6 +162,36 @@ export class RemotePlayer {
     }
     updateRig(this.rig, dt);
 
+    // 🐶 песик дріботить за хазяїном
+    if (this.dog) {
+      const g = this.dog;
+      if (!g.group.visible && this._hasFirst) {
+        g.x = this.pos.x + 1.5; g.z = this.pos.z + 1.5;
+        g.group.visible = true;
+      }
+      const tx = this.pos.x + Math.sin(this.yaw + 2.4) * 1.7;
+      const tz = this.pos.z + Math.cos(this.yaw + 2.4) * 1.7;
+      const dx = tx - g.x, dz = tz - g.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 35) { g.x = tx; g.z = tz; }
+      const spd = d > 8 ? 9.5 : d > 1.1 ? 5.5 : 0;
+      let moving = false;
+      if (spd > 0 && d > 0.1) {
+        g.x += (dx / d) * spd * dt;
+        g.z += (dz / d) * spd * dt;
+        g.yaw = Math.atan2(-dx, -dz);
+        moving = true;
+      }
+      const gy = this.level.world.groundH(g.x, g.z);
+      g.phase = (g.phase || 0) + dt * (moving ? 14 : 3);
+      g.legs.forEach((leg, i) => {
+        leg.rotation.x = moving ? Math.sin(g.phase + (i % 2) * Math.PI) * 0.7 : 0;
+      });
+      g.tail.rotation.z = Math.sin(g.phase * 1.6) * 0.5;
+      g.group.position.set(g.x, gy, g.z);
+      g.group.rotation.y += (g.yaw - g.group.rotation.y) * Math.min(1, dt * 9);
+    }
+
     // HP-бар
     const pct = Math.max(0, Math.min(1, this.health / this.maxHealth));
     if (Math.abs(pct - this._lastBarPct) > 0.01) this._drawBar(pct);
@@ -185,5 +224,6 @@ export class RemotePlayer {
 
   dispose() {
     this.level.scene.remove(this.rig.group);
+    if (this.dog) this.level.scene.remove(this.dog.group);
   }
 }
