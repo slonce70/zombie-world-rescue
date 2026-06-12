@@ -20,7 +20,7 @@ import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };

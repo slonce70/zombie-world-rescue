@@ -450,7 +450,17 @@ export class DynamicMissions {
     this.prompt = null;
 
     for (const m of this.missions) {
-      if (m.beam) m.beam.update(dt);
+      if (!m.beam) continue;
+      m.beam.update(dt);
+      // 🧭 маяк веде до НАСТУПНОЇ цілі місії, а не стоїть на місці
+      const target = this._beamTarget(m);
+      if (target) {
+        const g = m.beam.group;
+        const ty = this.level.world.groundH(target.x, target.z);
+        g.position.x += (target.x - g.position.x) * Math.min(1, dt * 6);
+        g.position.z += (target.z - g.position.z) * Math.min(1, dt * 6);
+        g.position.y = ty;
+      }
     }
     if (this.bossBeam) this.bossBeam.update(dt);
 
@@ -507,6 +517,28 @@ export class DynamicMissions {
     this._updateCivilians(dt);
   }
 
+  // куди має стояти маяк місії просто зараз
+  _beamTarget(m) {
+    if (m.state !== 'active') return null;
+    if (m.type === 'collect') {
+      const next = m.crates.find((c) => !c.taken);
+      return next ? { x: next.x, z: next.z } : null;
+    }
+    if (m.type === 'nests') {
+      const next = m.nestList.find((n) => !n.cleared);
+      return next ? { x: next.x, z: next.z } : null;
+    }
+    if (m.type === 'hunt') {
+      const alive = m.elites.find((e) => e.state !== 'dead' && !e.gone);
+      return alive ? { x: alive.x, z: alive.z } : null;
+    }
+    if (m.type === 'escort') {
+      // до старту — на точці зустрічі; після — веде до вежі
+      return m.started ? { x: m.dest.x, z: m.dest.z } : { x: m.site.x, z: m.site.z + 2 };
+    }
+    return null; // rescue/repair/clear/defense — маяк на місці
+  }
+
   // ---------- апдейтери типів ----------
   _up_rescue(m, dt, input, allowControl) {
     const level = this.level;
@@ -538,7 +570,7 @@ export class DynamicMissions {
     const player = level.player;
     const rp = level.world.repairPoint;
     const d = Math.hypot(player.pos.x - rp.x, player.pos.z - rp.z);
-    if (d < 3.0) {
+    if (d < 3.6) {
       this.prompt = {
         text: m.progress > 0 ? 'Тримай E — ремонт' : 'Тримай E — почни ремонт',
         hold: true, progress: m.progress,
@@ -584,7 +616,7 @@ export class DynamicMissions {
     } else if (m.crateOpenedT < 0) {
       const wc = level.world.weaponCrate;
       const d = Math.hypot(player.pos.x - wc.x, player.pos.z - wc.z);
-      if (d < 2.8) {
+      if (d < 3.4) {
         this.prompt = { text: 'Натисни E — відкрий ящик', hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.crateOpenedT = 0;
@@ -609,7 +641,7 @@ export class DynamicMissions {
       if (c.taken) continue;
       c.mesh.position.y = c.y + Math.abs(Math.sin(performance.now() / 400 + c.x)) * 0.12;
       const d = Math.hypot(player.pos.x - c.x, player.pos.z - c.z);
-      if (d < 2.6) {
+      if (d < 3.4) {
         this.prompt = { text: `🧺 Натисни E — забери припаси (${m.found}/4)`, hold: false };
         if (allowControl && input.pressed('KeyE')) {
           c.taken = true;
@@ -679,7 +711,7 @@ export class DynamicMissions {
       if (n.cleared) continue;
       n.pod.scale.y = 1.25 + Math.sin(performance.now() / 350 + n.x) * 0.07;
       const d = Math.hypot(player.pos.x - n.x, player.pos.z - n.z);
-      if (d < 3.0) {
+      if (d < 3.8) {
         this.prompt = { text: '🟣 Тримай E — знешкодь гніздо', hold: true, progress: n.progress };
         if (allowControl && input.down('KeyE')) {
           n.progress = Math.min(1, n.progress + dt / 4);
@@ -710,7 +742,7 @@ export class DynamicMissions {
     const player = level.player;
     if (!m.started) {
       const d = Math.hypot(player.pos.x - m.site.x, player.pos.z - (m.site.z + 2));
-      if (d < 4) {
+      if (d < 5) {
         this.prompt = { text: '🧳 Натисни E — забери мандрівника', hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.started = true;

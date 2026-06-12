@@ -94,6 +94,13 @@ await page.screenshot({ path: 'shots/u3-shield-zombie.png' });
 // ============ 🪂 АЕРОДРОП З БАЗУКОЮ ============
 console.log('▸ Аеродроп приносить базуку');
 await page.evaluate(() => window.__game.test.airdropNow());
+// чекаємо появу ящика і прискорюємо посадку (повний спуск ~20 ігрових секунд —
+// у повільному headless це хвилини реального часу)
+await waitFor(async () => await page.evaluate(() => !!window.__game.level.effects.airdrop), 20000, 'аеродроп з\'явився');
+await page.evaluate(() => {
+  const ad = window.__game.level.effects.airdrop;
+  ad.g.position.y = ad.gy + 1.5;
+});
 const dropLanded = await waitFor(async () =>
   await page.evaluate(() => window.__game.level.effects.airdrop && window.__game.level.effects.airdrop.landed), 40000, 'аеродроп приземлився');
 check(dropLanded, 'аеродроп приземлився');

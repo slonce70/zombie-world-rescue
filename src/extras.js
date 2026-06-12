@@ -61,7 +61,7 @@ export class Megabox {
       this._hinted = true;
       level.bus.emit('toast', '🦙 МЕГАБОКС поблизу! Знайди фіолетовий промінь!');
     }
-    if (d < 2.8 && !level.missions.prompt) {
+    if (d < 3.6 && !level.missions.prompt) {
       level.missions.prompt = { text: '🦙 Натисни E — відкрий МЕГАБОКС!', hold: false };
       if (allowControl && input.pressed('KeyE')) this.open();
     }

@@ -175,7 +175,7 @@ body.in-level #hud { display: block; }
 
 /* орда */
 #horde-counter {
-  position: absolute; left: 50%; top: 76px; transform: translateX(-50%);
+  position: absolute; left: 50%; top: 84px; transform: translateX(-50%);
   background: rgba(160, 30, 30, 0.85); border: 2px solid rgba(255,120,120,.7); border-radius: 12px;
   color: #fff; font-weight: 900; font-size: 18px; padding: 7px 20px; display: none;
   animation: hp-pulse 1s infinite;
@@ -388,9 +388,12 @@ body.touch-mode #ammo { right: 178px; bottom: 10px; }
 body.touch-mode #health { bottom: 14px; left: 12px; }
 body.touch-mode #topright { top: 8px; right: 8px; gap: 4px; }
 body.touch-mode #minimap { width: 88px; height: 88px; }
-body.touch-mode #coins { position: fixed; top: 8px; right: 300px; padding: 6px 12px; font-size: 17px; }
-body.touch-mode #bossbar { top: 56px; width: min(400px, 46vw); }
-body.touch-mode #horde-counter { top: 104px; }
+body.touch-mode #coins { position: fixed; top: 8px; right: 318px; padding: 6px 12px; font-size: 17px; }
+body.touch-mode #bossbar { top: 48px; width: min(280px, 34vw); }
+body.touch-mode #boss-name { font-size: 12px; letter-spacing: 1px; margin-bottom: 3px; }
+body.touch-mode #boss-bar-bg { height: 12px; }
+body.touch-mode #horde-counter { top: 108px; font-size: 14px; padding: 5px 14px; }
+body.touch-mode #combo { top: 46%; font-size: 26px; }
 body.touch-mode #xp-chip { display: none; }
 body.touch-mode #waypoint { font-size: 13px; }
 .tb {
@@ -400,7 +403,7 @@ body.touch-mode #waypoint { font-size: 13px; }
   box-shadow: 0 4px 12px rgba(0,0,0,.35); position: relative;
 }
 .tb.tb-big { width: 76px; height: 76px; font-size: 33px; background: rgba(200, 60, 50, 0.5); border-color: rgba(255,150,130,0.6); }
-.tb.tb-small { width: 40px; height: 40px; font-size: 17px; }
+.tb.tb-small { width: 44px; height: 44px; font-size: 18px; }
 .tb.active { filter: brightness(1.6); transform: scale(0.93); }
 .tb-badge {
   position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px;
@@ -414,7 +417,7 @@ body.touch-mode #waypoint { font-size: 13px; }
   #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: 70px; }
   body.touch-mode #minimap { width: 74px; height: 74px; }
   body.touch-mode #touch-util { right: 92px; }
-  body.touch-mode #coins { right: 280px; }
+  body.touch-mode #coins { right: 298px; }
 }
 
 /* компактний HUD на малих екранах */
@@ -480,6 +483,7 @@ body.touch-mode #waypoint { font-size: 13px; }
 .globe-act {
   position: relative; font-size: 15px; font-weight: 900; padding: 11px 18px;
   background: rgba(28, 44, 66, 0.85); border: 2px solid var(--ui-border);
+  pointer-events: auto; /* #globe-ui має pointer-events:none — кнопки мусять ловити кліки самі */
 }
 .globe-act:hover { border-color: var(--accent); transform: translateY(-2px); }
 .globe-act.storm-btn { background: rgba(74, 38, 110, 0.85); border-color: rgba(176, 134, 242, 0.5); }
@@ -611,3 +615,21 @@ body.touch-mode #waypoint { font-size: 13px; }
 }
 .shop-tab:hover { border-color: var(--accent); }
 .shop-tab.on { background: rgba(255, 210, 63, 0.16); border-color: var(--accent); color: var(--accent); }
+
+/* 🔄 портретна орієнтація на телефоні — просимо повернути */
+#rotate-hint {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(10, 18, 30, 0.96); color: #fff;
+  flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 14px; padding: 30px;
+}
+#rotate-hint .rh-icon { font-size: 64px; animation: rh-spin 2s ease-in-out infinite; }
+@keyframes rh-spin { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+#rotate-hint .rh-text { font-size: 20px; font-weight: 900; }
+#rotate-hint .rh-sub { font-size: 14px; color: #9fb8d4; font-weight: 700; }
+@media (orientation: portrait) and (max-width: 620px) {
+  body.touch-mode #rotate-hint { display: flex; }
+}
+
+.touch-controls-hint { display: none; margin-top: 12px; color: #9fb8d4; font-size: 13px; font-weight: 700; max-width: 420px; }
+body.touch-mode .touch-controls-hint { display: block; }
