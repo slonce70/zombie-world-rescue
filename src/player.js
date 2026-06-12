@@ -47,6 +47,12 @@ export class Player {
     // тимчасові бафи (секунди, що лишились)
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
 
+    // 💃 емоції-танці та 🛴 їзда на самокаті
+    this.emoting = null;
+    this._emoteWasFP = true;
+    this._danceSpin = 0;
+    this.riding = null;
+
     this.weapons = ['pistol'];
     this.cur = 'pistol';
     this.ammo = {};
@@ -61,8 +67,8 @@ export class Player {
     this.reloading = 0;
     this.firstPerson = true;
 
-    // герой для виду від 3-ї особи
-    this.rig = makeHero();
+    // герой для виду від 3-ї особи (з обраним скіном)
+    this.rig = makeHero((level.game && level.game.save.activeSkin) || 'classic');
     scene.add(this.rig.group);
     this.tpGuns = {};
     for (const w of WEAPON_SLOTS) {
@@ -187,6 +193,35 @@ export class Player {
     return true;
   }
 
+  // 💃 станцювати поточний обраний танець (N)
+  emote() {
+    if (this.emoting || this.riding || this.health <= 0 || !this.onGround) return false;
+    this.emoting = (this.level.game && this.level.game.save.activeDance) || 'shuffle';
+    this._emoteWasFP = this.firstPerson;
+    this._danceSpin = 0;
+    this.firstPerson = false;
+    this._applyView();
+    this.rig.anim.danceStyle = this.emoting;
+    setAnim(this.rig, 'dance');
+    this.level.audio.dance();
+    this.level.effects.burst(
+      this.pos.clone().setY(this.pos.y + 1.5),
+      [0xffd23f, 0xff5d8c, 0x4fd8ff][Math.floor(Math.random() * 3)], 14,
+      { speed: 3, up: 3, life: 0.9, size: 1.1 }
+    );
+    this.level.bus.emit('dance');
+    return true;
+  }
+
+  stopEmote() {
+    if (!this.emoting) return;
+    this.emoting = null;
+    if (this._emoteWasFP) {
+      this.firstPerson = true;
+      this._applyView();
+    }
+  }
+
   startReload() {
     const a = this.curAmmo;
     const w = this.weapon;
@@ -230,7 +265,8 @@ export class Player {
     const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
     const sprint = moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
     const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
-    const speed = 5.6 * this.speedMult * buffSpeed * (sprint ? 1.55 : 1);
+    const rideMult = this.riding ? 1.85 : 1;
+    const speed = 5.6 * this.speedMult * buffSpeed * rideMult * (sprint ? 1.55 : 1);
     let tx = 0, tz = 0;
     if (moving) {
       const len = Math.max(1, Math.hypot(mx, mz));
@@ -305,7 +341,13 @@ export class Player {
       }
       if (input.pressed('KeyR')) this.startReload();
       if (input.pressed('KeyG')) this.throwGrenade();
+      if (input.pressed('KeyN')) {
+        if (this.emoting) this.stopEmote();
+        else this.emote();
+      }
     }
+    // рух, постріл або стрибок скасовують танець
+    if (this.emoting && (moving || input.justClicked || input.pressed('Space'))) this.stopEmote();
     if (this.grenadeCd > 0) this.grenadeCd -= dt;
 
     // --- перезарядка ---
@@ -330,7 +372,7 @@ export class Player {
     // буфер кліку: якщо клікнули на мить раніше, ніж минув кулдаун — постріл не губиться
     if (input.justClicked) this._clickBuffer = 0.3;
     else if (this._clickBuffer > 0) this._clickBuffer -= dt;
-    if (allowControl && this.reloading <= 0) {
+    if (allowControl && this.reloading <= 0 && !this.emoting) {
       const w = this.weapon;
       const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
       if (trigger && this.shootCd <= 0) {
@@ -435,10 +477,18 @@ export class Player {
   _updateRigs(dt, hSpeed, moving, sprint) {
     if (!this.firstPerson) {
       this.rig.group.position.set(this.pos.x, this.pos.y, this.pos.z);
-      this.rig.group.rotation.y = this.yaw;
-      setAnim(this.rig, 'aim');
-      this.rig.anim.speed = hSpeed;
-      this.rig.anim.aimPitch = this.pitch;
+      if (this.emoting) {
+        // 💃 танець: «Дзиґа» крутиться всім тілом
+        if (this.emoting === 'spin') this._danceSpin += dt * 7;
+        this.rig.group.rotation.y = this.yaw + this._danceSpin;
+        this.rig.anim.danceStyle = this.emoting;
+        setAnim(this.rig, 'dance');
+      } else {
+        this.rig.group.rotation.y = this.yaw;
+        setAnim(this.rig, 'aim');
+        this.rig.anim.speed = hSpeed;
+        this.rig.anim.aimPitch = this.pitch;
+      }
       updateRig(this.rig, dt);
     }
   }

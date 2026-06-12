@@ -17,6 +17,12 @@
       <p class="globe-sub">Зомбі захопили планету! Звільняй країни одну за одною.</p>
     </div>
     <div class="globe-bottom">
+      <div class="globe-actions">
+        <button id="btn-pass" class="btn globe-act">🎖️ Зоряний шлях <span id="pass-badge" class="act-badge"></span></button>
+        <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
+        <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
+        <button id="btn-storm" class="btn globe-act storm-btn">⛈️ ШТОРМ</button>
+      </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
       <button id="btn-quality" class="btn quality-btn">⚙️ Якість: Авто</button>
       <p class="globe-hint">🖱️ Обертай глобус мишкою · Натисни на жовту країну</p>
@@ -42,6 +48,7 @@
     <div id="topright">
       <div id="coins"><span class="coin-icon">₴</span><span id="coins-value">0</span></div>
       <canvas id="minimap" width="200" height="200"></canvas>
+      <div id="xp-chip"><span id="xp-lvl">⭐ 1</span><div id="xp-bar"><div id="xp-fill"></div></div></div>
     </div>
 
     <div id="health">
@@ -55,6 +62,12 @@
       <div id="weapon-name">🔫 Пістолет</div>
       <div id="ammo-nums"><span id="ammo-mag">12</span><span class="ammo-sep">/</span><span id="ammo-reserve">∞</span></div>
       <div id="grenades">💣 <span id="grenades-value">2</span> <span class="grenade-key">(G)</span></div>
+      <div id="gadget-chips"></div>
+    </div>
+
+    <div id="waypoint">
+      <span id="wp-arrow">➤</span>
+      <span id="wp-label">🆘 120м</span>
     </div>
 
     <div id="combo"></div>
@@ -85,18 +98,20 @@
   <!-- Мобільне керування -->
   <div id="touch-ui">
     <div id="joy-base"><div id="joy-knob"></div></div>
-    <div id="touch-right">
-      <button id="tb-fire" class="tb tb-big">🔫</button>
-      <button id="tb-jump" class="tb">⬆️</button>
-      <button id="tb-grenade" class="tb">💣</button>
-      <button id="tb-reload" class="tb">🔄</button>
-      <button id="tb-interact" class="tb">✋</button>
-    </div>
-    <div id="touch-top">
-      <button id="tb-weapon" class="tb tb-small">🔁</button>
+    <div id="touch-util">
+      <button id="tb-dance" class="tb tb-small">💃</button>
       <button id="tb-camera" class="tb tb-small">📷</button>
       <button id="tb-shop" class="tb tb-small">🛒</button>
       <button id="tb-pause" class="tb tb-small">⏸️</button>
+    </div>
+    <div id="touch-right">
+      <button id="tb-weapon" class="tb">🔁</button>
+      <button id="tb-grenade" class="tb">💣</button>
+      <button id="tb-reload" class="tb">🔄</button>
+      <button id="tb-gadget" class="tb">🦘<span id="tb-gadget-n" class="tb-badge">0</span></button>
+      <button id="tb-interact" class="tb">✋</button>
+      <button id="tb-jump" class="tb">⬆️</button>
+      <button id="tb-fire" class="tb tb-big">🔫</button>
     </div>
   </div>
 
@@ -131,9 +146,10 @@
         <span><b>R</b> — перезарядка</span>
         <span><b>1-7</b> — зброя (Q — наступна)</span>
         <span><b>G</b> — 💣 граната</span>
+        <span><b>F</b> — 🦘 батут · <b>C</b> — 🧱 барикада</span>
+        <span><b>N</b> — 💃 танець</span>
         <span><b>V</b> — вид 1-ї/3-ї особи</span>
-        <span><b>B</b> — магазин</span>
-        <span><b>M</b> — звук вкл/викл</span>
+        <span><b>B</b> — магазин · <b>M</b> — звук</span>
       </div>
     </div>
   </div>
@@ -173,6 +189,55 @@
       <p class="victory-sub">Ти переміг Зомбі-Короля і врятував країну!</p>
       <div id="victory-stats"></div>
       <button id="btn-victory-globe" class="btn btn-primary big">🌍 На глобус</button>
+    </div>
+  </div>
+
+  <!-- Зоряний шлях (безкоштовний пасс) -->
+  <div id="overlay-pass" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>🎖️ ЗОРЯНИЙ ШЛЯХ</h2>
+        <button class="btn-x panel-close" data-close="overlay-pass">✕</button>
+      </div>
+      <div id="pass-progress"></div>
+      <div id="pass-track"></div>
+    </div>
+  </div>
+
+  <!-- Щоденні завдання -->
+  <div id="overlay-quests" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>📅 ЗАВДАННЯ ДНЯ</h2>
+        <button class="btn-x panel-close" data-close="overlay-quests">✕</button>
+      </div>
+      <p class="panel-sub">Нові завдання — щодня! Нагорода: монети та зірковий досвід ⭐</p>
+      <div id="quest-list"></div>
+    </div>
+  </div>
+
+  <!-- Гардероб -->
+  <div id="overlay-wardrobe" class="overlay">
+    <div class="overlay-card panel-card wide">
+      <div class="panel-header">
+        <h2>🎒 ГАРДЕРОБ</h2>
+        <button class="btn-x panel-close" data-close="overlay-wardrobe">✕</button>
+      </div>
+      <div id="wardrobe-content"></div>
+    </div>
+  </div>
+
+  <!-- Кінець шторму -->
+  <div id="overlay-storm-end" class="overlay">
+    <div id="storm-confetti"></div>
+    <div class="overlay-card victory-card">
+      <h1>⛈️ ШТОРМ СКІНЧИВСЯ!</h1>
+      <p class="storm-sub">Ти протримався хоробро!</p>
+      <div id="storm-stats"></div>
+      <div class="btn-row">
+        <button id="btn-storm-retry" class="btn btn-primary big">⛈️ Ще раз!</button>
+        <button id="btn-storm-globe" class="btn big">🌍 На глобус</button>
+      </div>
     </div>
   </div>
 

@@ -11,12 +11,16 @@ import { HUD } from './hud.js';
 import { Shop } from './shop.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
-import { COUNTRIES, getBiome } from './countries.js';
+import { COUNTRIES, CAMPAIGN_ORDER, getBiome } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
+import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
+import { Megabox, Pet, Vehicles, Gadgets } from './extras.js';
+import { StormMode } from './storm.js';
+import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
@@ -39,6 +43,14 @@ const TIPS = [
   'Бронежилет 🦺 поглинає шкоду — поповнюй пластинами!',
   'Снайперка 🎯 пробиває трьох зомбі наскрізь — шикуй їх у чергу!',
   'Смаколики 🥐 на столиках повертають здоров’я!',
+  'Шукай 🦙 МЕГАБОКС — фіолетовий промінь видно здалеку!',
+  'Клавіша N — переможний танець. Спробуй після боса! 💃',
+  'Самокат 🛴 збиває зомбі на повній швидкості!',
+  'Постав барикаду (C) — зомбі застрягнуть, а ти стріляй! 🧱',
+  'Кишеньковий батут (F) закине тебе на будь-який дах! 🦘',
+  'Песик Дружок 🐶 збирає монети і чує сюрпризи в будинках',
+  'Виконуй щоденні завдання 📅 — монети й зірковий досвід!',
+  'Грай у ⛈️ ШТОРМ після звільнення країни — там рекорди!',
 ];
 
 class Game {
@@ -65,9 +77,9 @@ class Game {
     this.audio = new AudioMan();
     if (this.params.has('mute') || this.testMode) this.audio.setMuted(true);
     this.save = this._loadSave();
-    if (this.params.has('fresh')) {
-      this.save = { coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {} };
-    }
+    if (this.params.has('fresh')) this.save = this._newSave();
+    this.progress = new Progress(this);
+    this.quests = new DailyQuests(this);
 
     this.hud = new HUD(this);
     this.shop = new Shop(this);
@@ -135,6 +147,40 @@ class Game {
       this._hideOverlay('overlay-victory');
       this.endLevel();
     });
+    // панелі глобуса: пасс, завдання, гардероб, шторм
+    for (const el of document.querySelectorAll('.panel-close')) {
+      el.addEventListener('click', () => {
+        this._hideOverlay(el.dataset.close);
+        this.audio.click();
+      });
+    }
+    document.getElementById('btn-pass').addEventListener('click', () => {
+      this.renderPassPanel();
+      this._showOverlay('overlay-pass');
+      this.audio.click();
+    });
+    document.getElementById('btn-quests').addEventListener('click', () => {
+      this.renderQuestsPanel();
+      this._showOverlay('overlay-quests');
+      this.audio.click();
+    });
+    document.getElementById('btn-wardrobe').addEventListener('click', () => {
+      this.renderWardrobe();
+      this._showOverlay('overlay-wardrobe');
+      this.audio.click();
+    });
+    document.getElementById('btn-storm').addEventListener('click', () => this.startStorm());
+    document.getElementById('btn-storm-retry').addEventListener('click', () => {
+      this._hideOverlay('overlay-storm-end');
+      const c = this.level ? this.level.countryId : null;
+      this.endLevel();
+      this.startStorm(c);
+    });
+    document.getElementById('btn-storm-globe').addEventListener('click', () => {
+      this._hideOverlay('overlay-storm-end');
+      this.endLevel();
+    });
+
     // перемикач якості
     document.getElementById('btn-quality').addEventListener('click', () => {
       const i = QUALITY_MODES.indexOf(this.save.quality || 'auto');
@@ -159,12 +205,31 @@ class Game {
     this._boot();
   }
 
+  _newSave() {
+    return {
+      coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {},
+      xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
+      activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
+      gadgets: { tramp: 0, wall: 0 }, megaPity: 0, quests: null, stormBest: {},
+    };
+  }
+
   _loadSave() {
-    const defaults = { coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {} };
+    const defaults = this._newSave();
     let out = defaults;
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (s && typeof s === 'object') out = Object.assign(defaults, s);
+      if (s && typeof s === 'object') {
+        out = Object.assign(defaults, s);
+        // вкладені об'єкти і списки могли прийти зі старого сейва неповними
+        out.gadgets = Object.assign({ tramp: 0, wall: 0 }, out.gadgets || {});
+        if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
+        if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
+        if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
+        if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
+        if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
+        out.stormBest = out.stormBest || {};
+      }
     } catch (e) { /* зіпсований сейв — почнемо заново */ }
     // міграція: зброя за вже звільнені країни (старі сейви без weapons)
     for (const id of Object.keys(out.liberated || {})) {
@@ -216,8 +281,116 @@ class Game {
     if (show) {
       document.getElementById('liberated-count').textContent =
         Object.keys(this.save.liberated).length;
+      // бейджі: рівень пасса і незавершені завдання дня
+      const passBadge = document.getElementById('pass-badge');
+      passBadge.textContent = `⭐${this.progress.level}`;
+      passBadge.classList.add('show');
+      const qLeft = this.quests.list.filter((q) => !q.done).length;
+      const qBadge = document.getElementById('quest-badge');
+      qBadge.textContent = qLeft;
+      qBadge.classList.toggle('show', qLeft > 0);
+      // шторм доступний після першої звільненої країни
+      const anyLib = Object.keys(this.save.liberated).length > 0;
+      document.getElementById('btn-storm').classList.toggle('locked', !anyLib);
       if (this._newVersion) this._onNewVersion(this._newVersion);
     }
+  }
+
+  // ---------- панелі глобуса ----------
+  renderPassPanel() {
+    const lvl = this.progress.level;
+    const frac = this.progress.levelFrac();
+    const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
+    document.getElementById('pass-progress').innerHTML = lvl >= PASS_MAX_LEVEL
+      ? `⭐ Рівень ${lvl} — МАКСИМУМ! Ти зірка! 🏆`
+      : `⭐ Рівень ${lvl} · до наступного: ${Math.round(frac * need)}/${need} XP
+         <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
+    let html = '';
+    for (let n = 2; n <= PASS_MAX_LEVEL; n++) {
+      const r = PASS_REWARDS[n];
+      if (!r) continue;
+      const got = lvl >= n;
+      const cls = got ? 'got' : (n === lvl + 1 ? 'current' : 'locked');
+      html += `<div class="pass-row ${cls}">
+        <div class="pass-lvl">${n}</div>
+        <div class="pass-ico">${r.icon}</div>
+        <div class="pass-name">${r.name}</div>
+        <div class="pass-state">${got ? '✅' : '🔒'}</div>
+      </div>`;
+    }
+    document.getElementById('pass-track').innerHTML = html;
+  }
+
+  renderQuestsPanel() {
+    this.quests.ensureToday();
+    let html = '';
+    for (const q of this.quests.list) {
+      const pct = Math.round((q.progress / q.target) * 100);
+      html += `<div class="quest-row ${q.done ? 'done' : ''}">
+        <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
+        <div class="quest-reward">🪙 120 монет · ⭐ 40 XP</div>
+        <div class="quest-bar"><div style="width:${pct}%"></div></div>
+        <div class="quest-prog">${q.progress} / ${q.target}</div>
+      </div>`;
+    }
+    document.getElementById('quest-list').innerHTML = html;
+  }
+
+  renderWardrobe() {
+    const save = this.save;
+    const card = (id, meta, owned, equipped, kind) => `
+      <div class="ward-card ${equipped ? 'equipped' : ''} ${owned ? '' : 'locked'}" data-kind="${kind}" data-id="${id}">
+        <div class="ward-ico">${meta.icon}</div>
+        <div class="ward-name">${meta.name}</div>
+        <div class="ward-tag">${equipped ? '✅ Одягнено' : owned ? 'Натисни — обрати' : '🔒 ' + (meta.desc || '')}</div>
+      </div>`;
+    let html = '<div class="ward-section">Скіни героя</div><div class="ward-grid">';
+    for (const [id, meta] of Object.entries(HERO_SKINS)) {
+      html += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
+    }
+    html += '</div><div class="ward-section">Танці (N)</div><div class="ward-grid">';
+    for (const [id, meta] of Object.entries(DANCES)) {
+      html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
+    }
+    html += '</div><div class="ward-section">Сліди куль</div><div class="ward-grid">';
+    for (const [id, meta] of Object.entries(TRACERS)) {
+      html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
+    }
+    html += '</div>';
+    const root = document.getElementById('wardrobe-content');
+    root.innerHTML = html;
+    root.querySelectorAll('.ward-card:not(.locked)').forEach((el) => {
+      el.addEventListener('click', () => {
+        const { kind, id } = el.dataset;
+        if (kind === 'skin') save.activeSkin = id;
+        else if (kind === 'dance') save.activeDance = id;
+        else if (kind === 'tracer') {
+          save.activeTracer = id;
+          if (this.level) this.level.effects.tracerStyle = id === 'classic' ? null : id;
+        }
+        this.saveGame();
+        this.audio.purchase();
+        this.renderWardrobe();
+      });
+    });
+  }
+
+  // ---------- шторм ----------
+  startStorm(countryId = null) {
+    const lib = Object.keys(this.save.liberated);
+    if (!lib.length) {
+      this.audio.denied();
+      this.hud.toast('⛈️ Шторм відкриється після звільнення першої країни!');
+      return;
+    }
+    // найсвіжіша звільнена країна кампанії
+    if (!countryId) {
+      for (let i = CAMPAIGN_ORDER.length - 1; i >= 0; i--) {
+        if (this.save.liberated[CAMPAIGN_ORDER[i]]) { countryId = CAMPAIGN_ORDER[i]; break; }
+      }
+    }
+    this.audio.click();
+    this.startLevel(countryId || 'UKR', { storm: true });
   }
 
   // ---------- автооновлення ----------
@@ -258,11 +431,11 @@ class Game {
   _hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
 
   // ---------- рівень ----------
-  async startLevel(countryId) {
+  async startLevel(countryId, opts = {}) {
     if (this._startingLevel) return;
     this._startingLevel = true;
     try {
-      await this._buildLevel(countryId);
+      await this._buildLevel(countryId, opts);
     } catch (e) {
       // не блокуємо гру назавжди — повертаємось на глобус
       console.error('Помилка побудови рівня', e);
@@ -276,10 +449,13 @@ class Game {
     }
   }
 
-  async _buildLevel(countryId) {
+  async _buildLevel(countryId, opts = {}) {
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
+    const isStorm = !!opts.storm;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = `${country.flag} ${country.name.toUpperCase()}`;
+    document.getElementById('ll-title').textContent = isStorm
+      ? `⛈️ ШТОРМ: ${country.name.toUpperCase()}`
+      : `${country.flag} ${country.name.toUpperCase()}`;
     document.getElementById('ll-tip').textContent = '💡 ' + TIPS[Math.floor(Math.random() * TIPS.length)];
     this._showOverlay('overlay-level-loading');
     this._showGlobeUI(false);
@@ -302,6 +478,7 @@ class Game {
     level.addCoins = (n) => {
       this.save.coins += n;
       level.stats.coinsEarned += n;
+      this.quests.onEvent('coins', { n });
       this.saveGame();
     };
     level.player = new Player(level);
@@ -319,8 +496,20 @@ class Game {
     if (this.save.weapons.includes('bazooka')) level.player.addRockets(2);
 
     level.zombies = new Zombies(level, this.seed + 2);
-    level.zombies.populate();
-    level.missions = new Missions(level);
+    if (isStorm) {
+      // ⛈️ шторм: без місій, тільки хвилі і коло
+      level.storm = new StormMode(level);
+      level.missions = level.storm;
+    } else {
+      level.zombies.populate();
+      level.missions = new Missions(level);
+    }
+    // 🦙🐶🛴🦘 іграшки рівня
+    level.megabox = new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.vehicles = new Vehicles(level);
+    level.gadgets = new Gadgets(level);
+    level.pet = (this.save.upgrades.dog || 0) > 0 ? new Pet(level) : null;
+    level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
     for (const ls of level.world.lootSpots) {
@@ -366,6 +555,7 @@ class Game {
       magnet: { dur: 25, msg: '🧲 МАГНІТ МОНЕТ на 25 секунд!' },
     };
     level.effects.onPickup = (type, value) => {
+      if (type !== 'coin') this.quests.onEvent('pickup');
       if (type === 'coin') {
         level.addCoins(value);
         this.audio.coin();
@@ -426,7 +616,27 @@ class Game {
     this.hud.wire(level.bus);
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('bossDied', () => this._onBossDied());
-    level.bus.on('hordeEnd', () => level.addCoins(60));
+    level.bus.on('hordeEnd', () => {
+      level.addCoins(60);
+      this.progress.addXp(XP_VALUES.horde);
+      this.quests.onEvent('horde');
+    });
+    // ⭐ зірковий досвід і щоденні завдання
+    level.bus.on('zombieKilled', (z) => {
+      const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
+      this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
+      this.quests.onEvent('kill', { weapon: level.player.cur });
+      if (z.golden) this.quests.onEvent('golden');
+      if (z.type === 'boss' && !level.storm) this.quests.onEvent('boss');
+    });
+    level.bus.on('missionDone', () => this.progress.addXp(XP_VALUES.mission));
+    level.bus.on('hitmarker', (crit) => { if (crit) this.quests.onEvent('headshot'); });
+    level.bus.on('shieldBroken', () => this.quests.onEvent('shield'));
+    level.bus.on('megaboxOpened', () => {
+      this.progress.addXp(XP_VALUES.megabox);
+      this.quests.onEvent('megabox');
+    });
+    level.bus.on('dance', () => this.quests.onEvent('dance'));
     // комбо за серії вбивств
     level.bus.on('zombieKilled', () => {
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
@@ -459,6 +669,61 @@ class Game {
       this._showOverlay('overlay-start');
     }
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, country.banner, 4.5);
+  }
+
+  // 🐶 купили песика — з'являється просто в поточному рівні
+  spawnPet() {
+    if (this.level && !this.level.pet) this.level.pet = new Pet(this.level);
+  }
+
+  // 🦙 нагорода Мегабокса: pity гарантує круте після 2 невдач
+  openMegaboxReward(x, z) {
+    const save = this.save;
+    const level = this.level;
+    const unownedSkins = ['frog', 'super'].filter((id) => !save.skins.includes(id));
+    const unownedDances = ['jump', 'chicken'].filter((id) => !save.dances.includes(id));
+    const hasCosmetic = unownedSkins.length + unownedDances.length > 0;
+    let roll = Math.random();
+    if (this._megaForce !== undefined) { roll = this._megaForce; this._megaForce = undefined; }
+    let title, sub;
+    if (hasCosmetic && (save.megaPity >= 2 || roll < 0.45)) {
+      save.megaPity = 0;
+      const pickSkin = unownedSkins.length && (!unownedDances.length || roll < 0.25);
+      if (pickSkin) {
+        const id = unownedSkins[0];
+        save.skins.push(id);
+        title = `${HERO_SKINS[id].icon} НОВИЙ СКІН!`;
+        sub = `«${HERO_SKINS[id].name}» — одягни в Гардеробі 🎒`;
+      } else {
+        const id = unownedDances[0];
+        save.dances.push(id);
+        save.activeDance = id;
+        title = `${DANCES[id].icon} НОВИЙ ТАНЕЦЬ!`;
+        sub = `«${DANCES[id].name}» — натисни N і танцюй!`;
+      }
+    } else {
+      save.megaPity = (save.megaPity || 0) + 1;
+      if (roll < 0.62 || !level) {
+        // фонтан монет
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * Math.PI * 2;
+          level.effects.spawnCoin(x + Math.cos(a) * (1 + Math.random() * 2.2), z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
+        }
+        title = '💰 ФОНТАН МОНЕТ!';
+        sub = 'Збирай скоріше! (наступний бокс щасливіший 😉)';
+      } else if (roll < 0.83) {
+        save.gadgets.tramp += 2;
+        save.gadgets.wall += 2;
+        title = '🦘🧱 НАБІР ГАДЖЕТІВ!';
+        sub = '+2 батути і +2 барикади (F і C)';
+      } else {
+        for (const k of ['speed', 'rage', 'bubble', 'magnet']) level.player.buffs[k] = 20;
+        title = '🌈 УСІ ПІДСИЛЕННЯ!';
+        sub = 'Швидкість, лють, бульбашка і магніт — на 20 секунд!';
+      }
+    }
+    this.hud.banner(title, sub, 4.5);
+    this.saveGame();
   }
 
   // нагорода-зброя за країну: видається і запам'ятовується назавжди.
@@ -495,7 +760,7 @@ class Game {
     this.deathT = -1;
     this.input.exitLock();
     // прибираємо всі оверлеї рівня
-    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start']) {
+    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end']) {
       this._hideOverlay(id);
     }
     if (this.shop.isOpen) this.shop.close();
@@ -507,12 +772,47 @@ class Game {
 
   _onPlayerDied() {
     this.level.stats.deaths++;
+    if (this.level.storm) {
+      this._endStormRun();
+      return;
+    }
     this.deathT = 3.5;
     this.audio.defeat();
     this._showOverlay('overlay-death');
   }
 
+  _endStormRun() {
+    const level = this.level;
+    if (!level || level.storm.over) return;
+    const res = level.storm.results();
+    level.storm.over = true;
+    this.audio.defeat();
+    this.input.exitLock();
+    // рекорд по країні
+    const prev = this.save.stormBest[level.countryId];
+    const isRecord = !prev || res.wave > prev.wave || (res.wave === prev.wave && res.time > prev.time);
+    if (isRecord) this.save.stormBest[level.countryId] = { wave: res.wave, time: res.time };
+    this.progress.addXp(20 + res.wave * 5);
+    this.saveGame();
+    const rec = isRecord && prev ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+    const best = this.save.stormBest[level.countryId];
+    document.getElementById('storm-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">Хвиль відбито${rec}</span><span class="stat-val">${res.wave - 1}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Протримався</span><span class="stat-val">${Math.floor(res.time / 60)}:${String(res.time % 60).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${res.kills}</span></div>
+      <div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд (${this.level.country.name})</span><span class="stat-val">хвиля ${best.wave}</span></div>`;
+    this._showOverlay('overlay-storm-end');
+  }
+
   _onBossDied() {
+    if (this.level && this.level.storm) {
+      // ⛈️ міні-бос шторму: бонус і граємо далі
+      this.level.addCoins(120);
+      this.progress.addXp(60);
+      this.hud.banner('👑 МІНІ-БОСА ПЕРЕМОЖЕНО!', '+120 монет · шторм триває!');
+      this.audio.mission();
+      return;
+    }
     this.audio.victory();
     this.audio.setMode(null);
     this.level.bossDefeated = true;
@@ -554,6 +854,7 @@ class Game {
         combo: this.level.combo.best,
       };
     }
+    this.progress.addXp(XP_VALUES.country);
     this.saveGame();
     this.globe.setLiberated();
     this.input.exitLock();
@@ -632,6 +933,13 @@ class Game {
         this.level.player.update(dt, this.input, allowControl);
         this.level.zombies.update(dt);
         this.level.missions.update(dt, this.input, allowControl);
+        // іграшки: самокати, мегабокс, гаджети, песик
+        this.level.vehicles.update(dt, this.input, allowControl);
+        if (this.level.megabox && !this.level.megabox.done) {
+          this.level.megabox.update(dt, this.input, allowControl);
+        }
+        this.level.gadgets.update(dt, this.input, allowControl);
+        if (this.level.pet) this.level.pet.update(dt);
         this.level.world.update(dt, this.level.player.pos);
         this.level.effects.update(dt);
         this.level.stats.time += dt;
@@ -717,6 +1025,30 @@ class Game {
         hordeActive: g.level ? g.level.zombies.hordeActive : false,
         stats: g.level ? g.level.stats : null,
         victoryShown: g.victoryShown,
+        // оновлення 4
+        xp: g.save.xp,
+        passLevel: g.progress.level,
+        skins: [...g.save.skins],
+        dances: [...g.save.dances],
+        activeSkin: g.save.activeSkin,
+        activeDance: g.save.activeDance,
+        gadgets: { ...g.save.gadgets },
+        megaPity: g.save.megaPity,
+        quests: g.quests.list.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
+        megabox: g.level && g.level.megabox ? { x: g.level.megabox.x, z: g.level.megabox.z, opened: g.level.megabox.opened } : null,
+        pet: g.level ? !!g.level.pet : false,
+        riding: g.level ? !!g.level.player.riding : false,
+        emoting: g.level ? g.level.player.emoting : null,
+        scooters: g.level ? g.level.vehicles.list.map((r) => ({ x: r.x, z: r.z })) : [],
+        walls: g.level ? g.level.gadgets.walls.map((w) => ({ x: w.x, z: w.z, hp: w.hp })) : [],
+        tramps: g.level ? g.level.gadgets.tramps.length : 0,
+        jumpPads: g.level ? g.level.world.jumpPads.length : 0,
+        storm: g.level && g.level.storm ? {
+          wave: g.level.storm.wave, r: g.level.storm.r,
+          outside: g.level.storm.isOutside(), over: g.level.storm.over,
+          phase: g.level.storm.phase,
+        } : null,
+        stormBest: { ...g.save.stormBest },
       }),
       teleport: (x, z) => {
         const p = g.level.player;
@@ -778,6 +1110,46 @@ class Game {
       damageBoss: (amt) => {
         if (g.level.zombies.boss) g.level.zombies.boss.damage(amt, null, false);
       },
+      // оновлення 4
+      addXp: (n) => g.progress.addXp(n),
+      megaForce: (roll) => { g._megaForce = roll; },
+      openMegabox: () => g.level.megabox && g.level.megabox.open(),
+      placeTramp: () => g.level.gadgets.placeTramp(),
+      placeWall: () => g.level.gadgets.placeWall(),
+      giveGadgets: (t, w) => {
+        g.save.gadgets.tramp += t;
+        g.save.gadgets.wall += w;
+        g.saveGame();
+      },
+      dance: () => g.level.player.emote(),
+      stopDance: () => g.level.player.stopEmote(),
+      mountScooter: (i = 0) => {
+        const r = g.level.vehicles.list[i];
+        g.test.teleport(r.x + 1, r.z);
+        g.level.vehicles.mount(r);
+      },
+      dismountScooter: () => g.level.vehicles.dismount(),
+      startStorm: (c) => g.startStorm(c),
+      questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),
+      regenQuests: (dateKey) => {
+        g.save.quests = null;
+        g.quests.ensureToday(dateKey);
+      },
+      setSkin: (id) => {
+        if (!g.save.skins.includes(id)) g.save.skins.push(id);
+        g.save.activeSkin = id;
+        g.saveGame();
+      },
+      setDance: (id) => {
+        if (!g.save.dances.includes(id)) g.save.dances.push(id);
+        g.save.activeDance = id;
+        g.saveGame();
+      },
+      givePet: () => {
+        g.save.upgrades.dog = 1;
+        g.spawnPet();
+      },
+      petPos: () => g.level.pet ? { x: g.level.pet.x, z: g.level.pet.z } : null,
     };
   }
 }

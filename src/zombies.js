@@ -76,6 +76,7 @@ export class Zombies {
       summonedAt: { 75: false, 50: false, 25: false },
       frost: bossStyle === 'frost',
       bossStyle: type === 'boss' ? bossStyle : null,
+      noLeash: !!opts.noLeash, // міні-боси шторму гуляють вільно
       // дальній бій (сніговики, плювака, Король Мороз, Шеф Багет)
       ranged: stats.ranged
         || (type === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
@@ -527,7 +528,7 @@ export class Zombies {
           } else {
             z.rangedCd = 0.9;
           }
-        } else if (!z.horde && z.type !== 'boss') {
+        } else if (!z.horde && z.type !== 'boss' && !z._stormWave) {
           // охоронці прив'язані до своєї точки, решта — до відстані від гравця
           const giveUp = z.guard
             ? Math.hypot(z.x - z.anchor.x, z.z - z.anchor.z) > 45
@@ -582,6 +583,7 @@ export class Zombies {
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5, { horde: false });
               mz.aggroed = true;
               mz.state = 'chase';
+              if (z._stormWave) mz._stormWave = true;
             }
           }
         }
@@ -618,7 +620,7 @@ export class Zombies {
         if (enraged) z.enraged = true;
         // ліш: бос не покидає околиці арени — повертається і лікується
         const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);
-        if (!z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;
+        if (!z.noLeash && !z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;
         else if (z.leashed && dArena < 8) z.leashed = false;
         if (z.leashed) {
           z.telegraph = 0;

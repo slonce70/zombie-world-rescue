@@ -377,6 +377,9 @@ export class Effects {
       if (!t.mesh.visible) { slot = t; break; }
     }
     if (!slot) slot = this.tracerPool[0];
+    // стиль сліду куль (нагороди Зоряного шляху)
+    if (this.tracerStyle === 'gold') slot.mesh.material.color.setHex(0xffd23f);
+    else if (this.tracerStyle === 'rainbow') slot.mesh.material.color.setHSL((performance.now() / 600) % 1, 0.9, 0.62);
     slot.life = 0.07;
     slot.mesh.visible = true;
     slot.mesh.scale.set(1, len, 1);
@@ -400,6 +403,15 @@ export class Effects {
     m.position.y += 0.15;
     this.scene.add(m);
     this.rings.push({ mesh: m, t: 0, maxR });
+  }
+
+  // пес або інший помічник збирає предмет негайно
+  collectCoinNow(c) {
+    const i = this.coins.indexOf(c);
+    if (i < 0) return;
+    if (this.onPickup) this.onPickup(c.type, c.value);
+    this.scene.remove(c.mesh);
+    this.coins.splice(i, 1);
   }
 
   spawnCoin(x, z, value = 5, life = 45, yOverride = null) {

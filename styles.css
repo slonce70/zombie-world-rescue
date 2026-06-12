@@ -372,26 +372,50 @@ body.in-level #hud { display: block; }
   position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%;
   background: rgba(255,255,255,0.55); box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }
+/* бойовий кластер: сітка 3×2 + велика кнопка вогню внизу праворуч */
 #touch-right {
-  position: fixed; right: 14px; bottom: 104px; display: flex; flex-direction: column;
-  gap: 10px; align-items: center; pointer-events: auto;
+  position: fixed; right: 10px; bottom: 78px; display: grid;
+  grid-template-columns: repeat(3, 50px); gap: 6px;
+  justify-items: center; align-items: center; pointer-events: auto;
 }
-/* на тач-пристроях блок зброї зсувається лівіше від кнопок (поза media query) */
-body.touch-mode #ammo { right: 116px; bottom: 14px; }
+#tb-fire { grid-column: 2 / 4; justify-self: end; }
+/* службові кнопки — рядок угорі, лівіше мінімапи */
+#touch-util {
+  position: fixed; top: 8px; right: 108px; display: flex; gap: 6px; pointer-events: auto;
+}
+/* компактний HUD у тач-режимі: нічого не накладається */
+body.touch-mode #ammo { right: 178px; bottom: 10px; }
 body.touch-mode #health { bottom: 14px; left: 12px; }
-#touch-top {
-  position: fixed; right: 14px; top: 235px; display: flex; flex-direction: column;
-  gap: 8px; pointer-events: auto;
-}
+body.touch-mode #topright { top: 8px; right: 8px; gap: 4px; }
+body.touch-mode #minimap { width: 88px; height: 88px; }
+body.touch-mode #coins { position: fixed; top: 8px; right: 300px; padding: 6px 12px; font-size: 17px; }
+body.touch-mode #bossbar { top: 56px; width: min(400px, 46vw); }
+body.touch-mode #horde-counter { top: 104px; }
+body.touch-mode #xp-chip { display: none; }
+body.touch-mode #waypoint { font-size: 13px; }
 .tb {
-  width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
-  background: rgba(18, 30, 46, 0.55); font-size: 24px; cursor: pointer;
+  width: 50px; height: 50px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(18, 30, 46, 0.55); font-size: 21px; cursor: pointer;
   -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none;
-  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  box-shadow: 0 4px 12px rgba(0,0,0,.35); position: relative;
 }
-.tb.tb-big { width: 84px; height: 84px; font-size: 36px; background: rgba(200, 60, 50, 0.5); border-color: rgba(255,150,130,0.6); }
-.tb.tb-small { width: 46px; height: 46px; font-size: 18px; }
+.tb.tb-big { width: 76px; height: 76px; font-size: 33px; background: rgba(200, 60, 50, 0.5); border-color: rgba(255,150,130,0.6); }
+.tb.tb-small { width: 40px; height: 40px; font-size: 17px; }
 .tb.active { filter: brightness(1.6); transform: scale(0.93); }
+.tb-badge {
+  position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px;
+  background: var(--accent); color: #5a3c00; border-radius: 9px;
+  font-size: 11px; font-weight: 900; line-height: 18px; padding: 0 3px;
+}
+/* дуже низькі екрани — все трохи менше */
+@media (max-height: 400px) {
+  .tb { width: 44px; height: 44px; font-size: 18px; }
+  .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
+  #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: 70px; }
+  body.touch-mode #minimap { width: 74px; height: 74px; }
+  body.touch-mode #touch-util { right: 92px; }
+  body.touch-mode #coins { right: 280px; }
+}
 
 /* компактний HUD на малих екранах */
 @media (max-width: 900px), (max-height: 560px) {
@@ -446,3 +470,115 @@ body.touch-mode #health { bottom: 14px; left: 12px; }
 .shop-price { color: var(--accent); font-weight: 900; font-size: 18px; margin-top: 6px; }
 .shop-hint { margin-top: 18px; color: #9fb8d4; font-size: 13px; }
 .shop-hint b { color: var(--accent); }
+
+/* ================= ОНОВЛЕННЯ 4: ШТОРМ І ЗОРЯНИЙ ШЛЯХ ================= */
+
+/* живе меню глобуса */
+#globe-ui h1 { animation: float-title 4.5s ease-in-out infinite; }
+@keyframes float-title { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.globe-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.globe-act {
+  position: relative; font-size: 15px; font-weight: 900; padding: 11px 18px;
+  background: rgba(28, 44, 66, 0.85); border: 2px solid var(--ui-border);
+}
+.globe-act:hover { border-color: var(--accent); transform: translateY(-2px); }
+.globe-act.storm-btn { background: rgba(74, 38, 110, 0.85); border-color: rgba(176, 134, 242, 0.5); }
+.globe-act.storm-btn:hover { border-color: #b086f2; }
+.globe-act.locked { opacity: 0.55; }
+.act-badge {
+  display: none; min-width: 20px; height: 20px; border-radius: 10px; margin-left: 4px;
+  background: #ff5d5d; color: #fff; font-size: 12px; line-height: 20px; padding: 0 5px;
+}
+.act-badge.show { display: inline-block; animation: buff-pop .3s ease; }
+
+/* bump-анімація (монети, місії) */
+.bump { animation: card-bump .4s ease; }
+@keyframes card-bump { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+/* стрілка-вказівник до цілі */
+#waypoint {
+  position: fixed; left: 0; top: 0; display: none; z-index: 11;
+  pointer-events: none; font-weight: 900; text-align: center; will-change: transform;
+}
+#waypoint.show { display: block; }
+#wp-arrow {
+  display: none; font-size: 26px; color: var(--accent);
+  text-shadow: 0 0 8px rgba(0,0,0,.8); line-height: 1;
+}
+#waypoint.edge #wp-arrow { display: block; }
+#wp-label {
+  display: inline-block; background: rgba(15, 25, 40, 0.75); border: 2px solid rgba(255, 210, 63, 0.55);
+  border-radius: 12px; color: #fff; font-size: 14px; padding: 4px 10px; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,.7);
+}
+#waypoint.on #wp-label { animation: wp-bob 1.4s ease-in-out infinite; }
+@keyframes wp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* зірковий рівень (XP) */
+#xp-chip {
+  background: var(--ui-bg); border: 2px solid var(--ui-border); border-radius: 12px;
+  padding: 5px 12px; display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+}
+#xp-lvl { color: #ffd23f; font-weight: 900; font-size: 15px; white-space: nowrap; }
+#xp-bar { width: 70px; height: 8px; background: rgba(0,0,0,.5); border-radius: 5px; overflow: hidden; }
+#xp-fill { height: 100%; width: 0; background: linear-gradient(90deg, #ffd23f, #ff9d3f); border-radius: 5px; transition: width .3s; }
+
+/* чипи гаджетів біля гранат */
+#gadget-chips { color: #cfe8ff; font-weight: 800; font-size: 14px; margin-top: 3px; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+#gadget-chips .none { opacity: 0.45; }
+
+/* панелі глобуса (пасс/завдання/гардероб) */
+.panel-card { width: min(640px, 94vw); max-width: min(640px, 94vw); text-align: left; }
+.panel-card.wide { width: min(820px, 96vw); max-width: min(820px, 96vw); }
+.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.panel-sub { color: #9fb8d4; font-size: 14px; font-weight: 600; margin-top: 4px; }
+#pass-progress { margin: 14px 0 10px; color: #fff; font-weight: 800; font-size: 16px; }
+#pass-progress .xpbar { height: 14px; background: rgba(0,0,0,.5); border-radius: 8px; overflow: hidden; margin-top: 6px; }
+#pass-progress .xpbar div { height: 100%; background: linear-gradient(90deg, #ffd23f, #ff9d3f); border-radius: 8px; }
+#pass-track { max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 6px; }
+.pass-row {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+  background: rgba(255,255,255,0.06); border: 2px solid var(--ui-border); border-radius: 12px;
+}
+.pass-row.got { opacity: 0.55; }
+.pass-row.current { border-color: var(--accent); background: rgba(255, 210, 63, 0.1); }
+.pass-row.locked { opacity: 0.8; }
+.pass-lvl { min-width: 46px; text-align: center; color: var(--accent); font-weight: 900; font-size: 17px; }
+.pass-ico { font-size: 26px; }
+.pass-name { flex: 1; color: #fff; font-weight: 800; font-size: 15px; }
+.pass-state { font-size: 18px; }
+
+/* завдання дня */
+#quest-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.quest-row {
+  padding: 12px 14px; background: rgba(255,255,255,0.06);
+  border: 2px solid var(--ui-border); border-radius: 14px;
+}
+.quest-row.done { border-color: #58c14c; background: rgba(88, 193, 76, 0.12); }
+.quest-title { color: #fff; font-weight: 800; font-size: 16px; }
+.quest-reward { color: var(--accent); font-weight: 800; font-size: 13px; margin-top: 3px; }
+.quest-bar { height: 10px; background: rgba(0,0,0,.5); border-radius: 6px; overflow: hidden; margin-top: 8px; }
+.quest-bar div { height: 100%; background: linear-gradient(90deg, #6fd86f, #3cba4d); border-radius: 6px; }
+.quest-prog { color: #9fb8d4; font-weight: 700; font-size: 13px; margin-top: 4px; }
+
+/* гардероб */
+.ward-section { color: var(--accent); font-weight: 900; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; margin: 14px 0 8px; border-bottom: 1px solid var(--ui-border); padding-bottom: 4px; }
+.ward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.ward-card {
+  background: rgba(255,255,255,0.07); border: 2px solid var(--ui-border); border-radius: 14px;
+  padding: 12px 8px; text-align: center; cursor: pointer; transition: all .14s;
+}
+.ward-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.ward-card.equipped { border-color: #58c14c; background: rgba(88, 193, 76, 0.14); }
+.ward-card.locked { opacity: 0.45; cursor: default; }
+.ward-card.locked:hover { transform: none; border-color: var(--ui-border); }
+.ward-ico { font-size: 34px; }
+.ward-name { color: #fff; font-weight: 800; font-size: 14px; margin-top: 5px; }
+.ward-tag { font-size: 12px; font-weight: 700; color: #9fb8d4; margin-top: 3px; }
+.ward-card.equipped .ward-tag { color: #58c14c; }
+#wardrobe-content { max-height: 62vh; overflow-y: auto; padding-right: 6px; }
+
+/* шторм */
+.storm-sub { color: #d8c2f2; font-weight: 700; }
+#storm-stats { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }

@@ -6,6 +6,10 @@ export const SHOP_ITEMS = [
   { id: 'grenade', icon: '💣', name: 'Граната', desc: '+1 граната (G — кинути)', price: 35, max: Infinity, cat: 'Припаси' },
   { id: 'rocket', icon: '🧨', name: 'Ракета', desc: '+1 ракета для базуки', price: 60, max: Infinity, cat: 'Припаси', needsBazooka: true },
   { id: 'armorplate', icon: '🛡️', name: 'Бронепластина', desc: '+40 броні зараз', price: 80, max: Infinity, cat: 'Припаси' },
+  // --- гаджети ---
+  { id: 'tramp', icon: '🦘', name: 'Кишеньковий батут', desc: 'Постав де хочеш (клавіша F)', price: 90, max: Infinity, cat: 'Гаджети й друзі' },
+  { id: 'wall', icon: '🧱', name: 'Барикада', desc: 'Стіна на 100 міцності (клавіша C)', price: 70, max: Infinity, cat: 'Гаджети й друзі' },
+  { id: 'dog', icon: '🐶', name: 'Песик Дружок', desc: 'Збирає монети і гавкає на сюрпризи!', price: 350, max: 1, cat: 'Гаджети й друзі' },
   // --- зброя ---
   { id: 'smg', icon: '🌀', name: 'Швидкостріл', desc: 'Дуже швидка черга (клавіша 4)', price: 250, max: 1, cat: 'Зброя', weapon: true },
   { id: 'magnum', icon: '🤠', name: 'Магнум', desc: 'Могутній револьвер (клавіша 5)', price: 350, max: 1, cat: 'Зброя', weapon: true },
@@ -53,6 +57,7 @@ export class Shop {
 
   getCount(item) {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
+    if (item.id === 'tramp' || item.id === 'wall') return this.game.save.gadgets[item.id] || 0;
     return this.game.save.upgrades[item.id] || 0;
   }
 
@@ -147,6 +152,18 @@ export class Shop {
         player.applyGear(save.upgrades);
         player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08;
         game.hud.toast('👟 Кросівки-ракети! Стрибай вище — Space');
+        break;
+      case 'tramp':
+        save.gadgets.tramp = (save.gadgets.tramp || 0) + 1;
+        game.hud.toast('🦘 Батут у кишені! Клавіша F — поставити');
+        break;
+      case 'wall':
+        save.gadgets.wall = (save.gadgets.wall || 0) + 1;
+        game.hud.toast('🧱 Барикада в рюкзаку! Клавіша C — поставити');
+        break;
+      case 'dog':
+        game.spawnPet();
+        game.hud.toast('🐶 Дружок тепер з тобою! Він збирає монети сам');
         break;
     }
     game.audio.purchase();

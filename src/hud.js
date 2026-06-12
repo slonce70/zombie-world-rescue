@@ -1,5 +1,6 @@
-// HUD: приціл, здоров'я, патрони, монети, місії, мінікарта, банери
+// HUD: приціл, здоров'я, патрони, монети, місії, мінікарта, банери, стрілка до цілі
 
+import * as THREE from 'three';
 import { WEAPONS } from './player.js';
 import { clamp } from './utils.js';
 
@@ -39,8 +40,18 @@ export class HUD {
       grenades: $('grenades'),
       grenadesValue: $('grenades-value'),
       combo: $('combo'),
+      waypoint: $('waypoint'),
+      wpArrow: $('wp-arrow'),
+      wpLabel: $('wp-label'),
+      xpChip: $('xp-chip'),
+      xpLvl: $('xp-lvl'),
+      xpFill: $('xp-fill'),
+      gadgetChips: $('gadget-chips'),
+      missionPanel: $('mission-panel'),
     };
     this._lastCombo = 0;
+    this._lastCoins = -1;
+    this._v3 = new THREE.Vector3();
     this.ctx = this.el.minimap.getContext('2d');
     this.bannerT = 0;
     this.hitT = 0;
@@ -49,11 +60,20 @@ export class HUD {
     this.minimapT = 0;
   }
 
+  _bump(el) {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+
   wire(bus) {
     bus.on('hitmarker', (crit) => this.hitmarker(crit));
     bus.on('playerHurt', () => this.damageFlash());
     bus.on('toast', (text) => this.toast(text));
-    bus.on('missionDone', (m) => this.banner('✅ МІСІЮ ВИКОНАНО!', `${m.title} · +${m.reward} монет 💰`));
+    bus.on('missionDone', (m) => {
+      this.banner('✅ МІСІЮ ВИКОНАНО!', `${m.title} · +${m.reward} монет 💰`);
+      this._bump(this.el.missionPanel);
+    });
     bus.on('hordeWarning', () => this.banner('⚠️ УВАГА!', 'Наближається орда зомбі!'));
     bus.on('hordeStart', () => this.banner('🧟 ОРДА!', 'Відбий напад!'));
     bus.on('hordeEnd', () => this.banner('🎉 Орду відбито!', '+60 монет 💰'));
@@ -176,8 +196,36 @@ export class HUD {
     }
     this._lastCombo = combo;
 
-    // монети
-    this.el.coins.textContent = this.game.save.coins;
+    // монети (з підстрибуванням, коли зросли)
+    const coinsNow = this.game.save.coins;
+    if (coinsNow !== this._lastCoins) {
+      this.el.coins.textContent = coinsNow;
+      if (this._lastCoins >= 0 && coinsNow > this._lastCoins) this._bump(this.el.coins.parentElement || this.el.coins);
+      this._lastCoins = coinsNow;
+    }
+
+    // зірковий рівень (XP)
+    const prog = this.game.progress;
+    if (prog) {
+      const lvlTxt = `⭐ ${prog.level}`;
+      if (this.el.xpLvl.textContent !== lvlTxt) this.el.xpLvl.textContent = lvlTxt;
+      this.el.xpFill.style.width = (prog.levelFrac() * 100) + '%';
+    }
+
+    // чипи гаджетів (🦘 батут F, 🧱 барикада C)
+    const gd = this.game.save.gadgets || {};
+    const gHtml = (gd.tramp || gd.wall)
+      ? `<span class="${gd.tramp ? '' : 'none'}">🦘 ${gd.tramp || 0} (F)</span> · <span class="${gd.wall ? '' : 'none'}">🧱 ${gd.wall || 0} (C)</span>`
+      : '';
+    if (this._lastGadgetHtml !== gHtml) {
+      this.el.gadgetChips.innerHTML = gHtml;
+      this._lastGadgetHtml = gHtml;
+      const badge = document.getElementById('tb-gadget-n');
+      if (badge) badge.textContent = (gd.tramp || 0) + (gd.wall || 0);
+    }
+
+    // стрілка-вказівник до поточної цілі
+    this._updateWaypoint(level, p);
 
     // приціл: розліт
     const spread = 6 + p.gunKick * 14 + p.bobAmp * 6;
@@ -250,6 +298,69 @@ export class HUD {
     if (this.minimapT <= 0) {
       this.minimapT = 1 / 15;
       this._drawMinimap();
+    }
+  }
+
+  // ---------- стрілка-вказівник до цілі ----------
+  _waypointTarget(level) {
+    // шторм: якщо гравець поза колом — веди в безпечну зону
+    if (level.storm && level.storm.isOutside()) {
+      const s = level.storm;
+      return { x: s.cx, z: s.cz, icon: '🟢', label: 'БІЖИ В КОЛО!' };
+    }
+    const ms = level.missions;
+    const boss = level.zombies.boss;
+    if (boss && boss.state !== 'dead') return { x: boss.x, z: boss.z, y: boss.y + boss.rig.height + 1, icon: '👑' };
+    const mk = ms.getMarkers ? ms.getMarkers() : [];
+    if (mk.length) return { x: mk[0].x, z: mk[0].z, icon: mk[0].icon };
+    return null;
+  }
+
+  _updateWaypoint(level, p) {
+    const wp = this.el.waypoint;
+    const t = this._waypointTarget(level);
+    if (!t || this.game.victoryShown || p.health <= 0) {
+      wp.classList.remove('show');
+      return;
+    }
+    const cam = p.camera;
+    const ty = t.y !== undefined ? t.y : level.world.groundH(t.x, t.z) + 2.4;
+    const v = this._v3.set(t.x, ty, t.z).project(cam);
+    const behind = v.z > 1;
+    let sx = (v.x * 0.5 + 0.5) * innerWidth;
+    let sy = (-v.y * 0.5 + 0.5) * innerHeight;
+    const dist = Math.hypot(t.x - p.pos.x, t.z - p.pos.z);
+    const label = t.label || `${t.icon} ${Math.round(dist)}м`;
+    if (this._lastWpLabel !== label) {
+      this.el.wpLabel.textContent = label;
+      this._lastWpLabel = label;
+    }
+    wp.classList.add('show');
+    // близько до цілі — ховаємо, щоб не миготіло перед носом
+    if (dist < 7 && !t.label) {
+      wp.classList.remove('show');
+      return;
+    }
+    const onScreen = !behind && Math.abs(v.x) < 0.88 && Math.abs(v.y) < 0.82;
+    if (onScreen) {
+      wp.classList.add('on');
+      wp.classList.remove('edge');
+      wp.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%)`;
+    } else {
+      // ціль поза екраном: стрілка на краю, повернута в її бік
+      wp.classList.add('edge');
+      wp.classList.remove('on');
+      if (behind) { sx = innerWidth - sx; sy = innerHeight - sy; }
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      let dx = sx - cx, dy = sy - cy;
+      if (behind) { dx = -dx || 0.01; dy = Math.abs(dy) + 40; } // позаду — стрілка вниз/убік
+      // розтягуємо напрямок до краю екрана і клампимо з відступами
+      const len = Math.hypot(dx, dy) || 1;
+      const px2 = clamp(cx + (dx / len) * innerWidth, 80, innerWidth - 80);
+      const py2 = clamp(cy + (dy / len) * innerHeight, 70, innerHeight - 120);
+      const ang = Math.atan2(py2 - cy, px2 - cx);
+      wp.style.transform = `translate(${Math.round(px2)}px, ${Math.round(py2)}px) translate(-50%, -50%)`;
+      this.el.wpArrow.style.transform = `rotate(${ang}rad)`;
     }
   }
 
@@ -399,6 +510,22 @@ export class HUD {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffdd66';
     ctx.fillText('N', nx, ny + 4);
+
+    // ⛈️ коло шторму
+    if (level.storm) {
+      const s = level.storm;
+      const [sx, sy] = toMap(s.cx, s.cz);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(C, C, R, 0, 6.29);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r * k, 0, 6.29);
+      ctx.strokeStyle = 'rgba(176, 134, 242, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // рамка
     ctx.beginPath();

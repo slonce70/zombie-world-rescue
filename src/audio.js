@@ -214,6 +214,67 @@ export class AudioMan {
     });
   }
 
+  // 🎖️ новий зірковий рівень — урочистий фанфар
+  levelUp() {
+    const t = this.t;
+    [60, 64, 67, 72, 76, 79, 84].forEach((m, i) => {
+      this._osc('triangle', midi(m), t + i * 0.07, 0.22, 0.18);
+      this._osc('square', midi(m + 12), t + i * 0.07, 0.14, 0.07);
+    });
+    this._osc('triangle', midi(88), t + 0.55, 0.5, 0.16);
+  }
+
+  // 📅 завдання дня виконано
+  questDone() {
+    const t = this.t;
+    [72, 76, 79, 76, 84].forEach((m, i) => this._osc('square', midi(m), t + i * 0.07, 0.12, 0.14));
+  }
+
+  // 💃 фанковий джингл для танцю
+  dance() {
+    const t = this.t;
+    const line = [60, 0, 63, 65, 0, 60, 67, 65];
+    line.forEach((m, i) => {
+      if (m) this._osc('square', midi(m), t + i * 0.11, 0.1, 0.13);
+      this._noise(t + i * 0.11, 0.03, 0.07, 'highpass', 6000, 1);
+    });
+    [48, 0, 51, 53].forEach((m, i) => {
+      if (m) this._osc('triangle', midi(m), t + i * 0.22, 0.2, 0.16);
+    });
+  }
+
+  // 🐶 гавкіт песика
+  bark() {
+    const t = this.t;
+    this._osc('sawtooth', 480, t, 0.07, 0.16, 220);
+    this._osc('sawtooth', 520, t + 0.12, 0.06, 0.14, 240);
+  }
+
+  // 🦙 мегабокс: барабанний дріб + тада!
+  megabox() {
+    const t = this.t;
+    for (let i = 0; i < 10; i++) this._noise(t + i * 0.06, 0.04, 0.08, 'bandpass', 1800, 2);
+    [72, 76, 79, 84].forEach((m, i) => {
+      this._osc('triangle', midi(m), t + 0.65 + i * 0.08, 0.3, 0.2);
+      this._osc('square', midi(m + 12), t + 0.65 + i * 0.08, 0.18, 0.08);
+    });
+  }
+
+  // ⛈️ сирена шторму — коло звужується
+  stormSiren() {
+    const t = this.t;
+    for (let i = 0; i < 2; i++) {
+      this._osc('sawtooth', 380, t + i * 0.5, 0.4, 0.1, 560);
+    }
+  }
+
+  // 🛴 дзвоник самоката
+  bell() {
+    const t = this.t;
+    this._osc('triangle', 1320, t, 0.18, 0.18);
+    this._osc('triangle', 1760, t + 0.02, 0.14, 0.1);
+  }
+
   zgroan(vol = 1, pitch = 1) {
     if (!this.ctx || this._groanCd > this.t) return;
     this._groanCd = this.t + 0.25;
