@@ -723,3 +723,51 @@ body.touch-mode .touch-controls-hint { display: block; }
   .team-row { min-width: 96px; padding: 3px 7px; }
   .team-nick { font-size: 10px; }
 }
+
+/* кооп: перемикач режиму в лобі */
+#lobby-modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 6px; }
+.lobby-mode {
+  padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 14px;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+}
+.lobby-mode.pick { cursor: pointer; }
+.lobby-mode.pick:hover { border-color: rgba(255, 210, 63, 0.6); }
+.lobby-mode.sel { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
+.lobby-mode.locked { opacity: 0.45; }
+
+/* 🏆 Ліга */
+.globe-act.league-btn { background: rgba(110, 84, 20, 0.85); border-color: rgba(255, 210, 63, 0.5); }
+.globe-act.league-btn:hover { border-color: var(--accent); }
+.league-tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 8px; }
+.league-tab {
+  font-family: var(--font); cursor: pointer; font-weight: 800; font-size: 14px;
+  padding: 8px 16px; border-radius: 12px; color: #fff;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+}
+.league-tab.on { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
+.league-countries { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
+.league-cty {
+  font-size: 20px; cursor: pointer; padding: 4px 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+}
+.league-cty.on { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
+.league-list { max-height: 46vh; overflow-y: auto; text-align: left; }
+.league-loading { color: #8aa0b5; font-weight: 700; padding: 18px; text-align: center; }
+.league-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 10px;
+  font-weight: 800; font-size: 15px; margin-bottom: 3px;
+  background: rgba(255,255,255,0.04);
+}
+.league-row.me { border: 2px solid var(--accent); background: rgba(255, 210, 63, 0.1); }
+.league-row.gap { margin-top: 10px; }
+.lr-rank { min-width: 34px; color: var(--accent); }
+.lr-nick { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.league-team { color: #8aa0b5; font-size: 12px; font-weight: 700; }
+.lr-score { color: #9fe8ff; }
+/* місце у світі на фінальних екранах */
+.league-place { margin: 8px 0 2px; font-weight: 900; font-size: 18px; color: var(--accent); }
+
+.globe-act.arena-btn { background: rgba(110, 26, 70, 0.85); border-color: rgba(255, 68, 170, 0.5); }
+.globe-act.arena-btn:hover { border-color: #ff44aa; }
+
+.shop-surge { font-size: 12px; }

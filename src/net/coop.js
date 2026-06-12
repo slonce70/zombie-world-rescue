@@ -30,6 +30,7 @@ export class CoopSession {
     this.state = 'idle';       // idle | lobby | level
     this.net = null;           // HostNet | GuestNet поточного рівня
     this.countryId = 'UKR';
+    this.mode = 'campaign';    // campaign | storm
     this.onRoster = null;      // () => {} — оновити лобі
     this.onCfg = null;         // (countryId)
     this.onEnd = null;         // (reason) — кімната померла
@@ -116,7 +117,12 @@ export class CoopSession {
   // ---------- лобі (хост) ----------
   setCountry(countryId) {
     this.countryId = countryId;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId });
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode });
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode });
   }
 
   // хост тисне СТАРТ
@@ -125,11 +131,14 @@ export class CoopSession {
     const game = this.game;
     const countryId = this.countryId;
     const runIndex = (game.save.missionRuns && game.save.missionRuns[countryId]) || 0;
-    const spec = { countryId, seed: game.seed, runIndex };
+    const storm = this.mode === 'storm';
+    const arena = this.mode === 'arena';
+    const realCountry = arena ? 'UKR' : countryId;
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena };
     this.transport.broadcast({ t: 'start', ...spec });
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(countryId, { coop: { session: this, role: 'host', spec } });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -173,11 +182,12 @@ export class CoopSession {
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'cfg') {
         this.countryId = d.countryId;
+        if (d.mode) this.mode = d.mode;
         if (this.onCfg) this.onCfg(d.countryId);
       } else if (d.t === 'start') {
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d } });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {

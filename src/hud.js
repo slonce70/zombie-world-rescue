@@ -220,7 +220,7 @@ export class HUD {
     const activeG = this.game.save.activeGadget;
     let gHtml = '';
     if (activeG && gadgets) {
-      const icon = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱' }[activeG];
+      const icon = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱', turret: '🤖' }[activeG];
       gHtml = gadgets.cd > 0
         ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}с</span>`
         : `${icon} ГОТОВО (F)`;
@@ -230,7 +230,7 @@ export class HUD {
       this._lastGadgetHtml = gHtml;
       const btn = document.getElementById('tb-gadget');
       if (btn && activeG) {
-        btn.childNodes[0].textContent = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱' }[activeG];
+        btn.childNodes[0].textContent = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱', turret: '🤖' }[activeG];
       }
       const badge = document.getElementById('tb-gadget-n');
       if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';

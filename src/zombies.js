@@ -73,7 +73,10 @@ export class Zombies {
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
-    const hpScale = type === 'boss' ? 1 : this.diff.hp;
+    // 🤝 кооп: більше гравців — жилавіші зомбі (+30% за кожного гостя)
+    const playersN = (this.level.players && this.level.players.length) || 1;
+    const coopScale = opts.mirror ? 1 : 1 + 0.3 * (playersN - 1);
+    const hpScale = type === 'boss' ? 1 : this.diff.hp * coopScale;
     const z_ = {
       nid, rig, type, stats,
       hp: Math.round(stats.hp * hpScale), maxHp: Math.round(stats.hp * hpScale),
@@ -299,8 +302,11 @@ export class Zombies {
     const cfg = (this.level.country && this.level.country.boss) || { hp: 1300, frost: false };
     const style = cfg.style || (cfg.frost ? 'frost' : 'king');
     const b = this.spawn('boss', x, z - 6, { horde: false, style });
-    b.maxHp = cfg.hp;
-    b.hp = hp !== null ? Math.min(cfg.hp, Math.max(150, hp)) : cfg.hp;
+    // 🤝 кооп: бос міцніший на +45% за кожного гостя
+    const playersN = (this.level.players && this.level.players.length) || 1;
+    const bossHp = Math.round(cfg.hp * (1 + 0.45 * (playersN - 1)));
+    b.maxHp = bossHp;
+    b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
     b.aggroed = true;
     b.state = 'chase';
     return b;

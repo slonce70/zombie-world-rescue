@@ -13,6 +13,7 @@ export const SHOP_ITEMS = [
   { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: `${GADGETS.heal.desc} · перезарядка ${GADGETS.heal.cd}с`, price: GADGETS.heal.price, max: 1, cat: 'Гаджети й друзі', gadget: true },
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: `${GADGETS.tramp.desc} · перезарядка ${GADGETS.tramp.cd}с`, price: GADGETS.tramp.price, max: 1, cat: 'Гаджети й друзі', gadget: true },
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: `${GADGETS.wall.desc} · перезарядка ${GADGETS.wall.cd}с`, price: GADGETS.wall.price, max: 1, cat: 'Гаджети й друзі', gadget: true },
+  { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: `${GADGETS.turret.desc} · перезарядка ${GADGETS.turret.cd}с`, price: GADGETS.turret.price, max: 1, cat: 'Гаджети й друзі', gadget: true },
   { id: 'dog', icon: '🐶', name: 'Песик Дружок', desc: 'Збирає монети і гавкає на сюрпризи!', price: 350, max: 1, cat: 'Гаджети й друзі' },
   // --- зброя ---
   { id: 'smg', icon: '🌀', name: 'Швидкостріл', desc: 'Дуже швидка черга (клавіша 4)', price: 250, max: 1, cat: 'Зброя', weapon: true },
@@ -59,6 +60,15 @@ export class Shop {
     else this.open();
   }
 
+  // ⛈️ у Штормі припаси дорожчають: +12% за кожну відбиту хвилю
+  priceOf(item) {
+    const level = this.game.level;
+    if (level && level.storm && item.cat === 'Припаси') {
+      return Math.ceil(item.price * (1 + 0.12 * Math.max(0, level.storm.wave - 1)));
+    }
+    return item.price;
+  }
+
   getCount(item) {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
@@ -88,9 +98,11 @@ export class Shop {
       const count = this.getCount(item);
       const maxed = count >= item.max;
       const locked = item.needsBazooka && !hasBazooka;
-      const afford = save.coins >= item.price;
+      const price = this.priceOf(item);
+      const afford = save.coins >= price;
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
-      const priceLabel = locked ? '🔒' : maxed ? (item.weapon || item.gadget ? 'Є!' : 'МАКС') : item.price + ' <span class="coin-icon">₴</span>';
+      const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
+      const priceLabel = locked ? '🔒' : maxed ? (item.weapon || item.gadget ? 'Є!' : 'МАКС') : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? 'Спершу знайди базуку в аеродропі! 🪂' : item.desc;
       html += `
         <div class="shop-item ${maxed || locked ? 'maxed' : afford ? '' : 'poor'}" data-id="${item.id}">
@@ -113,7 +125,8 @@ export class Shop {
     const player = game.level && game.level.player;
     if (!item || !player) return;
     const count = this.getCount(item);
-    if (count >= item.max || save.coins < item.price
+    const price = this.priceOf(item);
+    if (count >= item.max || save.coins < price
       || (item.needsBazooka && !save.weapons.includes('bazooka'))) {
       game.audio.denied();
       return;
@@ -130,7 +143,7 @@ export class Shop {
       game.hud.toast('Броня вже повна! 🛡️');
       return;
     }
-    save.coins -= item.price;
+    save.coins -= price;
     if (item.max !== Infinity && !item.weapon) save.upgrades[id] = count + 1;
     switch (id) {
       case 'medkit': player.heal(50); break;
@@ -170,6 +183,7 @@ export class Shop {
       case 'heal':
       case 'tramp':
       case 'wall':
+      case 'turret':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
         game.hud.toast(`${item.icon} ${item.name} — твій назавжди! Клавіша F (обрати інший — Гардероб 🎒)`);

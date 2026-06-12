@@ -173,6 +173,8 @@ export class GuestNet {
       level.zombies.hordeActive = !!s.h[0];
       level.zombies.hordeRemaining = s.h[1];
     }
+    if (s.st && level.storm && level.storm.applyNet) level.storm.applyNet(s.st);
+    if (s.br && level.bossRush) level.bossRush.applyNet(s.br);
   }
 
   _applyEv(e) {
@@ -243,6 +245,9 @@ export class GuestNet {
       case 'wallgo': level.gadgets.netWallGone(a[0], !!a[1]); break;
       case 'tramp': level.gadgets.netTramp(a[0], a[1], a[2], a[3]); break;
       case 'trampgo': level.gadgets.netTrampGone(a[0]); break;
+      case 'turr': level.gadgets.netTurret(a[0], a[1], a[2], a[3]); break;
+      case 'turrgo': level.gadgets.netTurretGone(a[0], !!a[1]); break;
+      case 'tsh': level.gadgets.netTurretShot(a[0], a[1], a[2], a[3]); break;
       case 'ride': {
         level.vehicles.netRide(a[0], a[1], !!a[2], a[3], a[4], me);
         break;
@@ -253,6 +258,8 @@ export class GuestNet {
         break;
       }
       case 'vict': game.netVictory(); break;
+      case 'stormend': game._endStormRun(); break;
+      case 'arenaend': game._endArenaRun(); break;
       case 'hw': level.bus.emit('hordeWarning', 5); break;
       case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;
       case 'he': level.bus.emit('hordeEnd'); break;
@@ -292,6 +299,7 @@ export class GuestNet {
     for (const idx of w.barrelsGone || []) level.effects.netBarrelGone(idx);
     for (const [wid, x, z, yaw] of w.walls || []) level.gadgets.netWall(wid, 0, x, z, yaw);
     for (const [tid, x, z] of w.tramps || []) level.gadgets.netTramp(tid, 0, x, z);
+    for (const [tnid, owner, x, z] of w.turrets || []) level.gadgets.netTurret(tnid, owner, x, z);
     for (const [idx, x, z, rider] of w.scooters || []) {
       const r = level.vehicles.list[idx];
       if (!r) continue;

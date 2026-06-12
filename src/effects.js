@@ -542,9 +542,12 @@ export class Effects {
       if (!t.mesh.visible) { slot = t; break; }
     }
     if (!slot) slot = this.tracerPool[0];
-    // стиль сліду куль (нагороди Зоряного шляху)
+    // стиль сліду куль (нагороди Зоряного шляху і Шторму)
     if (this.tracerStyle === 'gold') slot.mesh.material.color.setHex(0xffd23f);
     else if (this.tracerStyle === 'rainbow') slot.mesh.material.color.setHSL((performance.now() / 600) % 1, 0.9, 0.62);
+    else if (this.tracerStyle === 'storm') slot.mesh.material.color.setHSL(0.72 + Math.sin(performance.now() / 180) * 0.055, 0.95, 0.66);
+    else if (this.tracerStyle === 'neon') slot.mesh.material.color.setHex(0x39ff88);
+    else if (this.tracerStyle === 'royal') slot.mesh.material.color.setHSL(Math.sin(performance.now() / 260) > 0 ? 0.13 : 0.97, 0.95, 0.6);
     slot.life = 0.07;
     slot.mesh.visible = true;
     slot.mesh.scale.set(1, len, 1);

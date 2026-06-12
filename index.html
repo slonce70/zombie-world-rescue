@@ -5,6 +5,9 @@
   <title>🧟 Операція: Порятунок Світу</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0d141c">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
   <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
@@ -22,7 +25,9 @@
         <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
         <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
         <button id="btn-storm" class="btn globe-act storm-btn">⛈️ ШТОРМ</button>
+        <button id="btn-arena" class="btn globe-act arena-btn">👑 АРЕНА</button>
         <button id="btn-coop" class="btn globe-act coop-btn">🤝 ГРАТИ РАЗОМ</button>
+        <button id="btn-league" class="btn globe-act league-btn">🏆 ЛІГА</button>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
       <button id="btn-quality" class="btn quality-btn">⚙️ Якість: Авто</button>
@@ -258,11 +263,24 @@
     <div class="overlay-card victory-card">
       <h1>⛈️ ШТОРМ СКІНЧИВСЯ!</h1>
       <p class="storm-sub">Ти протримався хоробро!</p>
+      <div id="storm-league-place" class="league-place"></div>
       <div id="storm-stats"></div>
       <div class="btn-row">
         <button id="btn-storm-retry" class="btn btn-primary big">⛈️ Ще раз!</button>
         <button id="btn-storm-globe" class="btn big">🌍 На глобус</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 🏆 Ліга рекордів -->
+  <div id="overlay-league" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>🏆 ЛІГА РЕКОРДІВ</h2>
+        <button class="btn-x panel-close" data-close="overlay-league">✕</button>
+      </div>
+      <p class="panel-sub">Найкращі гравці світу. Потрап у топ — і всі побачать твій нік!</p>
+      <div id="league-content"></div>
     </div>
   </div>
 
@@ -298,6 +316,8 @@
         <div id="lobby-code" class="lobby-code">····</div>
       </div>
       <div id="lobby-roster"></div>
+      <div class="lobby-section">Режим</div>
+      <div id="lobby-modes"></div>
       <div class="lobby-section">Країна</div>
       <div id="lobby-countries"></div>
       <p id="lobby-hint" class="panel-sub"></p>
@@ -311,6 +331,20 @@
       <div class="spinner">📡</div>
       <h2>Звʼязок з хостом…</h2>
       <p id="net-wait-sub">Хост відволікся — чекаємо…</p>
+    </div>
+  </div>
+
+  <!-- 👑 Кінець Арени босів -->
+  <div id="overlay-arena-end" class="overlay">
+    <div class="overlay-card victory-card">
+      <h1>👑 АРЕНА БОСІВ</h1>
+      <p class="storm-sub">Шість корон — один герой!</p>
+      <div id="arena-league-place" class="league-place"></div>
+      <div id="arena-stats"></div>
+      <div class="btn-row">
+        <button id="btn-arena-retry" class="btn btn-primary big">👑 Ще раз!</button>
+        <button id="btn-arena-globe" class="btn big">🌍 На глобус</button>
+      </div>
     </div>
   </div>
 
@@ -329,5 +363,11 @@
   </div>
 
   <script type="module" src="./src/main.js"></script>
+  <script>
+    // PWA: офлайн-кеш і встановлення на телефон
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
 </body>
 </html>

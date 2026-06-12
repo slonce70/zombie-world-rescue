@@ -481,6 +481,18 @@ export function updateRig(rig, dt) {
         armL = 2.6 + Math.sin(ph) * 0.3;
         armR = 2.6 + Math.cos(ph) * 0.3;
         legL = j * 0.5; legR = j * 0.5;
+      } else if (style === 'lightning') {
+        // ⚡ блискавка: різкі кутасті пози — руки зигзагом, стрибки в присіді
+        const step = Math.floor(ph * 1.1) % 4;
+        armL = step === 0 ? 2.6 : step === 1 ? 0.6 : step === 2 ? 1.8 : 0.2;
+        armR = step === 0 ? 0.2 : step === 1 ? 1.8 : step === 2 ? 0.6 : 2.6;
+        a.armLZ = step % 2 ? 0.9 : -0.4;
+        a.armRZ = step % 2 ? -0.4 : 0.9;
+        bodyY = step % 2 ? 0.1 : -0.06;
+        bodyRotZ = (step - 1.5) * 0.12;
+        headRotX = step % 2 ? -0.15 : 0.12;
+        legL = step % 2 ? 0.5 : -0.1;
+        legR = step % 2 ? -0.1 : 0.5;
       } else if (style === 'chicken') {
         // курча: лікті-крильця плескають, голова дзьобає
         armL = 0.4; armR = 0.4;
@@ -1296,6 +1308,9 @@ export const HERO_SKINS = {
   robot: { name: 'Робот', icon: '🤖', desc: 'Біп-буп, зомбі!' },
   frog: { name: 'Жабеня', icon: '🐸', desc: 'Ква проти зомбі (з Мегабокса)' },
   super: { name: 'Супергерой', icon: '🦸', desc: 'Плащ майорить! (з Мегабокса)' },
+  hunter: { name: 'Нічний мисливець', icon: '🌙', desc: 'Шторм, хвиля 12' },
+  thunder: { name: 'Громовідвід', icon: '⚡', desc: 'Шторм, хвиля 16' },
+  legend: { name: 'Легенда', icon: '🏆', desc: 'Зоряний шлях, рівень 25' },
 };
 
 // ---------- Танці (емоції) ----------
@@ -1306,6 +1321,7 @@ export const DANCES = {
   wave: { name: 'Хвиля', icon: '🌊', desc: 'Котить хвилю руками' },
   jump: { name: 'Стрибунець', icon: '🦘', desc: 'Радісні підскоки (з Мегабокса)' },
   chicken: { name: 'Курча', icon: '🐤', desc: 'Кудкудак! (з Мегабокса)' },
+  lightning: { name: 'Блискавка', icon: '⚡', desc: 'Шторм, хвиля 8' },
 };
 
 // ---------- Сліди куль ----------
@@ -1313,6 +1329,9 @@ export const TRACERS = {
   classic: { name: 'Класичні', icon: '➖' },
   gold: { name: 'Золоті', icon: '✨' },
   rainbow: { name: 'Веселкові', icon: '🌈' },
+  storm: { name: 'Штормові', icon: '🌩️' },
+  neon: { name: 'Неонові', icon: '🟢' },
+  royal: { name: 'Королівські', icon: '👑' },
 };
 
 export function makeHero(skinId = 'classic') {
@@ -1361,6 +1380,90 @@ export function makeHero(skinId = 'classic') {
       ribbon.position.set(0.16, -0.1, 0.22);
       ribbon.rotation.x = 0.25;
       rig.parts.torso.add(ribbon);
+      return rig;
+    },
+    // 🌙 Нічний мисливець: темний плащ із каптуром, місячні очі
+    hunter() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xd9c2a8, shirt: 0x1d2433, pants: 0x161c28, shoes: 0x10141d,
+        eyeL: 0.07, eyeR: 0.07, eyeWhite: 0xaee8ff, pupilColor: 0x2255aa,
+        mouth: 'smile', mouthColor: 0x6a4b3a, brow: -0.1, cast: 'all', sleeves: 'shirt',
+      });
+      const hoodM = toonMat(0x222b3d);
+      const hood = sphere(0.3, hoodM, 16, 12);
+      hood.position.set(0, 0.16, 0.05);
+      hood.scale.set(1.02, 1.0, 1.08);
+      rig.parts.head.add(hood);
+      const peak = cone(0.1, 0.22, hoodM, 8);
+      peak.position.set(0, 0.34, 0.12);
+      peak.rotation.x = 0.7;
+      rig.parts.head.add(peak);
+      // місячний кулон
+      const moon = sphere(0.06, toonMat(0xcfe2ff, 0x88aaff, 0.6), 8, 6);
+      moon.position.set(0, 0.42, -0.24);
+      rig.parts.torso.add(moon);
+      // плащ за спиною
+      const cape = box(0.5, 0.78, 0.05, toonMat(0x1a2233));
+      cape.position.set(0, 0.05, 0.27);
+      cape.rotation.x = -0.08;
+      rig.parts.torso.add(cape);
+      return rig;
+    },
+    // ⚡ Громовідвід: синьо-золотий, блискавка на грудях
+    thunder() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffc9a3, shirt: 0x2b4a8c, pants: 0x21304f, shoes: 0xffd23f,
+        eyeL: 0.062, eyeR: 0.062, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.06, cast: 'all', sleeves: 'shirt',
+      });
+      const boltM = toonMat(0xffd23f, 0xffaa00, 0.7);
+      // зигзаг-блискавка на грудях із трьох сегментів
+      for (const [bx, by, rz] of [[0.05, 0.36, -0.5], [-0.03, 0.22, 0.55], [0.05, 0.08, -0.5]]) {
+        const seg = box(0.07, 0.17, 0.04, boltM);
+        seg.position.set(bx, by, -0.25);
+        seg.rotation.z = rz;
+        rig.parts.torso.add(seg);
+      }
+      // золоті браслети
+      for (const side of ['armL', 'armR']) {
+        const band = cylinder(0.085, 0.085, 0.07, boltM, 10);
+        band.position.y = -0.42;
+        rig.parts[side].add(band);
+      }
+      // шпичка-громовідвід на голові
+      const rod = cylinder(0.02, 0.02, 0.22, toonMat(0xc9d4e2), 6);
+      rod.position.y = 0.4;
+      const tip = sphere(0.04, boltM, 6, 5);
+      tip.position.y = 0.52;
+      rig.parts.head.add(rod, tip);
+      return rig;
+    },
+    // 🏆 Легенда: золотий герой із лавровим вінком
+    legend() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd9a8, shirt: 0xc9a227, pants: 0x8a6f1d, shoes: 0x6e5a18,
+        eyeL: 0.06, eyeR: 0.06, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.08, cast: 'all', sleeves: 'shirt',
+      });
+      const goldM = toonMat(0xffd23f, 0xcc8800, 0.45);
+      // лавровий вінок
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        if (Math.abs(a - Math.PI) < 0.5) continue; // потилицю лишаємо
+        const leaf = box(0.1, 0.04, 0.03, goldM);
+        leaf.position.set(Math.cos(a) * 0.27, 0.18, Math.sin(a) * 0.27);
+        leaf.rotation.y = -a;
+        rig.parts.head.add(leaf);
+      }
+      // сяюча зірка на грудях
+      const star = sphere(0.08, goldM, 8, 6);
+      star.position.set(0, 0.3, -0.26);
+      rig.parts.torso.add(star);
+      // плащ переможця
+      const cape = box(0.52, 0.8, 0.05, toonMat(0xb4262f));
+      cape.position.set(0, 0.04, 0.27);
+      cape.rotation.x = -0.08;
+      rig.parts.torso.add(cape);
       return rig;
     },
     astro() {
@@ -1981,6 +2084,50 @@ export function makeMegaboxMesh() {
 // ============================================================
 // Гаджети: 🦘 кишеньковий батут і 🧱 барикада
 // ============================================================
+// 🤖 сторожова турель: тринога + обертова голова з дулом
+export function makeTurretMesh() {
+  const g = new THREE.Group();
+  const metalM = toonMat(0x5a6470);
+  const darkM = toonMat(0x37404f);
+  const accentM = toonMat(0x4fd8ff, 0x2288cc, 0.4);
+  // тринога
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    const leg = cylinder(0.05, 0.07, 0.85, darkM, 6);
+    leg.position.set(Math.cos(a) * 0.34, 0.38, Math.sin(a) * 0.34);
+    leg.rotation.z = Math.cos(a) * 0.45;
+    leg.rotation.x = -Math.sin(a) * 0.45;
+    g.add(leg);
+  }
+  // стійка і корпус
+  const post = cylinder(0.09, 0.11, 0.5, metalM, 8);
+  post.position.y = 0.85;
+  g.add(post);
+  // обертова голова
+  const head = new THREE.Group();
+  head.position.y = 1.18;
+  const body = box(0.42, 0.3, 0.5, metalM);
+  const eye = sphere(0.075, accentM, 8, 6);
+  eye.position.set(0, 0.05, -0.27);
+  const barrel = cylinder(0.045, 0.045, 0.5, darkM, 7);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0.12, -0.04, -0.4);
+  const barrelTip = cylinder(0.06, 0.06, 0.08, accentM, 7);
+  barrelTip.rotation.x = Math.PI / 2;
+  barrelTip.position.set(0.12, -0.04, -0.66);
+  const antenna = cylinder(0.015, 0.015, 0.3, darkM, 5);
+  antenna.position.set(-0.14, 0.28, 0.1);
+  const antTip = sphere(0.035, toonMat(0xff5d5d, 0xff2222, 0.6), 6, 5);
+  antTip.position.set(-0.14, 0.44, 0.1);
+  head.add(body, eye, barrel, barrelTip, antenna, antTip);
+  g.add(head);
+  // дуло (для трасерів)
+  const muzzle = new THREE.Object3D();
+  muzzle.position.set(0.12, -0.04, -0.7);
+  head.add(muzzle);
+  return { group: g, head, muzzle };
+}
+
 export function makeTrampolineMesh() {
   const g = new THREE.Group();
   const rim = new THREE.Mesh(

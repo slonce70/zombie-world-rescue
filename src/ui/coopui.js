@@ -21,6 +21,7 @@ export class CoopUI {
       lobbyCode: $('lobby-code'),
       roster: $('lobby-roster'),
       countries: $('lobby-countries'),
+      modes: $('lobby-modes'),
       start: $('btn-lobby-start'),
       leave: $('btn-lobby-leave'),
       hint: $('lobby-hint'),
@@ -185,12 +186,44 @@ export class CoopUI {
     }
     this.el.roster.innerHTML = html;
 
-    // вибір країни
-    let ch = '';
+    // режим: кампанія чи шторм
     const save = this.game.save;
+    const anyLib = Object.keys(save.liberated || {}).length > 0;
+    const stormAllowed = !isHost || anyLib;
+    let mh = '';
+    const libCount = Object.keys(save.liberated || {}).length;
+    for (const [mid, label] of [['campaign', '🎯 Кампанія'], ['storm', '⛈️ Шторм'], ['arena', '👑 Арена']]) {
+      const sel = s.mode === mid;
+      const locked = isHost && ((mid === 'storm' && !anyLib) || (mid === 'arena' && libCount < 2));
+      mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
+    }
+    this.el.modes.innerHTML = mh;
+    if (isHost) {
+      this.el.modes.querySelectorAll('.lobby-mode.pick').forEach((el) => {
+        el.addEventListener('click', () => {
+          this.game.audio.click();
+          s.setMode(el.dataset.mode);
+          // шторм лише на звільнених — перескакуємо, якщо поточна не пасує
+          if (s.mode === 'storm' && !save.liberated[s.countryId]) {
+            const lib = CAMPAIGN_ORDER.filter((c) => save.liberated[c]);
+            if (lib.length) s.setCountry(lib[lib.length - 1]);
+          }
+          this._renderLobby();
+        });
+      });
+    }
+    void stormAllowed;
+
+    // вибір країни (в Арени своя мапа — пікер ховаємо)
+    document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = s.mode === 'arena' ? 'none' : '';
+    this.el.countries.style.display = s.mode === 'arena' ? 'none' : '';
+    let ch = '';
     for (const id of CAMPAIGN_ORDER) {
       const c = COUNTRIES[id];
-      const unlocked = id === 'UKR' || save.liberated[CAMPAIGN_ORDER[CAMPAIGN_ORDER.indexOf(id) - 1]];
+      // у шторм-режимі грають лише ЗВІЛЬНЕНІ хостом країни
+      const unlocked = s.mode === 'storm'
+        ? !!save.liberated[id]
+        : (id === 'UKR' || save.liberated[CAMPAIGN_ORDER[CAMPAIGN_ORDER.indexOf(id) - 1]]);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;
       ch += `<div class="${cls}" data-id="${id}">${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</div>`;
@@ -208,9 +241,10 @@ export class CoopUI {
 
     this.el.start.style.display = isHost ? '' : 'none';
     this.el.start.disabled = false;
+    const modeTxt = s.mode === 'storm' ? '⛈️ ШТОРМ' : s.mode === 'arena' ? '👑 АРЕНУ БОСІВ' : 'кампанію';
     this.el.hint.textContent = isHost
       ? (s.roster.size > 1 ? 'Усі в зборі? Тисни СТАРТ!' : 'Продиктуй другу код кімнати 👆')
-      : `Чекаємо, поки хост обере країну і натисне СТАРТ… ${COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag : ''}`;
+      : `Хост обрав ${modeTxt} · ${COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag + ' ' + COUNTRIES[s.countryId].name : ''} — чекаємо на СТАРТ…`;
   }
 
   _esc(str) {

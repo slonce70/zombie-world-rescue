@@ -16,12 +16,15 @@ import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
+import { BossRush } from './bossrush.js';
 import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
+import { LeagueUI } from './ui/leagueui.js';
+import { submitScore } from './net/league.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 11;
+const APP_VERSION = 12;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -97,6 +100,7 @@ class Game {
     this.shop = new Shop(this);
     this.globe = new Globe(this);
     this.coop = new CoopUI(this);
+    this.league = new LeagueUI(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
@@ -186,6 +190,16 @@ class Game {
       this.audio.click();
     });
     document.getElementById('btn-storm').addEventListener('click', () => this.startStorm());
+    document.getElementById('btn-arena').addEventListener('click', () => this.startArena());
+    document.getElementById('btn-arena-retry').addEventListener('click', () => {
+      this._hideOverlay('overlay-arena-end');
+      this.endLevel();
+      this.startArena();
+    });
+    document.getElementById('btn-arena-globe').addEventListener('click', () => {
+      this._hideOverlay('overlay-arena-end');
+      this.endLevel();
+    });
     document.getElementById('btn-storm-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-storm-end');
       const c = this.level ? this.level.countryId : null;
@@ -334,6 +348,7 @@ class Game {
       // шторм доступний після першої звільненої країни
       const anyLib = Object.keys(this.save.liberated).length > 0;
       document.getElementById('btn-storm').classList.toggle('locked', !anyLib);
+      document.getElementById('btn-arena').classList.toggle('locked', Object.keys(this.save.liberated).length < 2);
       if (this._newVersion) this._onNewVersion(this._newVersion);
     }
   }
@@ -426,7 +441,7 @@ class Game {
   // ---------- шторм ----------
   startStorm(countryId = null) {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast('⛈️ Шторм поки що тільки соло — спершу вийди з кімнати');
+      this.hud.toast('⛈️🤝 У коопі Шторм запускається з лобі кімнати — обери режим «Шторм»!');
       this.audio.denied();
       return;
     }
@@ -444,6 +459,23 @@ class Game {
     }
     this.audio.click();
     this.startLevel(countryId || 'UKR', { storm: true });
+  }
+
+  // ---------- 👑 Арена босів ----------
+  startArena() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast('👑🤝 У коопі Арена запускається з лобі кімнати — обери режим «Арена»!');
+      this.audio.denied();
+      return;
+    }
+    const lib = Object.keys(this.save.liberated).length;
+    if (lib < 2) {
+      this.audio.denied();
+      this.hud.toast('👑 Арена босів відкриється після звільнення 2 країн!');
+      return;
+    }
+    this.audio.click();
+    this.startLevel('UKR', { arena: true });
   }
 
   // ---------- автооновлення ----------
@@ -507,10 +539,13 @@ class Game {
     const isStorm = !!opts.storm;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
+    const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = isStorm
-      ? `⛈️ ШТОРМ: ${country.name.toUpperCase()}`
-      : `${country.flag} ${country.name.toUpperCase()}`;
+    document.getElementById('ll-title').textContent = isArena
+      ? '👑 АРЕНА БОСІВ'
+      : isStorm
+        ? `⛈️ ШТОРМ: ${country.name.toUpperCase()}`
+        : `${country.flag} ${country.name.toUpperCase()}`;
     document.getElementById('ll-tip').textContent = '💡 ' + TIPS[Math.floor(Math.random() * TIPS.length)];
     this._showOverlay('overlay-level-loading');
     this._showGlobeUI(false);
@@ -558,7 +593,11 @@ class Game {
     if (this.save.weapons.includes('bazooka')) level.player.addRockets(2);
 
     level.zombies = new Zombies(level, this.seed + 2);
-    if (isStorm) {
+    if (isArena) {
+      // 👑 арена: тільки боси, чиста мапа
+      level.bossRush = new BossRush(level);
+      level.missions = level.bossRush;
+    } else if (isStorm) {
       // ⛈️ шторм: без місій, тільки хвилі і коло
       level.storm = new StormMode(level);
       level.missions = level.storm;
@@ -567,14 +606,14 @@ class Game {
       level.missions = new DynamicMissions(level);
     }
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = isGuest ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     level.pet = (this.save.upgrades.dog || 0) > 0 ? new Pet(level) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isGuest) {
+    if (!isStorm && !isArena && !isGuest) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -586,7 +625,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of (isGuest ? [] : level.world.lootSpots)) {
+    for (const ls of ((isGuest || isArena) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -769,6 +808,12 @@ class Game {
       level.net.attach(coop.spec);
     }
 
+    if (isArena) {
+      const a = level.world.layout.arena;
+      const gy = level.world.groundH(a.x, a.z + 12);
+      level.player.pos.set(a.x, gy, a.z + 12);
+    }
+
     this.level = level;
     this.state = 'level';
     this.victoryShown = false;
@@ -911,7 +956,7 @@ class Game {
     this.deathT = -1;
     this.input.exitLock();
     // прибираємо всі оверлеї рівня
-    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end']) {
+    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end']) {
       this._hideOverlay(id);
     }
     if (this.shop.isOpen) this.shop.close();
@@ -923,7 +968,29 @@ class Game {
 
   _onPlayerDied() {
     this.level.stats.deaths++;
+    if (this.level.bossRush) {
+      if (this.level.net) {
+        this.deathT = 9999;
+        const card = document.querySelector('#overlay-death p');
+        if (card) card.textContent = '👑 Команда ще б\'ється! Чекай, поки друг підніме (E).';
+        this.audio.defeat();
+        this._showOverlay('overlay-death');
+        return;
+      }
+      this._endArenaRun();
+      return;
+    }
     if (this.level.storm) {
+      if (this.level.net) {
+        // ⛈️🤝 кооп-шторм: лежиш і чекаєш на підняття — авто-респавна немає.
+        // Забіг завершується, лише коли впала ВСЯ команда (детектить хост).
+        this.deathT = 9999;
+        const card = document.querySelector('#overlay-death p');
+        if (card) card.textContent = '⛈️ Команда ще тримається! Чекай, поки друг підбіжить і підніме (E).';
+        this.audio.defeat();
+        this._showOverlay('overlay-death');
+        return;
+      }
       this._endStormRun();
       return;
     }
@@ -995,9 +1062,14 @@ class Game {
 
   _endStormRun() {
     const level = this.level;
-    if (!level || level.storm.over) return;
+    if (!level || !level.storm || level.storm.over) return;
     const res = level.storm.results();
     level.storm.over = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    // у коопі «Ще раз» недоречна — всі повертаються в лобі
+    const retryBtn = document.getElementById('btn-storm-retry');
+    if (retryBtn) retryBtn.style.display = level.net ? 'none' : '';
     this.audio.defeat();
     this.input.exitLock();
     // рекорд по країні
@@ -1005,7 +1077,34 @@ class Game {
     const isRecord = !prev || res.wave > prev.wave || (res.wave === prev.wave && res.time > prev.time);
     if (isRecord) this.save.stormBest[level.countryId] = { wave: res.wave, time: res.time };
     this.progress.addXp(20 + res.wave * 5);
+    // ⛈️ нагороди за досягнуті хвилі (раз назавжди)
+    this.save.stormRewards = this.save.stormRewards || {};
+    const STORM_MILESTONES = [
+      { wave: 5, type: 'tracer', id: 'storm', label: '🌩️ Штормові кулі' },
+      { wave: 8, type: 'dance', id: 'lightning', label: '⚡ Танець «Блискавка»' },
+      { wave: 12, type: 'skin', id: 'hunter', label: '🌙 Скін «Нічний мисливець»' },
+      { wave: 16, type: 'skin', id: 'thunder', label: '⚡ Скін «Громовідвід»' },
+    ];
+    for (const ms of STORM_MILESTONES) {
+      if (res.wave < ms.wave || this.save.stormRewards[ms.id]) continue;
+      this.save.stormRewards[ms.id] = true;
+      const pool = ms.type === 'tracer' ? this.save.tracers : ms.type === 'dance' ? this.save.dances : this.save.skins;
+      if (!pool.includes(ms.id)) pool.push(ms.id);
+      this.hud.banner('⛈️ НАГОРОДА ШТОРМУ!', `${ms.label} — дивись у Гардеробі 🎒`, 5);
+      this.audio.levelUp();
+    }
     this.saveGame();
+    // 🏆 Ліга: відправляємо результат і показуємо місце у світі
+    const placeEl = document.getElementById('storm-league-place');
+    if (placeEl) {
+      placeEl.textContent = '';
+      const team = level.net
+        ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
+        : [];
+      submitScore(this, { mode: 'storm', country: level.countryId, score: res.wave, team }).then((r) => {
+        if (r && r.me) placeEl.textContent = `🌍 Твоє місце у світовій Лізі: #${r.me.rank}`;
+      });
+    }
     const rec = isRecord && prev ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
     const best = this.save.stormBest[level.countryId];
     document.getElementById('storm-stats').innerHTML = `
@@ -1016,7 +1115,67 @@ class Game {
     this._showOverlay('overlay-storm-end');
   }
 
+  // 👑 кінець забігу Арени (перемога над усіма або падіння команди)
+  _endArenaRun() {
+    const level = this.level;
+    if (!level || !level.bossRush || level.bossRush.over) return;
+    const res = level.bossRush.results();
+    level.bossRush.over = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (level.net && level.net.authority) {
+      level.netEv('arenaend');
+      level.net.flushEvents();
+    }
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) retryBtn.style.display = level.net ? 'none' : '';
+    if (res.completed) this.audio.victory();
+    else this.audio.defeat();
+    this.input.exitLock();
+    // рекорд: лише ПОВНІ проходження, менший час кращий
+    let isRecord = false;
+    if (res.completed) {
+      const prev = this.save.arenaBest;
+      isRecord = !prev || res.timeMs < prev;
+      if (isRecord) this.save.arenaBest = res.timeMs;
+      this.progress.addXp(150);
+    } else {
+      this.progress.addXp(15 + res.bosses * 20);
+    }
+    this.saveGame();
+    // 🏆 Ліга (тільки завершені забіги)
+    const placeEl = document.getElementById('arena-league-place');
+    if (placeEl) {
+      placeEl.textContent = '';
+      if (res.completed) {
+        const team = level.net
+          ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
+          : [];
+        submitScore(this, { mode: 'arena', country: 'ALL', score: res.timeMs, team }).then((r) => {
+          if (r && r.me) placeEl.textContent = `🌍 Твоє місце у світовій Лізі: #${r.me.rank}`;
+        });
+      }
+    }
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.querySelector('#overlay-arena-end h1').textContent = res.completed
+      ? '👑 УСІХ БОСІВ ПЕРЕМОЖЕНО!'
+      : '💀 Арена цього разу сильніша…';
+    const recBadge = isRecord && res.completed ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+    const best = this.save.arenaBest;
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">👑</span><span class="stat-name">Босів переможено</span><span class="stat-val">${res.bosses} / 6</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Час${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${best ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>` : ''}
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${level.stats.kills}</span></div>`;
+    this._showOverlay('overlay-arena-end');
+  }
+
   _onBossDied() {
+    if (this.level && this.level.bossRush) {
+      this.level.bossRush.onBossDied();
+      return;
+    }
     if (this.level && this.level.storm) {
       // ⛈️ міні-бос шторму: бонус і граємо далі
       this.level.addCoins(120);
@@ -1412,6 +1571,7 @@ class Game {
       },
       dismountScooter: () => g.level.vehicles.dismount(),
       startStorm: (c) => g.startStorm(c),
+      startArena: () => g.startArena(),
       questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),
       regenQuests: (dateKey) => {
         g.save.quests = null;
@@ -1443,6 +1603,7 @@ class Game {
       coopCreate: (nick) => g.coop.session.create(nick || 'Хост'),
       coopJoin: (code, nick) => g.coop.session.join(code, nick || 'Гість'),
       coopSetCountry: (c) => g.coop.session.setCountry(c),
+      coopSetMode: (mo) => g.coop.session.setMode(mo),
       coopStartLevel: () => g.coop.session.startLevel(),
       coopLeave: () => g.coop.session.leave(),
       coopState: () => {

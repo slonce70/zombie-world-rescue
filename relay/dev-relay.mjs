@@ -5,6 +5,7 @@
 //   relay → клієнт: {from: id, d: <будь-що>}
 //   службові:       {t:'relay', you, isHost, peers:[...]}, {t:'peer', id, on}, {t:'err', code}
 // Хост завжди отримує id 1. Кімната живе, поки живий хост (грейс 90с на реконект).
+import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
@@ -13,8 +14,70 @@ const HOST_GRACE_MS = 90_000;
 
 const rooms = new Map(); // code -> { sockets: Map<id, ws>, nextId, hostTimer }
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`[relay] ws://localhost:${PORT}/ws?room=CODE`);
+// 🏆 локальна Ліга в пам'яті — щоб розробка повністю працювала офлайн
+const league = new Map(); // `${cid}|${mode}|${country}` -> {nick, score, team, ts}
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function leagueTop(mode, country, cid) {
+  const rows = [...league.entries()]
+    .filter(([k]) => k.endsWith(`|${mode}|${country}`))
+    .map(([k, v]) => ({ cid: k.split('|')[0], ...v }))
+    .sort((a, b) => (mode === 'arena' ? a.score - b.score : b.score - a.score))
+    .slice(0, 50)
+    .map((r, i) => ({ rank: i + 1, nick: r.nick, score: r.score, team: r.team, me: r.cid === cid }));
+  const mine = league.get(`${cid}|${mode}|${country}`);
+  const me = mine ? { rank: rows.findIndex((r) => r.me) + 1 || rows.length + 1, score: mine.score } : null;
+  return { top: rows, me };
+}
+
+const httpServer = createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (!url.pathname.startsWith('/league/')) {
+    res.writeHead(200, CORS);
+    res.end('zr-dev-relay ok');
+    return;
+  }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS);
+    res.end();
+    return;
+  }
+  if (url.pathname === '/league/top') {
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(leagueTop(url.searchParams.get('mode') || 'storm',
+      (url.searchParams.get('country') || 'UKR').toUpperCase(), url.searchParams.get('cid') || '')));
+    return;
+  }
+  if (url.pathname === '/league/submit' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (ch) => { body += ch; });
+    req.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        const key = `${d.cid}|${d.mode}|${String(d.country).toUpperCase()}`;
+        const cur = league.get(key);
+        const better = !cur || (d.mode === 'arena' ? d.score < cur.score : d.score > cur.score);
+        if (better) league.set(key, { nick: String(d.nick).slice(0, 12), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify(leagueTop(d.mode, String(d.country).toUpperCase(), d.cid)));
+      } catch (e) {
+        res.writeHead(400, CORS);
+        res.end('{"error":"bad"}');
+      }
+    });
+    return;
+  }
+  res.writeHead(404, CORS);
+  res.end('{"error":"notfound"}');
+});
+
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(PORT);
+console.log(`[relay] ws://localhost:${PORT}/ws?room=CODE (+ /league/*)`);
 
 function send(ws, obj) {
   if (ws.readyState === 1) ws.send(JSON.stringify(obj));

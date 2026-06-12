@@ -1,7 +1,7 @@
 // Іграшки рівня: 🦙 Мегабокс, 🐶 пес Дружок, 🛴 самокати, 🦘🧱 гаджети
 import * as THREE from 'three';
 import {
-  makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh,
+  makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
 } from './characters.js';
 
 // ============================================================
@@ -385,11 +385,16 @@ export class Vehicles {
 // 🧰 Гаджети: обираєш ОДИН перед боєм (Гардероб), клавіша F, перезарядка
 // ============================================================
 export const GADGETS = {
-  shield: { name: 'Щит', icon: '🛡️', cd: 30, price: 300, desc: 'Поглинає 255 шкоди, поки не розіб\'ється' },
+  shield: { name: 'Щит', icon: '🛡️', cd: 30, price: 300, desc: 'Аварійна бульбашка: поглинає 50 шкоди' },
   heal: { name: 'Відновлення', icon: '💚', cd: 25, price: 250, desc: '+50 здоров\'я миттєво' },
   tramp: { name: 'Кишеньковий батут', icon: '🦘', cd: 20, price: 150, desc: 'Постав і застрибни на дах' },
   wall: { name: 'Барикада', icon: '🧱', cd: 25, price: 200, desc: 'Стіна на 100 міцності (E — забрати)' },
+  // 🤖 преміум: автоматична вогнева підтримка
+  turret: { name: 'Турель', icon: '🤖', cd: 45, price: 450, desc: 'Сторожова турель: 30с сама обстрілює зомбі поруч' },
 };
+
+// баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
+export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
 
 export class Gadgets {
   constructor(level) {
@@ -397,6 +402,7 @@ export class Gadgets {
     this.cd = 0;
     this.tramps = [];
     this.walls = [];
+    this.turrets = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
     // 🛡 бульбашка гаджет-щита довкола героя
@@ -423,7 +429,7 @@ export class Gadgets {
     if (p.gadgetShield > 0) {
       this.shieldMesh.visible = true;
       this.shieldMesh.position.set(p.pos.x, p.pos.y + 1.1, p.pos.z);
-      this.shieldMesh.material.opacity = 0.1 + 0.2 * (p.gadgetShield / 255);
+      this.shieldMesh.material.opacity = 0.1 + 0.2 * Math.min(1, p.gadgetShield / 50);
       this.shieldMesh.rotation.y += dt * 0.4;
     } else if (this.shieldMesh.visible) {
       this.shieldMesh.visible = false;
@@ -458,8 +464,17 @@ export class Gadgets {
       }
     }
 
+    // дзеркало (гість): голова турелі ліниво обертається між пострілами
+    if (level.mirror) {
+      for (const t of this.turrets) {
+        t.idleSpin += dt;
+        if (t.idleSpin > 2.5) t.mesh.head.rotation.y += dt * 0.6;
+      }
+      return;
+    }
+    // 🤖 турелі: стрільба/тиск/життя (рахує лише хост/соло)
+    this._updateTurrets(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
-    if (level.mirror) return;
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
       const w = this.walls[i];
@@ -498,9 +513,9 @@ export class Gadgets {
     const p = level.player;
     let ok = false;
     if (id === 'shield') {
-      p.gadgetShield = 255;
+      p.gadgetShield = 50;
       level.audio.powerup();
-      level.bus.emit('toast', '🛡️ Щит увімкнено: поглине 255 шкоди!');
+      level.bus.emit('toast', '🛡️ Щит увімкнено: поглине 50 шкоди!');
       ok = true;
     } else if (id === 'heal') {
       if (p.health >= p.maxHealth) {
@@ -519,6 +534,9 @@ export class Gadgets {
     } else if (id === 'wall') {
       if (level.mirror) ok = this._requestPlace('wall', 2.6);
       else ok = this._placeWall();
+    } else if (id === 'turret') {
+      if (level.mirror) ok = this._requestPlace('turret', 2.2);
+      else ok = this._placeTurret();
     }
     if (ok) {
       this.cd = GADGETS[id].cd;
@@ -540,7 +558,8 @@ export class Gadgets {
   _requestPlace(kind, dist) {
     const pos = this._placePos(dist);
     if (!pos) {
-      this.level.bus.emit('toast', kind === 'wall' ? 'Тут не можна поставити барикаду 🙈' : 'Тут не можна поставити батут 🙈');
+      this.level.bus.emit('toast', kind === 'wall' ? 'Тут не можна поставити барикаду 🙈'
+        : kind === 'turret' ? 'Тут не можна поставити турель 🙈' : 'Тут не можна поставити батут 🙈');
       return false;
     }
     this.level.net.sendGadget(kind, pos.x, pos.z, this.level.player.yaw);
@@ -679,6 +698,134 @@ export class Gadgets {
     if (w.hp <= 0) {
       const i = this.walls.indexOf(w);
       if (i >= 0) this._removeWall(i, true);
+    }
+  }
+
+  // ================= 🤖 ТУРЕЛЬ =================
+  _placeTurret() {
+    const pos = this._placePos(2.2);
+    if (!pos) {
+      this.level.bus.emit('toast', 'Тут не можна поставити турель 🙈');
+      return false;
+    }
+    this.placeTurretAt(pos.x, pos.z, 1);
+    return true;
+  }
+
+  placeTurretAt(x, z, ownerPid) {
+    const level = this.level;
+    const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
+    this._buildTurret(nid, x, z, ownerPid);
+    if (level.net && level.net.authority) {
+      level.netEv('turr', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10);
+    }
+    return true;
+  }
+
+  _buildTurret(nid, x, z, ownerPid) {
+    const level = this.level;
+    // одна активна турель на гравця — нова замінює стару
+    const oldIdx = this.turrets.findIndex((t) => t.ownerPid === ownerPid);
+    if (oldIdx >= 0) this._removeTurret(oldIdx, false);
+    const y = level.world.groundH(x, z);
+    const m = makeTurretMesh();
+    m.group.position.set(x, y, z);
+    level.scene.add(m.group);
+    const collider = { x, z, r: 0.45, top: y + 1.3 };
+    level.world.colliders.push(collider);
+    level.world._buildGrid();
+    this.turrets.push({
+      nid, ownerPid, x, z, y,
+      hp: TURRET.hp, life: TURRET.life, fireT: 0.6,
+      mesh: m, collider, idleSpin: 0,
+    });
+    level.audio.powerup();
+    level.effects.ring(new THREE.Vector3(x, y, z), 0x4fd8ff, 2.2);
+  }
+
+  _removeTurret(i, broken) {
+    const level = this.level;
+    const t = this.turrets[i];
+    if (!t) return;
+    this.turrets.splice(i, 1);
+    if (level.net && level.net.authority) level.netEv('turrgo', t.nid, broken ? 1 : 0);
+    level.scene.remove(t.mesh.group);
+    level.world.colliders = level.world.colliders.filter((c) => c !== t.collider);
+    level.world._buildGrid();
+    if (broken) {
+      level.effects.burst(new THREE.Vector3(t.x, t.y + 1, t.z), 0x7d8aa0, 14, { speed: 4, up: 3.5, life: 0.7, size: 1.1 });
+      level.audio.shieldBreak();
+      level.bus.emit('toast', '🤖 Турель зламали!');
+    } else {
+      level.effects.burst(new THREE.Vector3(t.x, t.y + 1, t.z), 0x4fd8ff, 8, { speed: 2.5, up: 2, life: 0.5, size: 0.8 });
+    }
+  }
+
+  // гість: турель із мережі (лише візуал — стріляє хост подіями tsh)
+  netTurret(nid, ownerPid, x, z) {
+    if (this.turrets.some((t) => t.nid === nid)) return;
+    this._buildTurret(nid, x, z, ownerPid);
+  }
+
+  netTurretGone(nid, broken) {
+    const i = this.turrets.findIndex((t) => t.nid === nid);
+    if (i >= 0) this._removeTurret(i, broken);
+  }
+
+  // гість: постріл турелі — поворот голови, трасер, звук
+  netTurretShot(nid, tx, ty, tz) {
+    const t = this.turrets.find((x) => x.nid === nid);
+    if (!t) return;
+    t.mesh.head.rotation.y = Math.atan2(-(tx - t.x), -(tz - t.z));
+    const muzzle = new THREE.Vector3();
+    t.mesh.muzzle.getWorldPosition(muzzle);
+    this.level.effects.tracer(muzzle, new THREE.Vector3(tx, ty, tz));
+    const p = this.level.player.pos;
+    if (Math.hypot(t.x - p.x, t.z - p.z) < 55) this.level.audio.shot('pistol');
+  }
+
+  // господар турелі (хост/соло): вибір цілі, стрільба, тиск зомбі, час життя
+  _updateTurrets(dt) {
+    const level = this.level;
+    for (let i = this.turrets.length - 1; i >= 0; i--) {
+      const t = this.turrets[i];
+      t.life -= dt;
+      if (t.life <= 0) { this._removeTurret(i, false); continue; }
+      // зомбі гатять по турелі (як по барикаді)
+      let pressure = 0;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || !z.aggroed) continue;
+        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.4) pressure += z.stats.dmg;
+      }
+      if (pressure > 0) {
+        t.hp -= pressure * dt * 0.85;
+        if (t.hp <= 0) { this._removeTurret(i, true); continue; }
+      }
+      // стрільба: найближчий живий зомбі в радіусі
+      t.fireT -= dt;
+      if (t.fireT > 0) continue;
+      let best = null;
+      let bd = TURRET.range;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || z.gone) continue;
+        const d = Math.hypot(z.x - t.x, z.z - t.z);
+        if (d < bd) { bd = d; best = z; }
+      }
+      if (!best) { t.fireT = 0.2; continue; }
+      t.fireT = TURRET.fireCd;
+      const ty = best.y + best.rig.height * 0.6;
+      t.mesh.head.rotation.y = Math.atan2(-(best.x - t.x), -(best.z - t.z));
+      const muzzle = new THREE.Vector3();
+      t.mesh.muzzle.getWorldPosition(muzzle);
+      level.effects.tracer(muzzle, new THREE.Vector3(best.x, ty, best.z));
+      const p = level.player.pos;
+      if (Math.hypot(t.x - p.x, t.z - p.z) < 55) level.audio.shot('pistol');
+      const dir = new THREE.Vector3(best.x - t.x, 0, best.z - t.z).normalize();
+      best.lastHitBy = t.ownerPid;
+      best.damage(TURRET.dmg, dir, false);
+      if (level.net && level.net.authority) {
+        level.netEv('tsh', t.nid, Math.round(best.x * 10) / 10, Math.round(ty * 10) / 10, Math.round(best.z * 10) / 10);
+      }
     }
   }
 

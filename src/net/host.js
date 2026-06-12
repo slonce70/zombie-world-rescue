@@ -258,6 +258,7 @@ export class HostNet {
     if (Math.hypot(solved.x - d.x, solved.z - d.z) > 0.4) return;
     if (d.kind === 'wall') level.gadgets.placeWallAt(d.x, d.z, d.yaw, from);
     else if (d.kind === 'tramp') level.gadgets.placeTrampAt(d.x, d.z, from);
+    else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from);
   }
 
   // ---------- зомбі / гравці: гачки для ігрових систем ----------
@@ -322,6 +323,20 @@ export class HostNet {
       }
     }
 
+    // ⛈️👑 кооп-виживання: якщо впала ВСЯ команда — забіг завершено для всіх
+    const level = this.level;
+    const run = level.storm || level.bossRush;
+    if (run && !run.over) {
+      const allDown = (level.players || []).length > 0
+        && level.players.every((p) => p.health <= 0);
+      if (allDown) {
+        this.ev(level.storm ? 'stormend' : 'arenaend');
+        this.flushEvents();
+        if (level.storm) this.game._endStormRun();
+        else this.game._endArenaRun();
+      }
+    }
+
     this.snapT -= dt;
     if (this.snapT <= 0) {
       this.snapT = 1 / SNAP_HZ;
@@ -372,6 +387,14 @@ export class HostNet {
     }
     const zm = level.zombies;
     snap.h = [zm.hordeActive ? 1 : 0, zm.hordeRemaining];
+    if (level.storm) {
+      const st = level.storm;
+      snap.st = [r1(st.r), st.phase === 'shrink' ? 1 : 0, r1(st.phaseT), st.wave, st.waveAlive];
+    }
+    if (level.bossRush) {
+      const br = level.bossRush;
+      snap.br = [br.idx, br.state === 'fight' ? 1 : 0, r1(br.breakT)];
+    }
     return snap;
   }
 
@@ -406,6 +429,7 @@ export class HostNet {
       barrelsGone: (eff.barrels || []).map((b, i) => (b.exploded ? i : -1)).filter((i) => i >= 0),
       walls: level.gadgets.walls.map((w) => [w.nid, w.x, w.z, w.yaw, Math.round(w.hp)]),
       tramps: level.gadgets.tramps.map((t) => [t.nid, t.pad.x, t.pad.z]),
+      turrets: level.gadgets.turrets.map((t) => [t.nid, t.ownerPid, r1(t.x), r1(t.z)]),
       scooters: level.vehicles.list.map((r, i) => [i, r1(r.x), r1(r.z), r.riderPid || (r.taken ? 1 : 0)]),
       airdrop: eff.airdrop ? [r1(eff.airdrop.x), r1(eff.airdrop.z), eff.airdrop.landed ? 1 : 0] : 0,
       megabox: level.megabox ? { x: r1(level.megabox.x), z: r1(level.megabox.z), opened: level.megabox.opened ? 1 : 0 } : 0,

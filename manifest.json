@@ -1,0 +1,15 @@
+{
+  "name": "Операція: Порятунок Світу",
+  "short_name": "Зомбі-Рятунок",
+  "description": "3D-екшен проти зомбі: кампанія 6 країн, кооп на 4 гравці, Шторм і Ліга рекордів",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0d141c",
+  "theme_color": "#0d141c",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

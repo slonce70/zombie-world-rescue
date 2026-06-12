@@ -58,7 +58,18 @@ export class StormMode {
     this.wall.frustumCulled = false;
     level.scene.add(this.wall);
 
-    this._spawnWave();
+    this.mirror = !!level.mirror;
+    if (!this.mirror) this._spawnWave();
+  }
+
+  // гість: стан кола/хвилі зі снапшота хоста
+  applyNet(st) {
+    this.r = st[0];
+    this.phase = st[1] ? 'shrink' : 'rest';
+    this.phaseT = st[2];
+    this.wave = st[3];
+    this.waveAlive = st[4];
+    this.wall.scale.set(this.r, 1, this.r);
   }
 
   // --- Missions API ---
@@ -90,6 +101,12 @@ export class StormMode {
     this.prompt = null;
     this.wall.material.uniforms.uTime.value = this.time;
 
+    if (this.mirror) {
+      // коло і хвилі веде хост (applyNet) — у гостя лише власна шкода поза колом
+      this._outsideDamage(dt);
+      return;
+    }
+
     // фази кола
     this.phaseT -= dt;
     if (this.phase === 'rest' && this.phaseT <= 0) {
@@ -99,6 +116,7 @@ export class StormMode {
       this.targetR = Math.max(this.minR, this.r * 0.68);
       level.audio.stormSiren();
       level.bus.emit('toast', '🟣 УВАГА! Коло звужується!');
+      level.netEv('toast', '🟣 УВАГА! Коло звужується!');
     } else if (this.phase === 'shrink') {
       const k = 1 - Math.max(0, this.phaseT / 22);
       this.r = this.shrinkFrom + (this.targetR - this.shrinkFrom) * k;
@@ -110,7 +128,42 @@ export class StormMode {
     }
     this.wall.scale.set(this.r, 1, this.r);
 
-    // шкода поза колом (оминає броню — як справжній шторм!)
+    this._outsideDamage(dt);
+
+    // лічимо живих зомбі хвилі
+    let alive = 0;
+    for (const z of level.zombies.list) {
+      if (z.state !== 'dead' && z._stormWave) alive++;
+    }
+    this.waveAlive = alive;
+    if (alive === 0 && this._spawnWaveSoon === undefined) {
+      // хвилю відбито!
+      const bonus = 25 + this.wave * 10;
+      level.addCoins(bonus);
+      level.game.progress.addXp(12 + this.wave * 3);
+      level.game.hud.banner(`🎉 ХВИЛЮ ${this.wave} ВІДБИТО!`, `+${bonus} монет · хвиля ${this.wave + 1} за 6с…`, 3.5);
+      // гостям: банер + той самий бонус монет (подія sbb)
+      level.netEv('banner', `🎉 ХВИЛЮ ${this.wave} ВІДБИТО!`, `+${bonus} монет · хвиля ${this.wave + 1} за 6с…`, 3.5);
+      level.netEv('sbb', bonus);
+      if (this.wave % 3 === 2) {
+        level.bus.emit('toast', '🛒 Поповни запаси (B) — з кожною хвилею дорожче!');
+        level.netEv('toast', '🛒 Поповни запаси (B) — з кожною хвилею дорожче!');
+      }
+      level.audio.mission();
+      this._spawnWaveSoon = 6;
+    }
+    if (this._spawnWaveSoon !== undefined) {
+      this._spawnWaveSoon -= dt;
+      if (this._spawnWaveSoon <= 0) {
+        delete this._spawnWaveSoon;
+        this._spawnWave();
+      }
+    }
+  }
+
+  // шкода поза колом (оминає броню — як справжній шторм!); і хост, і гість — по собі
+  _outsideDamage(dt) {
+    const level = this.level;
     const p = level.player;
     if (this.isOutside() && p.health > 0) {
       this.damageT -= dt;
@@ -127,36 +180,18 @@ export class StormMode {
         }
       }
     }
-
-    // лічимо живих зомбі хвилі
-    let alive = 0;
-    for (const z of level.zombies.list) {
-      if (z.state !== 'dead' && z._stormWave) alive++;
-    }
-    this.waveAlive = alive;
-    if (alive === 0 && this._spawnWaveSoon === undefined) {
-      // хвилю відбито!
-      const bonus = 25 + this.wave * 10;
-      level.addCoins(bonus);
-      level.game.progress.addXp(12 + this.wave * 3);
-      level.game.hud.banner(`🎉 ХВИЛЮ ${this.wave} ВІДБИТО!`, `+${bonus} монет · хвиля ${this.wave + 1} за 6с…`, 3.5);
-      level.audio.mission();
-      this._spawnWaveSoon = 6;
-    }
-    if (this._spawnWaveSoon !== undefined) {
-      this._spawnWaveSoon -= dt;
-      if (this._spawnWaveSoon <= 0) {
-        delete this._spawnWaveSoon;
-        this._spawnWave();
-      }
-    }
   }
 
   _spawnWave() {
     const level = this.level;
     this.wave++;
     delete this._spawnWaveSoon;
-    const n = 5 + this.wave * 3;
+    // 🤝 кооп: хвиля більша на +60% за кожного додаткового гравця.
+    // Перша хвиля спавниться ще ДО підключення мережі — тоді рахуємо ростер кімнати.
+    const sess = level.game.coop && level.game.coop.session;
+    const playersN = (level.players && level.players.length)
+      || (sess && sess.state === 'level' ? Math.max(1, sess.roster.size) : 1);
+    const n = Math.round((5 + this.wave * 3) * (1 + 0.6 * (playersN - 1)));
     // типи: чим більше країн звільнено, тим різноманітніші зомбі
     const lib = level.game.save.liberated || {};
     const pool = ['walker', 'walker', 'runner'];
@@ -190,11 +225,12 @@ export class StormMode {
       const b = level.zombies.spawn('boss', this.cx, this.cz - Math.min(this.r * 0.5, 25), {
         style: styles[(this.wave / 4 - 1) % 4], noLeash: true,
       });
-      b.maxHp = b.hp = 700 + this.wave * 120;
+      b.maxHp = b.hp = Math.round((700 + this.wave * 120) * (1 + 0.45 * (playersN - 1)));
       b._stormWave = true;
       b.aggroed = true;
       b.state = 'chase';
       level.game.hud.banner('👑 МІНІ-БОС ПРИЙШОВ!', 'Він теж хоче в коло!', 3);
+      level.netEv('banner', '👑 МІНІ-БОС ПРИЙШОВ!', 'Він теж хоче в коло!', 3);
       level.audio.bossRoar();
     }
     if (this.wave > 1) level.audio.horde();
@@ -205,7 +241,7 @@ export class StormMode {
   results() {
     return {
       wave: this.wave,
-      time: Math.round(this.time),
+      time: Math.round(this.level.stats.time),
       kills: this.level.stats.kills,
     };
   }

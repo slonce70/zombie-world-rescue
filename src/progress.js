@@ -24,8 +24,19 @@ export const PASS_REWARDS = {
   18: { type: 'coins', n: 300, icon: '💰', name: '300 монет' },
   19: { type: 'coins', n: 350, icon: '💰', name: '350 монет' },
   20: { type: 'skin', id: 'robot', icon: '🤖', name: 'Скін «Робот»' },
+  // Оновлення 9: шлях продовжується до 30
+  21: { type: 'coins', n: 400, icon: '💰', name: '400 монет' },
+  22: { type: 'tracer', id: 'neon', icon: '🟢', name: 'Неонові кулі' },
+  23: { type: 'coins', n: 450, icon: '💰', name: '450 монет' },
+  24: { type: 'coins', n: 500, icon: '💰', name: '500 монет' },
+  25: { type: 'skin', id: 'legend', icon: '🏆', name: 'Скін «Легенда»' },
+  26: { type: 'coins', n: 550, icon: '💰', name: '550 монет' },
+  27: { type: 'coins', n: 600, icon: '💰', name: '600 монет' },
+  28: { type: 'coins', n: 650, icon: '💰', name: '650 монет' },
+  29: { type: 'coins', n: 700, icon: '💰', name: '700 монет' },
+  30: { type: 'tracer', id: 'royal', icon: '👑', name: 'Королівські кулі + слава' },
 };
-export const PASS_MAX_LEVEL = 20;
+export const PASS_MAX_LEVEL = 30;
 
 // скільки XP треба, щоб перейти з рівня n на n+1
 export function xpForLevel(n) { return 80 + 40 * (n - 1); }

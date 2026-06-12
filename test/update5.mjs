@@ -157,20 +157,20 @@ const shieldRes = await page.evaluate(async () => {
   const used = g.test.useGadget();
   const shieldVal = p.gadgetShield;
   const cd = g.level.gadgets.cd;
-  // удар 100: щит приймає все
+  // удар 30: щит приймає все (з оновлення 9 щит = 50)
   p.respawnProtect = 0;
   const hpBefore = p.health;
-  p.takeDamage(100, p.pos.x + 1, p.pos.z);
+  p.takeDamage(30, p.pos.x + 1, p.pos.z);
   const after100 = { hp: p.health, shield: p.gadgetShield };
-  // ще 200: щит (155) поглинає частину, решта в гравця
-  p.takeDamage(200, p.pos.x + 1, p.pos.z);
+  // ще 60: щит (20) поглинає частину, решта в гравця
+  p.takeDamage(60, p.pos.x + 1, p.pos.z);
   const after300 = { hp: p.health, shield: p.gadgetShield };
   g.test.god();
   return { used, shieldVal, cd, hpBefore, after100, after300 };
 });
-check(shieldRes.used && shieldRes.shieldVal === 255, `щит дає 255 захисту (${shieldRes.shieldVal})`);
+check(shieldRes.used && shieldRes.shieldVal === 50, `щит дає 50 захисту (${shieldRes.shieldVal})`);
 check(shieldRes.cd >= 29, `перезарядка щита 30с (${Math.round(shieldRes.cd)})`);
-check(shieldRes.after100.hp === shieldRes.hpBefore && shieldRes.after100.shield === 155, `100 шкоди з'їв щит (HP ${shieldRes.after100.hp}, щит ${shieldRes.after100.shield})`);
+check(shieldRes.after100.hp === shieldRes.hpBefore && shieldRes.after100.shield === 20, `30 шкоди з'їв щит (HP ${shieldRes.after100.hp}, щит ${shieldRes.after100.shield})`);
 check(shieldRes.after300.shield === 0 && shieldRes.after300.hp < shieldRes.hpBefore, 'щит розбито — решта пройшла у гравця');
 const healRes = await page.evaluate(() => {
   const g = window.__game;
