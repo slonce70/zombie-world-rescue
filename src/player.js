@@ -104,6 +104,13 @@ export class Player {
     this._shootEnd = new THREE.Vector3();
     this._muzzlePos = new THREE.Vector3();
 
+    // 🔦 ліхтарик (вмикається вночі сам — setLamp із циклу день/ніч)
+    this.lamp = new THREE.SpotLight(0xfff0c2, 0, 30, 0.52, 0.5, 1.1);
+    this.lamp.position.set(0, 0.15, 0.1);
+    this.camera.add(this.lamp);
+    this.lamp.target.position.set(0, -0.12, -12);
+    this.camera.add(this.lamp.target);
+
     this.bobPhase = 0;
     this.bobAmp = 0;
     this.gunKick = 0;
@@ -117,6 +124,11 @@ export class Player {
     this._right = new THREE.Vector3();
 
     this._applyView();
+  }
+
+  // 🔦 яскравість ліхтарика від глибини ночі
+  setLamp(nightK) {
+    this.lamp.intensity = nightK * 42;
   }
 
   get weapon() { return WEAPONS[this.cur]; }

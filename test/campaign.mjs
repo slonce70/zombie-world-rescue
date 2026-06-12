@@ -1,4 +1,4 @@
-// Повне проходження кампанії від початку до кінця: 4 країни поспіль
+// Повне проходження кампанії від початку до кінця: 6 країн поспіль
 // на одному сейві — місії, орди, боси, нагороди, прогресія.
 import { chromium } from 'playwright';
 
@@ -28,8 +28,8 @@ async function waitFor(fn, timeoutMs, label) {
 await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
 
-const ORDER = ['UKR', 'POL', 'DEU', 'FRA'];
-const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper' };
+const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'TUR', 'EGY'];
+const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', TUR: 'magnum', EGY: 'bazooka' };
 
 for (const c of ORDER) {
   console.log(`▸ Граємо: ${c}`);
@@ -100,8 +100,8 @@ const final = await page.evaluate(() => {
     allDone: g.globe.allDone,
   };
 });
-check(final.liberated === 4, `усі 4 країни звільнено (${final.liberated})`);
-check(final.weapons.length >= 4, `арсенал: ${final.weapons.join(', ')}`);
+check(final.liberated === 6, `усі 6 країн звільнено (${final.liberated})`);
+check(final.weapons.length >= 6, `арсенал: ${final.weapons.join(', ')}`);
 check(final.passLevel >= 5, `зірковий рівень після кампанії: ${final.passLevel} (XP ${final.xp})`);
 check(final.allDone, 'глобус святкує: світ врятовано');
 check(final.coins > 300, `монет зароблено: ${final.coins}`);
@@ -111,7 +111,7 @@ await page.evaluate(() => window.__game.test.startStorm());
 const stormOk = await waitFor(() => window.__game.level && window.__game.level.storm && window.__game.level.storm.wave >= 1, 40000, 'шторм');
 check(stormOk, 'шторм запускається після кампанії');
 const stormCountry = await page.evaluate(() => window.__game.level.countryId);
-check(stormCountry === 'FRA', `шторм на найскладнішій звільненій країні (${stormCountry})`);
+check(stormCountry === 'EGY', `шторм на найскладнішій звільненій країні (${stormCountry})`);
 
 console.log('');
 if (errors.length) {

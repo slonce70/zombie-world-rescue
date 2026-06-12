@@ -55,6 +55,7 @@ export class World {
     this._buildFun();
     this._buildClouds();
     if (this.biome.snowfall) this._buildSnowfall();
+    if (this.biome.dustfall) this._buildSnowfall(true);
     if (this.biome.leaffall) this._buildLeaffall();
     this._buildGrid();
     bakeGroupMeshes(this.staticGroup, { castShadow: true, receiveShadow: true });
@@ -81,6 +82,14 @@ export class World {
     if (lm.includes('vineyard')) this._lmVineyard(P.vineyard);
     if (lm.includes('balloon')) this._lmBalloon(P.balloon);
     if (lm.includes('chimneySmoke')) this._lmChimneySmoke();
+    if (lm.includes('grandBazaar')) this._lmGrandBazaar(P.grandBazaar);
+    if (lm.includes('galataTower')) this._lmGalataTower(P.galataTower);
+    if (lm.includes('teaGarden')) this._lmTeaGarden(P.teaGarden);
+    if (lm.includes('cappadociaBalloons')) this._lmCappadociaBalloons(P.cappadociaBalloons);
+    if (lm.includes('pyramids')) this._lmPyramids(P.pyramids);
+    if (lm.includes('sphinx')) this._lmSphinx(P.sphinx);
+    if (lm.includes('oasis')) this._lmOasis(P.oasis);
+    if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
     if (lm.includes('birds')) this._lmBirds();
   }
 
@@ -758,6 +767,367 @@ export class World {
     }
   }
 
+
+  // 🛍 Великий базар: критий ринок з арками, килимами і лампами (лут усередині!)
+  _lmGrandBazaar({ x, z }) {
+    const gy = this.groundH(x, z);
+    const W = 26, D = 13, H = 5.2;
+    const wallM = toonMat(0xe2cba0);
+    const trimM = toonMat(0xb4543a);
+    // довгі стіни з арковими проходами (по 3 арки з кожного боку)
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 4; i++) {
+        const px = x - W / 2 + (i + 0.5) * (W / 4);
+        const pier = new THREE.Mesh(new THREE.BoxGeometry(2.2, H, 1.1), wallM);
+        pier.position.set(px, gy + H / 2, z + side * D / 2);
+        this.staticGroup.add(pier);
+        this._addCollider(px, z + side * D / 2, 1.3, gy + H, 0.8);
+      }
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 1.2, 1.3), trimM);
+      lintel.position.set(x, gy + H - 0.4, z + side * D / 2);
+      this.staticGroup.add(lintel);
+    }
+    // торці
+    for (const side of [-1, 1]) {
+      const endW = new THREE.Mesh(new THREE.BoxGeometry(1.1, H, D - 2.6), wallM);
+      endW.position.set(x + side * W / 2, gy + H / 2, z);
+      this.staticGroup.add(endW);
+      this._addCollider(x + side * W / 2, z - D / 4, 1.4, gy + H, 0.9);
+      this._addCollider(x + side * W / 2, z + D / 4, 1.4, gy + H, 0.9);
+    }
+    // дах із трьома куполами
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 2, 0.5, D + 2), trimM);
+    roof.position.set(x, gy + H + 0.25, z);
+    this.staticGroup.add(roof);
+    this.floors.push({ x, z, ry: 0, w: W + 2, d: D + 2, top: gy + H + 0.5 });
+    const domeM = toonMat(0x6e9aa8);
+    for (let i = -1; i <= 1; i++) {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(3.0, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), domeM);
+      dome.position.set(x + i * 8.5, gy + H + 0.5, z);
+      this.staticGroup.add(dome);
+    }
+    // прилавки з килимами та лампами всередині
+    const rugCols = [0xd84f4f, 0x4a8ad4, 0xffd23f, 0x8d3bbd, 0x4cae54];
+    for (let i = 0; i < 4; i++) {
+      const sx = x - W / 2 + 4 + i * 6;
+      const stall = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 1.6), toonMat(0x8a5a32));
+      stall.position.set(sx, gy + 0.5, z - 2.2);
+      const rug = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 1.4), toonMat(rugCols[i % rugCols.length]));
+      rug.position.set(sx, gy + 1.05, z - 2.2);
+      this.staticGroup.add(stall, rug);
+      this._addCollider(sx, z - 2.2, 1.2, gy + 1.2, 0);
+      // висячий ліхтарик
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toonMat(0xffc233, 0xff9e2c, 1.0));
+      lamp.position.set(sx, gy + H - 1.1, z);
+      this.staticGroup.add(lamp);
+    }
+    // килими на стіні і лут
+    for (let i = 0; i < 3; i++) {
+      const wallRug = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.4, 0.08), toonMat(rugCols[(i + 2) % rugCols.length]));
+      wallRug.position.set(x - 6 + i * 6, gy + 2.6, z + D / 2 - 0.7);
+      this.staticGroup.add(wallRug);
+    }
+    this.lootSpots.push({ x: x - 8, z: z + 2.2, y: gy + 0.05, type: 'coins' });
+    this.lootSpots.push({ x: x + 2, z: z + 2.2, y: gy + 0.05, type: 'coins' });
+    this.lootSpots.push({ x: x + 9, z: z + 2.2, y: gy + 0.05, type: 'food' });
+    this.surpriseSpots.push({ x: x + W / 2 - 4, z });
+  }
+
+  // 🗼 вежа Галата: кругла вежа з оглядовим майданчиком (батутом нагору!)
+  _lmGalataTower({ x, z }) {
+    const gy = this.groundH(x, z);
+    const H = 12.5;
+    const bodyM = toonMat(0xd9c8a8);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.5, H, 14), bodyM);
+    body.position.set(x, gy + H / 2, z);
+    body.castShadow = true;
+    this.staticGroup.add(body);
+    this._addCollider(x, z, 3.6, gy + H, 3.0);
+    // вікна-бійниці
+    const winM = toonMat(0x37404f);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.2), winM);
+      win.position.set(x + Math.cos(a) * 3.25, gy + H * 0.62, z + Math.sin(a) * 3.25);
+      win.lookAt(x, gy + H * 0.62, z);
+      this.staticGroup.add(win);
+    }
+    // оглядовий майданчик з огорожею
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.5, 14), toonMat(0xb4543a));
+    deck.position.set(x, gy + H + 0.25, z);
+    this.staticGroup.add(deck);
+    this.floors.push({ x, z, ry: 0, w: 7.6, d: 7.6, top: gy + H + 0.5 });
+    const railM = toonMat(0x8a6a4a);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 5), railM);
+      post.position.set(x + Math.cos(a) * 4.0, gy + H + 1.0, z + Math.sin(a) * 4.0);
+      this.staticGroup.add(post);
+    }
+    const rail = new THREE.Mesh(new THREE.TorusGeometry(4.0, 0.07, 6, 18), railM);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.set(x, gy + H + 1.5, z);
+    this.staticGroup.add(rail);
+    // конічний дах-шпиль над майданчиком
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(3.4, 3.6, 14), toonMat(0x6e8a9a));
+    cone.position.set(x, gy + H + 3.6, z);
+    cone.castShadow = true;
+    this.staticGroup.add(cone);
+    // центральна опора шпиля, щоб дах «тримався»
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.0, 8), railM);
+    pole.position.set(x, gy + H + 1.4, z);
+    this.staticGroup.add(pole);
+  }
+
+  // 🍵 чайний садок: столики, чайники і смаколики
+  _lmTeaGarden({ x, z }) {
+    const gy = this.groundH(x, z);
+    const woodM = toonMat(0x8a5a32);
+    const glassM = toonMat(0xd84f4f);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.4;
+      const tx = x + Math.cos(a) * 4.5;
+      const tz = z + Math.sin(a) * 4.5;
+      const ty = this.groundH(tx, tz);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.12, 10), woodM);
+      top.position.set(tx, ty + 0.78, tz);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.78, 7), woodM);
+      leg.position.set(tx, ty + 0.39, tz);
+      this.staticGroup.add(top, leg);
+      this._addCollider(tx, tz, 1.0, ty + 0.9, 0);
+      // чайничок і тюльпаноподібні склянки
+      const pot = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), toonMat(0xc9c2b4));
+      pot.position.set(tx - 0.25, ty + 0.97, tz);
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.045, 0.14, 7), glassM);
+      cup.position.set(tx + 0.25, ty + 0.92, tz + 0.1);
+      this.staticGroup.add(pot, cup);
+      // табурети
+      for (let st = 0; st < 2; st++) {
+        const sa = a + (st ? 0.7 : -0.7);
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.45, 8), toonMat(0xb4543a));
+        const sx = tx + Math.cos(sa) * 1.5;
+        const sz = tz + Math.sin(sa) * 1.5;
+        stool.position.set(sx, this.groundH(sx, sz) + 0.22, sz);
+        this.staticGroup.add(stool);
+      }
+    }
+    // великий самовар-казан у центрі
+    const kettle = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 9), toonMat(0xb8a468, 0x8a6a2a, 0.2));
+    kettle.position.set(x, gy + 0.8, z);
+    kettle.scale.set(1, 1.2, 1);
+    this.staticGroup.add(kettle);
+    this._addCollider(x, z, 0.9, gy + 1.4, 0);
+    // смаколики на столиках
+    this.lootSpots.push({ x: x + 4.5, z, y: gy + 0.95, type: 'food' });
+    this.lootSpots.push({ x: x - 4.5, z: z + 0.5, y: gy + 0.95, type: 'food' });
+  }
+
+  // 🎈 кулі Каппадокії: кілька різнокольорових куль дрейфують у небі
+  _lmCappadociaBalloons({ x, z }) {
+    this.balloonsExtra = [];
+    const palettes = [
+      [0xd84f4f, 0xffd23f], [0x4a8ad4, 0xf5efe0], [0x8d3bbd, 0xffd23f], [0x4cae54, 0xf5efe0],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const g = new THREE.Group();
+      const [c1, c2] = palettes[i % palettes.length];
+      const env = new THREE.Mesh(new THREE.SphereGeometry(2.6, 12, 10), new THREE.MeshToonMaterial({ color: c1, gradientMap: toonMat(0).gradientMap }));
+      env.scale.y = 1.15;
+      for (let k = 0; k < 3; k++) {
+        const stripe = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.16, 6, 16), toonMat(c2));
+        stripe.rotation.x = Math.PI / 2;
+        stripe.position.y = -0.7 + k * 0.9;
+        stripe.scale.setScalar(1 - Math.abs(k - 1) * 0.14);
+        g.add(stripe);
+      }
+      const basket = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 1.1), toonMat(0x8a5a32));
+      basket.position.y = -3.8;
+      g.add(env, basket);
+      const bx = x + this.rng.range(-26, 26);
+      const bz = z + this.rng.range(-26, 26);
+      const h = this.rng.range(26, 46);
+      g.position.set(bx, h, bz);
+      this.scene.add(g);
+      this.balloonsExtra.push({ g, cx: bx, cz: bz, h, ph: this.rng.range(0, 6.28), spd: this.rng.range(0.03, 0.07) });
+    }
+  }
+
+  // 🔺 піраміди: Велика (вилазь уступами до скарбу!) і дві малі
+  _lmPyramids({ x, z }) {
+    const gy = this.groundH(x, z);
+    const stoneA = toonMat(0xddc18c);
+    const stoneB = toonMat(0xd0b27a);
+    // Велика піраміда: 13 уступів по 1.25м — на кожен можна вистрибнути
+    const LAYERS = 13;
+    const STEP = 1.25;
+    const BASE = 34;
+    for (let i = 0; i < LAYERS; i++) {
+      const size = BASE * (1 - i / LAYERS);
+      const layer = new THREE.Mesh(new THREE.BoxGeometry(size, STEP, size), i % 2 ? stoneA : stoneB);
+      layer.position.set(x, gy + STEP / 2 + i * STEP, z);
+      layer.castShadow = i % 3 === 0; // не всі шари — тіні дорогі
+      layer.receiveShadow = true;
+      this.staticGroup.add(layer);
+      this.floors.push({ x, z, ry: 0, w: size, d: size, top: gy + (i + 1) * STEP });
+    }
+    // золота верхівка
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.6, 4), toonMat(0xffd23f, 0xcc8800, 0.35));
+    cap.position.set(x, gy + LAYERS * STEP + 0.8, z);
+    cap.rotation.y = Math.PI / 4;
+    this.staticGroup.add(cap);
+    // колайдери лише по периметру основи (всередину не зайдеш, зомбі не лізуть)
+    const half = BASE / 2;
+    // низькі колайдери: пішки не зайдеш усередину, але стрибком — на перший уступ
+    for (let t = -half + 1.5; t <= half - 1.5; t += 3) {
+      this._addCollider(x + t, z - half, 1.6, gy + 0.5, 0);
+      this._addCollider(x + t, z + half, 1.6, gy + 0.5, 0);
+      this._addCollider(x - half, z + t, 1.6, gy + 0.5, 0);
+      this._addCollider(x + half, z + t, 1.6, gy + 0.5, 0);
+    }
+    // скарб на вершині
+    this.lootSpots.push({ x, z, y: gy + LAYERS * STEP + 0.05, type: 'coins' });
+    // дві малі піраміди поряд (суцільні, без сходження)
+    for (const [ox, oz, sc] of [[-24, 14, 0.45], [20, 20, 0.34]]) {
+      const mh = 16 * sc;
+      const mini = new THREE.Mesh(new THREE.ConeGeometry(13 * sc, mh, 4), stoneB);
+      const mx = x + ox, mz = z + oz;
+      const my = this.groundH(mx, mz);
+      mini.position.set(mx, my + mh / 2, mz);
+      mini.rotation.y = Math.PI / 4;
+      mini.castShadow = true;
+      this.staticGroup.add(mini);
+      this._addCollider(mx, mz, 10 * sc, my + mh, 4 * sc);
+    }
+  }
+
+  // 🦁 сфінкс: лежачий лев з обличчям фараона
+  _lmSphinx({ x, z }) {
+    const gy = this.groundH(x, z);
+    const sandM = toonMat(0xd9b87e);
+    const g = new THREE.Group();
+    // тіло
+    const body = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 3.6), sandM);
+    body.position.set(0, 1.5, 0);
+    // передні лапи
+    for (const side of [-1, 1]) {
+      const paw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.1, 1.1), sandM);
+      paw.position.set(-5.4, 0.65, side * 1.15);
+      g.add(paw);
+    }
+    // груди і голова
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.4, 3.0), sandM);
+    chest.position.set(-3.6, 2.4, 0);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.0, 1.7), sandM);
+    head.position.set(-3.6, 4.9, 0);
+    // немес — смугаста хустка фараона
+    const nemesM = toonMat(0x4a8ad4);
+    for (const side of [-1, 1]) {
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.5), nemesM);
+      flap.position.set(-3.6, 4.6, side * 1.05);
+      flap.rotation.x = side * 0.12;
+      g.add(flap);
+    }
+    const crownBand = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.5, 1.9), toonMat(0xffd23f, 0xcc8800, 0.25));
+    crownBand.position.set(-3.6, 5.9, 0);
+    // обличчя: очі
+    const eyeM = toonMat(0x37404f);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.35), eyeM);
+      eye.position.set(-4.58, 5.1, side * 0.4);
+      g.add(eye);
+    }
+    // задні стегна і хвіст
+    const hips = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.0, 3.4), sandM);
+    hips.position.set(3.6, 1.8, 0);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 3.6, 7), sandM);
+    tail.rotation.z = 1.25;
+    tail.position.set(4.6, 1.2, 1.6);
+    g.add(body, chest, head, crownBand, hips, tail);
+    g.position.set(x, gy, z);
+    g.rotation.y = -0.35;
+    this.staticGroup.add(g);
+    this._addCollider(x - 3, z, 2.6, gy + 4.5, 1.6);
+    this._addCollider(x + 2, z, 2.6, gy + 3, 1.6);
+    // спина сфінкса — секретна полиця
+    this.floors.push({ x: x + 0.5, z, ry: -0.35, w: 8, d: 3.4, top: gy + 2.8 });
+  }
+
+  // 🌴 оаза: вода, пальми навколо, тінь і прохолода
+  _lmOasis({ x, z }) {
+    this._lmPond({ x, z, r: 9 });
+    // пальми по колу
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + this.rng.range(-0.2, 0.2);
+      const r = 10.5 + this.rng.range(0, 3);
+      const px = x + Math.cos(a) * r;
+      const pz = z + Math.sin(a) * r;
+      this._buildPalm(px, pz, this.rng.range(0.9, 1.25));
+    }
+  }
+
+  // 🗿 обеліск із золотою верхівкою
+  _lmObelisk({ x, z }) {
+    const gy = this.groundH(x, z);
+    const stoneM = toonMat(0xc9ab74);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 2.4), stoneM);
+    base.position.set(x, gy + 0.5, z);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.95, 8.5, 4), stoneM);
+    shaft.position.set(x, gy + 5.2, z);
+    shaft.rotation.y = Math.PI / 4;
+    shaft.castShadow = true;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.9, 4), toonMat(0xffd23f, 0xcc8800, 0.3));
+    tip.position.set(x, gy + 9.9, z);
+    tip.rotation.y = Math.PI / 4;
+    this.staticGroup.add(base, shaft, tip);
+    this._addCollider(x, z, 1.4, gy + 9, 0.7);
+    // ієрогліфи-рисочки
+    const glyphM = toonMat(0x8a6a3a);
+    for (let i = 0; i < 5; i++) {
+      const gl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.06), glyphM);
+      gl.position.set(x, gy + 2.2 + i * 1.2, z - 0.78 + (i % 2) * 0.04);
+      this.staticGroup.add(gl);
+    }
+  }
+
+  // 🌴 одна пальма: вигнутий стовбур + віяло листя (і колайдер)
+  _buildPalm(x, z, scale = 1) {
+    const gy = this.groundH(x, z);
+    const trunkM = toonMat(0x9a7448);
+    const lean = this.rng.range(-0.18, 0.18);
+    const segs = 4;
+    const H = 4.6 * scale;
+    let topX = x, topY = gy;
+    for (let i = 0; i < segs; i++) {
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * scale * (1 - i * 0.12), 0.2 * scale * (1 - i * 0.1), H / segs + 0.15, 7), trunkM);
+      topX = x + lean * (i + 0.5) * (H / segs);
+      seg.position.set(topX, gy + (i + 0.5) * (H / segs), z);
+      seg.rotation.z = -lean * 0.8;
+      seg.castShadow = true;
+      this.staticGroup.add(seg);
+    }
+    topY = gy + H;
+    topX = x + lean * H;
+    const leafM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap, side: THREE.DoubleSide });
+    const greens = this.biome.treeGreens;
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.34 * scale, 2.6 * scale, 4), leafM.clone());
+      leaf.material.color.setHex(greens[i % greens.length]);
+      leaf.position.set(topX + Math.cos(a) * 1.1 * scale, topY + 0.25, z + Math.sin(a) * 1.1 * scale);
+      leaf.rotation.z = Math.cos(a) * 1.25;
+      leaf.rotation.x = -Math.sin(a) * 1.25;
+      leaf.castShadow = i % 2 === 0;
+      this.staticGroup.add(leaf);
+    }
+    // кокоси
+    for (let i = 0; i < 3; i++) {
+      const coco = new THREE.Mesh(new THREE.SphereGeometry(0.16 * scale, 7, 6), toonMat(0x6b4a2a));
+      coco.position.set(topX + this.rng.range(-0.3, 0.3), topY - 0.1, z + this.rng.range(-0.3, 0.3));
+      this.staticGroup.add(coco);
+    }
+    this._addCollider(x, z, 0.45 * scale, gy + 2.4, 0.25);
+  }
+
   // сума пагорбів карти в точці
   _hillsAt(x, z) {
     let h = 0;
@@ -830,6 +1200,7 @@ export class World {
     const b = this.biome;
     const hemi = new THREE.HemisphereLight(b.hemiSky, b.hemiGround, b.hemiIntensity);
     this.scene.add(hemi);
+    this.hemi = hemi;
     const sun = new THREE.DirectionalLight(b.sunColor, b.sunIntensity);
     sun.position.set(b.sunPos[0], b.sunPos[1], b.sunPos[2]);
     sun.castShadow = true;
@@ -849,6 +1220,40 @@ export class World {
     this.sunBaseY = b.sunPos[1];
     this.sunBaseZ = b.sunPos[2];
     this.scene.fog = new THREE.Fog(b.fogColor, b.fogNear, b.fogFar);
+    // 🌙 база для циклу день/ніч
+    this.nightK = 0;
+    this._dayFog = new THREE.Color(b.fogColor);
+    this._nightFog = new THREE.Color(0x131b2e);
+    this._daySun = new THREE.Color(b.sunColor);
+    this._nightSun = new THREE.Color(0x9db8e8);
+  }
+
+  // 🌙 ніч: k = 0 (день) … 1 (глибока ніч). Викликається щокадру з main.
+  setNight(k) {
+    if (Math.abs(k - this.nightK) < 0.002) return;
+    this.nightK = k;
+    const b = this.biome;
+    // сонце стає місячним світлом
+    this.sun.intensity = b.sunIntensity * (1 - k * 0.82);
+    this.sun.color.copy(this._daySun).lerp(this._nightSun, k);
+    this.hemi.intensity = b.hemiIntensity * (1 - k * 0.62);
+    // небо
+    if (this.sky) {
+      const u = this.sky.material.uniforms;
+      u.top.value.setHex(b.skyTop).lerp(this._skyNightTop, k);
+      u.horizon.value.setHex(b.skyHorizon).lerp(this._skyNightHor, k);
+      u.bottom.value.setHex(b.skyBottom).lerp(this._skyNightBot, k);
+    }
+    // туман густішає і синішає
+    this.scene.fog.color.copy(this._dayFog).lerp(this._nightFog, k);
+    this.scene.fog.far = b.fogFar * (1 - k * 0.3);
+    // сонячний диск ховається, місяць і зорі виходять
+    if (this.sunDiscs) for (const d of this.sunDiscs) d.material.opacity = d.userData.baseOp * (1 - k);
+    if (this.moon) this.moon.material.opacity = k * 0.95;
+    if (this.moonGlow) this.moonGlow.material.opacity = k * 0.22;
+    if (this.stars) this.stars.material.opacity = k * 0.9;
+    // ліхтарі розгораються
+    if (this.lampHeadM) this.lampHeadM.emissiveIntensity = b.lampGlow + k * 2.2;
   }
 
   // сонце-тінь слідує за гравцем (з кроком, щоб тіні не мерехтіли)
@@ -889,6 +1294,9 @@ export class World {
     const sky = new THREE.Mesh(geo, mat);
     this.scene.add(sky);
     this.sky = sky;
+    this._skyNightTop = new THREE.Color(0x0a1226);
+    this._skyNightHor = new THREE.Color(0x1d2a4a);
+    this._skyNightBot = new THREE.Color(0x0d1422);
     // сонячний диск
     const sunDisc = new THREE.Mesh(
       new THREE.CircleGeometry(38, 24),
@@ -904,6 +1312,48 @@ export class World {
     glow.position.copy(sunDisc.position).multiplyScalar(0.995);
     glow.lookAt(0, 0, 0);
     this.scene.add(glow);
+    sunDisc.userData.baseOp = 0.95;
+    glow.userData.baseOp = 0.25;
+    this.sunDiscs = [sunDisc, glow];
+
+    // 🌙 місяць (з кратерами) — на протилежному боці неба, вдень прозорий
+    const mp = this.biome.sunDiscPos;
+    const moon = new THREE.Mesh(
+      new THREE.CircleGeometry(26, 22),
+      new THREE.MeshBasicMaterial({ color: 0xeef2ff, fog: false, transparent: true, opacity: 0 })
+    );
+    moon.position.set(-mp[0] * 0.9, Math.max(mp[1], 280), -mp[2] * 0.9);
+    moon.lookAt(0, 0, 0);
+    this.scene.add(moon);
+    this.moon = moon;
+    const mGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(46, 22),
+      new THREE.MeshBasicMaterial({ color: 0xbcd0ff, fog: false, transparent: true, opacity: 0 })
+    );
+    mGlow.position.copy(moon.position).multiplyScalar(1.002);
+    mGlow.lookAt(0, 0, 0);
+    this.scene.add(mGlow);
+    this.moonGlow = mGlow;
+
+    // ✨ зорі: жменя точок по куполу
+    const starN = 320;
+    const starPos = new Float32Array(starN * 3);
+    const srng = new RNG(42);
+    for (let i = 0; i < starN; i++) {
+      const a = srng.range(0, Math.PI * 2);
+      const elev = Math.asin(srng.range(0.08, 0.98));
+      const R = 720;
+      starPos[i * 3] = Math.cos(a) * Math.cos(elev) * R;
+      starPos[i * 3 + 1] = Math.sin(elev) * R;
+      starPos[i * 3 + 2] = Math.sin(a) * Math.cos(elev) * R;
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+      color: 0xfff8e0, size: 2.4, sizeAttenuation: false, fog: false, transparent: true, opacity: 0,
+    }));
+    this.scene.add(stars);
+    this.stars = stars;
   }
 
   // ---------- терен ----------
@@ -1055,6 +1505,58 @@ export class World {
 
   _buildVegetation() {
     const rng = this.rng;
+    // 🌴 пустельний біом: рідкі пальми замість лісу
+    if (this.biome.palms) {
+      const acceptPalm = (x, z) => {
+        const d = Math.hypot(x, z);
+        if (d > this.layout.BOUND + 10) return false;
+        if (this.roadDist(x, z) < 7) return false;
+        if (!this._farFromSites(x, z, 12)) return false;
+        return rng.chance(0.5);
+      };
+      const palmPts = this._scatterPoints(85, 9, acceptPalm);
+      for (const p of palmPts) this._buildPalm(p.x, p.z, rng.range(0.8, 1.3));
+      // сухі кущики і каміння пустелі
+      const bushPts = this._scatterPoints(120, 4, (x, z) =>
+        Math.hypot(x, z) < this.layout.BOUND + 5 && this.roadDist(x, z) > 4.5 && this._farFromSites(x, z, 4));
+      const bushGeo = new THREE.IcosahedronGeometry(1, 1);
+      const bushMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap });
+      const bushes = new THREE.InstancedMesh(bushGeo, bushMat, bushPts.length);
+      const dryCols = [0xa89a58, 0x968a4e, 0x7e8a44, 0xb0a468];
+      const m4d = new THREE.Matrix4();
+      const qd = new THREE.Quaternion();
+      const v3d = new THREE.Vector3();
+      const scd = new THREE.Vector3();
+      const cold = new THREE.Color();
+      bushPts.forEach((p, i) => {
+        const h = this.groundH(p.x, p.z);
+        const sz = rng.range(0.35, 0.8);
+        qd.setFromEuler(new THREE.Euler(0, rng.next() * 6.28, 0));
+        m4d.compose(v3d.set(p.x, h + sz * 0.4, p.z), qd, scd.set(sz, sz * 0.55, sz));
+        bushes.setMatrixAt(i, m4d);
+        bushes.setColorAt(i, cold.setHex(rng.pick(dryCols)));
+      });
+      bushes.castShadow = true;
+      this.scene.add(bushes);
+      const rockPts = this._scatterPoints(90, 6, (x, z) =>
+        Math.hypot(x, z) < this.layout.BOUND + 8 && this.roadDist(x, z) > 5 && this._farFromSites(x, z, 5));
+      const rockGeo = new THREE.IcosahedronGeometry(1, 0);
+      const rockMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap, flatShading: true });
+      const rocks = new THREE.InstancedMesh(rockGeo, rockMat, rockPts.length);
+      const rockCols = [0xc9ab74, 0xb8995e, 0xd4b780];
+      rockPts.forEach((p, i) => {
+        const h = this.groundH(p.x, p.z);
+        const sz = rng.range(0.4, 1.7);
+        qd.setFromEuler(new THREE.Euler(rng.next(), rng.next() * 6.28, rng.next()));
+        m4d.compose(v3d.set(p.x, h + sz * 0.3, p.z), qd, scd.set(sz, sz * rng.range(0.55, 0.85), sz));
+        rocks.setMatrixAt(i, m4d);
+        rocks.setColorAt(i, cold.setHex(rng.pick(rockCols)));
+        if (sz > 0.9) this._addCollider(p.x, p.z, sz * 0.8, h + sz, sz * 0.8);
+      });
+      rocks.castShadow = true;
+      this.scene.add(rocks);
+      return;
+    }
     const isForest = (x, z) => this.fbmLow(x * 0.016 + 200, z * 0.016 + 200) > 0.12;
     const acceptTree = (x, z) => {
       const d = Math.hypot(x, z);
@@ -1565,6 +2067,7 @@ export class World {
     // ліхтарі вздовж південної дороги
     const lampM = toonMat(0x37404f);
     const lampHeadM = toonMat(0xffd97a, 0xffc233, this.biome.lampGlow);
+    this.lampHeadM = lampHeadM; // вночі розгоряється (setNight)
     for (const [lx, lz] of [[10, 130], [2, 90], [10, 50], [-4, 24], [12, 14], [-8, -2]]) {
       const ly = this.groundH(lx, lz);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 8), lampM);
@@ -1572,7 +2075,8 @@ export class World {
       pole.castShadow = true;
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), lampHeadM);
       head.position.set(lx, ly + 3.5, lz);
-      this.staticGroup.add(pole, head);
+      this.staticGroup.add(pole);
+      this.scene.add(head); // НЕ в staticGroup: запікання з'їдає emissive, а вночі ліхтар світиться
       this._addCollider(lx, lz, 0.25, ly + 3.2, 0.15);
     }
   }
@@ -2344,10 +2848,15 @@ export class World {
   }
 
   // ---------- снігопад ----------
-  _buildSnowfall() {
-    const N = this.quality.snow;
-    const geo = new THREE.SphereGeometry(0.05, 5, 4);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+  _buildSnowfall(dust = false) {
+    const N = dust ? Math.round(this.quality.snow * 0.5) : this.quality.snow;
+    const geo = new THREE.SphereGeometry(dust ? 0.04 : 0.05, 5, 4);
+    const mat = new THREE.MeshBasicMaterial({
+      color: dust ? 0xe8cf9a : 0xffffff,
+      transparent: true,
+      opacity: dust ? 0.4 : 0.85,
+    });
+    this.dustMode = dust;
     this.snowMesh = new THREE.InstancedMesh(geo, mat, N);
     this.snowMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.snowMesh.frustumCulled = false;
@@ -2417,8 +2926,16 @@ export class World {
     if (!this.snowMesh) return;
     for (let i = 0; i < this.snowFlakes.length; i++) {
       const f = this.snowFlakes[i];
-      f.y -= f.spd * dt;
-      f.x += Math.sin(this.time * f.drift + f.ph) * dt * 0.8;
+      if (this.dustMode) {
+        // піщана імла: несеться вітром майже горизонтально
+        f.x += f.spd * dt * 2.2;
+        f.y -= f.spd * dt * 0.25;
+        f.z += Math.sin(this.time * f.drift + f.ph) * dt * 1.4;
+        if (f.x > 35) { f.x = -35; f.y = this.rng.range(0.5, 14); f.z = this.rng.range(-35, 35); }
+      } else {
+        f.y -= f.spd * dt;
+        f.x += Math.sin(this.time * f.drift + f.ph) * dt * 0.8;
+      }
       if (f.y < -2) {
         f.y = 26 + this.rng.range(0, 6);
         f.x = this.rng.range(-35, 35);
@@ -2600,6 +3117,14 @@ export class World {
       }
     }
     // повітряна куля пливе колами
+    if (this.balloonsExtra) {
+      for (const b of this.balloonsExtra) {
+        b.ph += dt * b.spd;
+        b.g.position.x = b.cx + Math.cos(b.ph) * 14;
+        b.g.position.z = b.cz + Math.sin(b.ph * 0.8) * 12;
+        b.g.position.y = b.h + Math.sin(this.time * 0.3 + b.ph * 4) * 1.6;
+      }
+    }
     if (this.balloon) {
       this.balloon.ph += dt * 0.05;
       const b = this.balloon;

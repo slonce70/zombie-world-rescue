@@ -21,7 +21,7 @@ import { CoopUI } from './ui/coopui.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -737,6 +737,9 @@ class Game {
       document.getElementById('boss-name').textContent = country.boss.name;
     });
 
+    // прогріваємо шейдери, поки висить екран завантаження — без фризу на старті
+    try { this.renderer.compile(level.scene, level.player.camera); } catch (e) { /* ignore */ }
+
     // 🤝 кооп: мережевий шар рівня
     if (coop) {
       level.net = coop.session.makeNet(level, coop.spec);
@@ -769,6 +772,7 @@ class Game {
     this.level = level;
     this.state = 'level';
     this.victoryShown = false;
+    this._nightAnnounced = false;
     this.paused = false;
     this.deathT = -1;
     this.hud.showBoss(false);
@@ -1176,6 +1180,7 @@ class Game {
         if (this.level.net) this._updateRevive(dt, allowControl);
         if (this.level.pet) this.level.pet.update(dt);
         this.level.world.update(dt, this.level.player.pos);
+        this._updateDayNight();
         this.level.effects.update(dt);
         this.level.stats.time += dt;
         // комбо згасає без вбивств
@@ -1203,6 +1208,32 @@ class Game {
       if (!skipRender) this.renderer.render(this.level.scene, this.level.player.camera);
     }
     this.input.postUpdate();
+  }
+
+  // 🌙 цикл день/ніч: ~2хв день → 20с сутінки → ~1хв ніч → 20с світанок.
+  // nightK їде від часу рівня, тож у коопі ніч настає в усіх ОДНОЧАСНО.
+  _updateDayNight() {
+    const level = this.level;
+    if (!level) return;
+    const CYCLE = 220;
+    const ct = level.stats.time % CYCLE;
+    let k = 0;
+    if (ct < 120) k = 0;
+    else if (ct < 140) k = (ct - 120) / 20;
+    else if (ct < 195) k = 1;
+    else if (ct < 215) k = 1 - (ct - 195) / 20;
+    k = k * k * (3 - 2 * k); // плавні переходи
+    level.nightK = k;
+    level.world.setNight(k);
+    level.player.setLamp(k);
+    const isNight = k > 0.5;
+    if (isNight && !this._nightAnnounced) {
+      this._nightAnnounced = true;
+      this.hud.toast('🌙 НІЧ! Зомбі бачать далі — твій ліхтарик увімкнено');
+    } else if (!isNight && this._nightAnnounced) {
+      this._nightAnnounced = false;
+      this.hud.toast('☀️ Світанок! Зомбі знову сонні');
+    }
   }
 
   _updateMusic(dt) {
@@ -1290,6 +1321,7 @@ class Game {
         walls: g.level ? g.level.gadgets.walls.map((w) => ({ x: w.x, z: w.z, hp: w.hp })) : [],
         tramps: g.level ? g.level.gadgets.tramps.length : 0,
         jumpPads: g.level ? g.level.world.jumpPads.length : 0,
+        nightK: g.level ? Math.round((g.level.nightK || 0) * 100) / 100 : 0,
         storm: g.level && g.level.storm ? {
           wave: g.level.storm.wave, r: g.level.storm.r,
           outside: g.level.storm.isOutside(), over: g.level.storm.over,
@@ -1297,6 +1329,7 @@ class Game {
         } : null,
         stormBest: { ...g.save.stormBest },
       }),
+      setLevelTime: (t) => { g.level.stats.time = t; },
       teleport: (x, z) => {
         const p = g.level.player;
         p.pos.set(x, g.level.world.groundH(x, z), z);

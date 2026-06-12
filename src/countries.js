@@ -3,6 +3,8 @@ import ukraineMap from './maps/ukraine.js';
 import polandMap from './maps/poland.js';
 import germanyMap from './maps/germany.js';
 import franceMap from './maps/france.js';
+import turkeyMap from './maps/turkey.js';
+import egyptMap from './maps/egypt.js';
 
 export const BIOMES = {
   summer: {
@@ -80,6 +82,45 @@ export const BIOMES = {
     lampGlow: 0.8,
     signText: 'МІСТЕЧКО ЛАВАНДОВЕ',
   },
+  // 🇹🇷 теплий вечір над Босфором
+  bosphorus: {
+    skyTop: 0x3f7fc4, skyHorizon: 0xffc98a, skyBottom: 0xc4a88a,
+    fogColor: 0xf2d9b8, fogNear: 120, fogFar: 410,
+    hemiSky: 0xf2dcc0, hemiGround: 0x8a7a52, hemiIntensity: 0.92,
+    sunColor: 0xffe2b8, sunIntensity: 1.7, sunPos: [95, 75, 50],
+    sunDisc: 0xffce8a, sunDiscPos: [390, 230, 250],
+    grass1: 0x9cb04a, grass2: 0x7e9a3e, grass3: 0xb8c25a,
+    dirt: 0xb89a6e, plaza: 0xcaa87e, arenaGround: 0xa89072,
+    roadMain: 0xb49c74, roadEdge: 0x877454,
+    treeGreens: [0x6e9a3a, 0x82a848, 0x5a8a34, 0x96b052, 0x7a9a44],
+    pineGreens: [0x2e5a3a, 0x254e32, 0x35663f], // кипариси — темні і стрункі
+    pineRatio: 0.5, snow: false, snowfall: false,
+    housePalette: [0xf5ead2, 0xf7dfc2, 0xe8d6c4, 0xf2e2cc, 0xdfd2c0],
+    roofPalette: [0xb4543a, 0xa84c34, 0xc05e40, 0x96503c],
+    flowers: true, hay: false,
+    lampGlow: 0.9,
+    signText: 'МІСТО СХІДНЕ',
+  },
+  // 🇪🇬 розпечена пустеля з пірамідами
+  desert: {
+    skyTop: 0x4a9ce8, skyHorizon: 0xffe6b0, skyBottom: 0xe2c188,
+    fogColor: 0xf2e0b4, fogNear: 110, fogFar: 390,
+    hemiSky: 0xffeccc, hemiGround: 0xb89c5e, hemiIntensity: 1.0,
+    sunColor: 0xfff2cc, sunIntensity: 2.0, sunPos: [60, 120, 40],
+    sunDisc: 0xfff0b8, sunDiscPos: [300, 440, 220],
+    grass1: 0xe2c488, grass2: 0xd4b372, grass3: 0xeed29c, // пісок замість трави
+    dirt: 0xc9a86a, plaza: 0xd9bc86, arenaGround: 0xc4a878,
+    roadMain: 0xbfa070, roadEdge: 0x8f7850,
+    treeGreens: [0x5a8a3a, 0x6e9a44, 0x4f7a34], // пальмове листя
+    pineGreens: [0x5a8a3a, 0x4f7a34, 0x6e9a44],
+    pineRatio: 0, snow: false, snowfall: false, dustfall: true,
+    palms: true, sparseTrees: true,
+    housePalette: [0xefdcb4, 0xe8d2a4, 0xf2e2c0, 0xdfc89a, 0xe8d8b8],
+    roofPalette: [0xc9a86a, 0xb8945a, 0xa8854e, 0xd4b274],
+    flowers: false, hay: false,
+    lampGlow: 1.0,
+    signText: 'ОАЗА ЗОЛОТА',
+  },
 };
 
 export const COUNTRIES = {
@@ -143,9 +184,39 @@ export const COUNTRIES = {
     banner: 'Лаванда, вежа до неба і ШЕФ БАГЕТ. Стережись черствих багетів! 🥖',
     food: 'круасан',
   },
+  TUR: {
+    id: 'TUR', name: 'Туреччина', flag: '🇹🇷', seed: 6060,
+    lat: 39.0, lon: 35.2,
+    victoryTitle: '🇹🇷 ТУРЕЧЧИНУ ЗВІЛЬНЕНО!',
+    biome: 'bosphorus',
+    map: turkeyMap,
+    difficulty: { hp: 2.0, dmg: 1.6, counts: 1.5 },
+    weaponReward: 'magnum',
+    weaponRewardToast: 'Ти отримав МАГНУМ! Клавіша 5 — один постріл, один зомбі 🤠',
+    extraZombie: 'gunner',
+    shieldGuards: 4,
+    boss: { name: '👑 ПАША КЕБАБ', hp: 5200, frost: false, style: 'sultan' },
+    banner: 'Великий базар, повітряні кулі і ПАША КЕБАБ. Стережись шампурів! 🍢',
+    food: 'лукум',
+  },
+  EGY: {
+    id: 'EGY', name: 'Єгипет', flag: '🇪🇬', seed: 7070,
+    lat: 26.6, lon: 30.2,
+    victoryTitle: '🇪🇬 ЄГИПЕТ ЗВІЛЬНЕНО!',
+    biome: 'desert',
+    map: egyptMap,
+    difficulty: { hp: 2.25, dmg: 1.7, counts: 1.55 },
+    weaponReward: 'bazooka',
+    weaponRewardToast: 'Ти отримав БАЗУКУ ФАРАОНА! Клавіша 7 — рознеси їх усіх 🚀',
+    extraZombie: 'mummy',
+    shieldGuards: 3,
+    boss: { name: '👑 ФАРАОН ТУТ-АНХ-ЗОМБ', hp: 6400, frost: false, style: 'pharaoh' },
+    banner: 'Піраміди, мумії і сам ФАРАОН. Кусючі скарабеї літають! 🪲',
+    food: 'фінік',
+  },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'TUR', 'EGY'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;

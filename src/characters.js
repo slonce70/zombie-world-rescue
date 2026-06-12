@@ -830,6 +830,36 @@ export function makeShieldMesh() {
 
 function buildZombie(type, rng) {
   if (type === 'snowman') return buildSnowman(rng);
+  if (type === 'mummy') {
+    // 🧻 мумія: вся в бинтах, очі світяться з-під пов'язок
+    const wrapCol = rng.pick([0xe2dac4, 0xd9d2bc, 0xe8e0cc]);
+    const rig = makeHumanoid({
+      scale: 1.05, belly: 0.95, armsForward: 1.15, lean: -0.1,
+      skin: wrapCol, shirt: wrapCol, pants: wrapCol, shoes: 0xc9c2ac,
+      eyeWhite: 0x7fe8ff, eyeL: 0.09, eyeR: 0.09,
+      pupilColor: 0x115a7a, mouth: 'crooked', teeth: false,
+      brow: 0.42, sleeves: 'skin', nose: false,
+    });
+    // смуги бинтів навхрест по тулубу, руках і голові
+    const bandM = toonMat(0xcfc6a8);
+    for (let i = 0; i < 3; i++) {
+      const band = box(0.46, 0.06, 0.4, bandM);
+      band.position.set(0, 0.08 + i * 0.18, 0);
+      band.rotation.y = i % 2 ? 0.35 : -0.3;
+      rig.parts.torso.add(band);
+    }
+    const headBand = box(0.4, 0.07, 0.38, bandM);
+    headBand.position.set(0, 0.12, 0);
+    headBand.rotation.y = 0.25;
+    rig.parts.head.add(headBand);
+    // звисаючий хвостик бинта
+    const loose = box(0.07, 0.4, 0.03, bandM);
+    loose.position.set(0.2, -0.32, -0.15);
+    loose.rotation.z = 0.25;
+    rig.parts.armR.add(loose);
+    rig.ztype = 'mummy';
+    return rig;
+  }
   const skin = rng.pick(ZOMBIE_SKINS);
   const common = {
     skin,
@@ -1018,6 +1048,16 @@ const BOSS_SPECS = {
     skin: 0x9fce62, shirt: 0xf2efe4, pants: 0x46506b, shoes: 0x2e2620,
     eyeWhite: 0xfff4d6, pupilColor: 0x6e3a1a, browColor: 0x5a4030,
   },
+  // 🇹🇷 Паша Кебаб: оксамитовий жилет, феска і шампур
+  sultan: {
+    skin: 0x7eb054, shirt: 0x8c2f3e, pants: 0x3a3050, shoes: 0x2e2620,
+    eyeWhite: 0xffe9b8, pupilColor: 0x8a4a1a, browColor: 0x3a2a20,
+  },
+  // 🇪🇬 Фараон Тут-Анх-Зомб: бинти і золото
+  pharaoh: {
+    skin: 0xb8c49a, shirt: 0xe8e0cc, pants: 0xd9d2bc, shoes: 0xc9b88a,
+    eyeWhite: 0x9be8ff, pupilColor: 0x1a6a8a, browColor: 0x8a6a2a,
+  },
 };
 
 export function makeBoss(style = 'king') {
@@ -1061,6 +1101,79 @@ export function makeBoss(style = 'king') {
     const baguette = capsule(0.07, 0.55, baguetteM, 4, 8);
     baguette.position.set(0, -0.62, 0);
     rig.parts.armL.add(baguette);
+  } else if (style === 'sultan') {
+    // 🍢 феска з китицею
+    const fezM = toonMat(0xb4262f);
+    const fez = cylinder(0.2, 0.24, 0.22, fezM, 12);
+    fez.position.set(0, 0.42, 0);
+    fez.rotation.z = 0.1;
+    const tassel = sphere(0.06, toonMat(0xffd23f), 6, 5);
+    tassel.position.set(0.16, 0.5, 0);
+    rig.parts.head.add(fez, tassel);
+    // закручені вуса
+    const mouM = toonMat(0x2e2620);
+    for (const side of [-1, 1]) {
+      const mou = box(0.14, 0.045, 0.03, mouM);
+      mou.position.set(side * 0.1, 0.05, -0.21);
+      mou.rotation.z = side * 0.55;
+      const curl = sphere(0.035, mouM, 6, 5);
+      curl.position.set(side * 0.18, 0.1, -0.21);
+      rig.parts.head.add(mou, curl);
+    }
+    // золотий пояс-кушак і жилет
+    const sash = box(0.66, 0.16, 0.5, toonMat(0xffd23f, 0xcc8800, 0.2));
+    sash.position.set(0, 0.06, 0);
+    rig.parts.torso.add(sash);
+    // 🍢 величезний шампур із шматками кебаба в руці
+    const skewer = cylinder(0.035, 0.035, 1.05, toonMat(0x9aa3ad), 6);
+    skewer.position.set(0, -0.62, 0);
+    const meatM = toonMat(0xa85636);
+    for (let i = 0; i < 3; i++) {
+      const meat = sphere(0.1, meatM, 8, 6);
+      meat.position.set(0, -0.45 - i * 0.22, 0);
+      meat.scale.set(1, 0.8, 1);
+      rig.parts.armL.add(meat);
+    }
+    rig.parts.armL.add(skewer);
+  } else if (style === 'pharaoh') {
+    // 👑 немес — смугаста хустка фараона
+    const nemesM = toonMat(0x3f7fc4);
+    const goldM = toonMat(0xffd23f, 0xcc8800, 0.3);
+    const hood = sphere(0.3, nemesM, 12, 9);
+    hood.position.set(0, 0.28, 0.04);
+    hood.scale.set(1.05, 0.85, 1.1);
+    rig.parts.head.add(hood);
+    for (const side of [-1, 1]) {
+      const flap = box(0.16, 0.42, 0.07, nemesM);
+      flap.position.set(side * 0.22, 0.0, 0.0);
+      flap.rotation.z = side * 0.12;
+      rig.parts.head.add(flap);
+    }
+    const band = box(0.45, 0.09, 0.3, goldM);
+    band.position.set(0, 0.34, -0.12);
+    rig.parts.head.add(band);
+    // золота кобра на чолі
+    const cobra = cone(0.045, 0.16, goldM, 6);
+    cobra.position.set(0, 0.44, -0.22);
+    rig.parts.head.add(cobra);
+    // бинти мумії поверх тіла
+    const wrapM = toonMat(0xd9d2bc);
+    for (let i = 0; i < 3; i++) {
+      const wrap = box(0.58, 0.07, 0.5, wrapM);
+      wrap.position.set(0, 0.05 + i * 0.22, 0);
+      wrap.rotation.y = (i % 2 ? 0.18 : -0.14);
+      rig.parts.torso.add(wrap);
+    }
+    // золотий комір-усех
+    const collar = cylinder(0.34, 0.42, 0.1, goldM, 12);
+    collar.position.set(0, 0.62, 0);
+    rig.parts.torso.add(collar);
+    // посох-анкх у руці
+    const staff = cylinder(0.03, 0.03, 1.0, goldM, 6);
+    staff.position.set(0, -0.6, 0);
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.03, 6, 12), goldM);
+    loop.position.set(0, -1.12, 0);
+    rig.parts.armL.add(staff, loop);
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

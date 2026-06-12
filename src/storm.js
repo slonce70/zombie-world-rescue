@@ -164,6 +164,8 @@ export class StormMode {
     if (lib.POL || this.wave >= 3) pool.push('snowman');
     if (lib.DEU || this.wave >= 4) pool.push('shield');
     if (lib.FRA || this.wave >= 5) pool.push('spitter', 'ironclad');
+    if (lib.TUR || this.wave >= 6) pool.push('gunner', 'gunner');
+    if (lib.EGY || this.wave >= 7) pool.push('mummy', 'mummy');
     const p = level.player.pos;
     const rng = level.zombies.rng;
     for (let i = 0; i < n; i++) {

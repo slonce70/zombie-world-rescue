@@ -313,6 +313,55 @@ export class Effects {
         const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 6), toonMat(0xe8e2d0));
         tail.position.set(0, 0.36, 0.26);
         g.add(body, head, beak, comb, tail);
+      } else if (kind === 'cats') {
+        // 🐈 вуличний котик: тільце, вушка-трикутнички і хвіст-трубою
+        const catCol = [0xe8a04a, 0x4a4a52, 0xf5f0e0, 0xb86a3a][i % 4];
+        const catM = toonMat(catCol);
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), catM);
+        body.position.y = 0.22;
+        body.scale.set(1, 0.85, 1.4);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), catM);
+        head.position.set(0, 0.42, -0.24);
+        for (const side of [-1, 1]) {
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.1, 4), catM);
+          ear.position.set(side * 0.07, 0.55, -0.24);
+          g.add(ear);
+        }
+        const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.42, 6), catM);
+        tail.position.set(0, 0.42, 0.3);
+        tail.rotation.x = -0.5;
+        const noseC = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.05, 4), toonMat(0xff8c8c));
+        noseC.rotation.x = -Math.PI / 2;
+        noseC.position.set(0, 0.4, -0.36);
+        g.add(body, head, tail, noseC);
+      } else if (kind === 'camels') {
+        // 🐫 верблюд: великий, з горбами і довгою шиєю
+        const camM = toonMat([0xc9a86a, 0xb8945a, 0xd4b274][i % 3]);
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 9), camM);
+        body.position.y = 0.95;
+        body.scale.set(1, 0.8, 1.5);
+        for (const hz of [-0.25, 0.3]) {
+          const hump = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), camM);
+          hump.position.set(0, 1.4, hz);
+          g.add(hump);
+        }
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.9, 7), camM);
+        neck.position.set(0, 1.45, -0.78);
+        neck.rotation.x = 0.45;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), camM);
+        head.position.set(0, 1.9, -1.0);
+        head.scale.set(0.9, 0.8, 1.3);
+        for (const side of [-1, 1]) {
+          for (const lz of [-0.4, 0.45]) {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.95, 6), camM);
+            leg.position.set(side * 0.28, 0.48, lz);
+            g.add(leg);
+          }
+        }
+        const tailC = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.5, 5), camM);
+        tailC.position.set(0, 1.1, 0.85);
+        tailC.rotation.x = 0.3;
+        g.add(body, neck, head, tailC);
       } else {
         const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), toonMat(0xb8bcc4));
         body.position.y = 0.22;

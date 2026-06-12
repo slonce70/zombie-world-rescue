@@ -26,12 +26,18 @@ const TYPE_STATS = {
   },
   // 🦾 броньовик: залізний нагрудник 600 міцності, повільний; голова вразлива!
   ironclad: { hp: 60, speed: 0.85, chaseSpeed: 1.7, aggro: 22, dmg: 5, attackR: 2.1, coins: 35, pitch: 0.5, chestHp: 600 },
+  // 🧻 мумія: повільна, але жилава і боляче хапає; вночі особливо моторошна
+  mummy: { hp: 160, speed: 1.0, chaseSpeed: 2.3, aggro: 26, dmg: 18, attackR: 2.0, coins: 18, pitch: 0.6 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
 const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 4.5, projSpeed: 20, dmg: 18, size: 0.5 };
 // 🥖 Шеф Багет жбурляє багети
 const BAGUETTE_RANGED = { min: 8, max: 38, hold: 0, cd: 3.6, projSpeed: 19, dmg: 16, size: 0.34, color: 0xd9a35e, stretch: true };
+// 🍢 Паша Кебаб кидає розпечені шампури
+const KEBAB_RANGED = { min: 8, max: 40, hold: 0, cd: 3.2, projSpeed: 23, dmg: 17, size: 0.3, color: 0xb4543a };
+// 🪲 Фараон насилає золотих скарабеїв
+const SCARAB_RANGED = { min: 7, max: 42, hold: 0, cd: 2.8, projSpeed: 17, dmg: 19, size: 0.34, color: 0xd4af37 };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -94,7 +100,9 @@ export class Zombies {
       // дальній бій (сніговики, плювака, Король Мороз, Шеф Багет)
       ranged: stats.ranged
         || (type === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
-        || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null),
+        || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null)
+        || (type === 'boss' && bossStyle === 'sultan' ? KEBAB_RANGED : null)
+        || (type === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null),
       rangedCd: this.rng.range(0.5, 2.5),
       throwProj: false,
       // 🛡 щит
@@ -565,6 +573,8 @@ export class Zombies {
       const st = z.stats;
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
+      // 🌙 вночі зомбі помічають здалеку
+      const nightAggro = 1 + (level.nightK || 0) * 0.5;
       // золотий зомбі: побачив гравця — тікає
       if (z.golden && z.state !== 'dead') {
         if (playerAlive && distP < 26) z.state = 'flee';
@@ -601,7 +611,7 @@ export class Zombies {
 
       // --- стани ---
       if (z.state === 'wander') {
-        if (playerAlive && (distP < st.aggro || z.aggroed)) {
+        if (playerAlive && (distP < st.aggro * nightAggro || z.aggroed)) {
           z.state = 'chase';
           this._aggro(z);
           level.audio.zgroan(1 - clamp(distP / 40, 0, 0.8), st.pitch);
@@ -702,7 +712,9 @@ export class Zombies {
               const mtype = st === 'frost' ? (i % 2 ? 'snowman' : 'walker')
                 : st === 'iron' ? (i % 2 ? 'shield' : 'runner')
                   : st === 'chef' ? (i % 2 ? 'spitter' : 'walker')
-                    : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                    : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
+                      : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
+                        : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5, { horde: false });
               mz.aggroed = true;
               mz.state = 'chase';
