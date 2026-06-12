@@ -225,7 +225,7 @@ export class StormMode {
       const b = level.zombies.spawn('boss', this.cx, this.cz - Math.min(this.r * 0.5, 25), {
         style: styles[(this.wave / 4 - 1) % 4], noLeash: true,
       });
-      b.maxHp = b.hp = Math.round((700 + this.wave * 120) * (1 + 0.45 * (playersN - 1)));
+      b.maxHp = b.hp = Math.round((700 + this.wave * 120) * playersN);
       b._stormWave = true;
       b.aggroed = true;
       b.state = 'chase';

@@ -3,7 +3,7 @@
 // лічильник онлайна, хто в мережі, відкриті кімнати з кнопкою «Зайти» без кода.
 import { CoopSession, loadNick, saveNick, cleanNick } from '../net/coop.js';
 import { LobbyClient } from '../net/lobby.js';
-import { COUNTRIES, CAMPAIGN_ORDER } from '../countries.js';
+import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
 
 const PUBLIC_KEY = 'zr-public';
@@ -105,10 +105,17 @@ export class CoopUI {
       this._syncPolling();
     });
 
-    this.session.onRoster = () => { this._renderLobby(); this.lobbyNet.refresh(); };
+    this.session.onRoster = () => {
+      this._renderLobby();
+      this.updateRoomChip();
+      this.lobbyNet.refresh();
+    };
     this.session.onCfg = () => this._renderLobby();
     this.session.onStarted = () => {
       game._hideOverlay('overlay-lobby');
+      this.updateRoomChip();
+      const n = this.session.roster.size;
+      if (n > 1) game.hud.toast(`⚔️ Вас ${n} — зомбі сильніші ×${n}! Тримайтесь разом!`);
       this.lobbyNet.refresh(); // у списку кімнат стане «⚔️ у грі»
     };
     this.session.onEnd = (reason, wasLevel) => {
@@ -152,6 +159,19 @@ export class CoopUI {
       n: s.roster.size, state: s.state === 'level' ? 'game' : 'lobby',
       build: window.__APP_VERSION,
     };
+  }
+
+  // 🤝 чип у HUD: код кімнати + скільки нас (видно всім — клич друзів просто в бою)
+  updateRoomChip() {
+    const el = document.getElementById('coop-room');
+    if (!el) return;
+    const s = this.session;
+    const show = s.state === 'level' && !!s.room;
+    el.style.display = show ? '' : 'none';
+    if (show) {
+      const n = s.roster.size;
+      el.innerHTML = `🤝 Код: <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''}`;
+    }
   }
 
   // пінгуємо, поки видно модалку або жива сесія
@@ -390,7 +410,7 @@ export class CoopUI {
       // у шторм-режимі грають лише ЗВІЛЬНЕНІ хостом країни
       const unlocked = s.mode === 'storm'
         ? !!save.liberated[id]
-        : (id === 'UKR' || save.liberated[CAMPAIGN_ORDER[CAMPAIGN_ORDER.indexOf(id) - 1]]);
+        : isCountryOpen(save.liberated, id);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;
       ch += `<div class="${cls}" data-id="${id}">${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</div>`;

@@ -90,11 +90,20 @@ export class CoopSession {
       build: this.game.constructor.APP_VERSION ?? window.__APP_VERSION,
       proto: PROTO_VERSION,
     }, true);
-    // чекаємо welcome
+    // чекаємо welcome (хост може бути зайнятий боєм — даємо запас)
     await new Promise((resolve, reject) => {
       this._joinResolve = resolve;
       this._joinReject = reject;
-      setTimeout(() => { if (this._joinReject) { this._joinReject(new Error('timeout')); this._joinReject = null; } }, 8000);
+      setTimeout(() => {
+        if (this._joinReject) {
+          this._joinReject(new Error('timeout'));
+          this._joinReject = null;
+          this._joinResolve = null;
+          // прибираємо напівз'єднання: пізній welcome не повинен тягти у гру з помилкою на екрані
+          this.transport.close();
+          this._reset();
+        }
+      }, 15000);
     });
     return this.room;
   }

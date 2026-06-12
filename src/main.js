@@ -24,7 +24,7 @@ import { submitScore } from './net/league.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -189,8 +189,11 @@ class Game {
       this._showOverlay('overlay-wardrobe');
       this.audio.click();
     });
-    document.getElementById('btn-storm').addEventListener('click', () => this.startStorm());
-    document.getElementById('btn-arena').addEventListener('click', () => this.startArena());
+    document.getElementById('btn-solo').addEventListener('click', () => {
+      this.audio.click();
+      this.renderSoloMenu();
+      this._showOverlay('overlay-solo');
+    });
     document.getElementById('btn-arena-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-arena-end');
       this.endLevel();
@@ -345,12 +348,70 @@ class Game {
       const qBadge = document.getElementById('quest-badge');
       qBadge.textContent = qLeft;
       qBadge.classList.toggle('show', qLeft > 0);
-      // шторм доступний після першої звільненої країни
-      const anyLib = Object.keys(this.save.liberated).length > 0;
-      document.getElementById('btn-storm').classList.toggle('locked', !anyLib);
-      document.getElementById('btn-arena').classList.toggle('locked', Object.keys(this.save.liberated).length < 2);
       if (this._newVersion) this._onNewVersion(this._newVersion);
     }
+    if (this.coop) this.coop.updateRoomChip();
+  }
+
+  // ---------- 🎮 меню «Грати» (соло-режими) ----------
+  renderSoloMenu() {
+    const libN = Object.keys(this.save.liberated).length;
+    const modes = [
+      {
+        id: 'campaign', icon: '🎯', name: 'КАМПАНІЯ', locked: false,
+        desc: 'Звільняй країни світу: місії, боси, нагороди',
+      },
+      {
+        id: 'storm', icon: '⛈️', name: 'ШТОРМ', locked: libN < 1,
+        desc: libN < 1 ? 'Відкриється після першої звільненої країни' : 'Виживи у колі, що звужується. Рекорд — у Лігу!',
+      },
+      {
+        id: 'arena', icon: '👑', name: 'АРЕНА БОСІВ', locked: libN < 2,
+        desc: libN < 2 ? 'Відкриється після двох звільнених країн' : 'Усі 6 босів поспіль на час. Час — у Лігу!',
+      },
+    ];
+    const root = document.getElementById('solo-modes');
+    root.innerHTML = modes.map((m) => `
+      <div class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
+        <div class="sm-ico">${m.icon}</div>
+        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}</div>
+        <div class="sm-desc">${m.desc}</div></div>
+        <div class="sm-go">${m.locked ? '' : '▶'}</div>
+      </div>`).join('');
+    const cRoot = document.getElementById('solo-countries');
+    cRoot.style.display = 'none';
+    cRoot.innerHTML = '';
+    root.querySelectorAll('.solo-mode').forEach((el) => {
+      el.addEventListener('click', () => {
+        const mode = el.dataset.mode;
+        if (el.classList.contains('locked')) {
+          this.audio.denied();
+          return;
+        }
+        this.audio.click();
+        if (mode === 'campaign') {
+          this._hideOverlay('overlay-solo');
+          this.hud.toast('🔴 Натисни червону країну на глобусі — там зомбі!');
+        } else if (mode === 'arena') {
+          this._hideOverlay('overlay-solo');
+          this.startArena();
+        } else {
+          // шторм: обери звільнену країну (у кожної — своя таблиця Ліги)
+          root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
+          cRoot.style.display = '';
+          cRoot.innerHTML = '<div class="solo-cty-title">Де переживати Шторм?</div>'
+            + CAMPAIGN_ORDER.filter((id) => this.save.liberated[id]).map((id) =>
+              `<button class="btn solo-cty" data-id="${id}">${COUNTRIES[id].flag} ${COUNTRIES[id].name}</button>`).join('');
+          cRoot.querySelectorAll('.solo-cty').forEach((b) => {
+            b.addEventListener('click', () => {
+              this.audio.click();
+              this._hideOverlay('overlay-solo');
+              this.startStorm(b.dataset.id);
+            });
+          });
+        }
+      });
+    });
   }
 
   // ---------- панелі глобуса ----------
@@ -1600,8 +1661,15 @@ class Game {
       },
       forceMissions: (types) => { g._forceMissionSet = types; },
       // 🤝 кооп
-      coopCreate: (nick) => g.coop.session.create(nick || 'Хост'),
-      coopJoin: (code, nick) => g.coop.session.join(code, nick || 'Гість'),
+      coopCreate: async (nick) => {
+        const code = await g.coop.session.create(nick || 'Хост');
+        g.coop._openLobby(); // як у UI: вмикає лобі-пінги (анонс кімнати)
+        return code;
+      },
+      coopJoin: async (code, nick) => {
+        await g.coop.session.join(code, nick || 'Гість');
+        g.coop._openLobby();
+      },
       coopSetCountry: (c) => g.coop.session.setCountry(c),
       coopSetMode: (mo) => g.coop.session.setMode(mo),
       coopStartLevel: () => g.coop.session.startLevel(),

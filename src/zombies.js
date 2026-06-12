@@ -73,9 +73,8 @@ export class Zombies {
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
-    // 🤝 кооп: більше гравців — жилавіші зомбі (+30% за кожного гостя)
-    const playersN = (this.level.players && this.level.players.length) || 1;
-    const coopScale = opts.mirror ? 1 : 1 + 0.3 * (playersN - 1);
+    // 🤝 кооп: зомбі сильніші пропорційно команді (2 гравці → ×2 HP, 3 → ×3)
+    const coopScale = opts.mirror ? 1 : this.coopMul();
     const hpScale = type === 'boss' ? 1 : this.diff.hp * coopScale;
     const z_ = {
       nid, rig, type, stats,
@@ -302,9 +301,8 @@ export class Zombies {
     const cfg = (this.level.country && this.level.country.boss) || { hp: 1300, frost: false };
     const style = cfg.style || (cfg.frost ? 'frost' : 'king');
     const b = this.spawn('boss', x, z - 6, { horde: false, style });
-    // 🤝 кооп: бос міцніший на +45% за кожного гостя
-    const playersN = (this.level.players && this.level.players.length) || 1;
-    const bossHp = Math.round(cfg.hp * (1 + 0.45 * (playersN - 1)));
+    // 🤝 кооп: бос міцніший пропорційно команді (×N гравців)
+    const bossHp = Math.round(cfg.hp * this.coopMul());
     b.maxHp = bossHp;
     b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
     b.aggroed = true;
@@ -682,7 +680,7 @@ export class Zombies {
             if (playerAlive) {
               const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
               const target = new THREE.Vector3(tp.x, tp.y + 1.25, tp.z);
-              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size, z.ranged.color);
+              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg * this.coopMul(), z.ranged.size, z.ranged.color);
               level.netEv('proj',
                 Math.round(from.x * 10) / 10, Math.round(from.y * 10) / 10, Math.round(from.z * 10) / 10,
                 Math.round(target.x * 10) / 10, Math.round(target.y * 10) / 10, Math.round(target.z * 10) / 10,
@@ -690,7 +688,7 @@ export class Zombies {
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
-            this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
+            this._hurt(tgt, st.dmg * this.diff.dmg * this.coopMul(), z.x, z.z);
             level.audio.zattack(1);
             if (z.type === 'boss') {
               level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), z.frost ? 0x66ccff : 0xff6644, 5);
@@ -744,7 +742,7 @@ export class Zombies {
           z.z += z.chargeDZ * cs * dt;
           if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
             z.didHit = true;
-            this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
+            this._hurt(tgt, 34 * this.diff.dmg * this.coopMul(), z.x, z.z);
             level.audio.slam();
           }
           if (z.charging <= 0) {
@@ -861,6 +859,17 @@ export class Zombies {
       }
     }
     if (removeAny) this.list = this.list.filter((z) => !z.gone);
+  }
+
+  // 🤝 множник команди: соло/дзеркало = 1, кооп = кількість гравців
+  coopMul() {
+    const level = this.level;
+    if (level.mirror) return 1;
+    const byPlayers = level.players && level.players.length;
+    if (byPlayers) return byPlayers;
+    // початкові зомбі спавняться ще ДО підключення мережі — рахуємо ростер кімнати
+    const sess = level.game && level.game.coop && level.game.coop.session;
+    return (sess && sess.state === 'level') ? Math.max(1, sess.roster.size) : 1;
   }
 
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму

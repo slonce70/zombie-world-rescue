@@ -1,6 +1,6 @@
 // Глобальна карта: 3D-глобус, захоплені країни, прогресія кампанії
 import * as THREE from 'three';
-import { COUNTRIES, nextTarget } from './countries.js';
+import { COUNTRIES, nextTarget, isCountryOpen } from './countries.js';
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
   const phi = (lon + 180) * Math.PI / 180;
@@ -246,11 +246,12 @@ export class Globe {
     const liberated = this.game.save.liberated || {};
     for (const f of this.features) {
       const id = f.id || f.properties.name;
-      let fill = '#8d86a3', stroke = '#6b6485'; // захоплені зомбі — хворобливо-фіолетові
+      let fill = '#8d86a3', stroke = '#6b6485'; // далекі землі — хворобливо-фіолетові
       if (liberated[id]) { fill = '#58c14c'; stroke = '#3e9c36'; }
-      else if (id === this.targetId) {
-        fill = this.hoverId === id ? '#ffe06b' : '#f2c94c';
-        stroke = '#c99a1f';
+      else if (isCountryOpen(liberated, id)) {
+        // 🔴 зомбі тут, і ти можеш атакувати — тривожно-червона
+        fill = this.hoverId === id ? '#ff6b57' : '#e04a3a';
+        stroke = '#9c2f24';
       }
       this._paintCountry(ctx, f, fill, stroke, w, h);
     }
@@ -328,14 +329,14 @@ export class Globe {
       tooltip.style.left = (e.clientX + 14) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
       const known = COUNTRIES[c.id];
-      if (c.id === this.targetId) {
-        tooltip.innerHTML = `${known ? known.flag : '⭐'} <b>${known ? known.name : c.name}</b> — натисни, щоб грати!`;
-        tooltip.classList.add('available');
-      } else if ((this.game.save.liberated || {})[c.id]) {
+      if ((this.game.save.liberated || {})[c.id]) {
         tooltip.innerHTML = `✅ <b>${known ? known.name : c.name}</b> — звільнено! Натисни, щоб зіграти ще раз`;
         tooltip.classList.add('available');
+      } else if (isCountryOpen(this.game.save.liberated, c.id)) {
+        tooltip.innerHTML = `🔴 ${known ? known.flag : ''} <b>${known ? known.name : c.name}</b> — тут зомбі! Натисни, щоб звільнити`;
+        tooltip.classList.add('available');
       } else {
-        tooltip.innerHTML = `🔒 <b>${c.name}</b> — спочатку звільни попередні країни`;
+        tooltip.innerHTML = `🔒 <b>${c.name}</b> — спочатку звільни Україну`;
         tooltip.classList.remove('available');
       }
       document.body.style.cursor = 'pointer';
@@ -356,7 +357,7 @@ export class Globe {
     const c = this.pickCountry(hit.uv);
     if (!c) return;
     this.game.audio.ensure();
-    const playable = c.id === this.targetId || (this.game.save.liberated || {})[c.id];
+    const playable = (this.game.save.liberated || {})[c.id] || isCountryOpen(this.game.save.liberated, c.id);
     if (playable && COUNTRIES[c.id]) {
       this.game.audio.click();
       document.getElementById('globe-tooltip').style.display = 'none';
@@ -364,7 +365,7 @@ export class Globe {
       this.game.startLevel(c.id);
     } else {
       this.game.audio.denied();
-      this.game.hud.toast(`🔒 ${c.name}: спочатку звільни попередні країни!`);
+      this.game.hud.toast(`🔒 ${c.name}: спочатку звільни Україну!`);
     }
   }
 

@@ -73,7 +73,7 @@ export class BossRush {
     const b = level.zombies.spawn('boss', x, z - 6, { style: cfg.style, noLeash: true });
     // наростання: 80% → 120% сили + кооп-масштаб
     const playersN = (level.players && level.players.length) || 1;
-    const hp = Math.round(cfg.hp * (0.8 + 0.08 * this.idx) * (1 + 0.45 * (playersN - 1)));
+    const hp = Math.round(cfg.hp * (0.8 + 0.08 * this.idx) * playersN);
     b.maxHp = b.hp = hp;
     b.aggroed = true;
     b.state = 'chase';

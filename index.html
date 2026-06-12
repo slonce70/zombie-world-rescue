@@ -17,25 +17,38 @@
   <div id="globe-ui">
     <div class="globe-top">
       <h1>🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span></h1>
-      <p class="globe-sub">Зомбі захопили планету! Звільняй країни одну за одною.</p>
+      <p class="globe-sub">Зомбі захопили планету! Рятуй країни — сам або з друзями.</p>
+    </div>
+    <div class="globe-side">
+      <button id="btn-pass" class="btn globe-act">🎖️ Зоряний шлях <span id="pass-badge" class="act-badge"></span></button>
+      <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
+      <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
+      <button id="btn-league" class="btn globe-act league-btn">🏆 Ліга</button>
+      <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
     </div>
     <div class="globe-bottom">
-      <div class="globe-actions">
-        <button id="btn-pass" class="btn globe-act">🎖️ Зоряний шлях <span id="pass-badge" class="act-badge"></span></button>
-        <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
-        <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
-        <button id="btn-storm" class="btn globe-act storm-btn">⛈️ ШТОРМ</button>
-        <button id="btn-arena" class="btn globe-act arena-btn">👑 АРЕНА</button>
-        <button id="btn-coop" class="btn globe-act coop-btn">🤝 ГРАТИ РАЗОМ</button>
-        <button id="btn-league" class="btn globe-act league-btn">🏆 ЛІГА</button>
+      <div class="globe-play-row">
+        <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
+        <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
-      <button id="btn-quality" class="btn quality-btn">⚙️ Якість: Авто</button>
-      <p class="globe-hint">🖱️ Обертай глобус мишкою · Натисни на жовту країну</p>
+      <p class="globe-hint">🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!</p>
     </div>
     <div id="version-tag"></div>
   </div>
   <div id="globe-tooltip"></div>
+
+  <!-- 🎮 Соло: вибір режиму -->
+  <div id="overlay-solo" class="overlay">
+    <div class="overlay-card panel-card solo-card">
+      <div class="panel-header">
+        <h2>🎮 ГРАТИ</h2>
+        <button class="btn-x panel-close" data-close="overlay-solo">✕</button>
+      </div>
+      <div id="solo-modes" class="solo-modes"></div>
+      <div id="solo-countries" class="solo-countries"></div>
+    </div>
+  </div>
 
   <!-- HUD -->
   <div id="hud">
@@ -55,6 +68,7 @@
       <div id="coins"><span class="coin-icon">₴</span><span id="coins-value">0</span></div>
       <canvas id="minimap" width="200" height="200"></canvas>
       <div id="xp-chip"><span id="xp-lvl">⭐ 1</span><div id="xp-bar"><div id="xp-fill"></div></div></div>
+      <div id="coop-room" style="display:none"></div>
     </div>
 
     <div id="health">

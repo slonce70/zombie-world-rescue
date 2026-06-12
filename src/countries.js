@@ -230,3 +230,10 @@ export function nextTarget(liberated) {
   }
   return null;
 }
+
+// Чи відкрита країна для гри: Україна — завжди перша,
+// після її звільнення відкривається ВЕСЬ світ (грай у будь-якому порядку)
+export function isCountryOpen(liberated, id) {
+  if (!COUNTRIES[id]) return false;
+  return id === 'UKR' || !!(liberated && liberated.UKR);
+}
