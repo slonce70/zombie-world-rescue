@@ -5,7 +5,7 @@ import { AudioMan } from './audio.js';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { Zombies } from './zombies.js';
-import { Missions } from './missions.js';
+import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js';
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop } from './shop.js';
@@ -20,7 +20,7 @@ import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 5;
+const APP_VERSION = 6;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
@@ -56,6 +56,11 @@ const TIPS = [
   'Зомбі-стрілець 🔫 б\'є здалеку — ховайся за будинки!',
   'Базука 🚀 тепер НАЙСИЛЬНІША зброя — бережи ракети для товстунів!',
   'На самокаті: W — газ, S — гальмо, A/D — кермо 🛴',
+  'Щоразу нові завдання! Перепройди країну — буде інакше 🎲',
+  'Елітні зомбі 👹 в золотих коронах — сильні, але щедрі',
+  'Зомбі-гнізда 🟣 знешкоджуються утриманням E — стережись охорони!',
+  'Мандрівника 🧳 захищай від укусів — він сховається, якщо боляче',
+  'Лут у будинках щоразу інший — заглядай усюди! 🎁',
 ];
 
 class Game {
@@ -216,6 +221,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
+      missionRuns: {},
     };
   }
 
@@ -235,6 +241,7 @@ class Game {
           delete out.gadgets;
         }
         if (out.activeGadget && !out.gadgetsOwned.includes(out.activeGadget)) out.activeGadget = null;
+        out.missionRuns = out.missionRuns || {};
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
@@ -521,7 +528,7 @@ class Game {
       level.missions = level.storm;
     } else {
       level.zombies.populate();
-      level.missions = new Missions(level);
+      level.missions = new DynamicMissions(level);
     }
     // 🦙🐶🛴🦘 іграшки рівня
     level.megabox = new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
@@ -530,6 +537,18 @@ class Game {
     level.pet = (this.save.upgrades.dog || 0) > 0 ? new Pet(level) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
+    // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
+    if (!isStorm) {
+      const LOOT_POOL = [
+        'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
+        'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
+      ];
+      for (const ls of level.world.lootSpots) {
+        if (Math.random() < 0.7) {
+          ls.type = LOOT_POOL[Math.floor(Math.random() * LOOT_POOL.length)];
+        }
+      }
+    }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
     for (const ls of level.world.lootSpots) {
       if (ls.type === 'coins') {
@@ -870,6 +889,8 @@ class Game {
     this._hideOverlay('overlay-death');
     const country = this.level.country;
     this.save.liberated[country.id] = true;
+    // наступне проходження цієї країни отримає НОВИЙ набір місій
+    this.save.missionRuns[country.id] = (this.save.missionRuns[country.id] || 0) + 1;
     const s = this.level.stats;
     // рекорди країни
     const prev = this.save.records[country.id];
@@ -1044,7 +1065,11 @@ class Game {
           buffs: { ...g.level.player.buffs },
           rockets: g.level.player.ammo.bazooka.reserve + g.level.player.ammo.bazooka.mag,
         } : null,
-        missions: g.level ? g.level.missions.missions.map((m) => ({ id: m.id, state: m.state })) : null,
+        // id — стабільні назви слотів (сумісність зі старими тестами), type — справжній тип
+        missions: g.level ? g.level.missions.missions.map((m, i) => ({
+          id: ['rescue', 'tower', 'warehouse'][i] || m.id, type: m.type || m.id, state: m.state,
+        })) : null,
+        missionRuns: { ...g.save.missionRuns },
         bossStarted: g.level ? g.level.missions.bossStarted : false,
         bossHp: g.level && g.level.zombies.boss ? g.level.zombies.boss.hp : null,
         zombies: g.level ? g.level.zombies.list.filter((z) => z.state !== 'dead').length : 0,
@@ -1181,6 +1206,13 @@ class Game {
         g.spawnPet();
       },
       petPos: () => g.level.pet ? { x: g.level.pet.x, z: g.level.pet.z } : null,
+      rollMissions: (c, seed, run) => rollMissionSet(c, seed, run),
+      missionTypes: () => Object.keys(MISSION_TYPES),
+      setMissionRun: (c, n) => {
+        g.save.missionRuns[c] = n;
+        g.saveGame();
+      },
+      forceMissions: (types) => { g._forceMissionSet = types; },
     };
   }
 }
