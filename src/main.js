@@ -15,6 +15,8 @@ import { COUNTRIES, getBiome } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 
 const SAVE_KEY = 'zr-save-v1';
+// тримати в синхроні з version.json — бампити при кожному релізі
+const APP_VERSION = 3;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
@@ -202,6 +204,7 @@ class Game {
     this._hideOverlay('overlay-loading');
     this.state = 'globe';
     this._showGlobeUI(true);
+    this._initVersionCheck();
     this.renderer.setAnimationLoop(() => this._frame());
     const c = this.params.get('country');
     if (c && COUNTRIES[c]) this.startLevel(c);
@@ -213,7 +216,42 @@ class Game {
     if (show) {
       document.getElementById('liberated-count').textContent =
         Object.keys(this.save.liberated).length;
+      if (this._newVersion) this._onNewVersion(this._newVersion);
     }
+  }
+
+  // ---------- автооновлення ----------
+  // Браузер (особливо відновлена стара вкладка) може тримати застарілу збірку.
+  // Періодично звіряємо version.json із сервера і перезавантажуємось на глобусі.
+  _initVersionCheck() {
+    const tag = document.getElementById('version-tag');
+    if (tag) tag.textContent = 'v' + APP_VERSION;
+    if (this.params.has('test')) return;
+    const check = async () => {
+      try {
+        const res = await fetch('./version.json', { cache: 'no-store' });
+        const data = await res.json();
+        if (data && data.v > APP_VERSION) this._onNewVersion(data.v);
+      } catch (e) { /* офлайн — спробуємо пізніше */ }
+    };
+    check();
+    setInterval(check, 5 * 60 * 1000);
+  }
+
+  _onNewVersion(v) {
+    this._newVersion = v;
+    // посеред рівня не перезавантажуємо — гравець втратить прогрес місії
+    if (this.state !== 'globe') return;
+    let alreadyTried = false;
+    try { alreadyTried = sessionStorage.getItem('zr-reload-for') === String(v); } catch (e) { /* ignore */ }
+    if (!alreadyTried) {
+      try { sessionStorage.setItem('zr-reload-for', String(v)); } catch (e) { /* ignore */ }
+      location.reload();
+      return;
+    }
+    // перезавантаження не допомогло (кеш ще тримає старі файли) — кажемо гравцю
+    const tag = document.getElementById('version-tag');
+    if (tag) tag.textContent = `🔄 Вийшло оновлення v${v}! Онови сторінку: Ctrl(⌘)+Shift+R`;
   }
 
   _showOverlay(id) { document.getElementById(id).classList.add('show'); }
