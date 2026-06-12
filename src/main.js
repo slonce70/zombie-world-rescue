@@ -21,7 +21,7 @@ import { CoopUI } from './ui/coopui.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -128,6 +128,9 @@ class Game {
     };
 
     window.addEventListener('keydown', (e) => {
+      // у полі вводу літери B/M — це просто літери, а не магазин/звук
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }

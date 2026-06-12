@@ -20,6 +20,9 @@ export class Input {
     this.touchMode = false;
 
     window.addEventListener('keydown', (e) => {
+      // друкуємо в полі вводу (нік, код кімнати) — гра клавіші не чіпає
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (['Space', 'Tab', 'KeyE'].includes(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
