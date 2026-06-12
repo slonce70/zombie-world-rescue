@@ -7,7 +7,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "python3 -m http.server 8741",
+    "relay": "node relay/dev-relay.mjs",
+    "test": "node test/smoke.mjs",
+    "test:coop": "node test/coop.mjs"
   },
   "keywords": [],
   "author": "",
@@ -15,5 +18,8 @@
   "type": "commonjs",
   "dependencies": {
     "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "ws": "^8.21.0"
   }
 }

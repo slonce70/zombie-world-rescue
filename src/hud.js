@@ -50,6 +50,7 @@ export class HUD {
       missionPanel: $('mission-panel'),
       scope: $('scope'),
       tbScope: $('tb-scope'),
+      teamPanel: $('team-panel'),
     };
     this._lastCombo = 0;
     this._lastCoins = -1;
@@ -318,6 +319,22 @@ export class HUD {
       this.el.hordeCounter.classList.remove('show');
     }
 
+    // 🤝 панель команди (кооп)
+    let teamHtml = '';
+    if (level.net) {
+      const esc = (str) => String(str).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+      for (const [, rp] of level.net.remotes) {
+        const pct = clamp(rp.health / (rp.maxHealth || 100), 0, 1);
+        const dead = rp.health <= 0;
+        teamHtml += `<div class="team-row"><div class="team-nick ${dead ? 'dead' : ''}">${dead ? '💀 ' : '🤝 '}${esc(rp.nick)}</div>`
+          + `<div class="team-hp"><div class="${pct < 0.3 ? 'low' : ''}" style="width:${Math.round(pct * 100)}%"></div></div></div>`;
+      }
+    }
+    if (this._lastTeamHtml !== teamHtml) {
+      this.el.teamPanel.innerHTML = teamHtml;
+      this._lastTeamHtml = teamHtml;
+    }
+
     // мінікарта (15 разів/с достатньо)
     this.minimapT -= dt;
     if (this.minimapT <= 0) {
@@ -511,6 +528,26 @@ export class HUD {
       ctx.font = '13px serif';
       ctx.textAlign = 'center';
       ctx.fillText(m.icon, mx, my + 5);
+    }
+
+    // 🤝 союзники — блакитні крапки (видно навіть за межами огляду)
+    if (level.net) {
+      for (const [, rp] of level.net.remotes) {
+        let [ax, ay] = toMap(rp.pos.x, rp.pos.z);
+        const adx = ax - C, ady = ay - C;
+        const ad = Math.hypot(adx, ady);
+        if (ad > R - 9) {
+          ax = C + (adx / ad) * (R - 9);
+          ay = C + (ady / ad) * (R - 9);
+        }
+        ctx.beginPath();
+        ctx.arc(ax, ay, 4, 0, 6.29);
+        ctx.fillStyle = rp.health > 0 ? '#4fd8ff' : '#8090a0';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
 
     // гравець (трикутник, завжди вгору)

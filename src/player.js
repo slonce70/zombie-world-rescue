@@ -161,7 +161,9 @@ export class Player {
     const pos = this.camera.position.clone().addScaledVector(dir, 0.6);
     const vel = dir.multiplyScalar(11.5);
     vel.y += 4.5;
-    this.level.effects.spawnGrenade(pos, vel);
+    if (this.level.mirror) this.level.net.sendNade(pos, vel);
+    else if (this.level.net) this.level.net.spawnNetGrenade(pos, vel);
+    else this.level.effects.spawnGrenade(pos, vel);
     this.level.audio.throwWhoosh(1);
     this.gunKick = 0.6;
     return true;
@@ -560,6 +562,13 @@ export class Player {
     arms.muzzle.getWorldPosition(this._muzzlePos);
     level.effects.muzzleFlash(this._muzzlePos);
 
+    // кооп: гість збирає влучання і шле хосту одним повідомленням
+    const netHits = [];
+    const netBar = [];
+    const netWalls = [];
+    let netBall = false;
+    let netEnd = null;
+
     // точка пострілу: від 1-ї особи — поточні очі (камера оновлюється в кінці кадру
     // і після телепорту може відставати), від 3-ї — камера через приціл
     const origin = this.firstPerson
@@ -569,7 +578,10 @@ export class Player {
     // 🚀 базука: летить ракета, шкода — вибухом
     if (w.rocket) {
       const dir = this.forwardVec(this._shootDir).clone().normalize();
-      level.effects.spawnRocket(origin.clone().addScaledVector(dir, 0.7), dir, w.dmg);
+      const ro = origin.clone().addScaledVector(dir, 0.7);
+      if (level.mirror) level.net.sendRocket(ro, dir, Math.round(w.dmg * dmgMult));
+      else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(w.dmg * dmgMult));
+      else level.effects.spawnRocket(ro, dir, w.dmg);
       level.audio.rocket();
       this.camShake = Math.max(this.camShake, 0.5);
       applyRecoil();
@@ -597,7 +609,8 @@ export class Player {
       // вибухові бочки і м'яч — теж цілі
       const bHit = level.effects.barrelHitTest(origin, dir, MAX_D);
       if (bHit && bHit.t < blockT && (!hit || bHit.t < hit.t)) {
-        level.effects.damageBarrel(bHit.barrel, w.dmg * dmgMult);
+        if (level.mirror) netBar.push([level.effects.barrels.indexOf(bHit.barrel), Math.round(w.dmg * dmgMult)]);
+        else level.effects.damageBarrel(bHit.barrel, w.dmg * dmgMult);
         const bp = this._shootEnd.copy(origin).addScaledVector(dir, bHit.t);
         level.effects.burst(bp, 0xff5544, 4, { speed: 2, life: 0.3 });
         if (i < 3) level.effects.tracer(this._muzzlePos, bp);
@@ -605,14 +618,16 @@ export class Player {
       }
       const wHit = level.gadgets ? level.gadgets.wallHitTest(origin, dir, MAX_D) : null;
       if (wHit && wHit.t < blockT && (!hit || wHit.t < hit.t)) {
-        level.gadgets.damageWall(wHit.wall, w.dmg * dmgMult);
+        if (level.mirror) netWalls.push([wHit.wall.nid, Math.round(w.dmg * dmgMult)]);
+        else level.gadgets.damageWall(wHit.wall, w.dmg * dmgMult);
         const wp = this._shootEnd.copy(origin).addScaledVector(dir, wHit.t);
         if (i < 3) level.effects.tracer(this._muzzlePos, wp);
         continue;
       }
       const ballHit = level.effects.ballHitTest(origin, dir, MAX_D);
       if (ballHit && ballHit.t < blockT && (!hit || ballHit.t < hit.t)) {
-        level.effects.kickBall(dir, 9);
+        if (level.mirror) netBall = true;
+        else level.effects.kickBall(dir, 9);
         const bp = this._shootEnd.copy(origin).addScaledVector(dir, ballHit.t);
         if (i < 3) level.effects.tracer(this._muzzlePos, bp);
         continue;
@@ -625,7 +640,8 @@ export class Player {
       } else if (hit) {
         endPoint = hit.point;
         let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
-        hit.zombie.damage(dmg, dir, hit.headshot);
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0]);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot); }
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;
         acc.point = hit.point;
@@ -646,7 +662,8 @@ export class Player {
             const wallT = this.world.shotBlockDist(from, dir, next.t);
             if (wallT < next.t) break;
             dmg *= 0.7;
-            next.zombie.damage(dmg, dir, next.headshot);
+            if (level.mirror) netHits.push([next.zombie.nid, Math.round(dmg), next.headshot ? 1 : 0]);
+            else { next.zombie.lastHitBy = 1; next.zombie.damage(dmg, dir, next.headshot); }
             const acc2 = dmgByZombie.get(next.zombie) || { total: 0, point: next.point, crit: false };
             acc2.total += dmg;
             acc2.point = next.point;
@@ -663,8 +680,13 @@ export class Player {
         endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
       }
       if (i < 3) level.effects.tracer(this._muzzlePos, endPoint);
+      if (i === 0 && endPoint) netEnd = { x: endPoint.x, y: endPoint.y, z: endPoint.z };
     }
     applyRecoil();
+    if (level.net) {
+      if (level.mirror) level.net.shotReport(this.cur, netEnd, netHits, netBar, netWalls, netBall);
+      else level.net.onLocalShot(this.cur, netEnd);
+    }
     for (const [, acc] of dmgByZombie) {
       level.effects.damageNumber(acc.point, acc.total, acc.crit);
     }
@@ -720,6 +742,7 @@ export class Player {
   }
 
   respawn() {
+    if (this.level.mirror) this.level.net.sendRespawned();
     const gy = this.world.groundH(this.L.SPAWN.x, this.L.SPAWN.z);
     this.pos.set(this.L.SPAWN.x, gy, this.L.SPAWN.z);
     this.vel.set(0, 0, 0);

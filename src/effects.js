@@ -10,6 +10,10 @@ export class Effects {
     this.audio = audio;
     this.onPickup = null; // (type, value) => {}
     this.getPlayerPos = null;
+    this.getPickupTargets = null;  // кооп: () => [{pos, magnet, pid}] — хто може підбирати
+    this.getDamageTargets = null;  // кооп: () => [{pos, pid}] — кого б'ють снаряди
+    this.levelRef = null;          // ставить main: доступ до level.net/netEv/mirror
+    this.nidSeq = 0;               // локальні id предметів (соло)
 
     // пул частинок
     this.MAX_P = 220;
@@ -90,6 +94,45 @@ export class Effects {
     this._dmgIdx = 0;
   }
 
+  // предмет створено: дати мережевий id і (на хості) розіслати гостям
+  _finishItem(c, x, z, yOverride, nid) {
+    const L = this.levelRef;
+    c.nid = nid !== null && nid !== undefined ? nid
+      : (L && L.net && L.net.authority ? L.net.allocId() : ++this.nidSeq);
+    this.coins.push(c);
+    if (L && L.net && L.net.authority && (nid === null || nid === undefined)) {
+      L.netEv('it', c.nid, c.type, Math.round(x * 10) / 10, Math.round(z * 10) / 10,
+        yOverride === null || yOverride === undefined ? null : Math.round(yOverride * 10) / 10,
+        c.value, Math.round(c.life));
+    }
+    return c;
+  }
+
+  // гість: предмет із мережі
+  spawnNetItem(nid, kind, x, z, y, value, life) {
+    if (this.removeItemByNid(nid)) { /* перестворення — прибрали стару копію */ }
+    if (kind === 'coin') this.spawnCoin(x, z, value, life, y, nid);
+    else this.spawnPickup(x, z, kind, life, y, nid);
+    const c = this.coins[this.coins.length - 1];
+    if (c) c.value = value;
+  }
+
+  removeItemByNid(nid) {
+    for (let i = 0; i < this.coins.length; i++) {
+      if (this.coins[i].nid === nid) {
+        this.scene.remove(this.coins[i].mesh);
+        this.coins.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  clearNetItems() {
+    for (const c of this.coins) this.scene.remove(c.mesh);
+    this.coins = [];
+  }
+
   // ---------- 🧨 вибухові бочки ----------
   addBarrel(x, z) {
     if (!this.barrels) this.barrels = [];
@@ -143,7 +186,7 @@ export class Effects {
     if (b.hp <= 0) b.fuse = 0.1;
   }
 
-  _explodeAt(pos, radius = 5.5, dmg = 135) {
+  _explodeAt(pos, radius = 5.5, dmg = 135, meta = null) {
     this.burst(pos, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
     this.burst(pos, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
     this.ring(pos, 0xffaa44, radius + 0.5);
@@ -151,6 +194,11 @@ export class Effects {
     this.flashLight.intensity = 30;
     this.flashT = 0.12;
     this.audio.explosion();
+    const L = this.levelRef;
+    if (L && L.net && L.net.authority) {
+      L.netEv('bm', Math.round(pos.x * 10) / 10, Math.round(pos.y * 10) / 10, Math.round(pos.z * 10) / 10,
+        radius, (meta && meta.gid) || 0, (meta && meta.barrels) || 0);
+    }
     if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg);
     // ланцюгова реакція бочок
     if (this.barrels) {
@@ -206,15 +254,20 @@ export class Effects {
   }
 
   // ---------- 🪂 аеродроп ----------
-  _spawnAirdrop(px, pz) {
-    const a = Math.random() * Math.PI * 2;
-    let x = px + Math.cos(a) * 26;
-    let z = pz + Math.sin(a) * 26;
-    const dB = Math.hypot(x, z);
-    const bound = this.world.layout.BOUND;
-    if (dB > bound - 12) {
-      x *= (bound - 14) / dB;
-      z *= (bound - 14) / dB;
+  _spawnAirdrop(px, pz, fixed = false) {
+    let x, z;
+    if (fixed) {
+      x = px; z = pz;
+    } else {
+      const a = Math.random() * Math.PI * 2;
+      x = px + Math.cos(a) * 26;
+      z = pz + Math.sin(a) * 26;
+      const dB = Math.hypot(x, z);
+      const bound = this.world.layout.BOUND;
+      if (dB > bound - 12) {
+        x *= (bound - 14) / dB;
+        z *= (bound - 14) / dB;
+      }
     }
     const g = new THREE.Group();
     const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.2), toonMat(0xb08d57));
@@ -230,7 +283,15 @@ export class Effects {
     this.scene.add(g);
     const beam = this.makeBeam(x, z, 0x6fc3ff, '🪂');
     this.airdrop = { g, chute, x, z, gy, beam, landed: false, lifeAfter: 60 };
+    const L = this.levelRef;
+    if (L && L.net && L.net.authority) L.netEv('ad', Math.round(x * 10) / 10, Math.round(z * 10) / 10);
     if (this.onAirdrop) this.onAirdrop();
+  }
+
+  // гість: аеродроп із мережі
+  netAirdrop(x, z) {
+    if (this.airdrop) return;
+    this._spawnAirdrop(x, z, true);
   }
 
   // ---------- 🐔/🐇 тварини ----------
@@ -294,7 +355,7 @@ export class Effects {
   }
 
   // 🚀 ракета базуки: летить прямо, вибухає від першого дотику
-  spawnRocket(from, dir, dmg) {
+  spawnRocket(from, dir, dmg, gid = null) {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), toonMat(0x6b7a4a));
     body.rotation.x = Math.PI / 2;
@@ -308,21 +369,76 @@ export class Effects {
     g.position.copy(from);
     g.lookAt(from.clone().add(dir));
     this.scene.add(g);
-    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0 });
+    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid });
   }
 
-  spawnGrenade(pos, vel) {
+  spawnGrenade(pos, vel, gid = null) {
     const m = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
     m.position.copy(pos);
     const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.06), toonMat(0xb8b8b8));
     band.position.y = 0.13;
     m.add(band);
     this.scene.add(m);
-    this.grenadesLive.push({ mesh: m, v: vel.clone(), fuse: 2.0, blink: 0 });
+    this.grenadesLive.push({ mesh: m, v: vel.clone(), fuse: 2.0, blink: 0, gid });
+  }
+
+  // гість: граната з мережі (вибухне лише за подією bm від хоста)
+  spawnNetGrenade(gid, px, py, pz, vx, vy, vz) {
+    this.spawnGrenade(new THREE.Vector3(px, py, pz), new THREE.Vector3(vx, vy, vz), gid);
+    const g = this.grenadesLive[this.grenadesLive.length - 1];
+    if (g) g.netWait = true;
+  }
+
+  spawnNetRocket(gid, ox, oy, oz, dx, dy, dz) {
+    this.spawnRocket(new THREE.Vector3(ox, oy, oz), new THREE.Vector3(dx, dy, dz).normalize(), 0, gid);
+    const rk = this.rockets[this.rockets.length - 1];
+    if (rk) rk.netWait = true;
+  }
+
+  // гість: вибух з мережі — лише картинка/звук, бочки і струс
+  netExplosion(x, y, z, r, gid, barrelIdxs) {
+    const pos = new THREE.Vector3(x, y, z);
+    this.burst(pos, 0xffa040, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
+    this.burst(pos, 0x553a22, 10, { speed: 4, up: 4, life: 0.6, size: 1.2 });
+    this.ring(pos, 0xffaa44, r + 0.5);
+    this.flashLight.position.copy(pos);
+    this.flashLight.intensity = 30;
+    this.flashT = 0.12;
+    this.audio.explosion();
+    if (gid) {
+      for (let i = this.grenadesLive.length - 1; i >= 0; i--) {
+        if (this.grenadesLive[i].gid === gid) {
+          this.scene.remove(this.grenadesLive[i].mesh);
+          this.grenadesLive.splice(i, 1);
+        }
+      }
+      for (let i = this.rockets.length - 1; i >= 0; i--) {
+        if (this.rockets[i].gid === gid) {
+          this.scene.remove(this.rockets[i].mesh);
+          disposeObject(this.rockets[i].mesh);
+          this.rockets.splice(i, 1);
+        }
+      }
+    }
+    for (const idx of barrelIdxs || []) this.netBarrelGone(idx);
+    const pp = this.getPlayerPos ? this.getPlayerPos() : null;
+    if (pp && this.levelRef) {
+      const pd = Math.hypot(pp.x - x, pp.z - z);
+      if (pd < r + 3) this.levelRef.player.camShake = Math.max(this.levelRef.player.camShake, 1.2);
+    }
+  }
+
+  netBarrelGone(idx) {
+    const b = this.barrels && this.barrels[idx];
+    if (!b || b.exploded) return;
+    b.exploded = true;
+    this.scene.remove(b.mesh);
+    disposeObject(b.mesh);
+    this.world.removeCollider(b.collider);
   }
 
   _explodeGrenade(g) {
-    this._explodeAt(g.mesh.position, 5.5);
+    this._explodeAt(g.mesh.position, 5.5, 135, { gid: g.gid || 0 });
     this.scene.remove(g.mesh);
   }
 
@@ -414,23 +530,27 @@ export class Effects {
     this.coins.splice(i, 1);
   }
 
-  spawnCoin(x, z, value = 5, life = 45, yOverride = null) {
+  spawnCoin(x, z, value = 5, life = 45, yOverride = null, nid = null) {
+    const L = this.levelRef;
+    if (L && L.mirror && nid === null) return; // на гості предмети існують лише з мережі
     const m = new THREE.Mesh(this.coinGeo, this.coinMat);
     const y = yOverride !== null ? yOverride : this.world.groundH(x, z);
     m.position.set(x, y + 0.4, z);
     m.rotation.x = Math.PI / 2 - 0.3;
     this.scene.add(m);
-    this.coins.push({ mesh: m, type: 'coin', value, t: Math.random() * 6, vy: 2.5, baseY: y + 0.35, life });
+    this._finishItem({ mesh: m, type: 'coin', value, t: Math.random() * 6, vy: 2.5, baseY: y + 0.35, life }, x, z, yOverride, nid);
   }
 
-  spawnPickup(x, z, type, life = 45, yOverride = null) {
+  spawnPickup(x, z, type, life = 45, yOverride = null, nid = null) {
+    const L = this.levelRef;
+    if (L && L.mirror && nid === null) return;
     const y0 = yOverride !== null ? yOverride : this.world.groundH(x, z);
     if (type === 'grenade') {
       const gm = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
       gm.scale.setScalar(1.5);
       gm.position.set(x, y0 + 0.35, z);
       this.scene.add(gm);
-      this.coins.push({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
+      this._finishItem({ mesh: gm, type: 'grenade', value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life }, x, z, yOverride, nid);
       return;
     }
     // ⚡💪🛡🧲 світні кулі-підсилення
@@ -446,7 +566,7 @@ export class Effects {
       g.add(orb, halo);
       g.position.set(x, y0 + 0.55, z);
       this.scene.add(g);
-      this.coins.push({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life });
+      this._finishItem({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life }, x, z, yOverride, nid);
       return;
     }
     if (type === 'armor') {
@@ -457,7 +577,7 @@ export class Effects {
       g.add(plate, stripe);
       g.position.set(x, y0 + 0.4, z);
       this.scene.add(g);
-      this.coins.push({ mesh: g, type, value: 40, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life });
+      this._finishItem({ mesh: g, type, value: 40, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life }, x, z, yOverride, nid);
       return;
     }
     if (type === 'rocket') {
@@ -470,7 +590,7 @@ export class Effects {
       g.rotation.z = 0.5;
       g.position.set(x, y0 + 0.4, z);
       this.scene.add(g);
-      this.coins.push({ mesh: g, type, value: 2, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life });
+      this._finishItem({ mesh: g, type, value: 2, t: Math.random() * 6, vy: 0, baseY: y0 + 0.35, life }, x, z, yOverride, nid);
       return;
     }
     if (type === 'bazooka') {
@@ -492,7 +612,7 @@ export class Effects {
       g.add(tube, band, mouth, halo);
       g.position.set(x, y0 + 0.55, z);
       this.scene.add(g);
-      this.coins.push({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life });
+      this._finishItem({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life }, x, z, yOverride, nid);
       return;
     }
     if (type === 'food') {
@@ -506,7 +626,7 @@ export class Effects {
       g.add(bun, sugar);
       g.position.set(x, y0 + 0.35, z);
       this.scene.add(g);
-      this.coins.push({ mesh: g, type, value: 15, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
+      this._finishItem({ mesh: g, type, value: 15, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life }, x, z, yOverride, nid);
       return;
     }
     const m = new THREE.Mesh(type === 'medkit' ? this.medGeo : this.ammoGeo, type === 'medkit' ? this.medMat : this.ammoMat);
@@ -522,7 +642,7 @@ export class Effects {
     }
     m.position.set(x, y0 + 0.35, z);
     this.scene.add(m);
-    this.coins.push({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life });
+    this._finishItem({ mesh: m, type, value: type === 'medkit' ? 25 : 30, t: Math.random() * 6, vy: 0, baseY: y0 + 0.3, life }, x, z, yOverride, nid);
   }
 
   update(dt) {
@@ -598,12 +718,23 @@ export class Effects {
       pr.mesh.position.addScaledVector(pr.v, dt);
       const mp = pr.mesh.position;
       let hit = blockedAt <= frameDist + pr.size;
-      if (!hit && ppos) {
-        const dx = mp.x - ppos.x, dy = mp.y - (ppos.y + 1.1), dz = mp.z - ppos.z;
-        if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) {
-          if (this.onProjectileHit) this.onProjectileHit(pr.dmg, mp.x, mp.z);
-          hit = true;
+      if (!hit && pr.dmg > 0) {
+        const dmgTargets = this.getDamageTargets
+          ? this.getDamageTargets()
+          : (ppos ? [{ pos: ppos, pid: 1 }] : []);
+        for (const tgt of dmgTargets) {
+          const tpv = tgt.pos;
+          const dx = mp.x - tpv.x, dy = mp.y - (tpv.y + 1.1), dz = mp.z - tpv.z;
+          if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) {
+            if (this.onProjectileHit) this.onProjectileHit(pr.dmg, mp.x, mp.z, tgt);
+            hit = true;
+            break;
+          }
         }
+      } else if (!hit && ppos) {
+        // dmg=0 (дзеркало): зникає біля свого гравця без шкоди
+        const dx = mp.x - ppos.x, dy = mp.y - (ppos.y + 1.1), dz = mp.z - ppos.z;
+        if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) hit = true;
       }
       if (!hit && mp.y < this.world.groundH(mp.x, mp.z) + pr.size * 0.5) hit = true;
       if (pr.spin) pr.mesh.rotation.x += dt * 9; // багет крутиться в польоті
@@ -639,10 +770,18 @@ export class Effects {
         this.burst(rp, 0xd8d8d8, 1, { speed: 0.4, up: 0.8, life: 0.5, size: 0.8 });
       }
       if (boom || rk.life <= 0) {
-        this._explodeAt(rp.clone(), 4.5, rk.dmg);
-        this.scene.remove(rk.mesh);
-        disposeObject(rk.mesh);
-        this.rockets.splice(i, 1);
+        if (rk.netWait) {
+          // гість: ховаємо ракету, великий вибух прийде подією bm
+          if (rk.life > 0.5) rk.life = 0.5;
+          rk.v.multiplyScalar(0.0);
+          rk.mesh.visible = false;
+          if (rk.life <= 0) { this.scene.remove(rk.mesh); disposeObject(rk.mesh); this.rockets.splice(i, 1); }
+        } else {
+          this._explodeAt(rp.clone(), 4.5, rk.dmg, { gid: rk.gid || 0 });
+          this.scene.remove(rk.mesh);
+          disposeObject(rk.mesh);
+          this.rockets.splice(i, 1);
+        }
       }
     }
 
@@ -667,6 +806,7 @@ export class Effects {
         g.mesh.material = (Math.floor(g.blink * 10) % 2) ? this.grenadeHotMat : this.grenadeMat;
       }
       if (g.fuse <= 0) {
+        if (g.netWait) { g.fuse = 0.01; continue; }
         this._explodeGrenade(g);
         this.grenadesLive.splice(i, 1);
       }
@@ -679,7 +819,7 @@ export class Effects {
         b.fuse -= dt;
         if (b.fuse <= 0) {
           b.exploded = true;
-          this._explodeAt(new THREE.Vector3(b.x, b.y + 0.6, b.z), 5.5);
+          this._explodeAt(new THREE.Vector3(b.x, b.y + 0.6, b.z), 5.5, 135, { barrels: [this.barrels.indexOf(b)] });
           this.scene.remove(b.mesh);
           disposeObject(b.mesh);
           this.world.removeCollider(b.collider);
@@ -687,8 +827,10 @@ export class Effects {
       }
     }
 
-    // м'яч
-    if (this.ball) {
+    // м'яч (на гості позиція їде зі снапшота — фізику не чіпаємо)
+    if (this.ball && this.levelRef && this.levelRef.mirror) {
+      this.ball.mesh.rotation.x += dt * 2;
+    } else if (this.ball) {
       const bl = this.ball;
       bl.v.y -= 13 * dt;
       bl.mesh.position.addScaledVector(bl.v, dt);
@@ -728,11 +870,13 @@ export class Effects {
       bl.v.z *= (1 - 0.4 * dt);
     }
 
-    // аеродроп
+    // аеродроп (таймер крутиться лише там, де є авторитет)
     if (this.airdropT === undefined) this.airdropT = 80;
     if (!this.airdrop) {
-      this.airdropT -= dt;
-      if (this.airdropT <= 0 && ppos) this._spawnAirdrop(ppos.x, ppos.z);
+      if (!this.levelRef || !this.levelRef.mirror) {
+        this.airdropT -= dt;
+        if (this.airdropT <= 0 && ppos) this._spawnAirdrop(ppos.x, ppos.z);
+      }
     } else {
       const ad = this.airdrop;
       if (!ad.landed) {
@@ -743,16 +887,18 @@ export class Effects {
           ad.landed = true;
           ad.chute.visible = false;
           this.burst(ad.g.position, 0xd8cdbb, 8, { speed: 3, life: 0.5 });
-          // лут навколо ящика + особливий сюрприз
-          this.spawnPickup(ad.x + 1.2, ad.z, 'ammo', 90);
-          this.spawnPickup(ad.x - 1.2, ad.z, 'medkit', 90);
-          const special = this.rollAirdropSpecial ? this.rollAirdropSpecial() : 'grenade';
-          this.spawnPickup(ad.x, ad.z + 1.4, special, 90);
-          if (special !== 'grenade' && Math.random() < 0.6) {
-            this.spawnPickup(ad.x - 0.5, ad.z - 1.3, 'grenade', 90);
-          }
-          for (let i = 0; i < 6; i++) {
-            this.spawnCoin(ad.x + (Math.random() - 0.5) * 3, ad.z + (Math.random() - 0.5) * 3, 10, 90);
+          if (!this.levelRef || !this.levelRef.mirror) {
+            // лут навколо ящика + особливий сюрприз
+            this.spawnPickup(ad.x + 1.2, ad.z, 'ammo', 90);
+            this.spawnPickup(ad.x - 1.2, ad.z, 'medkit', 90);
+            const special = this.rollAirdropSpecial ? this.rollAirdropSpecial() : 'grenade';
+            this.spawnPickup(ad.x, ad.z + 1.4, special, 90);
+            if (special !== 'grenade' && Math.random() < 0.6) {
+              this.spawnPickup(ad.x - 0.5, ad.z - 1.3, 'grenade', 90);
+            }
+            for (let i = 0; i < 6; i++) {
+              this.spawnCoin(ad.x + (Math.random() - 0.5) * 3, ad.z + (Math.random() - 0.5) * 3, 10, 90);
+            }
           }
         }
       } else {
@@ -834,11 +980,35 @@ export class Effects {
         c.mesh.rotation.y = c.t * 2;
         c.mesh.position.y = c.baseY + 0.15 + Math.sin(c.t * 2.5) * 0.07;
       }
-      if (pp) {
+      const L = this.levelRef;
+      const pickTargets = this.getPickupTargets
+        ? this.getPickupTargets()
+        : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), pid: 1 }] : []);
+      let granted = null;
+      let pulled = false;
+      for (const tgt of pickTargets) {
+        const tpv = tgt.pos;
+        const dx = tpv.x - c.mesh.position.x;
+        const dz = tpv.z - c.mesh.position.z;
+        const d = Math.hypot(dx, dz);
+        const magnetR = c.type === 'coin' ? (tgt.magnet ? 22 : 5) : 2.2;
+        if (!pulled && d < magnetR && d > 0.01) {
+          const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
+          c.mesh.position.x += dx * pull;
+          c.mesh.position.z += dz * pull;
+          pulled = true;
+        }
+        const grabR = tgt.pid === 1 ? 1.0 : 1.5; // гостям трохи щедріше через лаг
+        if (d < grabR && Math.abs(c.mesh.position.y - (tpv.y + 0.6)) < 1.8) {
+          granted = tgt;
+          break;
+        }
+      }
+      // гість: магніт лише як картинка, підбирання вирішує хост
+      if (L && L.mirror && pp && !pulled) {
         const dx = pp.x - c.mesh.position.x;
         const dz = pp.z - c.mesh.position.z;
         const d = Math.hypot(dx, dz);
-        // 🧲 баф-магніт тягне монети звідусіль
         const magnetOn = this.getMagnetActive && this.getMagnetActive();
         const magnetR = c.type === 'coin' ? (magnetOn ? 22 : 5) : 2.2;
         if (d < magnetR && d > 0.01) {
@@ -846,16 +1016,22 @@ export class Effects {
           c.mesh.position.x += dx * pull;
           c.mesh.position.z += dz * pull;
         }
-        if (d < 1.0 && Math.abs(c.mesh.position.y - (pp.y + 0.6)) < 1.8) {
-          if (this.onPickup) this.onPickup(c.type, c.value);
-          this.scene.remove(c.mesh);
-          this.coins.splice(i, 1);
-          continue;
+      }
+      if (granted) {
+        if (L && L.net && L.net.authority) {
+          L.netEv('lt', c.nid, granted.pid, c.type, c.value);
+          if (granted.pid === 1 && this.onPickup) this.onPickup(c.type, c.value);
+        } else if (this.onPickup) {
+          this.onPickup(c.type, c.value);
         }
+        this.scene.remove(c.mesh);
+        this.coins.splice(i, 1);
+        continue;
       }
       if (c.life <= 0) {
         this.scene.remove(c.mesh);
         this.coins.splice(i, 1);
+        if (L && L.net && L.net.authority) L.netEv('ig', c.nid);
       }
     }
   }

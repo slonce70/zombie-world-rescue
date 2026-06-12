@@ -633,3 +633,93 @@ body.touch-mode #waypoint { font-size: 13px; }
 
 .touch-controls-hint { display: none; margin-top: 12px; color: #9fb8d4; font-size: 13px; font-weight: 700; max-width: 420px; }
 body.touch-mode .touch-controls-hint { display: block; }
+
+/* ============ 🤝 Кооператив ============ */
+.globe-act.coop-btn { background: rgba(26, 92, 78, 0.85); border-color: rgba(77, 214, 168, 0.5); }
+.globe-act.coop-btn:hover { border-color: #4dd6a8; }
+
+.coop-card { max-width: 480px; width: min(92vw, 480px); }
+.coop-label { display: block; text-align: left; font-weight: 800; font-size: 14px; color: #bcd2e2; margin: 10px 2px 6px; }
+.coop-input {
+  width: 100%; box-sizing: border-box; font-family: var(--font); font-weight: 800; font-size: 20px;
+  padding: 12px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.25);
+  background: rgba(10, 20, 30, 0.6); color: #fff; outline: none;
+}
+.coop-input:focus { border-color: var(--accent); }
+.coop-code { text-transform: uppercase; letter-spacing: 8px; text-align: center; font-size: 26px; width: 170px; }
+.coop-wide { width: 100%; margin-top: 14px; }
+.coop-or { color: #8aa0b5; font-weight: 700; margin: 16px 0 10px; font-size: 14px; }
+.coop-join-row { display: flex; gap: 10px; justify-content: center; align-items: stretch; }
+.coop-join-row .btn { flex: 1; }
+.coop-error {
+  display: none; margin-top: 10px; padding: 8px 12px; border-radius: 10px;
+  background: rgba(180, 50, 50, 0.25); border: 1px solid rgba(255, 100, 100, 0.5);
+  color: #ffb3b3; font-weight: 700; font-size: 14px;
+}
+
+.lobby-code-box { margin: 6px 0 14px; }
+.lobby-code-label { color: #8aa0b5; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.lobby-code {
+  font-size: 52px; font-weight: 900; letter-spacing: 16px; color: var(--accent);
+  text-shadow: 0 4px 0 #8a6a00, 0 8px 24px rgba(0,0,0,.5); padding-left: 16px;
+}
+#lobby-roster { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.lobby-player {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+  font-weight: 800; font-size: 16px;
+}
+.lobby-player.me { border-color: var(--accent); }
+.lobby-player.empty { opacity: 0.4; font-weight: 600; }
+.lp-skin { font-size: 22px; }
+.lp-nick { flex: 1; text-align: left; }
+.lp-role { font-size: 12px; color: var(--accent); }
+.lobby-section { font-weight: 900; font-size: 13px; letter-spacing: 2px; color: var(--accent); text-align: left; margin: 8px 2px 6px; }
+#lobby-countries { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
+.lobby-country {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 86px;
+  padding: 10px 8px; border-radius: 12px; font-size: 26px;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+}
+.lobby-country span { font-size: 12px; font-weight: 800; }
+.lobby-country.pick { cursor: pointer; }
+.lobby-country.pick:hover { border-color: rgba(255, 210, 63, 0.6); }
+.lobby-country.sel { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
+.lobby-country.locked { opacity: 0.45; }
+
+/* панель команди в бою */
+#team-panel {
+  position: absolute; left: 14px; top: 46%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.team-row {
+  background: var(--ui-bg); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+  padding: 5px 9px; min-width: 130px;
+}
+.team-nick { font-size: 12px; font-weight: 800; color: #9fe8ff; }
+.team-nick.dead { color: #ff8080; }
+.team-hp { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.5); margin-top: 3px; overflow: hidden; }
+.team-hp > div { height: 100%; background: #4cff7a; border-radius: 3px; }
+.team-hp > div.low { background: #ff5d5d; }
+
+.overlay.see-through { background: rgba(8, 14, 20, 0.55); }
+
+/* кооп: вміст не вилазить за низькі екрани (телефон у ландшафті) */
+.coop-card { max-height: 92vh; overflow-y: auto; }
+@media (max-height: 460px) {
+  .coop-card { padding: 12px 18px; }
+  .coop-card .panel-header h2 { font-size: 20px; }
+  .coop-card .panel-sub { margin: 4px 0; font-size: 12px; }
+  .coop-input { font-size: 16px; padding: 8px 12px; }
+  .coop-or { margin: 8px 0 6px; }
+  .lobby-code { font-size: 34px; letter-spacing: 10px; }
+  .lobby-player { padding: 5px 10px; font-size: 14px; }
+  .lobby-country { min-width: 64px; padding: 6px 6px; font-size: 20px; }
+}
+
+/* кооп: компактна панель команди на телефонах (до 4 рядків без перекриттів) */
+@media (max-height: 480px) {
+  #team-panel { top: 40%; gap: 4px; }
+  .team-row { min-width: 96px; padding: 3px 7px; }
+  .team-nick { font-size: 10px; }
+}

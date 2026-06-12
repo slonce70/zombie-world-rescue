@@ -63,12 +63,15 @@ export class Megabox {
     }
     if (d < 3.6 && !level.missions.prompt) {
       level.missions.prompt = { text: '🦙 Натисни E — відкрий МЕГАБОКС!', hold: false };
-      if (allowControl && input.pressed('KeyE')) this.open();
+      if (allowControl && input.pressed('KeyE')) {
+        if (level.mirror) level.net.sendUse('megabox');
+        else this.open(1);
+      }
     }
   }
 
-  open() {
-    if (this.opened) return;
+  // святкова анімація відкриття (однакова всюди)
+  _openFx() {
     this.opened = true;
     this.openedAt = this.t;
     const level = this.level;
@@ -82,8 +85,29 @@ export class Megabox {
         { speed: 4.5, up: 4, life: 1.0, size: 1.3 }
       );
     }
-    level.game.openMegaboxReward(this.x, this.z);
-    level.bus.emit('megaboxOpened');
+  }
+
+  open(byPid = 1) {
+    if (this.opened) return;
+    this._openFx();
+    const level = this.level;
+    level.netEv('mb', byPid);
+    if (byPid === 1) {
+      level.game.openMegaboxReward(this.x, this.z);
+      level.bus.emit('megaboxOpened');
+    }
+  }
+
+  // гість: скриню відкрито (можливо, мною)
+  openNet(byPid) {
+    if (this.opened) return;
+    this._openFx();
+    const level = this.level;
+    const me = level.net ? level.net.myPid() : 0;
+    if (byPid === me) {
+      level.game.openMegaboxReward(this.x, this.z);
+      level.bus.emit('megaboxOpened');
+    }
   }
 }
 
@@ -223,6 +247,19 @@ export class Vehicles {
   update(dt, input, allowControl) {
     const level = this.level;
     const p = level.player;
+    // чужі райдери: самокат їде під віддаленим гравцем
+    if (level.net) {
+      const me = level.net.myPid ? level.net.myPid() : 1;
+      for (const r of this.list) {
+        if (!r.riderPid || r.riderPid === me || (level.net.role === 'host' && r.riderPid === 1)) continue;
+        const rp = level.net.remotes.get(r.riderPid);
+        if (rp) {
+          r.sc.group.position.copy(rp.pos);
+          r.sc.group.rotation.set(0, rp.yaw, 0);
+          for (const w of r.sc.wheels) w.rotation.x -= (rp._speed || 0) * dt * 1.2;
+        }
+      }
+    }
     if (this.riding) {
       const r = this.riding;
       // самокат під ногами героя, нахиляється в поворот разом із ним
@@ -232,13 +269,15 @@ export class Vehicles {
       // зійти: E
       if (allowControl && input.pressed('KeyE')) {
         input.justPressed.delete('KeyE');
-        this.dismount();
+        if (level.mirror) level.net.sendUse('dismount', { x: Math.round(p.pos.x * 10) / 10, z: Math.round(p.pos.z * 10) / 10 });
+        else this.dismount();
       }
       return;
     }
     // сісти: E біля самоката
     if (p.emoting || p.health <= 0) return;
     for (const r of this.list) {
+      if (r.taken) continue;
       const d = Math.hypot(p.pos.x - r.x, p.pos.z - r.z);
       if (d < 2.4) {
         if (!level.missions.prompt) {
@@ -246,10 +285,35 @@ export class Vehicles {
         }
         if (allowControl && input.pressed('KeyE')) {
           input.justPressed.delete('KeyE');
-          this.mount(r);
+          if (level.mirror) level.net.sendUse('scooter', { i: this.list.indexOf(r) });
+          else this.mount(r);
         }
         break;
       }
+    }
+  }
+
+  // подія з мережі: хтось сів/зійшов
+  netRide(pid, idx, on, x, z, myPid) {
+    const r = this.list[idx];
+    if (!r) return;
+    if (on) {
+      if (pid === myPid) {
+        this.mount(r);
+        r.riderPid = pid;
+      } else {
+        r.taken = true;
+        r.riderPid = pid;
+      }
+    } else if (pid === myPid) {
+      if (this.riding === r) this.dismountLocal(x, z);
+    } else {
+      r.taken = false;
+      r.riderPid = null;
+      r.x = x; r.z = z;
+      r.y = this.level.world.groundH(x, z);
+      r.sc.group.position.set(r.x, r.y, r.z);
+      r.sc.group.rotation.z = 0.09;
     }
   }
 
@@ -257,6 +321,10 @@ export class Vehicles {
     const p = this.level.player;
     this.riding = r;
     r.taken = true;
+    r.riderPid = this.level.net ? (this.level.net.myPid ? this.level.net.myPid() : 1) : 1;
+    if (this.level.net && this.level.net.authority) {
+      this.level.netEv('ride', 1, this.list.indexOf(r), 1, 0, 0);
+    }
     p.riding = r;
     p.rideSpeed = 0;
     this._wasFP = p.firstPerson;
@@ -267,6 +335,27 @@ export class Vehicles {
     this.level.bus.emit('toast', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти');
   }
 
+  dismountLocal(x, z) {
+    // зійти за командою хоста (позиція вже відома)
+    const r = this.riding;
+    const p = this.level.player;
+    if (!r) return;
+    this.riding = null;
+    p.riding = null;
+    p.rideSpeed = 0;
+    r.taken = false;
+    r.riderPid = null;
+    r.x = x !== undefined ? x : p.pos.x;
+    r.z = z !== undefined ? z : p.pos.z;
+    r.y = this.level.world.groundH(r.x, r.z);
+    r.sc.group.position.set(r.x, r.y, r.z);
+    r.sc.group.rotation.z = 0.09;
+    if (this._wasFP) {
+      p.firstPerson = true;
+      p._applyView();
+    }
+  }
+
   dismount() {
     const r = this.riding;
     const p = this.level.player;
@@ -275,6 +364,11 @@ export class Vehicles {
     p.riding = null;
     p.rideSpeed = 0;
     r.taken = false;
+    r.riderPid = null;
+    if (this.level.net && this.level.net.authority) {
+      this.level.netEv('ride', 1, this.list.indexOf(r), 0,
+        Math.round(p.pos.x * 10) / 10, Math.round(p.pos.z * 10) / 10);
+    }
     r.x = p.pos.x + Math.sin(p.yaw) * 1.2;
     r.z = p.pos.z + Math.cos(p.yaw) * 1.2;
     r.y = this.level.world.groundH(r.x, r.z);
@@ -304,6 +398,7 @@ export class Gadgets {
     this.tramps = [];
     this.walls = [];
     this._thunkCd = 0;
+    this._gidSeq = 0;
     // 🛡 бульбашка гаджет-щита довкола героя
     this.shieldMesh = new THREE.Mesh(
       new THREE.SphereGeometry(1.25, 18, 14),
@@ -342,9 +437,13 @@ export class Gadgets {
         const w = this.walls[i];
         if (Math.hypot(p.pos.x - w.x, p.pos.z - w.z) < 3.2) {
           input.justPressed.delete('KeyE');
-          this._removeWall(i, false);
-          level.bus.emit('toast', '🧱 Барикаду забрано назад');
-          level.audio.pickup();
+          if (level.mirror) {
+            level.net.sendUse('wallback', { i: w.nid });
+          } else {
+            this._removeWall(i, false);
+            level.bus.emit('toast', '🧱 Барикаду забрано назад');
+            level.audio.pickup();
+          }
           break;
         }
       }
@@ -359,7 +458,8 @@ export class Gadgets {
       }
     }
 
-    // зомбі гатять по барикадах
+    // зомбі гатять по барикадах (рахує лише хост/соло)
+    if (level.mirror) return;
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
       const w = this.walls[i];
@@ -414,9 +514,11 @@ export class Gadgets {
       level.bus.emit('toast', '💚 +50 здоров\'я!');
       ok = true;
     } else if (id === 'tramp') {
-      ok = this._placeTramp();
+      if (level.mirror) ok = this._requestPlace('tramp', 2.1);
+      else ok = this._placeTramp();
     } else if (id === 'wall') {
-      ok = this._placeWall();
+      if (level.mirror) ok = this._requestPlace('wall', 2.6);
+      else ok = this._placeWall();
     }
     if (ok) {
       this.cd = GADGETS[id].cd;
@@ -434,27 +536,70 @@ export class Gadgets {
     return { x, z, y: this.level.world.groundH(x, z) };
   }
 
+  // гість: просимо хоста поставити гаджет у нашій точці
+  _requestPlace(kind, dist) {
+    const pos = this._placePos(dist);
+    if (!pos) {
+      this.level.bus.emit('toast', kind === 'wall' ? 'Тут не можна поставити барикаду 🙈' : 'Тут не можна поставити батут 🙈');
+      return false;
+    }
+    this.level.net.sendGadget(kind, pos.x, pos.z, this.level.player.yaw);
+    return true;
+  }
+
   _placeTramp() {
     const pos = this._placePos(2.1);
     if (!pos) {
       this.level.bus.emit('toast', 'Тут не можна поставити батут 🙈');
       return false;
     }
+    this.placeTrampAt(pos.x, pos.z, 1);
+    return true;
+  }
+
+  placeTrampAt(x, z, ownerPid) {
+    const level = this.level;
+    const y = level.world.groundH(x, z);
+    const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
+    this._buildTramp(nid, x, y, z);
+    if (level.net && level.net.authority) level.netEv('tramp', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10);
+    return true;
+  }
+
+  _buildTramp(nid, x, y, z) {
     const mesh = makeTrampolineMesh();
-    mesh.position.set(pos.x, pos.y, pos.z);
+    mesh.position.set(x, y, z);
     this.level.scene.add(mesh);
-    const pad = { x: pos.x, z: pos.z, y: pos.y, power: 15, cd: 0 };
+    const pad = { x, z, y, power: 15, cd: 0 };
     this.level.world.jumpPads.push(pad);
-    this.tramps.push({ mesh, pad });
+    this.tramps.push({ mesh, pad, nid });
     if (this.tramps.length > 3) {
       const old = this.tramps.shift();
-      this.level.scene.remove(old.mesh);
-      const idx = this.level.world.jumpPads.indexOf(old.pad);
-      if (idx >= 0) this.level.world.jumpPads.splice(idx, 1);
+      this._disposeTramp(old);
+      if (this.level.net && this.level.net.authority) this.level.netEv('trampgo', old.nid);
     }
     this.level.audio.boing();
-    this.level.effects.ring(new THREE.Vector3(pos.x, pos.y, pos.z), 0x4fa8e8, 2);
-    return true;
+    this.level.effects.ring(new THREE.Vector3(x, y, z), 0x4fa8e8, 2);
+  }
+
+  _disposeTramp(t) {
+    this.level.scene.remove(t.mesh);
+    const idx = this.level.world.jumpPads.indexOf(t.pad);
+    if (idx >= 0) this.level.world.jumpPads.splice(idx, 1);
+  }
+
+  // гість: батут із мережі
+  netTramp(nid, ownerPid, x, z) {
+    if (this.tramps.some((t) => t.nid === nid)) return;
+    this._buildTramp(nid, x, this.level.world.groundH(x, z), z);
+  }
+
+  netTrampGone(nid) {
+    const i = this.tramps.findIndex((t) => t.nid === nid);
+    if (i >= 0) {
+      this._disposeTramp(this.tramps[i]);
+      this.tramps.splice(i, 1);
+    }
   }
 
   _placeWall() {
@@ -464,23 +609,49 @@ export class Gadgets {
       level.bus.emit('toast', 'Тут не можна поставити барикаду 🙈');
       return false;
     }
-    const yaw = level.player.yaw;
+    this.placeWallAt(pos.x, pos.z, level.player.yaw, 1);
+    return true;
+  }
+
+  placeWallAt(x, z, yaw, ownerPid) {
+    const level = this.level;
+    const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
+    this._buildWall(nid, x, z, yaw, ownerPid);
+    if (level.net && level.net.authority) {
+      level.netEv('wall', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10, Math.round(yaw * 100) / 100);
+    }
+    return true;
+  }
+
+  _buildWall(nid, x, z, yaw, ownerPid) {
+    const level = this.level;
+    const y = level.world.groundH(x, z);
     const mesh = makeBarricadeMesh();
-    mesh.position.set(pos.x, pos.y, pos.z);
+    mesh.position.set(x, y, z);
     mesh.rotation.y = yaw;
     level.scene.add(mesh);
     const colliders = [];
     for (const off of [-0.85, 0, 0.85]) {
-      const cx = pos.x + Math.cos(yaw) * off;
-      const cz = pos.z - Math.sin(yaw) * off;
-      const col = { x: cx, z: cz, r: 0.55, top: pos.y + 1.8 };
+      const cx = x + Math.cos(yaw) * off;
+      const cz = z - Math.sin(yaw) * off;
+      const col = { x: cx, z: cz, r: 0.55, top: y + 1.8 };
       level.world.colliders.push(col);
       colliders.push(col);
     }
     level.world._buildGrid();
-    this.walls.push({ mesh, colliders, hp: 100, x: pos.x, z: pos.z, y: pos.y, yaw });
+    this.walls.push({ mesh, colliders, hp: 100, x, z, y, yaw, nid, ownerPid });
     level.audio.door();
-    return true;
+  }
+
+  // гість: барикада з мережі
+  netWall(nid, ownerPid, x, z, yaw) {
+    if (this.walls.some((w) => w.nid === nid)) return;
+    this._buildWall(nid, x, z, yaw, ownerPid);
+  }
+
+  netWallGone(nid, broken) {
+    const i = this.walls.findIndex((w) => w.nid === nid);
+    if (i >= 0) this._removeWall(i, broken);
   }
 
   // куля гравця може влучити в барикаду (і зруйнувати її)
@@ -515,6 +686,7 @@ export class Gadgets {
     const level = this.level;
     const w = this.walls[i];
     this.walls.splice(i, 1);
+    if (level.net && level.net.authority) level.netEv('wallgo', w.nid, broken ? 1 : 0);
     level.scene.remove(w.mesh);
     level.world.colliders = level.world.colliders.filter((c) => !w.colliders.includes(c));
     level.world._buildGrid();

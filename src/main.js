@@ -17,10 +17,12 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
+import { CoopUI } from './ui/coopui.js';
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 7;
+const APP_VERSION = 8;
+window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
@@ -94,6 +96,7 @@ class Game {
     this.hud = new HUD(this);
     this.shop = new Shop(this);
     this.globe = new Globe(this);
+    this.coop = new CoopUI(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
@@ -211,6 +214,19 @@ class Game {
     });
 
     this.clock = new THREE.Clock();
+    // 🤝 кооп: у фоновій вкладці rAF спить, а хост мусить крутити світ.
+    // Web Worker-таймери браузер не тротлить — він і буде метрономом.
+    this._lastRaf = performance.now();
+    try {
+      const src = 'setInterval(() => postMessage(1), 33);';
+      this._ticker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      this._ticker.onmessage = () => {
+        // у коопі тікер — повноцінне друге джерело кроків: getDelta() ділить
+        // реальний час між викликами, тож сумарна швидкість світу точна,
+        // навіть коли rAF спить у фоновій вкладці
+        if (this.level && this.level.net) this._frame(true);
+      };
+    } catch (e) { /* без воркера гра просто живе на rAF */ }
     window.__game = this;
     this._boot();
   }
@@ -290,7 +306,10 @@ class Game {
     this.state = 'globe';
     this._showGlobeUI(true);
     this._initVersionCheck();
-    this.renderer.setAnimationLoop(() => this._frame());
+    this.renderer.setAnimationLoop(() => {
+      this._lastRaf = performance.now();
+      this._frame(false);
+    });
     const c = this.params.get('country');
     if (c && COUNTRIES[c]) this.startLevel(c);
   }
@@ -403,6 +422,11 @@ class Game {
 
   // ---------- шторм ----------
   startStorm(countryId = null) {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast('⛈️ Шторм поки що тільки соло — спершу вийди з кімнати');
+      this.audio.denied();
+      return;
+    }
     const lib = Object.keys(this.save.liberated);
     if (!lib.length) {
       this.audio.denied();
@@ -478,6 +502,8 @@ class Game {
   async _buildLevel(countryId, opts = {}) {
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
     const isStorm = !!opts.storm;
+    const coop = opts.coop || null;
+    const isGuest = !!(coop && coop.role === 'guest');
     // екран завантаження рівня з порадою
     document.getElementById('ll-title').textContent = isStorm
       ? `⛈️ ШТОРМ: ${country.name.toUpperCase()}`
@@ -498,9 +524,16 @@ class Game {
       stats: { kills: 0, shotsFired: 0, shotsHit: 0, coinsEarned: 0, deaths: 0, time: 0 },
       combo: { n: 0, t: 0, best: 0 },
       bossDefeated: false,
+      // кооп: net ставиться нижче; netEv — безпечна заглушка для соло
+      net: null,
+      mirror: isGuest,
+      netEv: () => {},
+      players: null,
+      runIndex: coop && coop.spec ? coop.spec.runIndex : undefined,
     };
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
+    level.effects.levelRef = level;
     level.addCoins = (n) => {
       this.save.coins += n;
       level.stats.coinsEarned += n;
@@ -527,18 +560,18 @@ class Game {
       level.storm = new StormMode(level);
       level.missions = level.storm;
     } else {
-      level.zombies.populate();
+      if (!isGuest) level.zombies.populate();
       level.missions = new DynamicMissions(level);
     }
-    // 🦙🐶🛴🦘 іграшки рівня
-    level.megabox = new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
+    level.megabox = isGuest ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     level.pet = (this.save.upgrades.dog || 0) > 0 ? new Pet(level) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm) {
+    if (!isStorm && !isGuest) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -550,7 +583,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of level.world.lootSpots) {
+    for (const ls of (isGuest ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -559,7 +592,7 @@ class Game {
         level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
       }
     }
-    for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+    if (!isGuest) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
 
     // приколи карти: бочки, м'яч, тварини, аеродроп
     const fun = country.map.fun || {};
@@ -665,6 +698,8 @@ class Game {
     });
     // ⭐ зірковий досвід і щоденні завдання
     level.bus.on('zombieKilled', (z) => {
+      // кооп-хост: чужі перемоги зараховуються їхнім господарям (події zd)
+      if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
       this.quests.onEvent('kill', { weapon: level.player.cur });
@@ -680,7 +715,8 @@ class Game {
     });
     level.bus.on('dance', () => this.quests.onEvent('dance'));
     // комбо за серії вбивств
-    level.bus.on('zombieKilled', () => {
+    level.bus.on('zombieKilled', (z) => {
+      if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
       c.n++;
@@ -698,6 +734,35 @@ class Game {
       document.getElementById('boss-name').textContent = country.boss.name;
     });
 
+    // 🤝 кооп: мережевий шар рівня
+    if (coop) {
+      level.net = coop.session.makeNet(level, coop.spec);
+      level.netEv = (...a) => level.net.ev(...a);
+      if (coop.role === 'host') {
+        // предмети підбирають і снаряди б'ють УСІХ гравців
+        level.effects.getPickupTargets = () => {
+          const out = [];
+          for (const pl of level.players || []) {
+            if (pl.health <= 0) continue;
+            out.push({
+              pos: pl.pos,
+              magnet: pl.pid === 1 ? level.player.buffs.magnet > 0 : !!pl.magnet,
+              pid: pl.pid,
+            });
+          }
+          return out;
+        };
+        level.effects.getDamageTargets = () => (level.players || []).filter((p) => p.health > 0);
+        level.effects.onProjectileHit = (dmg, x, z, tgt) => {
+          if (tgt) level.net.hurtPlayer(tgt, dmg, x, z);
+          else level.player.takeDamage(dmg, x, z);
+        };
+      } else {
+        level.effects.getPickupTargets = () => [];
+      }
+      level.net.attach(coop.spec);
+    }
+
     this.level = level;
     this.state = 'level';
     this.victoryShown = false;
@@ -711,6 +776,21 @@ class Game {
       this._showOverlay('overlay-start');
     }
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, country.banner, 4.5);
+  }
+
+  // 🤝 гість: мегабокс на позиції хоста
+  makeGuestMegabox(mb) {
+    if (!this.level || this.level.megabox) return;
+    this.level.megabox = new Megabox(this.level, mb.x, mb.z);
+  }
+
+  // 🤝 гість: перемога (подія від хоста)
+  netVictory() {
+    if (!this.level || this.victoryShown) return;
+    this.audio.victory();
+    this.audio.setMode(null);
+    this.level.bossDefeated = true;
+    this._showVictory();
   }
 
   // 🐶 купили песика — з'являється просто в поточному рівні
@@ -747,9 +827,13 @@ class Game {
       save.megaPity = (save.megaPity || 0) + 1;
       if (roll < 0.62 || !level) {
         // фонтан монет
-        for (let i = 0; i < 14; i++) {
-          const a = (i / 14) * Math.PI * 2;
-          level.effects.spawnCoin(x + Math.cos(a) * (1 + Math.random() * 2.2), z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
+        if (level && level.mirror) {
+          level.net.sendFountain(x, z);
+        } else if (level) {
+          for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * Math.PI * 2;
+            level.effects.spawnCoin(x + Math.cos(a) * (1 + Math.random() * 2.2), z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
+          }
         }
         title = '💰 ФОНТАН МОНЕТ!';
         sub = 'Збирай скоріше! (наступний бокс щасливіший 😉)';
@@ -786,6 +870,21 @@ class Game {
   }
 
   endLevel() {
+    // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
+    if (this.level && this.level.net && this.coop) {
+      const sess = this.coop.session;
+      if (sess.role === 'host' && sess.state === 'level') {
+        sess.transport.broadcast({ t: 'lvlend' });
+      }
+      sess.levelEnded();
+      this.level.net = null;
+      setTimeout(() => {
+        if (sess.state === 'lobby') {
+          this._showOverlay('overlay-lobby');
+          this.coop._renderLobby();
+        }
+      }, 50);
+    }
     if (this.level) {
       // звільняємо ресурси сцени
       this.level.scene.traverse((o) => {
@@ -903,6 +1002,7 @@ class Game {
     }
     this.progress.addXp(XP_VALUES.country);
     this.saveGame();
+    if (this.level.net && this.level.net.authority) this.level.netEv('vict');
     this.globe.setLiberated();
     this.input.exitLock();
     const mins = Math.floor(s.time / 60);
@@ -938,8 +1038,28 @@ class Game {
   }
 
   // ---------- цикл ----------
-  _frame() {
-    let dt = Math.min(this.clock.getDelta(), 0.05);
+  _frame(skipRender = false) {
+    // 🤝 кооп: накопичуємо РЕАЛЬНИЙ час і за потреби робимо кілька кроків —
+    // після сну вкладки (фонові пачки повідомлень тікера) світ наздоганяє
+    // годинник, а не падає у slow-motion
+    if (this.level && this.level.net) {
+      const real = Math.min(this.clock.getDelta(), 1);
+      // не більше 1.5с боргу: після дуже довгого сну наздоганяємо лише хвіст
+      this._timeAcc = Math.min((this._timeAcc || 0) + real, 1.5);
+      let steps = 0;
+      while (this._timeAcc > 0.0004 && steps < 10) {
+        steps++;
+        const dt = Math.min(this._timeAcc, 0.05);
+        this._timeAcc -= dt;
+        const last = this._timeAcc <= 0.0004 || steps === 10;
+        this._step(dt, skipRender || !last);
+      }
+      return;
+    }
+    this._step(Math.min(this.clock.getDelta(), 0.05), skipRender);
+  }
+
+  _step(dt, skipRender) {
     this._fpsAcc += dt;
     this._fpsN++;
     if (this._fpsAcc >= 1) {
@@ -970,13 +1090,16 @@ class Game {
 
     if (this.state === 'globe') {
       this.globe.update(dt);
-      this.renderer.render(this.globe.scene, this.globe.camera);
+      if (!skipRender) this.renderer.render(this.globe.scene, this.globe.camera);
     } else if (this.state === 'level' && this.level) {
-      const blocked = this.paused || this.shop.isOpen || this.victoryShown;
+      const isCoop = !!this.level.net;
+      // кооп: пауза/магазин ховають керування, але світ ЖИВЕ (інші ж грають!)
+      const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.victoryShown);
       if (!blocked) {
         const alive = this.level.player.health > 0;
         const allowControl = (this.input.locked || this.testMode || this.input.touchMode)
-          && this.deathT < 0 && alive;
+          && this.deathT < 0 && alive
+          && !(isCoop && (this.paused || this.shop.isOpen));
         this.level.player.update(dt, this.input, allowControl);
         this.level.zombies.update(dt);
         this.level.missions.update(dt, this.input, allowControl);
@@ -1004,14 +1127,15 @@ class Game {
           if (this.deathT <= 0) {
             this._hideOverlay('overlay-death');
             this.level.player.respawn();
-            this.level.zombies.clearNear(this.level.world.layout.SPAWN.x, this.level.world.layout.SPAWN.z, 30);
+            if (!this.level.mirror) this.level.zombies.clearNear(this.level.world.layout.SPAWN.x, this.level.world.layout.SPAWN.z, 30);
             this.deathT = -1;
             if (!this.testMode && !this.input.locked) this._showOverlay('overlay-start');
           }
         }
       }
+      if (this.level.net) this.level.net.update(dt);
       this.hud.update(dt);
-      this.renderer.render(this.level.scene, this.level.player.camera);
+      if (!skipRender) this.renderer.render(this.level.scene, this.level.player.camera);
     }
     this.input.postUpdate();
   }
@@ -1031,7 +1155,9 @@ class Game {
     else {
       const p = this.level.player.pos;
       for (const zb of z.list) {
-        if (zb.state !== 'dead' && zb.aggroed && Math.hypot(zb.x - p.x, zb.z - p.z) < 40) {
+        // у дзеркалі гостя агро читаємо зі стану снапшота (біт chase)
+        const aggro = zb.aggroed || ((zb.netB || 0) & 7) === 1;
+        if (zb.state !== 'dead' && aggro && Math.hypot(zb.x - p.x, zb.z - p.z) < 40) {
           mode = 'battle';
           break;
         }
@@ -1042,6 +1168,8 @@ class Game {
 
   showPause() {
     this.paused = true;
+    const note = document.getElementById('pause-coop-note');
+    if (note) note.style.display = this.level && this.level.net ? 'block' : 'none';
     this._showOverlay('overlay-pause');
   }
 
@@ -1213,6 +1341,27 @@ class Game {
         g.saveGame();
       },
       forceMissions: (types) => { g._forceMissionSet = types; },
+      // 🤝 кооп
+      coopCreate: (nick) => g.coop.session.create(nick || 'Хост'),
+      coopJoin: (code, nick) => g.coop.session.join(code, nick || 'Гість'),
+      coopSetCountry: (c) => g.coop.session.setCountry(c),
+      coopStartLevel: () => g.coop.session.startLevel(),
+      coopLeave: () => g.coop.session.leave(),
+      coopState: () => {
+        const s = g.coop.session;
+        const net = g.level && g.level.net;
+        return {
+          role: s.role, room: s.room, state: s.state, myPid: s.myPid,
+          roster: [...s.roster.entries()].map(([pid, r]) => ({ pid, nick: r.nick })),
+          remotes: net ? [...net.remotes.keys()] : [],
+          remotePos: net ? Object.fromEntries([...net.remotes.entries()].map(([pid, rp]) => [pid,
+            { x: Math.round(rp.pos.x * 10) / 10, y: Math.round(rp.pos.y * 10) / 10, z: Math.round(rp.pos.z * 10) / 10, hp: rp.health }])) : {},
+          aliveZombies: g.level ? g.level.zombies.list.filter((z) => z.state !== 'dead').length : 0,
+          items: g.level ? g.level.effects.coins.length : 0,
+          waiting: (net && net.waiting) || false,
+          connected: s.transport.connected,
+        };
+      },
     };
   }
 }

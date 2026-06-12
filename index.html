@@ -22,6 +22,7 @@
         <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
         <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
         <button id="btn-storm" class="btn globe-act storm-btn">⛈️ ШТОРМ</button>
+        <button id="btn-coop" class="btn globe-act coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
       <button id="btn-quality" class="btn quality-btn">⚙️ Якість: Авто</button>
@@ -96,6 +97,7 @@
       <div id="banner-sub"></div>
     </div>
     <div id="toasts"></div>
+    <div id="team-panel"></div>
   </div>
 
   <div id="rotate-hint">
@@ -172,6 +174,7 @@
   <div id="overlay-pause" class="overlay">
     <div class="overlay-card">
       <h2>⏸️ ПАУЗА</h2>
+      <p id="pause-coop-note" class="panel-sub" style="display:none">🤝 Це кооп: гра ТРИВАЄ, поки ти в меню — повертайся швидше!</p>
       <div class="btn-row">
         <button id="btn-resume" class="btn btn-primary">▶️ Продовжити</button>
         <button id="btn-pause-globe" class="btn">🌍 На глобус</button>
@@ -260,6 +263,54 @@
         <button id="btn-storm-retry" class="btn btn-primary big">⛈️ Ще раз!</button>
         <button id="btn-storm-globe" class="btn big">🌍 На глобус</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Кооп: вхід -->
+  <div id="overlay-coop" class="overlay">
+    <div class="overlay-card panel-card coop-card">
+      <div class="panel-header">
+        <h2>🤝 ГРАТИ РАЗОМ</h2>
+        <button class="btn-x panel-close" data-close="overlay-coop">✕</button>
+      </div>
+      <p class="panel-sub">Грай з другом онлайн! Один створює кімнату, інші вводять код.</p>
+      <label class="coop-label" for="coop-nick">Твій нік</label>
+      <input id="coop-nick" class="coop-input" maxlength="12" placeholder="Гравець" autocomplete="off">
+      <div id="coop-error" class="coop-error"></div>
+      <button id="btn-coop-create" class="btn btn-primary big coop-wide">🏠 СТВОРИТИ КІМНАТУ</button>
+      <div class="coop-or">— або введи код друга —</div>
+      <div class="coop-join-row">
+        <input id="coop-code" class="coop-input coop-code" maxlength="6" placeholder="КОД" autocomplete="off">
+        <button id="btn-coop-join" class="btn big">🚪 ПРИЄДНАТИСЯ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кооп: лобі -->
+  <div id="overlay-lobby" class="overlay">
+    <div class="overlay-card panel-card coop-card">
+      <div class="panel-header">
+        <h2>🛋️ КІМНАТА</h2>
+        <button id="btn-lobby-leave" class="btn-x">✕</button>
+      </div>
+      <div class="lobby-code-box">
+        <div class="lobby-code-label">Код кімнати — продиктуй другу:</div>
+        <div id="lobby-code" class="lobby-code">····</div>
+      </div>
+      <div id="lobby-roster"></div>
+      <div class="lobby-section">Країна</div>
+      <div id="lobby-countries"></div>
+      <p id="lobby-hint" class="panel-sub"></p>
+      <button id="btn-lobby-start" class="btn btn-primary big coop-wide">🚀 СТАРТ!</button>
+    </div>
+  </div>
+
+  <!-- Кооп: чекаємо на хоста -->
+  <div id="overlay-net-wait" class="overlay see-through">
+    <div class="overlay-card">
+      <div class="spinner">📡</div>
+      <h2>Звʼязок з хостом…</h2>
+      <p id="net-wait-sub">Хост відволікся — чекаємо…</p>
     </div>
   </div>
 

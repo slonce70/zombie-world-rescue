@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
 
-import { clamp, dampAngle, closestRaySeg, RNG } from './utils.js';
+import { clamp, damp, dampAngle, closestRaySeg, RNG } from './utils.js';
 
 const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
@@ -43,6 +43,9 @@ export class Zombies {
     this.diff = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
+    this.byNidMap = new Map();
+    this.mirror = !!level.mirror;
+    this._idSeq = 0;
     this.boss = null;
     this.hordeRemaining = 0;
     this.hordePending = 0;
@@ -54,7 +57,11 @@ export class Zombies {
 
   spawn(type, x, z, opts = {}) {
     const bossStyle = opts.style || (opts.frost ? 'frost' : 'king');
-    const rig = type === 'boss' ? makeBoss(bossStyle) : makeZombie(type, this.rng);
+    const nid = opts.nid !== undefined ? opts.nid
+      : (this.level.net && this.level.net.authority ? this.level.net.allocId() : ++this._idSeq);
+    // зовнішність зомбі — з nid-сідованого RNG: однакова у всіх гравців кооперативу
+    const vrng = new RNG((Math.imul(nid, 2654435761) ^ 0x9e3779) >>> 0);
+    const rig = type === 'boss' ? makeBoss(bossStyle) : makeZombie(type, vrng);
     const stats = TYPE_STATS[type];
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
@@ -62,7 +69,7 @@ export class Zombies {
     this.scene.add(rig.group);
     const hpScale = type === 'boss' ? 1 : this.diff.hp;
     const z_ = {
-      rig, type, stats,
+      nid, rig, type, stats,
       hp: Math.round(stats.hp * hpScale), maxHp: Math.round(stats.hp * hpScale),
       x, z, y,
       state: opts.horde ? 'chase' : 'wander',
@@ -113,9 +120,41 @@ export class Zombies {
       z_.chestHp = 0;
     }
     z_.damage = (amt, dir, headshot) => this._damage(z_, amt, dir, headshot);
+    if (opts.golden) this._makeGolden(z_);
+    if (opts.elite) this._makeElite(z_);
+    if (opts.sleeping) {
+      z_.sleeping = true;
+      setAnim(rig, 'idle');
+    }
+    this.byNidMap.set(nid, z_);
     this.list.push(z_);
     if (type === 'boss') this.boss = z_;
+    if (this.level.net && this.level.net.authority && !opts.mirror) this.level.net.onZombieSpawn(z_);
     return z_;
+  }
+
+  byNid(nid) { return this.byNidMap.get(nid) || null; }
+
+  // золоте покриття: один матеріал поверх запечених кольорів
+  _makeGolden(z_) {
+    z_.golden = true;
+    const goldM = toonMat(0xffd23f, 0xcc8800, 0.35);
+    z_.rig.group.traverse((o) => {
+      if (o.isMesh) o.material = goldM;
+    });
+  }
+
+  // 👹 еліт: золота корона-обідок і більший зріст
+  _makeElite(z_) {
+    z_.elite = true;
+    const crown = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24, 0.05, 6, 14),
+      toonMat(0xffd23f, 0xcc8800, 0.6)
+    );
+    crown.rotation.x = Math.PI / 2 - 0.15;
+    crown.position.y = 0.38;
+    z_.rig.parts.head.add(crown);
+    z_.rig.group.scale.multiplyScalar(1.18);
   }
 
   populate() {
@@ -202,15 +241,9 @@ export class Zombies {
       }
       if (ok) break;
     }
-    const z_ = this.spawn('walker', x, z, {});
-    z_.golden = true;
+    const z_ = this.spawn('walker', x, z, { golden: true });
     z_.hp = z_.maxHp = 80;
     z_.anchor = { x, z, r: 30 };
-    // золоте покриття: один матеріал поверх запечених кольорів
-    const goldM = toonMat(0xffd23f, 0xcc8800, 0.35);
-    z_.rig.group.traverse((o) => {
-      if (o.isMesh) o.material = goldM;
-    });
     return z_;
   }
 
@@ -226,6 +259,8 @@ export class Zombies {
         zb.gone = true;
         if (zb.horde) this.hordeRemaining--;
         this.scene.remove(zb.rig.group);
+        this.byNidMap.delete(zb.nid);
+        this.level.netEv('zg', zb.nid);
       }
     }
     this.list = this.list.filter((zb) => !zb.gone);
@@ -242,8 +277,7 @@ export class Zombies {
   // сплячий зомбі-сюрприз у будинку: прокидається, коли гравець поруч
   spawnSurprise(x, z) {
     const type = this.extraZombie && this.rng.chance(0.4) ? this.extraZombie : 'walker';
-    const z_ = this.spawn(type, x, z, {});
-    z_.sleeping = true;
+    const z_ = this.spawn(type, x, z, { sleeping: true });
     z_.anchor = { x, z, r: 2 };
     // стоїть на підлозі будинку, а не на терені під нею
     z_.y = Math.max(this.world.groundH(x, z), this.world.floorAt(x, z, 99));
@@ -270,6 +304,8 @@ export class Zombies {
     const hpLeft = b.hp;
     b.gone = true;
     this.scene.remove(b.rig.group);
+    this.byNidMap.delete(b.nid);
+    this.level.netEv('zg', b.nid);
     this.list = this.list.filter((zb) => zb !== b);
     this.boss = null;
     return hpLeft;
@@ -333,6 +369,7 @@ export class Zombies {
           level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.5);
           level.audio.shieldBreak();
           level.bus.emit('shieldBroken', z);
+          level.netEv('zsb', z.nid);
         }
         return;
       }
@@ -365,6 +402,7 @@ export class Zombies {
         level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.2);
         level.audio.shieldBreak();
         level.bus.emit('chestBroken', z);
+        level.netEv('zcb', z.nid);
       }
       return;
     }
@@ -396,7 +434,9 @@ export class Zombies {
     const level = this.level;
     const distV = Math.hypot(z.x - level.player.pos.x, z.z - level.player.pos.z);
     level.audio.zdie(1 - clamp(distV / 50, 0, 0.9));
-    level.stats.kills++;
+    // у коопі особиста статистика рахує лише власні перемоги
+    if (!level.net || (z.lastHitBy || 1) === 1) level.stats.kills++;
+    level.netEv('zd', z.nid, z.lastHitBy || 1, z.golden ? 1 : 0);
     level.bus.emit('zombieKilled', z);
     // лут
     if (z.type !== 'boss') {
@@ -437,10 +477,17 @@ export class Zombies {
   }
 
   update(dt) {
+    if (this.mirror) { this._updateMirror(dt); return; }
     const level = this.level;
     const player = level.player;
     const px = player.pos.x, pz = player.pos.z;
-    const playerAlive = player.health > 0;
+    // у коопі зомбі полюють на НАЙБЛИЖЧОГО живого гравця (хост або гості)
+    const players = level.players
+      || (this._soloPlayers || (this._soloPlayers = [{
+        pid: 1,
+        get pos() { return player.pos; },
+        get health() { return player.health; },
+      }]));
 
     // спавн орди хвилями
     if (this.hordeActive && this.hordePending > 0) {
@@ -448,11 +495,13 @@ export class Zombies {
       if (this.hordeSpawnT <= 0) {
         this.hordeSpawnT = 1.3;
         const batch = Math.min(4, this.hordePending);
+        const alivePl = players.filter((p) => p.health > 0);
         for (let i = 0; i < batch; i++) {
+          const cp = alivePl.length ? alivePl[Math.floor(this.rng.next() * alivePl.length)].pos : player.pos;
           const a = this.rng.next() * Math.PI * 2;
           const r = this.rng.range(32, 48);
-          let x = px + Math.cos(a) * r;
-          let z = pz + Math.sin(a) * r;
+          let x = cp.x + Math.cos(a) * r;
+          let z = cp.z + Math.sin(a) * r;
           const dB = Math.hypot(x, z);
           if (dB > this.L.BOUND - 5) {
             x *= (this.L.BOUND - 8) / dB;
@@ -496,12 +545,22 @@ export class Zombies {
           z.gone = true;
           removeAny = true;
           this.scene.remove(rig.group);
+          this.byNidMap.delete(z.nid);
         }
         continue;
       }
 
-      const dxP = px - z.x, dzP = pz - z.z;
-      const distP = Math.hypot(dxP, dzP);
+      let tgt = null;
+      let distP = Infinity;
+      for (const pl of players) {
+        if (pl.health <= 0) continue;
+        const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
+        if (d < distP) { distP = d; tgt = pl; }
+      }
+      const playerAlive = !!tgt;
+      const tp = tgt ? tgt.pos : player.pos;
+      if (!playerAlive) distP = Math.hypot(tp.x - z.x, tp.z - z.z);
+      const dxP = tp.x - z.x, dzP = tp.z - z.z;
       const st = z.stats;
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
@@ -562,7 +621,7 @@ export class Zombies {
         } else if (distP < st.attackR && z.telegraph <= 0 && z.charging <= 0) {
           // мелі тільки з прямою видимістю — крізь стіни бити не можна
           this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
-          this._p1.set(dxP, (player.pos.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
+          this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
           const meleeBlock = this.world.shotBlockDist(this._p0, this._p1, distP);
           if (meleeBlock > distP - 0.35) {
             z.state = 'attack';
@@ -575,7 +634,7 @@ export class Zombies {
           && z.telegraph <= 0 && z.charging <= 0) {
           // кидок сніжки, якщо є пряма видимість
           this._p0.set(z.x, z.y + z.rig.height * 0.75, z.z);
-          this._p1.set(dxP, (player.pos.y + 1.2) - (z.y + z.rig.height * 0.75), dzP).normalize();
+          this._p1.set(dxP, (tp.y + 1.2) - (z.y + z.rig.height * 0.75), dzP).normalize();
           const block = this.world.shotBlockDist(this._p0, this._p1, distP);
           if (block > distP - 1.5) {
             z.state = 'attack';
@@ -605,12 +664,16 @@ export class Zombies {
             z.throwProj = false;
             if (playerAlive) {
               const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
-              const target = new THREE.Vector3(px, player.pos.y + 1.25, pz);
+              const target = new THREE.Vector3(tp.x, tp.y + 1.25, tp.z);
               level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size, z.ranged.color);
+              level.netEv('proj',
+                Math.round(from.x * 10) / 10, Math.round(from.y * 10) / 10, Math.round(from.z * 10) / 10,
+                Math.round(target.x * 10) / 10, Math.round(target.y * 10) / 10, Math.round(target.z * 10) / 10,
+                z.ranged.projSpeed, z.ranged.size, z.ranged.color || 0);
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
-            player.takeDamage(st.dmg * this.diff.dmg, z.x, z.z);
+            this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
             level.audio.zattack(1);
             if (z.type === 'boss') {
               level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), z.frost ? 0x66ccff : 0xff6644, 5);
@@ -660,9 +723,9 @@ export class Zombies {
           const cs = 15;
           z.x += z.chargeDX * cs * dt;
           z.z += z.chargeDZ * cs * dt;
-          if (playerAlive && Math.hypot(px - z.x, pz - z.z) < 2.6 && !z.didHit) {
+          if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
             z.didHit = true;
-            player.takeDamage(34 * this.diff.dmg, z.x, z.z);
+            this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
             level.audio.slam();
           }
           if (z.charging <= 0) {
@@ -698,7 +761,7 @@ export class Zombies {
         if (z.type === 'boss' && z.leashed) {
           targetX = this.L.arena.x; targetZ = this.L.arena.z;
         } else {
-          targetX = px; targetZ = pz;
+          targetX = tp.x; targetZ = tp.z;
         }
         spd = st.chaseSpeed * (z.enraged ? 1.5 : 1);
       } else if (z.state === 'wander') {
@@ -754,6 +817,7 @@ export class Zombies {
         const targetYaw = Math.atan2(-faceX, -faceZ);
         rig.group.rotation.y = dampAngle(rig.group.rotation.y, targetYaw, 8, dt);
       }
+      z._netMoving = moving;
       rig.group.position.set(z.x, z.y, z.z);
 
       if (z.state !== 'attack') {
@@ -775,6 +839,208 @@ export class Zombies {
         if (distP < 45) {
           level.audio.zgroan(1 - clamp(distP / 45, 0, 0.92), st.pitch);
         }
+      }
+    }
+    if (removeAny) this.list = this.list.filter((z) => !z.gone);
+  }
+
+  // шкода гравцю: у коопі — через мережу (хост), соло — напряму
+  _hurt(tgt, dmg, fx, fz) {
+    if (!tgt) return;
+    if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz);
+    else this.level.player.takeDamage(dmg, fx, fz);
+  }
+
+  // ================= ДЗЕРКАЛО (гість кооперативу) =================
+  // Зомбі-маріонетка: позиції/стани приходять з хоста, тут лише анімація.
+  spawnPuppet(nid, type, x, z, o = {}) {
+    if (this.byNidMap.has(nid)) return this.byNidMap.get(nid);
+    const z_ = this.spawn(type, x, z, {
+      nid, mirror: true,
+      golden: !!o.g, elite: !!o.e, sleeping: !!o.sl, horde: !!o.h,
+      style: o.st || undefined,
+    });
+    if (o.mhp) { z_.maxHp = o.mhp; z_.hp = o.hp !== undefined ? o.hp : o.mhp; }
+    if (o.sh !== undefined && z_.shieldMax > 0) this._applyShieldPct(z_, o.sh);
+    if (o.ch !== undefined && z_.chestMax > 0) this._applyChestPct(z_, o.ch);
+    z_.netT = { x, z, y: z_.y };
+    z_.netB = 0;
+    return z_;
+  }
+
+  puppetDie(z, mine, golden) {
+    if (z.state === 'dead') return;
+    z.state = 'dead';
+    z.deadT = 0;
+    setAnim(z.rig, 'die');
+    const level = this.level;
+    const distV = Math.hypot(z.x - level.player.pos.x, z.z - level.player.pos.z);
+    level.audio.zdie(1 - clamp(distV / 50, 0, 0.9));
+    if (z.horde) this.hordeRemaining--;
+    if (mine) {
+      level.stats.kills++;
+      level.bus.emit('zombieKilled', z);
+    }
+    if (golden) level.audio.goldenJingle();
+    if (z.type === 'boss') this.boss = null;
+  }
+
+  puppetGone(nid) {
+    const z = this.byNidMap.get(nid);
+    if (!z) return;
+    z.gone = true;
+    this.scene.remove(z.rig.group);
+    this.byNidMap.delete(nid);
+    if (this.boss === z) this.boss = null;
+    this.list = this.list.filter((zb) => zb !== z);
+  }
+
+  puppetShieldBreak(nid) {
+    const z = this.byNidMap.get(nid);
+    if (!z || !z.shieldObj) return;
+    this._applyShieldPct(z, 0);
+  }
+
+  puppetChestBreak(nid) {
+    const z = this.byNidMap.get(nid);
+    if (!z) return;
+    this._applyChestPct(z, 0);
+  }
+
+  _applyShieldPct(z, pct) {
+    if (!z.shieldMax) return;
+    z.shieldHp = (z.shieldMax * pct) / 100;
+    if (pct <= 0 && z.shieldObj) {
+      const fx = -Math.sin(z.rig.group.rotation.y);
+      const fz = -Math.cos(z.rig.group.rotation.y);
+      const sparkPos = new THREE.Vector3(z.x + fx * 0.75, z.y + 1.15, z.z + fz * 0.75);
+      z.rig.body.remove(z.shieldObj.group);
+      z.shieldObj = null;
+      z.shieldHp = 0;
+      this.level.effects.burst(sparkPos, 0x7d8aa0, 14, { speed: 4.5, up: 4, life: 0.7, size: 1.3 });
+      this.level.audio.shieldBreak();
+    } else if (z.shieldObj) {
+      z.shieldObj.cracks1.visible = pct <= 75;
+      z.shieldObj.cracks2.visible = pct <= 50;
+      if (z.shieldObj.cracks3) z.shieldObj.cracks3.visible = pct <= 25;
+    }
+  }
+
+  _applyChestPct(z, pct) {
+    if (!z.chestMax) return;
+    z.chestHp = (z.chestMax * pct) / 100;
+    if (pct <= 0) {
+      if (z.chestObj && z.chestObj.visible) {
+        z.chestObj.visible = false;
+        if (z.chestCracks1) z.chestCracks1.visible = false;
+        if (z.chestCracks2) z.chestCracks2.visible = false;
+        this.level.effects.burst(new THREE.Vector3(z.x, z.y + 1.2, z.z), 0x7d8aa0, 12, { speed: 4, up: 3.5, life: 0.7, size: 1.2 });
+        this.level.audio.shieldBreak();
+      }
+    } else {
+      if (z.chestCracks1) z.chestCracks1.visible = pct <= 60;
+      if (z.chestCracks2) z.chestCracks2.visible = pct <= 30;
+    }
+  }
+
+  // снапшот хоста: цілі для інтерполяції
+  applySnapshot(zarr) {
+    for (const t of zarr) {
+      const z = this.byNidMap.get(t[0]);
+      if (!z || z.state === 'dead') continue;
+      z.netT = { x: t[1], z: t[2], y: t[3] };
+      z.netB = t[4];
+      z.hp = Math.max(1, Math.round((z.maxHp * t[5]) / 100));
+      if (t.length > 6) {
+        const v = t[6];
+        if (v >= 0 && z.shieldMax > 0 && z.shieldObj) this._applyShieldPct(z, v);
+        else if (v < 0 && z.chestMax > 0) this._applyChestPct(z, -(v + 1));
+      }
+      z.sleeping = !!(t[4] & 64);
+    }
+  }
+
+  clearAllPuppets() {
+    for (const z of this.list) this.scene.remove(z.rig.group);
+    this.list = [];
+    this.byNidMap.clear();
+    this.boss = null;
+  }
+
+  _updateMirror(dt) {
+    const level = this.level;
+    const p = level.player;
+    let removeAny = false;
+    for (const z of this.list) {
+      const rig = z.rig;
+      if (z.state === 'dead') {
+        z.deadT += dt;
+        updateRig(rig, dt);
+        if (z.deadT > 1.6) rig.group.position.y -= dt * 0.7;
+        if (z.deadT > 3.0) {
+          z.gone = true;
+          removeAny = true;
+          this.scene.remove(rig.group);
+          this.byNidMap.delete(z.nid);
+        }
+        continue;
+      }
+      const b = z.netB || 0;
+      const state = b & 7; // 0 wander 1 chase 2 attack 3 dead 4 flee
+      const charging = (b & 16) !== 0;
+      const telegraph = (b & 32) !== 0;
+      if (z.netT) {
+        const ddx = z.netT.x - z.x, ddz = z.netT.z - z.z;
+        const snapDist = Math.hypot(ddx, ddz);
+        if (snapDist > 10) {
+          z.x = z.netT.x; z.z = z.netT.z; z.y = z.netT.y;
+        } else {
+          z.x = damp(z.x, z.netT.x, 12, dt);
+          z.z = damp(z.z, z.netT.z, 12, dt);
+          z.y = damp(z.y, z.netT.y, 12, dt);
+        }
+        z._mirrorSpd = damp(z._mirrorSpd || 0, snapDist * 12, 8, dt);
+        // обличчям до руху, в атаці — до найближчого гравця (локальна здогадка)
+        let fx = ddx, fz = ddz;
+        if (state === 2 || telegraph) {
+          fx = p.pos.x - z.x; fz = p.pos.z - z.z;
+          let bd = Math.hypot(fx, fz);
+          if (level.net) {
+            for (const rp of level.net.remotes.values()) {
+              const d2 = Math.hypot(rp.pos.x - z.x, rp.pos.z - z.z);
+              if (d2 < bd) { bd = d2; fx = rp.pos.x - z.x; fz = rp.pos.z - z.z; }
+            }
+          }
+        }
+        if (Math.abs(fx) > 0.01 || Math.abs(fz) > 0.01) {
+          rig.group.rotation.y = dampAngle(rig.group.rotation.y, Math.atan2(-fx, -fz), 8, dt);
+        }
+      }
+      rig.group.position.set(z.x, z.y, z.z);
+      // анімація зі стану
+      if (z.sleeping) {
+        updateRig(rig, dt * 0.35);
+        continue;
+      }
+      const moving = (z._mirrorSpd || 0) > 0.6;
+      if (state === 2) {
+        if (rig.anim.mode !== 'attack') setAnim(rig, 'attack');
+        else if (rig.anim.attackT >= 1) { rig.anim.attackT = 0; }
+      } else if (telegraph) {
+        setAnim(rig, 'cheer');
+      } else if (moving) {
+        setAnim(rig, (z._mirrorSpd > 4 || charging) ? 'run' : 'walk');
+        rig.anim.speed = charging ? 14 : z._mirrorSpd;
+      } else {
+        setAnim(rig, 'idle');
+      }
+      updateRig(rig, dt);
+      // стогони
+      z.groanT -= dt;
+      if (z.groanT <= 0) {
+        z.groanT = z.aggroed ? this.rng.range(1.5, 4) : this.rng.range(4, 10);
+        const distP = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
+        if (distP < 45) level.audio.zgroan(1 - clamp(distP / 45, 0, 0.92), z.stats.pitch);
       }
     }
     if (removeAny) this.list = this.list.filter((z) => !z.gone);

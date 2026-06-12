@@ -55,7 +55,11 @@ export class DynamicMissions {
     this.level = level;
     this.L = level.world.layout;
     const game = level.game;
-    const runIndex = (game.save.missionRuns && game.save.missionRuns[level.countryId]) || 0;
+    this.mirror = !!level.mirror;
+    // у коопі гість будує місії з runIndex ХОСТА — щоб набір збігався
+    const runIndex = level.runIndex !== undefined
+      ? level.runIndex
+      : (game.save.missionRuns && game.save.missionRuns[level.countryId]) || 0;
     // тестовий хук: примусовий набір місій
     const types = game._forceMissionSet || rollMissionSet(level.countryId, level.country.seed, runIndex);
     this.runIndex = runIndex;
@@ -83,6 +87,8 @@ export class DynamicMissions {
 
     // якщо гравець загинув у бою з босом — бій перезапускається з арени
     level.bus.on('playerDied', () => {
+      if (this.mirror) return;
+      if (level.net && level.players && level.players.some((p) => p.health > 0)) return; // хтось живий — бій триває
       if (this.bossStarted && level.zombies.boss) {
         this.bossHpLeft = level.zombies.despawnBoss();
         this.bossStarted = false;
@@ -192,6 +198,7 @@ export class DynamicMissions {
 
   // 👹 елітні зомбі: більші, з золотою короною-обідком, розкидані по карті
   _spawnElites(m) {
+    if (this.mirror) return [];
     const level = this.level;
     const rng = new RNG(level.country.seed + 999 + this.runIndex);
     const elites = [];
@@ -204,19 +211,9 @@ export class DynamicMissions {
     spots.forEach((sp, i) => {
       let x = sp.x + rng.range(-6, 6), z = sp.z + rng.range(-6, 6);
       if (Math.hypot(x, z) > this.L.BOUND - 10) { x *= 0.7; z *= 0.7; }
-      const z_ = level.zombies.spawn(types[i % 3], x, z, {});
+      const z_ = level.zombies.spawn(types[i % 3], x, z, { elite: true });
       z_.hp = z_.maxHp = Math.round(z_.maxHp * 2.2);
-      z_.elite = true;
       z_.anchor = { x, z, r: 12 };
-      // золотий обідок-корона
-      const crown = new THREE.Mesh(
-        new THREE.TorusGeometry(0.24, 0.05, 6, 14),
-        toonMat(0xffd23f, 0xcc8800, 0.6)
-      );
-      crown.rotation.x = Math.PI / 2 - 0.15;
-      crown.position.y = 0.38;
-      z_.rig.parts.head.add(crown);
-      z_.rig.group.scale.multiplyScalar(1.18);
       elites.push(z_);
     });
     return elites;
@@ -249,11 +246,12 @@ export class DynamicMissions {
       const y = level.world.groundH(x, z);
       g.position.set(x, y, z);
       level.scene.add(g);
-      // охоронець гнізда
-      const guard = level.zombies.spawn(rng.chance(0.5) ? 'walker' : 'runner', x + 2, z + 1, {
-        anchor: { x, z, r: 6 }, guard: true,
-      });
-      void guard;
+      // охоронець гнізда (на гості приїде подією від хоста)
+      if (!this.mirror) {
+        level.zombies.spawn(rng.chance(0.5) ? 'walker' : 'runner', x + 2, z + 1, {
+          anchor: { x, z, r: 6 }, guard: true,
+        });
+      }
       nests.push({ x, z, y, mesh: g, pod, progress: 0, cleared: false });
     }
     return nests;
@@ -309,7 +307,8 @@ export class DynamicMissions {
       if (m.state !== 'active') continue;
       if (m.type === 'hunt') {
         // маркер — найближчий живий еліт
-        const alive = m.elites.find((e) => e.state !== 'dead');
+        const pool = this.mirror ? this.level.zombies.list.filter((e) => e.elite) : m.elites;
+        const alive = pool.find((e) => e.state !== 'dead' && !e.gone);
         if (alive) mk.push({ x: alive.x, z: alive.z, color: '#ffd23f', icon: '👹' });
         continue;
       }
@@ -343,6 +342,7 @@ export class DynamicMissions {
     level.addCoins(m.reward);
     level.audio.mission();
     level.bus.emit('missionDone', m);
+    level.netEv('md', m.slotIndex, m.reward, m.type);
     const count = Math.round(m.horde * ((level.country && level.country.difficulty.counts) || 1));
     if (this.pendingHorde) this.pendingHorde.count += count;
     else this.pendingHorde = { t: 5, count };
@@ -383,8 +383,17 @@ export class DynamicMissions {
       } else {
         const ox = Math.cos(c.angle) * 2.6;
         const oz = Math.sin(c.angle) * 2.6;
-        tx = player.pos.x + ox;
-        tz = player.pos.z + oz;
+        let fp = player.pos;
+        if (level.players) {
+          let bd = Infinity;
+          for (const pl of level.players) {
+            if (pl.health <= 0) continue;
+            const dd = Math.hypot(pl.pos.x - c.x, pl.pos.z - c.z);
+            if (dd < bd) { bd = dd; fp = pl.pos; }
+          }
+        }
+        tx = fp.x + ox;
+        tz = fp.z + oz;
         const d = Math.hypot(tx - c.x, tz - c.z);
         if (d > 30) {
           c.x = player.pos.x + ox;
@@ -415,15 +424,29 @@ export class DynamicMissions {
       updateRig(rig, dt);
     }
     const medic = this.civilians.find((c) => c.kind === 'medic');
-    if (medic && player.health > 0 && player.health < player.maxHealth) {
-      const d = Math.hypot(medic.x - player.pos.x, medic.z - player.pos.z);
-      if (d < 9) {
-        player.heal(3.2 * dt);
-        this.healPulseT -= dt;
-        if (this.healPulseT <= 0) {
-          this.healPulseT = 1.1;
-          const pp = player.pos;
-          level.effects.burst(new THREE.Vector3(pp.x, pp.y + 1.6, pp.z), 0x6dff9c, 4, { speed: 0.8, up: 1.6, life: 0.7, size: 0.7 });
+    if (medic) {
+      const patients = level.players || [{ pid: 1, pos: player.pos, health: player.health }];
+      for (const pl of patients) {
+        if (pl.health <= 0) continue;
+        const d = Math.hypot(medic.x - pl.pos.x, medic.z - pl.pos.z);
+        if (d >= 9) continue;
+        if (pl.pid === 1) {
+          if (player.health < player.maxHealth) {
+            player.heal(3.2 * dt);
+            this.healPulseT -= dt;
+            if (this.healPulseT <= 0) {
+              this.healPulseT = 1.1;
+              const pp = player.pos;
+              level.effects.burst(new THREE.Vector3(pp.x, pp.y + 1.6, pp.z), 0x6dff9c, 4, { speed: 0.8, up: 1.6, life: 0.7, size: 0.7 });
+            }
+          }
+        } else if (level.net && level.net.authority) {
+          // гостям шлемо лікування пачками раз на секунду
+          pl._healAcc = (pl._healAcc || 0) + 3.2 * dt;
+          if (pl._healAcc >= 3) {
+            level.net.healPlayer(pl, Math.round(pl._healAcc * 10) / 10);
+            pl._healAcc = 0;
+          }
         }
       }
     }
@@ -444,6 +467,7 @@ export class DynamicMissions {
 
   // ---------- головний цикл ----------
   update(dt, input, allowControl) {
+    if (this.mirror) { this._updateMirror(dt, input, allowControl); return; }
     const level = this.level;
     const player = level.player;
     const px = player.pos.x, pz = player.pos.z;
@@ -497,14 +521,17 @@ export class DynamicMissions {
       level.audio.bossRoar();
       level.bus.emit('bossUnlocked');
     }
-    if (this.bossUnlocked && !this.bossStarted && player.health > 0) {
-      const d = Math.hypot(px - this.L.arena.x, pz - this.L.arena.z);
-      if (d < this.L.arena.r - 4) {
+    if (this.bossUnlocked && !this.bossStarted) {
+      const challengers = level.players || [{ pos: player.pos, health: player.health }];
+      const inArena = challengers.some((p) => p.health > 0
+        && Math.hypot(p.pos.x - this.L.arena.x, p.pos.z - this.L.arena.z) < this.L.arena.r - 4);
+      if (inArena) {
         this.bossStarted = true;
         if (this.bossBeam) { this.bossBeam.remove(); this.bossBeam = null; }
         level.zombies.spawnBoss(this.bossHpLeft);
         level.audio.bossRoar();
         level.bus.emit('bossStart');
+        level.netEv('bstart');
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2 + 0.5;
           const sx = this.L.arena.x + Math.cos(a) * (this.L.arena.r - 7);
@@ -529,7 +556,8 @@ export class DynamicMissions {
       return next ? { x: next.x, z: next.z } : null;
     }
     if (m.type === 'hunt') {
-      const alive = m.elites.find((e) => e.state !== 'dead' && !e.gone);
+      const pool = this.mirror ? this.level.zombies.list.filter((e) => e.elite) : m.elites;
+      const alive = pool.find((e) => e.state !== 'dead' && !e.gone);
       return alive ? { x: alive.x, z: alive.z } : null;
     }
     if (m.type === 'escort') {
@@ -554,6 +582,7 @@ export class DynamicMissions {
           level.world.openBarn();
           level.audio.door();
           this.spawnCivilians();
+          level.netEv('barn');
         }
       }
     } else {
@@ -570,13 +599,24 @@ export class DynamicMissions {
     const player = level.player;
     const rp = level.world.repairPoint;
     const d = Math.hypot(player.pos.x - rp.x, player.pos.z - rp.z);
+    // кооп: рахуємо всіх, хто тримає E біля вежі (разом — швидше!)
+    let holders = 0;
+    if (d < 3.6 && allowControl && input.down('KeyE')) holders++;
+    if (level.players) {
+      for (const pl of level.players) {
+        if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+        if (Math.hypot(pl.pos.x - rp.x, pl.pos.z - rp.z) < 3.6) holders++;
+      }
+    }
     if (d < 3.6) {
       this.prompt = {
         text: m.progress > 0 ? 'Тримай E — ремонт' : 'Тримай E — почни ремонт',
         hold: true, progress: m.progress,
       };
-      if (allowControl && input.down('KeyE')) {
-        m.progress = Math.min(1, m.progress + dt / 12);
+    }
+    if (d < 3.6 || holders > 0) {
+      if (holders > 0) {
+        m.progress = Math.min(1, m.progress + (dt * holders) / 12);
         m.tickT -= dt;
         if (m.tickT <= 0) {
           m.tickT = 0.35;
@@ -598,6 +638,7 @@ export class DynamicMissions {
         }
         if (m.progress >= 1) {
           level.world.setTowerFixed();
+          level.netEv('tower');
           this._complete(m.id);
           level.bus.emit('toast', 'Полагоджено! Сигнал надіслано 📡');
         }
@@ -622,6 +663,7 @@ export class DynamicMissions {
           m.crateOpenedT = 0;
           level.world.openCrate();
           level.audio.door();
+          level.netEv('crate');
         }
       }
     } else {
@@ -647,6 +689,7 @@ export class DynamicMissions {
           c.taken = true;
           m.found++;
           level.scene.remove(c.mesh);
+          level.netEv('sup', m.slotIndex, m.crates.indexOf(c), 1);
           level.audio.pickup();
           level.effects.burst(new THREE.Vector3(c.x, c.y + 0.8, c.z), 0x4cff7a, 8, { speed: 2.5, up: 3, life: 0.6 });
           level.bus.emit('toast', m.found < 4 ? `🧺 Ящик ${m.found}/4! Шукай наступний за маркером` : '🧺 Усі припаси зібрано!');
@@ -660,7 +703,9 @@ export class DynamicMissions {
   _up_defense(m, dt) {
     const level = this.level;
     const player = level.player;
-    const inZone = Math.hypot(player.pos.x - m.zone.x, player.pos.z - m.zone.z) < m.zone.r;
+    const defenders = level.players || [{ pos: player.pos, health: player.health }];
+    const inZone = defenders.some((p) => p.health > 0
+      && Math.hypot(p.pos.x - m.zone.x, p.pos.z - m.zone.z) < m.zone.r);
     m.zone.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.2;
     if (!m.started) {
       if (inZone) {
@@ -711,10 +756,20 @@ export class DynamicMissions {
       if (n.cleared) continue;
       n.pod.scale.y = 1.25 + Math.sin(performance.now() / 350 + n.x) * 0.07;
       const d = Math.hypot(player.pos.x - n.x, player.pos.z - n.z);
+      let holders = 0;
+      if (d < 3.8 && allowControl && input.down('KeyE')) holders++;
+      if (level.players) {
+        for (const pl of level.players) {
+          if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+          if (Math.hypot(pl.pos.x - n.x, pl.pos.z - n.z) < 3.8) holders++;
+        }
+      }
       if (d < 3.8) {
         this.prompt = { text: '🟣 Тримай E — знешкодь гніздо', hold: true, progress: n.progress };
-        if (allowControl && input.down('KeyE')) {
-          n.progress = Math.min(1, n.progress + dt / 4);
+      }
+      if (d < 3.8 || holders > 0) {
+        if (holders > 0) {
+          n.progress = Math.min(1, n.progress + (dt * holders) / 4);
           if (Math.random() < dt * 6) {
             level.effects.burst(new THREE.Vector3(n.x, n.y + 1, n.z), 0xb06ee8, 2, { speed: 1.5, up: 2, life: 0.4, size: 0.7 });
           }
@@ -722,6 +777,7 @@ export class DynamicMissions {
             n.cleared = true;
             m.cleared++;
             level.scene.remove(n.mesh);
+            level.netEv('nest', m.slotIndex, m.nestList.indexOf(n));
             level.audio.shieldBreak();
             level.effects.burst(new THREE.Vector3(n.x, n.y + 1, n.z), 0x8d3bbd, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
             level.bus.emit('toast', m.cleared < 3 ? `🟣 Гніздо знищено (${m.cleared}/3)!` : '🟣 Усі гнізда знищено!');
@@ -754,8 +810,17 @@ export class DynamicMissions {
     }
     const t = m.traveler;
     if (!t) return;
-    // мандрівник іде за гравцем
-    const tx = player.pos.x + 1.8, tz = player.pos.z + 1.2;
+    // мандрівник іде за найближчим живим гравцем
+    let fp = player.pos;
+    if (level.players) {
+      let bd = Infinity;
+      for (const pl of level.players) {
+        if (pl.health <= 0) continue;
+        const dd = Math.hypot(pl.pos.x - t.x, pl.pos.z - t.z);
+        if (dd < bd) { bd = dd; fp = pl.pos; }
+      }
+    }
+    const tx = fp.x + 1.8, tz = fp.z + 1.2;
     const dx = tx - t.x, dz = tz - t.z;
     const d = Math.hypot(dx, dz);
     if (d > 30) { t.x = tx; t.z = tz; }
@@ -808,6 +873,340 @@ export class DynamicMissions {
       level.bus.emit('toast', '🧳 Мандрівник у безпеці! Дякує тобі від душі 💛');
       // лишається радіти біля вежі
       m.traveler = null;
+    }
+  }
+  // ================= КООП =================
+  // --- хост: інтеракції гостей (E) з перевіркою відстані ---
+  useBarn(pid, near) {
+    const m = this.missions.find((x) => x.type === 'rescue');
+    if (!m || m.state !== 'active' || m.opened) return;
+    const door = this.level.world.barnDoorCollider;
+    if (!near(door.x, door.z - 1, 3.6)) return;
+    m.opened = true;
+    m.openedT = 0;
+    this.level.world.openBarn();
+    this.level.audio.door();
+    this.spawnCivilians();
+    this.level.netEv('barn');
+  }
+
+  useCrate(pid, near) {
+    const m = this.missions.find((x) => x.type === 'clear');
+    if (!m || m.state !== 'active' || !this.crateReady || m.crateOpenedT >= 0) return;
+    const wc = this.level.world.weaponCrate;
+    if (!near(wc.x, wc.z, 3.8)) return;
+    m.crateOpenedT = 0;
+    this.level.world.openCrate();
+    this.level.audio.door();
+    this.level.netEv('crate');
+  }
+
+  useSupply(pid, i, near) {
+    const m = this.missions.find((x) => x.type === 'collect');
+    if (!m || m.state !== 'active') return;
+    const c = m.crates[i];
+    if (!c || c.taken || !near(c.x, c.z, 3.8)) return;
+    c.taken = true;
+    m.found++;
+    this.level.scene.remove(c.mesh);
+    this.level.netEv('sup', m.slotIndex, i, pid);
+    this.level.audio.pickup();
+    this.level.effects.burst(new THREE.Vector3(c.x, c.y + 0.8, c.z), 0x4cff7a, 8, { speed: 2.5, up: 3, life: 0.6 });
+    this.level.bus.emit('toast', m.found < 4 ? `🧺 Ящик ${m.found}/4!` : '🧺 Усі припаси зібрано!');
+    if (m.found >= 4) this._complete(m.id);
+  }
+
+  useEscort(pid, near) {
+    const m = this.missions.find((x) => x.type === 'escort');
+    if (!m || m.state !== 'active' || m.started) return;
+    if (!near(m.site.x, m.site.z + 2, 5)) return;
+    m.started = true;
+    this._spawnTraveler(m);
+    this.pendingWave = { t: 3, n: 4, onlyWalkers: true, site: m.site };
+    this.level.netEv('esc', 1);
+  }
+
+  // --- хост: стан місій для снапшота ---
+  netState() {
+    const out = {
+      g: [this.allDone ? 1 : 0, this.bossUnlocked ? 1 : 0, this.bossStarted ? 1 : 0],
+      s: [],
+      c: this.civilians.map((c) => [
+        Math.round(c.x * 10) / 10, Math.round(c.z * 10) / 10,
+        c.rig.anim.mode === 'run' ? 2 : c.rig.anim.mode === 'walk' ? 1 : c.rig.anim.mode === 'cheer' ? 3 : 0,
+      ]),
+      t: 0,
+    };
+    for (const m of this.missions) {
+      const a = [m.state === 'done' ? 1 : 0];
+      if (m.type === 'rescue') a.push(m.opened ? 1 : 0);
+      else if (m.type === 'repair') a.push(Math.round(m.progress * 100) / 100);
+      else if (m.type === 'clear') a.push(this.crateReady ? 1 : 0);
+      else if (m.type === 'collect') a.push(m.found);
+      else if (m.type === 'defense') a.push(m.started ? 1 : 0, Math.round(m.timer * 10) / 10);
+      else if (m.type === 'hunt') a.push(m.killed);
+      else if (m.type === 'nests') {
+        a.push(m.cleared);
+        for (const n of m.nestList) a.push(Math.round(n.progress * 100) / 100);
+      } else if (m.type === 'escort') a.push(m.started ? 1 : 0);
+      out.s.push(a);
+    }
+    const esc = this.missions.find((x) => x.type === 'escort');
+    if (esc && esc.traveler) {
+      out.t = [Math.round(esc.traveler.x * 10) / 10, Math.round(esc.traveler.z * 10) / 10, esc.traveler.hp];
+    }
+    return out;
+  }
+
+  // повний стан для гостя, що приєднався
+  netFullState() {
+    const out = this.netState();
+    for (const m of this.missions) {
+      if (m.type === 'collect') out.sup = m.crates.map((c) => (c.taken ? 1 : 0));
+      if (m.type === 'nests') out.nst = m.nestList.map((n) => (n.cleared ? 1 : 0));
+    }
+    return out;
+  }
+
+  // --- гість: застосувати стан зі снапшота ---
+  applyNet(ms) {
+    const level = this.level;
+    const wasUnlocked = this.bossUnlocked;
+    this.allDone = !!ms.g[0];
+    this.bossUnlocked = !!ms.g[1];
+    this.bossStarted = !!ms.g[2];
+    if (!wasUnlocked && this.bossUnlocked && !this.bossStarted && !this.bossBeam) {
+      this.bossBeam = level.effects.makeBeam(this.L.arena.x, this.L.arena.z, 0xff44aa, '👑');
+      level.audio.bossRoar();
+      level.bus.emit('bossUnlocked');
+    }
+    if (this.bossStarted && this.bossBeam) { this.bossBeam.remove(); this.bossBeam = null; }
+    ms.s.forEach((a, i) => {
+      const m = this.missions[i];
+      if (!m) return;
+      if (m.type === 'rescue') m.opened = !!a[1];
+      else if (m.type === 'repair') m.progress = a[1];
+      else if (m.type === 'clear') this.crateReady = !!a[1];
+      else if (m.type === 'collect') m.found = a[1];
+      else if (m.type === 'defense') { m.started = !!a[1]; m.timer = a[2]; }
+      else if (m.type === 'hunt') m.killed = a[1];
+      else if (m.type === 'nests') {
+        m.cleared = a[1];
+        m.nestList.forEach((n, j) => { if (!n.cleared) n.progress = a[2 + j] || 0; });
+      } else if (m.type === 'escort') {
+        if (a[1] && !m.started) { m.started = true; if (!m.traveler) this._spawnTraveler(m); }
+      }
+    });
+    // мандрівник: ціль для плавного руху
+    const esc = this.missions.find((x) => x.type === 'escort');
+    if (esc && esc.traveler && ms.t) {
+      esc.traveler.netT = { x: ms.t[0], z: ms.t[1] };
+      esc.traveler.hp = ms.t[2];
+    }
+    this._civNet = ms.c || [];
+  }
+
+  applyNetFull(ms) {
+    this.applyNet(ms);
+    ms.s.forEach((a, i) => {
+      const m = this.missions[i];
+      if (m && a[0] && m.state !== 'done') this.netMissionDone(i, 0, m.type, true);
+    });
+    const collect = this.missions.find((x) => x.type === 'collect');
+    if (collect && ms.sup) {
+      ms.sup.forEach((taken, i) => {
+        if (taken && !collect.crates[i].taken) {
+          collect.crates[i].taken = true;
+          this.level.scene.remove(collect.crates[i].mesh);
+        }
+      });
+    }
+    const nests = this.missions.find((x) => x.type === 'nests');
+    if (nests && ms.nst) {
+      ms.nst.forEach((cl, i) => {
+        if (cl && !nests.nestList[i].cleared) {
+          nests.nestList[i].cleared = true;
+          this.level.scene.remove(nests.nestList[i].mesh);
+        }
+      });
+    }
+    const rescue = this.missions.find((x) => x.type === 'rescue');
+    if (rescue && rescue.opened) this.netBarnOpened(true);
+  }
+
+  // --- гість: дискретні події ---
+  netBarnOpened(silent = false) {
+    const m = this.missions.find((x) => x.type === 'rescue');
+    if (m) m.opened = true;
+    if (!this.civilians.length) this.spawnCivilians();
+    if (!silent) this.level.bus.emit('toast', 'Людей врятовано! Медик лікуватиме вас поблизу 💚');
+  }
+
+  netSupplyTaken(slot, i, byPid) {
+    const m = this.missions[slot];
+    if (!m || m.type !== 'collect') return;
+    const c = m.crates[i];
+    if (!c || c.taken) return;
+    c.taken = true;
+    m.found = Math.max(m.found, m.crates.filter((x) => x.taken).length);
+    this.level.scene.remove(c.mesh);
+    this.level.audio.pickup();
+    this.level.effects.burst(new THREE.Vector3(c.x, c.y + 0.8, c.z), 0x4cff7a, 8, { speed: 2.5, up: 3, life: 0.6 });
+  }
+
+  netNestCleared(slot, i) {
+    const m = this.missions[slot];
+    if (!m || m.type !== 'nests') return;
+    const n = m.nestList[i];
+    if (!n || n.cleared) return;
+    n.cleared = true;
+    m.cleared = m.nestList.filter((x) => x.cleared).length;
+    this.level.scene.remove(n.mesh);
+    this.level.audio.shieldBreak();
+    this.level.effects.burst(new THREE.Vector3(n.x, n.y + 1, n.z), 0x8d3bbd, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
+  }
+
+  netMissionDone(slot, reward, type, silent = false) {
+    const m = this.missions[slot];
+    if (!m || m.state === 'done') return;
+    m.state = 'done';
+    if (m.beam) { m.beam.remove(); m.beam = null; }
+    if (m.zone) { this.level.scene.remove(m.zone.ring); m.zone = null; }
+    if (!silent) {
+      if (reward) this.level.addCoins(reward);
+      this.level.audio.mission();
+      this.level.bus.emit('missionDone', m);
+      // нагорода країни за зачистку складу — усім гравцям
+      if (type === 'clear') this.level.game.unlockWeapon(this.level.country.weaponReward);
+    }
+  }
+
+  // --- гість: дзеркальний цикл — підказки, маяки, анімації ---
+  _updateMirror(dt, input, allowControl) {
+    const level = this.level;
+    const player = level.player;
+    const net = level.net;
+    this.prompt = null;
+    if (net) net.holdE = false;
+
+    for (const m of this.missions) {
+      if (m.beam) {
+        m.beam.update(dt);
+        const target = this._beamTarget(m);
+        if (target) {
+          const g = m.beam.group;
+          const ty = level.world.groundH(target.x, target.z);
+          g.position.x += (target.x - g.position.x) * Math.min(1, dt * 6);
+          g.position.z += (target.z - g.position.z) * Math.min(1, dt * 6);
+          g.position.y = ty;
+        }
+      }
+    }
+    if (this.bossBeam) this.bossBeam.update(dt);
+
+    const near = (x, z, r) => Math.hypot(player.pos.x - x, player.pos.z - z) < r;
+    const pressE = allowControl && input.pressed('KeyE');
+
+    for (const m of this.missions) {
+      if (m.state !== 'active') continue;
+      if (m.type === 'rescue' && !m.opened) {
+        const door = level.world.barnDoorCollider;
+        if (near(door.x, door.z - 1, 3.2)) {
+          this.prompt = { text: 'Натисни E — відчини хлів', hold: false };
+          if (pressE) net.sendUse('barn');
+        }
+      } else if (m.type === 'repair') {
+        const rp = level.world.repairPoint;
+        if (near(rp.x, rp.z, 3.6)) {
+          this.prompt = {
+            text: m.progress > 0 ? 'Тримай E — ремонт' : 'Тримай E — почни ремонт',
+            hold: true, progress: m.progress,
+          };
+          if (net) net.holdE = true;
+        }
+      } else if (m.type === 'clear') {
+        if (this.crateReady) {
+          const wc = level.world.weaponCrate;
+          if (near(wc.x, wc.z, 3.4)) {
+            this.prompt = { text: 'Натисни E — відкрий ящик', hold: false };
+            if (pressE) net.sendUse('crate');
+          }
+        }
+      } else if (m.type === 'collect') {
+        for (let i = 0; i < m.crates.length; i++) {
+          const c = m.crates[i];
+          if (c.taken) continue;
+          c.mesh.position.y = c.y + Math.abs(Math.sin(performance.now() / 400 + c.x)) * 0.12;
+          if (near(c.x, c.z, 3.4)) {
+            this.prompt = { text: `🧺 Натисни E — забери припаси (${m.found}/4)`, hold: false };
+            if (pressE) net.sendUse('supply', { i });
+            break;
+          }
+        }
+      } else if (m.type === 'defense') {
+        m.zone.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.2;
+        if (m.started && !near(m.zone.x, m.zone.z, m.zone.r)) {
+          this.prompt = { text: '🛡️ Повернись у синє коло — тримайте оборону!', hold: false };
+        }
+      } else if (m.type === 'nests') {
+        for (const n of m.nestList) {
+          if (n.cleared) continue;
+          n.pod.scale.y = 1.25 + Math.sin(performance.now() / 350 + n.x) * 0.07;
+          if (near(n.x, n.z, 3.8)) {
+            this.prompt = { text: '🟣 Тримай E — знешкодь гніздо', hold: true, progress: n.progress };
+            if (net) net.holdE = true;
+            break;
+          }
+        }
+      } else if (m.type === 'escort' && !m.started) {
+        if (near(m.site.x, m.site.z + 2, 5)) {
+          this.prompt = { text: '🧳 Натисни E — забери мандрівника', hold: false };
+          if (pressE) net.sendUse('escort');
+        }
+      }
+    }
+
+    // цивільні: плавно до цілей зі снапшота
+    if (this._civNet && this.civilians.length) {
+      this.civilians.forEach((c, i) => {
+        const t = this._civNet[i];
+        if (!t) return;
+        const dx = t[0] - c.x, dz = t[1] - c.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 12) { c.x = t[0]; c.z = t[1]; }
+        else { c.x += dx * Math.min(1, dt * 8); c.z += dz * Math.min(1, dt * 8); }
+        if (d > 0.2) c.rig.group.rotation.y = Math.atan2(-dx, -dz);
+        setAnim(c.rig, ['idle', 'walk', 'run', 'cheer'][t[2]] || 'idle');
+        if (t[2] === 1 || t[2] === 2) c.rig.anim.speed = t[2] === 2 ? 5 : 3.4;
+        c.rig.group.position.set(c.x, level.world.groundH(c.x, c.z), c.z);
+        updateRig(c.rig, dt);
+      });
+      // медик лікує і гостя — локально, як у соло
+      const medic = this.civilians.find((c) => c.kind === 'medic');
+      if (medic && player.health > 0 && player.health < player.maxHealth) {
+        if (Math.hypot(medic.x - player.pos.x, medic.z - player.pos.z) < 9) {
+          player.heal(3.2 * dt);
+        }
+      }
+    }
+
+    // мандрівник
+    const esc = this.missions.find((x) => x.type === 'escort');
+    if (esc && esc.traveler && esc.traveler.netT) {
+      const t = esc.traveler;
+      const dx = t.netT.x - t.x, dz = t.netT.z - t.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 12) { t.x = t.netT.x; t.z = t.netT.z; }
+      else { t.x += dx * Math.min(1, dt * 8); t.z += dz * Math.min(1, dt * 8); }
+      if (d > 0.3) {
+        t.rig.group.rotation.y = Math.atan2(-dx, -dz);
+        setAnim(t.rig, d > 1.5 ? 'run' : 'walk');
+        t.rig.anim.speed = d > 1.5 ? 5 : 3.4;
+      } else {
+        setAnim(t.rig, 'idle');
+      }
+      t.rig.group.position.set(t.x, level.world.groundH(t.x, t.z), t.z);
+      updateRig(t.rig, dt);
     }
   }
 }

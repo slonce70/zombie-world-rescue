@@ -2082,6 +2082,8 @@ export class World {
   }
 
   openBarn() {
+    if (this.barnOpened) return;
+    this.barnOpened = true;
     this.barnOpening = true;
     const i = this.colliders.indexOf(this.barnDoorCollider);
     if (i >= 0) this.colliders.splice(i, 1);
@@ -2257,6 +2259,7 @@ export class World {
   }
 
   openCrate() {
+    this.crateOpened = true;
     this.weaponCrate.opening = true;
   }
 
