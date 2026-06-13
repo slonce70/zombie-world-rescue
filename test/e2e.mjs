@@ -22,9 +22,13 @@ const check = (cond, msg) => {
   if (!cond) failed++;
 };
 
+// SLOW=N множить усі таймаути: на CI-ранері з софтверним рендером ігровий час
+// тече у рази повільніше реального (dt-кламп) — локально це нічого не коштує,
+// бо waitFor виходить одразу при успіху
+const SLOW = parseFloat(process.env.SLOW || '1');
 async function waitFor(fn, timeoutMs, label) {
   const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await fn()) return true;
     await page.waitForTimeout(400);
   }
@@ -38,7 +42,7 @@ async function fightUntil(condFn, timeoutMs, label) {
   const t0 = Date.now();
   let lastKills = -1;
   let stuckSince = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await condFn()) return true;
     const kills = await page.evaluate(() => {
       const g = window.__game;
