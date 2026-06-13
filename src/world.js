@@ -104,6 +104,16 @@ export class World {
     if (lm.includes('birds')) this._lmBirds();
   }
 
+  _drapeXZGeometry(geo, cx, cz, offset = 0) {
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, this.groundH(cx + pos.getX(i), cz + pos.getZ(i)) + offset);
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  }
+
   // 🏛 міська брама: дві вежі, арка-місток нагорі (можна вилізти батутом!)
   _lmCityGate({ x, z }) {
     const gy = this.groundH(x, z);
@@ -630,21 +640,23 @@ export class World {
       color: 0x3f9fd4, transparent: true, opacity: 0.82,
       gradientMap: toonMat(0).gradientMap,
     });
+    this._drapeXZGeometry(geo, x, z, 0.18);
     const water = new THREE.Mesh(geo, mat);
-    const wy = this.groundH(x, z) + 0.18;
-    water.position.set(x, wy, z);
+    water.position.set(x, 0, z);
     this.scene.add(water);
     this.pond = { mesh: water, base: pp.array.slice(), t: 0 };
     // піщаний берег
     const sand = new THREE.Mesh(new THREE.RingGeometry(r * 0.92, r + 1.6, 26), toonMat(0xe8d9a0));
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(x, wy - 0.1, z);
+    this._drapeXZGeometry(sand.geometry, x, z, 0.08);
+    sand.position.set(x, 0, z);
     this.staticGroup.add(sand);
     // пірс
     const pierM = toonMat(0x8a5a32);
     for (let i = 0; i < 4; i++) {
+      const px = x - r + 1.2 + i * 0.6;
       const plank = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 0.55), pierM);
-      plank.position.set(x - r + 1.2 + i * 0.6, wy + 0.18, z + 2);
+      plank.position.set(px, this.groundH(px, z + 2) + 0.36, z + 2);
       this.staticGroup.add(plank);
     }
     // очерет
@@ -660,9 +672,11 @@ export class World {
     }
     // лілії
     for (let i = 0; i < 4; i++) {
+      const lx = x + this.rng.range(-r * 0.6, r * 0.6);
+      const lz = z + this.rng.range(-r * 0.6, r * 0.6);
       const lily = new THREE.Mesh(new THREE.CircleGeometry(0.45, 8), toonMat(0x57b83e));
       lily.rotation.x = -Math.PI / 2;
-      lily.position.set(x + this.rng.range(-r * 0.6, r * 0.6), wy + 0.04, z + this.rng.range(-r * 0.6, r * 0.6));
+      lily.position.set(lx, this.groundH(lx, lz) + 0.24, lz);
       this.scene.add(lily);
     }
   }
@@ -986,14 +1000,16 @@ export class World {
     cap.position.set(x, gy + LAYERS * STEP + 0.8, z);
     cap.rotation.y = Math.PI / 4;
     this.staticGroup.add(cap);
-    // колайдери лише по периметру основи (всередину не зайдеш, зомбі не лізуть)
     const half = BASE / 2;
-    // низькі колайдери: пішки не зайдеш усередину, але стрибком — на перший уступ
+    // низький фундамент не дає зайти крізь боки, але вимикається після посадки на перший уступ.
+    const firstStepBlockTop = gy + STEP * 0.52;
+    this._addCollider(x, z, half - 0.35, firstStepBlockTop, 0);
+    // колайдери лише по периметру основи (всередину не зайдеш, зомбі не лізуть)
     for (let t = -half + 1.5; t <= half - 1.5; t += 3) {
-      this._addCollider(x + t, z - half, 1.6, gy + 0.5, 0);
-      this._addCollider(x + t, z + half, 1.6, gy + 0.5, 0);
-      this._addCollider(x - half, z + t, 1.6, gy + 0.5, 0);
-      this._addCollider(x + half, z + t, 1.6, gy + 0.5, 0);
+      this._addCollider(x + t, z - half, 1.6, firstStepBlockTop, 0);
+      this._addCollider(x + t, z + half, 1.6, firstStepBlockTop, 0);
+      this._addCollider(x - half, z + t, 1.6, firstStepBlockTop, 0);
+      this._addCollider(x + half, z + t, 1.6, firstStepBlockTop, 0);
     }
     // скарб на вершині
     this.lootSpots.push({ x, z, y: gy + LAYERS * STEP + 0.05, type: 'coins' });
@@ -1445,6 +1461,7 @@ export class World {
     for (const rv of this.rivers) {
       const positions = [];
       const half = rv.width * 0.82;
+      const pushWaterVertex = (x, z) => positions.push(x, this.groundH(x, z) + 0.08, z);
       for (let s = 0; s < rv.pts.length - 1; s++) {
         const [ax, az] = rv.pts[s];
         const [bx, bz] = rv.pts[s + 1];
@@ -1455,14 +1472,12 @@ export class World {
           const t0 = i / steps, t1 = (i + 1) / steps;
           const x0 = lerp(ax, bx, t0), z0 = lerp(az, bz, t0);
           const x1 = lerp(ax, bx, t1), z1 = lerp(az, bz, t1);
-          positions.push(
-            x0 - nx * half, rv.level, z0 - nz * half,
-            x0 + nx * half, rv.level, z0 + nz * half,
-            x1 - nx * half, rv.level, z1 - nz * half,
-            x0 + nx * half, rv.level, z0 + nz * half,
-            x1 + nx * half, rv.level, z1 + nz * half,
-            x1 - nx * half, rv.level, z1 - nz * half
-          );
+          pushWaterVertex(x0 - nx * half, z0 - nz * half);
+          pushWaterVertex(x0 + nx * half, z0 + nz * half);
+          pushWaterVertex(x1 - nx * half, z1 - nz * half);
+          pushWaterVertex(x0 + nx * half, z0 + nz * half);
+          pushWaterVertex(x1 + nx * half, z1 + nz * half);
+          pushWaterVertex(x1 - nx * half, z1 - nz * half);
         }
       }
       const geo = new THREE.BufferGeometry();
@@ -2268,8 +2283,9 @@ export class World {
     tex.colorSpace = THREE.SRGBColorSpace;
     const geo = new THREE.CircleGeometry(r, 28);
     geo.rotateX(-Math.PI / 2);
+    this._drapeXZGeometry(geo, x, z, 0.09);
     const plaza = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ map: tex, gradientMap: toonMat(0).gradientMap, polygonOffset: true, polygonOffsetFactor: -3 }));
-    plaza.position.set(x, this.groundH(x, z) + 0.09, z);
+    plaza.position.set(x, 0, z);
     plaza.receiveShadow = true;
     this.scene.add(plaza);
 
@@ -2385,14 +2401,14 @@ export class World {
 
   // ❄️ замерзле озеро (лід — фізика ковзання в player.js)
   _lmFrozenLake({ x, z, r }) {
-    const wy = this.groundH(x, z) + 0.1;
     const geo = new THREE.CircleGeometry(r, 30);
     geo.rotateX(-Math.PI / 2);
+    this._drapeXZGeometry(geo, x, z, 0.1);
     const ice = new THREE.Mesh(geo, new THREE.MeshToonMaterial({
       color: 0x9ccbe8, gradientMap: toonMat(0).gradientMap,
       emissive: 0x3a7fc4, emissiveIntensity: 0.22,
     }));
-    ice.position.set(x, wy, z);
+    ice.position.set(x, 0, z);
     this.scene.add(ice);
     // тріщини
     const crackM = new THREE.MeshBasicMaterial({ color: 0x9bc4d8 });
@@ -2402,14 +2418,14 @@ export class World {
       const crack = new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, 0.16), crackM);
       const cx = x + this.rng.range(-r * 0.6, r * 0.6);
       const cz = z + this.rng.range(-r * 0.6, r * 0.6);
-      crack.position.set(cx, wy + 0.02, cz);
+      crack.position.set(cx, this.groundH(cx, cz) + 0.13, cz);
       crack.rotation.y = a;
       this.scene.add(crack);
     }
     // сніговий бортик
     const rim = new THREE.Mesh(new THREE.TorusGeometry(r + 0.8, 1.1, 8, 36), toonMat(0xf4f9fc));
     rim.rotation.x = -Math.PI / 2;
-    rim.position.set(x, wy - 0.55, z);
+    rim.position.set(x, this.groundH(x, z) - 0.45, z);
     rim.scale.set(1, 1, 0.5);
     this.staticGroup.add(rim);
     // табличка "ОБЕРЕЖНО: СЛИЗЬКО!"
@@ -2485,18 +2501,26 @@ export class World {
 
   // 🚂 залізничне депо: рейки, вагони, платформа
   _lmRailDepot({ x, z }) {
-    const gy = this.groundH(x, z);
     const railM = toonMat(0x4a5160);
     const tieM = toonMat(0x5e4530);
-    // рейки по дузі повз склад
+    // рейки повз склад: короткі сегменти повторюють схил, щоб довга балка не висіла у повітрі
     for (const off of [-0.8, 0.8]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(60, 0.15, 0.18), railM);
-      rail.position.set(x, gy + 0.12, z + 9 + off);
-      this.staticGroup.add(rail);
+      for (let sx = -30; sx < 30; sx += 2.5) {
+        const ax = x + sx, bx = x + Math.min(30, sx + 2.5);
+        const rz = z + 9 + off;
+        const ay = this.groundH(ax, rz), by = this.groundH(bx, rz);
+        const len = Math.hypot(bx - ax, by - ay);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(len + 0.04, 0.15, 0.18), railM);
+        rail.position.set((ax + bx) / 2, (ay + by) / 2 + 0.12, rz);
+        rail.rotation.z = Math.atan2(by - ay, bx - ax);
+        this.staticGroup.add(rail);
+      }
     }
     for (let i = 0; i < 28; i++) {
+      const tx = x - 29 + i * 2.1;
+      const tz = z + 9;
       const tie = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 2.4), tieM);
-      tie.position.set(x - 29 + i * 2.1, gy + 0.06, z + 9);
+      tie.position.set(tx, this.groundH(tx, tz) + 0.06, tz);
       this.staticGroup.add(tie);
     }
     // вагони
@@ -2526,9 +2550,13 @@ export class World {
       this.floors.push({ x: cx, z: cz, ry: 0, w: 9, d: 2.6, top: cy + 3.65 });
     }
     // платформа з ліхтарем
-    const plat = new THREE.Mesh(new THREE.BoxGeometry(16, 0.6, 3.5), toonMat(0x767e88));
-    plat.position.set(x, gy + 0.3, z + 5.2);
-    this.staticGroup.add(plat);
+    const platM = toonMat(0x767e88);
+    for (let i = 0; i < 8; i++) {
+      const px = x - 7 + i * 2;
+      const plat = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.6, 3.5), platM);
+      plat.position.set(px, this.groundH(px, z + 5.2) + 0.3, z + 5.2);
+      this.staticGroup.add(plat);
+    }
   }
 
   // 🎄 ялинки з гірляндами
@@ -3165,8 +3193,8 @@ export class World {
       const pos = this.pond.mesh.geometry.attributes.position;
       const base = this.pond.base;
       for (let i = 0; i < pos.count; i++) {
-        const bx = base[i * 3], bz = base[i * 3 + 2];
-        pos.setY(i, Math.sin(this.pond.t * 1.7 + bx * 0.55 + bz * 0.4) * 0.16);
+        const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2];
+        pos.setY(i, by + Math.sin(this.pond.t * 1.7 + bx * 0.55 + bz * 0.4) * 0.16);
       }
       pos.needsUpdate = true;
     }
