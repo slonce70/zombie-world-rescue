@@ -89,7 +89,8 @@ check(JSON.stringify(questsA) !== JSON.stringify(questsC), 'інший день 
 // прогрес і нагорода
 const questReward = await page.evaluate(() => {
   const g = window.__game;
-  g.test.regenQuests('2026-06-12');
+  // СЬОГОДНІШНЯ дата: onEvent робить ensureToday() і чужий день стер би прогрес
+  g.test.regenQuests(new Date().toISOString().slice(0, 10));
   const q = g.quests.list[0];
   const coinsBefore = g.save.coins;
   const xpBefore = g.save.xp;

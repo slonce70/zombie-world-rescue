@@ -233,6 +233,14 @@ export class GuestNet {
         if (level.missions.netNestCleared) level.missions.netNestCleared(a[0], a[1]);
         break;
       }
+      case 'mact': {
+        if (level.missions.netActDone) level.missions.netActDone(a[0], a[1]);
+        break;
+      }
+      case 'fit': {
+        if (level.missions.netFetchTaken) level.missions.netFetchTaken(a[0], a[1]);
+        break;
+      }
       case 'md': {
         if (level.missions.netMissionDone) level.missions.netMissionDone(a[0], a[1], a[2]);
         break;

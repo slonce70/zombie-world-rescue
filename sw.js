@@ -50,6 +50,9 @@ const SHELL = [
   './src/ui/coopui.js',
   './src/ui/leagueui.js',
   './src/ui/saveui.js',
+  './src/i18n.js',
+  './src/i18n/en.js',
+  './src/i18n/ru.js',
 ];
 
 self.addEventListener('install', (e) => {

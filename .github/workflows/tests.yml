@@ -26,6 +26,8 @@ jobs:
         run: node test/version-check.mjs
       - name: Cloud save (хмарний сейв, фільтр ніків, краш-екран)
         run: node test/cloudsave.mjs
+      - name: i18n (українська/English/русский)
+        run: node test/i18n.mjs
 
   # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
   # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт

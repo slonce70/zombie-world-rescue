@@ -2,6 +2,7 @@
 // Реалізує той самий інтерфейс, що й Missions (update/getHudList/getMarkers/...),
 // тому HUD і main працюють без змін.
 import * as THREE from 'three';
+import { t } from './i18n.js';
 
 export class StormMode {
   constructor(level) {
@@ -77,11 +78,11 @@ export class StormMode {
 
   getHudList() {
     const out = [
-      { icon: '⛈️', title: `ШТОРМ — хвиля ${this.wave}`, done: false },
-      { icon: '🧟', title: `Зомбі лишилось: ${this.waveAlive}`, done: false },
+      { icon: '⛈️', title: t('ШТОРМ — хвиля {n}', { n: this.wave }), done: false },
+      { icon: '🧟', title: t('Зомбі лишилось: {n}', { n: this.waveAlive }), done: false },
     ];
-    if (this.phase === 'shrink') out.push({ icon: '🟣', title: 'Коло звужується — тікай усередину!', done: false });
-    else out.push({ icon: '⏳', title: `Коло поїде за ${Math.ceil(this.phaseT)}с`, done: false });
+    if (this.phase === 'shrink') out.push({ icon: '🟣', title: t('Коло звужується — тікай усередину!'), done: false });
+    else out.push({ icon: '⏳', title: t('Коло поїде за {n}с', { n: Math.ceil(this.phaseT) }), done: false });
     return out;
   }
 
@@ -115,8 +116,8 @@ export class StormMode {
       this.shrinkFrom = this.r;
       this.targetR = Math.max(this.minR, this.r * 0.68);
       level.audio.stormSiren();
-      level.bus.emit('toast', '🟣 УВАГА! Коло звужується!');
-      level.netEv('toast', '🟣 УВАГА! Коло звужується!');
+      level.bus.emit('toast', t('🟣 УВАГА! Коло звужується!'));
+      level.netEv('toast', t('🟣 УВАГА! Коло звужується!'));
     } else if (this.phase === 'shrink') {
       const k = 1 - Math.max(0, this.phaseT / 22);
       this.r = this.shrinkFrom + (this.targetR - this.shrinkFrom) * k;
@@ -141,13 +142,13 @@ export class StormMode {
       const bonus = 25 + this.wave * 10;
       level.addCoins(bonus);
       level.game.progress.addXp(12 + this.wave * 3);
-      level.game.hud.banner(`🎉 ХВИЛЮ ${this.wave} ВІДБИТО!`, `+${bonus} монет · хвиля ${this.wave + 1} за 6с…`, 3.5);
+      level.game.hud.banner(t('🎉 ХВИЛЮ {n} ВІДБИТО!', { n: this.wave }), t('+{b} монет · хвиля {w} за 6с…', { b: bonus, w: this.wave + 1 }), 3.5);
       // гостям: банер + той самий бонус монет (подія sbb)
-      level.netEv('banner', `🎉 ХВИЛЮ ${this.wave} ВІДБИТО!`, `+${bonus} монет · хвиля ${this.wave + 1} за 6с…`, 3.5);
+      level.netEv('banner', t('🎉 ХВИЛЮ {n} ВІДБИТО!', { n: this.wave }), t('+{b} монет · хвиля {w} за 6с…', { b: bonus, w: this.wave + 1 }), 3.5);
       level.netEv('sbb', bonus);
       if (this.wave % 3 === 2) {
-        level.bus.emit('toast', '🛒 Поповни запаси (B) — з кожною хвилею дорожче!');
-        level.netEv('toast', '🛒 Поповни запаси (B) — з кожною хвилею дорожче!');
+        level.bus.emit('toast', t('🛒 Поповни запаси (B) — з кожною хвилею дорожче!'));
+        level.netEv('toast', t('🛒 Поповни запаси (B) — з кожною хвилею дорожче!'));
       }
       level.audio.mission();
       this._spawnWaveSoon = 6;
@@ -229,8 +230,8 @@ export class StormMode {
       b._stormWave = true;
       b.aggroed = true;
       b.state = 'chase';
-      level.game.hud.banner('👑 МІНІ-БОС ПРИЙШОВ!', 'Він теж хоче в коло!', 3);
-      level.netEv('banner', '👑 МІНІ-БОС ПРИЙШОВ!', 'Він теж хоче в коло!', 3);
+      level.game.hud.banner(t('👑 МІНІ-БОС ПРИЙШОВ!'), t('Він теж хоче в коло!'), 3);
+      level.netEv('banner', t('👑 МІНІ-БОС ПРИЙШОВ!'), t('Він теж хоче в коло!'), 3);
       level.audio.bossRoar();
     }
     if (this.wave > 1) level.audio.horde();

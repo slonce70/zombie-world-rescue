@@ -207,6 +207,7 @@ export class HostNet {
       case 'crate': if (ms.useCrate) ms.useCrate(from, near); break;
       case 'supply': if (ms.useSupply) ms.useSupply(from, d.i, near); break;
       case 'escort': if (ms.useEscort) ms.useEscort(from, near); break;
+      case 'fitem': if (ms.useFetchItem) ms.useFetchItem(from, d.slot, d.i, near); break;
       case 'megabox': {
         const mb = level.megabox;
         if (mb && !mb.opened && near(mb.x, mb.z, 4.2)) mb.open(from);

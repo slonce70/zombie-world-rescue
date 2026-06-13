@@ -2,6 +2,7 @@
 // Потік: нік (раз) → панель з кнопками ліворуч і «життям» праворуч —
 // лічильник онлайна, хто в мережі, відкриті кімнати з кнопкою «Зайти» без кода.
 import { CoopSession, loadNick, saveNick, cleanNick } from '../net/coop.js';
+import { t } from '../i18n.js';
 import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
@@ -115,7 +116,7 @@ export class CoopUI {
       game._hideOverlay('overlay-lobby');
       this.updateRoomChip();
       const n = this.session.roster.size;
-      if (n > 1) game.hud.toast(`⚔️ Вас ${n} — зомбі сильніші ×${n}! Тримайтесь разом!`);
+      if (n > 1) game.hud.toast(t('⚔️ Вас {n} — зомбі сильніші ×{n}! Тримайтесь разом!', { n }));
       this.lobbyNet.refresh(); // у списку кімнат стане «⚔️ у грі»
     };
     // гість більше не заручник мовчазного хоста: з очікування можна вийти
@@ -136,20 +137,20 @@ export class CoopUI {
         game.endLevel();
       }
       const msgs = {
-        hostgone: '😴 Хост закрив гру — кімнати більше немає',
-        lost: '📡 Звʼязок втрачено',
-        closed: '🚪 Кімнату закрито',
+        hostgone: t('😴 Хост закрив гру — кімнати більше немає'),
+        lost: t('📡 Звʼязок втрачено'),
+        closed: t('🚪 Кімнату закрито'),
       };
-      game.hud.toast(msgs[reason] || '🚪 Кімнату закрито');
+      game.hud.toast(msgs[reason] || t('🚪 Кімнату закрито'));
       this._syncPolling();
     };
 
     // швидкий вхід для тестів: ?coophost / ?coopjoin=CODE (&nick=)
     const params = game.params;
     if (params.has('coophost')) {
-      this._autoHost(params.get('nick') || 'Хост');
+      this._autoHost(params.get('nick') || t('Хост'));
     } else if (params.get('coopjoin')) {
-      this._autoJoin(params.get('coopjoin'), params.get('nick') || 'Гість');
+      this._autoJoin(params.get('coopjoin'), params.get('nick') || t('Гість'));
     }
   }
 
@@ -182,7 +183,7 @@ export class CoopUI {
     el.style.display = show ? '' : 'none';
     if (show) {
       const n = s.roster.size;
-      el.innerHTML = `🤝 Код: <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''}`;
+      el.innerHTML = t('🤝 Код:', {}) + ` <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''}`;
     }
   }
 
@@ -220,7 +221,7 @@ export class CoopUI {
   _acceptNick() {
     const nick = cleanNick(this.el.nick.value);
     if (nick.length < 2) {
-      this.el.nickErr.textContent = 'Введи нік (хоча б 2 символи) 😊';
+      this.el.nickErr.textContent = t('Введи нік (хоча б 2 символи) 😊');
       this.el.nickErr.style.display = 'block';
       return;
     }
@@ -236,7 +237,7 @@ export class CoopUI {
     const esc = (x) => this._esc(x);
     if (!d) {
       this.el.onlineN.textContent = '—';
-      this.el.rooms.innerHTML = '<div class="coop-side-empty">📡 Сервер недоступний — перевір інтернет</div>';
+      this.el.rooms.innerHTML = t('<div class="coop-side-empty">📡 Сервер недоступний — перевір інтернет</div>');
       this.el.players.innerHTML = '';
       return;
     }
@@ -249,16 +250,16 @@ export class CoopUI {
     let rh = '';
     for (const r of rooms) {
       const c = COUNTRIES[r.country];
-      const where = r.mode === 'arena' ? 'Арена' : c ? `${c.flag} ${c.name}` : r.country;
+      const where = r.mode === 'arena' ? t('Арена') : c ? `${c.flag} ${c.name}` : r.country;
       const full = r.n >= 4;
       rh += `<div class="coop-room">
         <span class="cr-mode">${MODE_ICON[r.mode] || '🎯'}</span>
-        <span class="cr-info"><b>${esc(r.host)}</b><small>${where} · ${r.state === 'game' ? '⚔️ у грі' : '🛋️ збирається'}</small></span>
+        <span class="cr-info"><b>${esc(r.host)}</b><small>${where} · ${r.state === 'game' ? t('⚔️ у грі') : t('🛋️ збирається')}</small></span>
         <span class="cr-n">${r.n}/4</span>
-        <button class="btn cr-join" data-code="${esc(r.code)}" ${full ? 'disabled' : ''}>${full ? 'Повна' : 'Зайти'}</button>
+        <button class="btn cr-join" data-code="${esc(r.code)}" ${full ? 'disabled' : ''}>${full ? t('Повна') : t('Зайти')}</button>
       </div>`;
     }
-    if (!rh) rh = '<div class="coop-side-empty">Поки немає відкритих кімнат.<br>Створи свою — і на тебе чекатимуть! 🏠</div>';
+    if (!rh) rh = t('<div class="coop-side-empty">Поки немає відкритих кімнат.<br>Створи свою — і на тебе чекатимуть! 🏠</div>');
     this.el.rooms.innerHTML = rh;
     this.el.rooms.querySelectorAll('.cr-join:not([disabled])').forEach((b) =>
       b.addEventListener('click', () => {
@@ -270,15 +271,15 @@ export class CoopUI {
     let ph = '';
     for (const nick of d.players || []) {
       const me = nick === myNick;
-      ph += `<span class="coop-player ${me ? 'me' : ''}">${esc(nick)}${me ? ' (ти)' : ''}</span>`;
+      ph += `<span class="coop-player ${me ? 'me' : ''}">${esc(nick)}${me ? t(' (ти)') : ''}</span>`;
     }
-    this.el.players.innerHTML = ph || '<div class="coop-side-empty">Тут зʼявляться гравці онлайн</div>';
+    this.el.players.innerHTML = ph || t('<div class="coop-side-empty">Тут зʼявляться гравці онлайн</div>');
   }
 
   // ---------- вхід у кімнату ----------
   async _autoHost(nick) {
     try {
-      saveNick(cleanNick(nick) || 'Хост');
+      saveNick(cleanNick(nick) || t('Хост'));
       const code = await this.session.create(nick);
       this._openLobby();
       this._syncPolling();
@@ -288,7 +289,7 @@ export class CoopUI {
 
   async _autoJoin(code, nick) {
     try {
-      saveNick(cleanNick(nick) || 'Гість');
+      saveNick(cleanNick(nick) || t('Гість'));
       await this.session.join(code.toUpperCase(), nick);
       this._openLobby();
       this._syncPolling();
@@ -311,7 +312,7 @@ export class CoopUI {
     if (!nick) return;
     this._err('');
     this.el.create.disabled = true;
-    this.el.create.textContent = '⏳ Створюємо…';
+    this.el.create.textContent = t('⏳ Створюємо…');
     try {
       await this.session.create(nick);
       this.game._hideOverlay('overlay-coop');
@@ -322,7 +323,7 @@ export class CoopUI {
       this._err(this._connErr(e));
     } finally {
       this.el.create.disabled = false;
-      this.el.create.textContent = '🏠 СТВОРИТИ КІМНАТУ';
+      this.el.create.textContent = t('🏠 СТВОРИТИ КІМНАТУ');
     }
   }
 
@@ -330,10 +331,10 @@ export class CoopUI {
     const nick = this._myNick();
     if (!nick) return;
     const code = (codeArg || this.el.code.value).trim().toUpperCase();
-    if (code.length < 4) { this._err('Введи код кімнати з 4 літер'); return; }
+    if (code.length < 4) { this._err(t('Введи код кімнати з 4 літер')); return; }
     this._err('');
     this.el.join.disabled = true;
-    this.el.join.textContent = '⏳ Заходимо…';
+    this.el.join.textContent = t('⏳ Заходимо…');
     try {
       await this.session.join(code, nick);
       this.game._hideOverlay('overlay-coop');
@@ -343,19 +344,19 @@ export class CoopUI {
       this._err(this._connErr(e));
     } finally {
       this.el.join.disabled = false;
-      this.el.join.textContent = '🚪 ЗАЙТИ';
+      this.el.join.textContent = t('🚪 ЗАЙТИ');
     }
   }
 
   _connErr(e) {
     const m = String(e && e.message || e);
-    if (m === 'norelay') return 'Сервер кооперативу ще не налаштовано — потрібно задеплоїти worker/ і вписати адресу в src/net/transport.js (див. README)';
-    if (m === 'noroom') return 'Кімнати з таким кодом немає 🤔 Перевір код!';
-    if (m === 'full') return 'Кімната вже повна (4 гравці) 😅';
-    if (m === 'taken') return 'Спробуй ще раз — код зайнятий';
-    if (m.startsWith('build:')) return `У вас різні версії гри! Онови сторінку: Ctrl(⌘)+Shift+R`;
-    if (m === 'timeout' || m === 'closed' || m === 'badurl') return 'Не вдалося звʼязатися з сервером 📡 Перевір інтернет';
-    return 'Щось пішло не так… Спробуй ще раз';
+    if (m === 'norelay') return t('Сервер кооперативу ще не налаштовано — потрібно задеплоїти worker/ і вписати адресу в src/net/transport.js (див. README)');
+    if (m === 'noroom') return t('Кімнати з таким кодом немає 🤔 Перевір код!');
+    if (m === 'full') return t('Кімната вже повна (4 гравці) 😅');
+    if (m === 'taken') return t('Спробуй ще раз — код зайнятий');
+    if (m.startsWith('build:')) return t('У вас різні версії гри! Онови сторінку: Ctrl(⌘)+Shift+R');
+    if (m === 'timeout' || m === 'closed' || m === 'badurl') return t('Не вдалося звʼязатися з сервером 📡 Перевір інтернет');
+    return t('Щось пішло не так… Спробуй ще раз');
   }
 
   _openLobby() {
@@ -378,11 +379,11 @@ export class CoopUI {
       html += `<div class="lobby-player ${pid === s.myPid ? 'me' : ''}">
         <span class="lp-skin">${skin}</span>
         <span class="lp-nick">${this._esc(r.nick || '...')}</span>
-        <span class="lp-role">${pid === 1 ? '👑 хост' : ''}</span>
+        <span class="lp-role">${pid === 1 ? t('👑 хост') : ''}</span>
       </div>`;
     }
     for (let i = s.roster.size; i < 4; i++) {
-      html += '<div class="lobby-player empty"><span class="lp-skin">➕</span><span class="lp-nick">вільне місце</span></div>';
+      html += t('<div class="lobby-player empty"><span class="lp-skin">➕</span><span class="lp-nick">вільне місце</span></div>');
     }
     this.el.roster.innerHTML = html;
 
@@ -391,7 +392,7 @@ export class CoopUI {
     const anyLib = Object.keys(save.liberated || {}).length > 0;
     let mh = '';
     const libCount = Object.keys(save.liberated || {}).length;
-    for (const [mid, label] of [['campaign', '🎯 Кампанія'], ['storm', '⛈️ Шторм'], ['arena', '👑 Арена']]) {
+    for (const [mid, label] of [['campaign', t('🎯 Кампанія')], ['storm', t('⛈️ Шторм')], ['arena', t('👑 Арена')]]) {
       const sel = s.mode === mid;
       const locked = isHost && ((mid === 'storm' && !anyLib) || (mid === 'arena' && libCount < 2));
       mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
@@ -441,12 +442,12 @@ export class CoopUI {
 
     this.el.start.style.display = isHost ? '' : 'none';
     this.el.start.disabled = false;
-    const modeTxt = s.mode === 'storm' ? '⛈️ ШТОРМ' : s.mode === 'arena' ? '👑 АРЕНУ БОСІВ' : 'кампанію';
+    const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : t('кампанію');
     this.el.hint.textContent = isHost
-      ? (s.roster.size > 1 ? 'Усі в зборі? Тисни СТАРТ!' : (this.publicOn
-        ? 'Кімнату видно у списку — чекай гостей або продиктуй код 👆'
-        : 'Продиктуй другу код кімнати 👆'))
-      : `Хост обрав ${modeTxt} · ${COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag + ' ' + COUNTRIES[s.countryId].name : ''} — чекаємо на СТАРТ…`;
+      ? (s.roster.size > 1 ? t('Усі в зборі? Тисни СТАРТ!') : (this.publicOn
+        ? t('Кімнату видно у списку — чекай гостей або продиктуй код 👆')
+        : t('Продиктуй другу код кімнати 👆')))
+      : t('Хост обрав {m} · {c} — чекаємо на СТАРТ…', { m: modeTxt, c: COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag + ' ' + COUNTRIES[s.countryId].name : '' });
   }
 
   _esc(str) {

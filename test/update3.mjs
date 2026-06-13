@@ -378,7 +378,7 @@ const campaign = await page.evaluate(async () => {
   const mod = await import('/src/countries.js');
   return { order: mod.CAMPAIGN_ORDER, names: mod.CAMPAIGN_ORDER.map((id) => mod.COUNTRIES[id].name) };
 });
-check(campaign.order.length === 4, `у кампанії 4 країни: ${campaign.names.join(' → ')}`);
+check(campaign.order.length === 6, `у кампанії 6 країн: ${campaign.names.join(' → ')}`);
 
 console.log('');
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 3 ПРОЙДЕНО' : `❌ ПРОВАЛЕНО: ${failed}`);

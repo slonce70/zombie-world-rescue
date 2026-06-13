@@ -43,7 +43,9 @@ const rolls = await page.evaluate(() => {
   };
 });
 check(JSON.stringify(rolls.polA) === JSON.stringify(rolls.polB), `роздача детермінована (${rolls.polA})`);
-check(new Set(rolls.polA).size === 3, 'три РІЗНІ типи місій на карті');
+// v16: місій 4 (3 основні + ⭐ бонусна), всі типи різні
+check(new Set(rolls.polA).size === rolls.polA.length && rolls.polA.length === 4,
+  `чотири РІЗНІ типи місій на карті (${rolls.polA})`);
 const distinctSets = new Set([rolls.polA, rolls.deu, rolls.fra, rolls.ukrRun1].map((x) => JSON.stringify(x)));
 check(distinctSets.size >= 3, `країни мають різні набори (${distinctSets.size}/4 унікальних)`);
 check(JSON.stringify(rolls.polA) !== JSON.stringify(rolls.polRun1) || JSON.stringify(rolls.ukrRun1) !== '["rescue","repair","clear"]',

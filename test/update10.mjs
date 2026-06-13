@@ -33,7 +33,7 @@ try {
     side: document.querySelectorAll('.globe-side .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('бічна колонка: 5 другорядних кнопок', menu.side === 5, `${menu.side}`);
+  check('бічна колонка: 7 другорядних кнопок (v15 +Прогрес, v16 +Мова)', menu.side === 7, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');

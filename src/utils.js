@@ -136,6 +136,54 @@ export function disposeObject(root) {
   });
 }
 
+// ---------- 🏔️ примітиви великого рельєфу для map.terrain(x,z) ----------
+// Кожен повертає Δвисоту в точці; карта складає з них свій унікальний ландшафт.
+
+// гірський гребінь уздовж відрізка: h на осі, плавний спад до 0 на відстані w
+export function ridge(x, z, ax, az, bx, bz, h, w) {
+  const d = distToSeg(x, z, ax, az, bx, bz);
+  if (d >= w) return 0;
+  const t = 1 - (d / w) * (d / w);
+  return h * t * t;
+}
+
+// долина/каньйон — те саме, але вниз
+export function valley(x, z, ax, az, bx, bz, depth, w) {
+  return -ridge(x, z, ax, az, bx, bz, depth, w);
+}
+
+// плоскогір'я (меза) з крутим краєм: повна висота всередині r, спад на смузі edge
+export function mesa(x, z, cx, cz, r, h, edge = 6) {
+  const d = Math.hypot(x - cx, z - cz);
+  return h * smoothstep(r + edge, r, d);
+}
+
+// терасований пагорб: конус, порізаний на сходинки stepH (виноградники, поля)
+export function terraces(x, z, cx, cz, r, h, stepH = 1.1) {
+  const d = Math.hypot(x - cx, z - cz);
+  if (d >= r) return 0;
+  const base = h * (1 - d / r);
+  const lo = Math.floor(base / stepH) * stepH;
+  const f = (base - lo) / stepH;
+  // вузька крутая «стінка» між полицями, широка пласка полиця
+  return lo + stepH * smoothstep(0.82, 0.98, f);
+}
+
+// поле дюн: дві хвилі під кутом — м'які піщані гряди
+export function dunes(x, z, amp, wavelength = 46, angle = 0.5) {
+  const u = x * Math.cos(angle) + z * Math.sin(angle);
+  const v = -x * Math.sin(angle) + z * Math.cos(angle);
+  const w1 = 0.5 + 0.5 * Math.sin((u / wavelength) * Math.PI * 2);
+  const w2 = 0.5 + 0.5 * Math.sin((v / (wavelength * 2.3)) * Math.PI * 2 + 1.7);
+  return amp * Math.pow(w1, 1.4) * (0.55 + 0.45 * w2);
+}
+
+// западина/кратер (озеро, оаза)
+export function basin(x, z, cx, cz, r, depth, edge = 10) {
+  const d = Math.hypot(x - cx, z - cz);
+  return -depth * smoothstep(r + edge, r * 0.4, d);
+}
+
 export class Bus {
   constructor() { this.m = new Map(); }
   on(e, f) {

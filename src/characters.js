@@ -1,5 +1,6 @@
 // Процедурні мультяшні персонажі (стиль Fortnite-lite) + анімації
 import * as THREE from 'three';
+import { t } from './i18n.js';
 
 let gradMap = null;
 function getGradMap() {
@@ -1301,37 +1302,37 @@ export function attachHeroGear(rig, kind) {
 
 // ---------- Скіни героя ----------
 export const HERO_SKINS = {
-  classic: { name: 'Класик', icon: '🧢', desc: 'Перевірений герой у кепці' },
-  ninja: { name: 'Ніндзя', icon: '🥷', desc: 'Тихий, як тінь' },
-  astro: { name: 'Космонавт', icon: '👨‍🚀', desc: 'Прямо з орбіти' },
-  pirate: { name: 'Пірат', icon: '🏴‍☠️', desc: 'Йо-хо-хо!' },
-  robot: { name: 'Робот', icon: '🤖', desc: 'Біп-буп, зомбі!' },
-  frog: { name: 'Жабеня', icon: '🐸', desc: 'Ква проти зомбі (з Мегабокса)' },
-  super: { name: 'Супергерой', icon: '🦸', desc: 'Плащ майорить! (з Мегабокса)' },
-  hunter: { name: 'Нічний мисливець', icon: '🌙', desc: 'Шторм, хвиля 12' },
-  thunder: { name: 'Громовідвід', icon: '⚡', desc: 'Шторм, хвиля 16' },
-  legend: { name: 'Легенда', icon: '🏆', desc: 'Зоряний шлях, рівень 25' },
+  classic: { name: t('Класик'), icon: '🧢', desc: t('Перевірений герой у кепці') },
+  ninja: { name: t('Ніндзя'), icon: '🥷', desc: t('Тихий, як тінь') },
+  astro: { name: t('Космонавт'), icon: '👨‍🚀', desc: t('Прямо з орбіти') },
+  pirate: { name: t('Пірат'), icon: '🏴‍☠️', desc: t('Йо-хо-хо!') },
+  robot: { name: t('Робот'), icon: '🤖', desc: t('Біп-буп, зомбі!') },
+  frog: { name: t('Жабеня'), icon: '🐸', desc: t('Ква проти зомбі (з Мегабокса)') },
+  super: { name: t('Супергерой'), icon: '🦸', desc: t('Плащ майорить! (з Мегабокса)') },
+  hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
+  thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
+  legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
 };
 
 // ---------- Танці (емоції) ----------
 export const DANCES = {
-  shuffle: { name: 'Денс', icon: '🕺', desc: 'Класика перемоги' },
-  spin: { name: 'Дзиґа', icon: '🌪️', desc: 'Крутись, як вихор!' },
-  robot: { name: 'Робот', icon: '🤖', desc: 'Біп-буп-денс' },
-  wave: { name: 'Хвиля', icon: '🌊', desc: 'Котить хвилю руками' },
-  jump: { name: 'Стрибунець', icon: '🦘', desc: 'Радісні підскоки (з Мегабокса)' },
-  chicken: { name: 'Курча', icon: '🐤', desc: 'Кудкудак! (з Мегабокса)' },
-  lightning: { name: 'Блискавка', icon: '⚡', desc: 'Шторм, хвиля 8' },
+  shuffle: { name: t('Денс'), icon: '🕺', desc: t('Класика перемоги') },
+  spin: { name: t('Дзиґа'), icon: '🌪️', desc: t('Крутись, як вихор!') },
+  robot: { name: t('Робот'), icon: '🤖', desc: t('Біп-буп-денс') },
+  wave: { name: t('Хвиля'), icon: '🌊', desc: t('Котить хвилю руками') },
+  jump: { name: t('Стрибунець'), icon: '🦘', desc: t('Радісні підскоки (з Мегабокса)') },
+  chicken: { name: t('Курча'), icon: '🐤', desc: t('Кудкудак! (з Мегабокса)') },
+  lightning: { name: t('Блискавка'), icon: '⚡', desc: t('Шторм, хвиля 8') },
 };
 
 // ---------- Сліди куль ----------
 export const TRACERS = {
-  classic: { name: 'Класичні', icon: '➖' },
-  gold: { name: 'Золоті', icon: '✨' },
-  rainbow: { name: 'Веселкові', icon: '🌈' },
-  storm: { name: 'Штормові', icon: '🌩️' },
-  neon: { name: 'Неонові', icon: '🟢' },
-  royal: { name: 'Королівські', icon: '👑' },
+  classic: { name: t('Класичні'), icon: '➖' },
+  gold: { name: t('Золоті'), icon: '✨' },
+  rainbow: { name: t('Веселкові'), icon: '🌈' },
+  storm: { name: t('Штормові'), icon: '🌩️' },
+  neon: { name: t('Неонові'), icon: '🟢' },
+  royal: { name: t('Королівські'), icon: '👑' },
 };
 
 export function makeHero(skinId = 'classic') {

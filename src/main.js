@@ -1,5 +1,6 @@
 // Головний модуль: state machine (глобус ↔ рівень), цикл гри, збереження
 import * as THREE from 'three';
+import { t, translateHtml, getLang, setLang, LANGS, LANG_NAMES } from './i18n.js';
 import { Input } from './input.js';
 import { AudioMan } from './audio.js';
 import { World } from './world.js';
@@ -24,6 +25,10 @@ import { SaveUI } from './ui/saveui.js';
 import { submitScore } from './net/league.js';
 import { CloudSave } from './net/cloudsave.js';
 
+// 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
+translateHtml(document.body);
+document.documentElement.lang = getLang();
+
 // 🚑 Аварійний екран: непіймана помилка → зрозумілий екран із кнопкою
 // перезавантаження замість мовчазно замерзлої гри. Сейв не страждає.
 let crashShown = false;
@@ -32,7 +37,7 @@ function showCrash(msg) {
   crashShown = true;
   try {
     const info = document.getElementById('crash-info');
-    if (info) info.textContent = String(msg || 'невідома помилка').slice(0, 300);
+    if (info) info.textContent = String(msg || t('невідома помилка')).slice(0, 300);
     const ov = document.getElementById('overlay-crash');
     if (ov) ov.classList.add('show');
     const b = document.getElementById('btn-crash-reload');
@@ -48,48 +53,48 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
-const QUALITY_LABELS = { auto: 'Авто', high: 'Гарна', fast: 'Швидка' };
+const QUALITY_LABELS = { auto: t('Авто'), high: t('Гарна'), fast: t('Швидка') };
 const TIPS = [
-  'Тримай Shift, щоб бігти від орди!',
-  'Гранати (G) вибухають і червоні бочки — ланцюгова реакція!',
-  'Зазирай у будинки з відчиненими дверима — там лут. Але обережно…',
-  'Золотий зомбі ⭐ тікає від тебе. Дожени — отримаєш джекпот!',
-  'Батути 🔵 закидають на дахи. Там сховані скарби!',
-  'Медик з хліва лікує тебе, коли стоїш поруч 💚',
-  'Хедшот робить подвійну шкоду. Цілься в голову!',
-  'Дробовик — король ближнього бою. Клавіша 3!',
-  'На льоду ковзько — гальмуй заздалегідь! ⛸',
-  'Комбо-серії вбивств дають бонусні монети 🔥',
-  'Шукай аеродропи 🪂 — там навіть БАЗУКА буває!',
-  'Клавіша V — подивись на свого героя збоку!',
-  'Щит щитоносця 🛡 не проб’єш у лоб — обійди ззаду або зламай!',
-  'У магазині (B) є нова зброя, бронежилет і шолом!',
-  'Світні кулі — підсилення: ⚡швидкість, 💪лють, 🛡бульбашка, 🧲магніт!',
-  'Бронежилет 🦺 поглинає шкоду — поповнюй пластинами!',
-  'Снайперка 🎯 пробиває трьох зомбі наскрізь — шикуй їх у чергу!',
-  'Смаколики 🥐 на столиках повертають здоров’я!',
-  'Шукай 🦙 МЕГАБОКС — фіолетовий промінь видно здалеку!',
-  'Клавіша N — переможний танець. Спробуй після боса! 💃',
-  'Самокат 🛴 збиває зомбі на повній швидкості!',
-  'Гаджет (F) обирається в Гардеробі: щит, відновлення, батут чи барикада! 🧰',
-  'Барикаду 🧱 можна розстріляти або забрати назад (E)',
-  'Песик Дружок 🐶 збирає монети і чує сюрпризи в будинках',
-  'Виконуй щоденні завдання 📅 — монети й зірковий досвід!',
-  'Грай у ⛈️ ШТОРМ після звільнення країни — там рекорди!',
-  'Права кнопка миші — оптика снайперки 🔭',
-  'Броньовик 🦾 у залізному нагруднику — цілься в ГОЛОВУ!',
-  'Зомбі-стрілець 🔫 б\'є здалеку — ховайся за будинки!',
-  'Базука 🚀 тепер НАЙСИЛЬНІША зброя — бережи ракети для товстунів!',
-  'На самокаті: W — газ, S — гальмо, A/D — кермо 🛴',
-  'Щоразу нові завдання! Перепройди країну — буде інакше 🎲',
-  'Елітні зомбі 👹 в золотих коронах — сильні, але щедрі',
-  'Зомбі-гнізда 🟣 знешкоджуються утриманням E — стережись охорони!',
-  'Мандрівника 🧳 захищай від укусів — він сховається, якщо боляче',
-  'Лут у будинках щоразу інший — заглядай усюди! 🎁',
+  t('Тримай Shift, щоб бігти від орди!'),
+  t('Гранати (G) вибухають і червоні бочки — ланцюгова реакція!'),
+  t('Зазирай у будинки з відчиненими дверима — там лут. Але обережно…'),
+  t('Золотий зомбі ⭐ тікає від тебе. Дожени — отримаєш джекпот!'),
+  t('Батути 🔵 закидають на дахи. Там сховані скарби!'),
+  t('Медик з хліва лікує тебе, коли стоїш поруч 💚'),
+  t('Хедшот робить подвійну шкоду. Цілься в голову!'),
+  t('Дробовик — король ближнього бою. Клавіша 3!'),
+  t('На льоду ковзько — гальмуй заздалегідь! ⛸'),
+  t('Комбо-серії вбивств дають бонусні монети 🔥'),
+  t('Шукай аеродропи 🪂 — там навіть БАЗУКА буває!'),
+  t('Клавіша V — подивись на свого героя збоку!'),
+  t('Щит щитоносця 🛡 не проб’єш у лоб — обійди ззаду або зламай!'),
+  t('У магазині (B) є нова зброя, бронежилет і шолом!'),
+  t('Світні кулі — підсилення: ⚡швидкість, 💪лють, 🛡бульбашка, 🧲магніт!'),
+  t('Бронежилет 🦺 поглинає шкоду — поповнюй пластинами!'),
+  t('Снайперка 🎯 пробиває трьох зомбі наскрізь — шикуй їх у чергу!'),
+  t('Смаколики 🥐 на столиках повертають здоров’я!'),
+  t('Шукай 🦙 МЕГАБОКС — фіолетовий промінь видно здалеку!'),
+  t('Клавіша N — переможний танець. Спробуй після боса! 💃'),
+  t('Самокат 🛴 збиває зомбі на повній швидкості!'),
+  t('Гаджет (F) обирається в Гардеробі: щит, відновлення, батут чи барикада! 🧰'),
+  t('Барикаду 🧱 можна розстріляти або забрати назад (E)'),
+  t('Песик Дружок 🐶 збирає монети і чує сюрпризи в будинках'),
+  t('Виконуй щоденні завдання 📅 — монети й зірковий досвід!'),
+  t('Грай у ⛈️ ШТОРМ після звільнення країни — там рекорди!'),
+  t('Права кнопка миші — оптика снайперки 🔭'),
+  t('Броньовик 🦾 у залізному нагруднику — цілься в ГОЛОВУ!'),
+  t('Зомбі-стрілець 🔫 б\'є здалеку — ховайся за будинки!'),
+  t('Базука 🚀 тепер НАЙСИЛЬНІША зброя — бережи ракети для товстунів!'),
+  t('На самокаті: W — газ, S — гальмо, A/D — кермо 🛴'),
+  t('Щоразу нові завдання! Перепройди країну — буде інакше 🎲'),
+  t('Елітні зомбі 👹 в золотих коронах — сильні, але щедрі'),
+  t('Зомбі-гнізда 🟣 знешкоджуються утриманням E — стережись охорони!'),
+  t('Мандрівника 🧳 захищай від укусів — він сховається, якщо боляче'),
+  t('Лут у будинках щоразу інший — заглядай усюди! 🎁'),
 ];
 
 class Game {
@@ -130,7 +135,7 @@ class Game {
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
-      if (startH2) startH2.textContent = '👆 ТОРКНИСЬ, ЩОБ ГРАТИ';
+      if (startH2) startH2.textContent = t('👆 ТОРКНИСЬ, ЩОБ ГРАТИ');
     }
 
     this.state = 'loading';
@@ -159,14 +164,14 @@ class Game {
 
     window.addEventListener('keydown', (e) => {
       // у полі вводу літери B/M — це просто літери, а не магазин/звук
-      const t = e.target;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const tgt = e.target;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }
       if (e.code === 'KeyM') {
         this.audio.setMuted(!this.audio.muted);
-        this.hud.toast(this.audio.muted ? '🔇 Звук вимкнено' : '🔊 Звук увімкнено');
+        this.hud.toast(this.audio.muted ? t('🔇 Звук вимкнено') : t('🔊 Звук увімкнено'));
       }
       if (e.code === 'Escape' && this.shop.isOpen) this.shop.close();
     });
@@ -238,6 +243,14 @@ class Game {
     document.getElementById('btn-storm-globe').addEventListener('click', () => {
       this._hideOverlay('overlay-storm-end');
       this.endLevel();
+    });
+
+    // 🌐 перемикач мови: uk → en → ru (перезавантаження застосовує все одразу)
+    const langBtn = document.getElementById('btn-lang');
+    langBtn.textContent = `🌐 ${LANG_NAMES[getLang()]}`;
+    langBtn.addEventListener('click', () => {
+      this.audio.click();
+      setLang(LANGS[(LANGS.indexOf(getLang()) + 1) % LANGS.length]);
     });
 
     // перемикач якості
@@ -332,7 +345,7 @@ class Game {
 
   _applyQuality() {
     const q = this.save.quality || 'auto';
-    document.getElementById('btn-quality').textContent = `⚙️ Якість: ${QUALITY_LABELS[q]}`;
+    document.getElementById('btn-quality').textContent = t('⚙️ Якість: {q}', { q: QUALITY_LABELS[q] });
     if (q === 'fast') this.pixelRatio = 1.0;
     else if (q === 'high') this.pixelRatio = Math.min(devicePixelRatio, 1.75);
     else this.pixelRatio = Math.min(devicePixelRatio, 1.5);
@@ -351,7 +364,7 @@ class Game {
     try {
       await this.globe.load();
     } catch (e) {
-      console.error('Не вдалося завантажити карту країн', e);
+      console.error(t('Не вдалося завантажити карту країн'), e);
     }
     this._hideOverlay('overlay-loading');
     this.state = 'globe';
@@ -390,16 +403,16 @@ class Game {
     const libN = Object.keys(this.save.liberated).length;
     const modes = [
       {
-        id: 'campaign', icon: '🎯', name: 'КАМПАНІЯ', locked: false,
-        desc: 'Звільняй країни світу: місії, боси, нагороди',
+        id: 'campaign', icon: '🎯', name: t('КАМПАНІЯ'), locked: false,
+        desc: t('Звільняй країни світу: місії, боси, нагороди'),
       },
       {
-        id: 'storm', icon: '⛈️', name: 'ШТОРМ', locked: libN < 1,
-        desc: libN < 1 ? 'Відкриється після першої звільненої країни' : 'Виживи у колі, що звужується. Рекорд — у Лігу!',
+        id: 'storm', icon: '⛈️', name: t('ШТОРМ'), locked: libN < 1,
+        desc: libN < 1 ? t('Відкриється після першої звільненої країни') : t('Виживи у колі, що звужується. Рекорд — у Лігу!'),
       },
       {
-        id: 'arena', icon: '👑', name: 'АРЕНА БОСІВ', locked: libN < 2,
-        desc: libN < 2 ? 'Відкриється після двох звільнених країн' : 'Усі 6 босів поспіль на час. Час — у Лігу!',
+        id: 'arena', icon: '👑', name: t('АРЕНА БОСІВ'), locked: libN < 2,
+        desc: libN < 2 ? t('Відкриється після двох звільнених країн') : t('Усі 6 босів поспіль на час. Час — у Лігу!'),
       },
     ];
     const root = document.getElementById('solo-modes');
@@ -431,7 +444,7 @@ class Game {
           // шторм: обери звільнену країну (у кожної — своя таблиця Ліги)
           root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
           cRoot.style.display = '';
-          cRoot.innerHTML = '<div class="solo-cty-title">Де переживати Шторм?</div>'
+          cRoot.innerHTML = t('<div class="solo-cty-title">Де переживати Шторм?</div>')
             + CAMPAIGN_ORDER.filter((id) => this.save.liberated[id]).map((id) =>
               `<button class="btn solo-cty" data-id="${id}">${COUNTRIES[id].flag} ${COUNTRIES[id].name}</button>`).join('');
           cRoot.querySelectorAll('.solo-cty').forEach((b) => {
@@ -452,8 +465,8 @@ class Game {
     const frac = this.progress.levelFrac();
     const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
     document.getElementById('pass-progress').innerHTML = lvl >= PASS_MAX_LEVEL
-      ? `⭐ Рівень ${lvl} — МАКСИМУМ! Ти зірка! 🏆`
-      : `⭐ Рівень ${lvl} · до наступного: ${Math.round(frac * need)}/${need} XP
+      ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl })
+      : t('⭐ Рівень {lvl} · до наступного: {a}/{b} XP', { lvl, a: Math.round(frac * need), b: need }) + `
          <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
     let html = '';
     for (let n = 2; n <= PASS_MAX_LEVEL; n++) {
@@ -478,7 +491,7 @@ class Game {
       const pct = Math.round((q.progress / q.target) * 100);
       html += `<div class="quest-row ${q.done ? 'done' : ''}">
         <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
-        <div class="quest-reward">🪙 120 монет · ⭐ 40 XP</div>
+        <div class="quest-reward">${t('🪙 120 монет · ⭐ 40 XP')}</div>
         <div class="quest-bar"><div style="width:${pct}%"></div></div>
         <div class="quest-prog">${q.progress} / ${q.target}</div>
       </div>`;
@@ -492,22 +505,22 @@ class Game {
       <div class="ward-card ${equipped ? 'equipped' : ''} ${owned ? '' : 'locked'}" data-kind="${kind}" data-id="${id}">
         <div class="ward-ico">${meta.icon}</div>
         <div class="ward-name">${meta.name}</div>
-        <div class="ward-tag">${equipped ? '✅ Одягнено' : owned ? 'Натисни — обрати' : '🔒 ' + (meta.desc || '')}</div>
+        <div class="ward-tag">${equipped ? t('✅ Одягнено') : owned ? t('Натисни — обрати') : '🔒 ' + (meta.desc || '')}</div>
       </div>`;
-    let html = '<div class="ward-section">Скіни героя</div><div class="ward-grid">';
+    let html = t('<div class="ward-section">Скіни героя</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(HERO_SKINS)) {
       html += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
     }
-    html += '</div><div class="ward-section">Танці (N)</div><div class="ward-grid">';
+    html += t('</div><div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
       html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
     }
-    html += '</div><div class="ward-section">Гаджет — береш ОДИН із собою (F)</div><div class="ward-grid">';
+    html += t('</div><div class="ward-section">Гаджет — береш ОДИН із собою (F)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(GADGETS)) {
-      const meta2 = { icon: meta.icon, name: meta.name, desc: `${meta.desc} (купи в магазині)` };
+      const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
       html += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
     }
-    html += '</div><div class="ward-section">Сліди куль</div><div class="ward-grid">';
+    html += t('</div><div class="ward-section">Сліди куль</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TRACERS)) {
       html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
     }
@@ -602,7 +615,7 @@ class Game {
     }
     // перезавантаження не допомогло (кеш ще тримає старі файли) — кажемо гравцю
     const tag = document.getElementById('version-tag');
-    if (tag) tag.textContent = `🔄 Вийшло оновлення v${v}! Онови сторінку: Ctrl(⌘)+Shift+R`;
+    if (tag) tag.textContent = t('🔄 Вийшло оновлення v{v}! Онови сторінку: Ctrl(⌘)+Shift+R', { v });
   }
 
   _showOverlay(id) { document.getElementById(id).classList.add('show'); }
@@ -616,7 +629,7 @@ class Game {
       await this._buildLevel(countryId, opts);
     } catch (e) {
       // не блокуємо гру назавжди — повертаємось на глобус
-      console.error('Помилка побудови рівня', e);
+      console.error(t('Помилка побудови рівня'), e);
       this.level = null;
       this.state = 'globe';
       this._showGlobeUI(true);
@@ -635,9 +648,9 @@ class Game {
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
     document.getElementById('ll-title').textContent = isArena
-      ? '👑 АРЕНА БОСІВ'
+      ? t('👑 АРЕНА БОСІВ')
       : isStorm
-        ? `⛈️ ШТОРМ: ${country.name.toUpperCase()}`
+        ? t('⛈️ ШТОРМ: {c}', { c: country.name.toUpperCase() })
         : `${country.flag} ${country.name.toUpperCase()}`;
     document.getElementById('ll-tip').textContent = '💡 ' + TIPS[Math.floor(Math.random() * TIPS.length)];
     this._showOverlay('overlay-level-loading');
@@ -737,8 +750,8 @@ class Game {
     if (fun.animals) level.effects.addAnimals(fun.animals);
     level.effects.onAirdrop = () => {
       this.hud.toast(this.save.weapons.includes('bazooka')
-        ? '🪂 Аеродроп! Припаси падають поблизу — шукай блакитний промінь!'
-        : '🪂 Аеродроп! Кажуть, у таких ящиках буває БАЗУКА… 🚀');
+        ? t('🪂 Аеродроп! Припаси падають поблизу — шукай блакитний промінь!')
+        : t('🪂 Аеродроп! Кажуть, у таких ящиках буває БАЗУКА… 🚀'));
       this.audio.mission();
     };
     // особливий вміст аеродропа
@@ -755,10 +768,10 @@ class Game {
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
     level.effects.zombieHitTest = (origin, dir, maxD) => level.zombies.hitTest(origin, dir, maxD);
     const BUFF_INFO = {
-      speed: { dur: 20, msg: '⚡ ТУРБО-ШВИДКІСТЬ на 20 секунд!' },
-      rage: { dur: 15, msg: '💪 ПОДВІЙНА ШКОДА на 15 секунд!' },
-      bubble: { dur: 8, msg: '🛡 НЕВРАЗЛИВІСТЬ на 8 секунд!' },
-      magnet: { dur: 25, msg: '🧲 МАГНІТ МОНЕТ на 25 секунд!' },
+      speed: { dur: 20, msg: t('⚡ ТУРБО-ШВИДКІСТЬ на 20 секунд!') },
+      rage: { dur: 15, msg: t('💪 ПОДВІЙНА ШКОДА на 15 секунд!') },
+      bubble: { dur: 8, msg: t('🛡 НЕВРАЗЛИВІСТЬ на 8 секунд!') },
+      magnet: { dur: 25, msg: t('🧲 МАГНІТ МОНЕТ на 25 секунд!') },
     };
     level.effects.onPickup = (type, value) => {
       if (type !== 'coin') this.quests.onEvent('pickup');
@@ -775,7 +788,7 @@ class Game {
       } else if (type === 'food') {
         level.player.heal(15);
         this.audio.heal();
-        this.hud.toast(`😋 Смачний ${level.country.food || 'смаколик'}! +15 здоров’я`);
+        this.hud.toast(t('😋 Смачний {f}! +15 здоров’я', { f: level.country.food || t('смаколик') }));
       } else if (type === 'armor') {
         level.player.addArmor(value || 40);
         this.audio.pickup();
@@ -788,7 +801,7 @@ class Game {
         this.unlockWeapon('bazooka');
         level.player.addRockets(3);
         this.audio.powerup();
-        this.hud.banner('🚀 БАЗУКА!', 'Клавіша 7 — рознеси їх усіх! (+3 ракети)');
+        this.hud.banner(t('🚀 БАЗУКА!'), t('Клавіша 7 — рознеси їх усіх! (+3 ракети)'));
       } else if (BUFF_INFO[type]) {
         level.player.buffs[type] = BUFF_INFO[type].dur;
         this.audio.powerup();
@@ -862,7 +875,7 @@ class Game {
         const bonus = c.n * 2;
         level.addCoins(bonus);
         this.audio.comboDing(c.n / 5);
-        this.hud.toast(`🔥 КОМБО x${c.n}! +${bonus} монет`);
+        this.hud.toast(t('🔥 КОМБО x{n}! +{b} монет', { n: c.n, b: bonus }));
       }
     });
     level.bus.on('bossStart', () => {
@@ -959,14 +972,14 @@ class Game {
       if (pickSkin) {
         const id = unownedSkins[0];
         save.skins.push(id);
-        title = `${HERO_SKINS[id].icon} НОВИЙ СКІН!`;
-        sub = `«${HERO_SKINS[id].name}» — одягни в Гардеробі 🎒`;
+        title = t('{i} НОВИЙ СКІН!', { i: HERO_SKINS[id].icon });
+        sub = t('«{n}» — одягни в Гардеробі 🎒', { n: HERO_SKINS[id].name });
       } else {
         const id = unownedDances[0];
         save.dances.push(id);
         save.activeDance = id;
-        title = `${DANCES[id].icon} НОВИЙ ТАНЕЦЬ!`;
-        sub = `«${DANCES[id].name}» — натисни N і танцюй!`;
+        title = t('{i} НОВИЙ ТАНЕЦЬ!', { i: DANCES[id].icon });
+        sub = t('«{n}» — натисни N і танцюй!', { n: DANCES[id].name });
       }
     } else {
       save.megaPity = (save.megaPity || 0) + 1;
@@ -980,20 +993,20 @@ class Game {
             level.effects.spawnCoin(x + Math.cos(a) * (1 + Math.random() * 2.2), z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
           }
         }
-        title = '💰 ФОНТАН МОНЕТ!';
-        sub = 'Збирай скоріше! (наступний бокс щасливіший 😉)';
+        title = t('💰 ФОНТАН МОНЕТ!');
+        sub = t('Збирай скоріше! (наступний бокс щасливіший 😉)');
       } else if (roll < 0.83) {
         if (level) {
           level.player.grenades += 3;
           level.player.addRockets(2);
           level.player.addAmmo(120);
         }
-        title = '🧨 БОЙОВИЙ НАБІР!';
-        sub = '+3 гранати, +2 ракети і гора патронів!';
+        title = t('🧨 БОЙОВИЙ НАБІР!');
+        sub = t('+3 гранати, +2 ракети і гора патронів!');
       } else {
         for (const k of ['speed', 'rage', 'bubble', 'magnet']) level.player.buffs[k] = 20;
-        title = '🌈 УСІ ПІДСИЛЕННЯ!';
-        sub = 'Швидкість, лють, бульбашка і магніт — на 20 секунд!';
+        title = t('🌈 УСІ ПІДСИЛЕННЯ!');
+        sub = t('Швидкість, лють, бульбашка і магніт — на 20 секунд!');
       }
     }
     this.hud.banner(title, sub, 4.5);
@@ -1065,7 +1078,7 @@ class Game {
       if (this.level.net) {
         this.deathT = 9999;
         const card = document.querySelector('#overlay-death p');
-        if (card) card.textContent = '👑 Команда ще б\'ється! Чекай, поки друг підніме (E).';
+        if (card) card.textContent = t('👑 Команда ще б\'ється! Чекай, поки друг підніме (E).');
         this.audio.defeat();
         this._showOverlay('overlay-death');
         return;
@@ -1079,7 +1092,7 @@ class Game {
         // Забіг завершується, лише коли впала ВСЯ команда (детектить хост).
         this.deathT = 9999;
         const card = document.querySelector('#overlay-death p');
-        if (card) card.textContent = '⛈️ Команда ще тримається! Чекай, поки друг підбіжить і підніме (E).';
+        if (card) card.textContent = t('⛈️ Команда ще тримається! Чекай, поки друг підбіжить і підніме (E).');
         this.audio.defeat();
         this._showOverlay('overlay-death');
         return;
@@ -1093,8 +1106,8 @@ class Game {
     const card = document.querySelector('#overlay-death p');
     if (card) {
       card.textContent = coop
-        ? '💚 Друг може підбігти і підняти тебе (E)! Або відродишся біля бази.'
-        : 'Не хвилюйся — прогрес місій зберігся.';
+        ? t('💚 Друг може підбігти і підняти тебе (E)! Або відродишся біля бази.')
+        : t('Не хвилюйся — прогрес місій зберігся.');
     }
     this.audio.defeat();
     this._showOverlay('overlay-death');
@@ -1112,7 +1125,7 @@ class Game {
     p.vel.set(0, 0, 0);
     this.audio.heal();
     this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 14, { speed: 2.5, up: 3, life: 0.8 });
-    this.hud.banner('💚 ТЕБЕ ПІДНЯЛИ!', byNick ? `${byNick} прийшов на допомогу — до бою!` : 'Дякуй другу і до бою!');
+    this.hud.banner(t('💚 ТЕБЕ ПІДНЯЛИ!'), byNick ? t('{n} прийшов на допомогу — до бою!', { n: byNick }) : t('Дякуй другу і до бою!'));
   }
 
   // 🤝 підняття пораненого тіммейта: тримай E біля тіла 3 секунди
@@ -1146,7 +1159,7 @@ class Game {
     }
     if (!level.missions.prompt) {
       level.missions.prompt = {
-        text: `💚 Тримай E — підніми ${target.nick}!`,
+        text: t('💚 Тримай E — підніми {n}!', { n: target.nick }),
         hold: true,
         progress: this._revProg || 0,
       };
@@ -1173,17 +1186,17 @@ class Game {
     // ⛈️ нагороди за досягнуті хвилі (раз назавжди)
     this.save.stormRewards = this.save.stormRewards || {};
     const STORM_MILESTONES = [
-      { wave: 5, type: 'tracer', id: 'storm', label: '🌩️ Штормові кулі' },
-      { wave: 8, type: 'dance', id: 'lightning', label: '⚡ Танець «Блискавка»' },
-      { wave: 12, type: 'skin', id: 'hunter', label: '🌙 Скін «Нічний мисливець»' },
-      { wave: 16, type: 'skin', id: 'thunder', label: '⚡ Скін «Громовідвід»' },
+      { wave: 5, type: 'tracer', id: 'storm', label: t('🌩️ Штормові кулі') },
+      { wave: 8, type: 'dance', id: 'lightning', label: t('⚡ Танець «Блискавка»') },
+      { wave: 12, type: 'skin', id: 'hunter', label: t('🌙 Скін «Нічний мисливець»') },
+      { wave: 16, type: 'skin', id: 'thunder', label: t('⚡ Скін «Громовідвід»') },
     ];
     for (const ms of STORM_MILESTONES) {
       if (res.wave < ms.wave || this.save.stormRewards[ms.id]) continue;
       this.save.stormRewards[ms.id] = true;
       const pool = ms.type === 'tracer' ? this.save.tracers : ms.type === 'dance' ? this.save.dances : this.save.skins;
       if (!pool.includes(ms.id)) pool.push(ms.id);
-      this.hud.banner('⛈️ НАГОРОДА ШТОРМУ!', `${ms.label} — дивись у Гардеробі 🎒`, 5);
+      this.hud.banner(t('⛈️ НАГОРОДА ШТОРМУ!'), t('{l} — дивись у Гардеробі 🎒', { l: ms.label }), 5);
       this.audio.levelUp();
     }
     this.saveGame();
@@ -1195,16 +1208,16 @@ class Game {
         ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
         : [];
       submitScore(this, { mode: 'storm', country: level.countryId, score: res.wave, team }).then((r) => {
-        if (r && r.me) placeEl.textContent = `🌍 Твоє місце у світовій Лізі: #${r.me.rank}`;
+        if (r && r.me) placeEl.textContent = t('🌍 Твоє місце у світовій Лізі: #{r}', { r: r.me.rank });
       });
     }
-    const rec = isRecord && prev ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+    const rec = isRecord && prev ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const best = this.save.stormBest[level.countryId];
     document.getElementById('storm-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">Хвиль відбито${rec}</span><span class="stat-val">${res.wave - 1}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Протримався</span><span class="stat-val">${Math.floor(res.time / 60)}:${String(res.time % 60).padStart(2, '0')}</span></div>
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд (${this.level.country.name})</span><span class="stat-val">хвиля ${best.wave}</span></div>`;
+      <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">${t('Хвиль відбито')}${rec}</span><span class="stat-val">${res.wave - 1}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Протримався')}</span><span class="stat-val">${Math.floor(res.time / 60)}:${String(res.time % 60).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
+      <div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')} (${this.level.country.name})</span><span class="stat-val">${t('хвиля')} ${best.wave}</span></div>`;
     this._showOverlay('overlay-storm-end');
   }
 
@@ -1245,22 +1258,22 @@ class Game {
           ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
           : [];
         submitScore(this, { mode: 'arena', country: 'ALL', score: res.timeMs, team }).then((r) => {
-          if (r && r.me) placeEl.textContent = `🌍 Твоє місце у світовій Лізі: #${r.me.rank}`;
+          if (r && r.me) placeEl.textContent = t('🌍 Твоє місце у світовій Лізі: #{r}', { r: r.me.rank });
         });
       }
     }
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.querySelector('#overlay-arena-end h1').textContent = res.completed
-      ? '👑 УСІХ БОСІВ ПЕРЕМОЖЕНО!'
-      : '💀 Арена цього разу сильніша…';
-    const recBadge = isRecord && res.completed ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+      ? t('👑 УСІХ БОСІВ ПЕРЕМОЖЕНО!')
+      : t('💀 Арена цього разу сильніша…');
+    const recBadge = isRecord && res.completed ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const best = this.save.arenaBest;
     document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">👑</span><span class="stat-name">Босів переможено</span><span class="stat-val">${res.bosses} / 6</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Час${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
-      ${best ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>` : ''}
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${level.stats.kills}</span></div>`;
+      <div class="stat"><span class="stat-icon">👑</span><span class="stat-name">${t('Босів переможено')}</span><span class="stat-val">${res.bosses} / 6</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${best ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>` : ''}
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
 
@@ -1273,7 +1286,7 @@ class Game {
       // ⛈️ міні-бос шторму: бонус і граємо далі
       this.level.addCoins(120);
       this.progress.addXp(60);
-      this.hud.banner('👑 МІНІ-БОСА ПЕРЕМОЖЕНО!', '+120 монет · шторм триває!');
+      this.hud.banner(t('👑 МІНІ-БОСА ПЕРЕМОЖЕНО!'), t('+120 монет · шторм триває!'));
       this.audio.mission();
       return;
     }
@@ -1329,19 +1342,19 @@ class Game {
     const secs = Math.floor(s.time % 60);
     const acc = s.shotsFired > 0 ? Math.round((s.shotsHit / s.shotsFired) * 100) : 0;
     document.querySelector('#overlay-victory h1').textContent = country.victoryTitle;
-    document.querySelector('.victory-sub').textContent = `Ти переміг боса «${country.boss.name.replace('👑 ', '')}» і врятував країну!`;
-    const recBadge = isRecord && prev ? ' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>' : '';
+    document.querySelector('.victory-sub').textContent = t('Ти переміг боса «{b}» і врятував країну!', { b: country.boss.name.replace('👑 ', '') });
+    const recBadge = isRecord && prev ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const bestLine = prev && !isRecord
-      ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">Рекорд часу</span><span class="stat-val">${Math.floor(prev.time / 60)}:${String(prev.time % 60).padStart(2, '0')}</span></div>`
+      ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд часу')}</span><span class="stat-val">${Math.floor(prev.time / 60)}:${String(prev.time % 60).padStart(2, '0')}</span></div>`
       : '';
     document.getElementById('victory-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">Час${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${bestLine}
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">Зомбі переможено</span><span class="stat-val">${s.kills}</span></div>
-      <div class="stat"><span class="stat-icon">🔥</span><span class="stat-name">Найкраще комбо</span><span class="stat-val">x${this.level.combo.best}</span></div>
-      <div class="stat"><span class="stat-icon">🎯</span><span class="stat-name">Точність</span><span class="stat-val">${acc}%</span></div>
-      <div class="stat"><span class="stat-icon">💰</span><span class="stat-name">Монет здобуто</span><span class="stat-val">${s.coinsEarned}</span></div>
-      <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">Смертей</span><span class="stat-val">${s.deaths}</span></div>`;
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${s.kills}</span></div>
+      <div class="stat"><span class="stat-icon">🔥</span><span class="stat-name">${t('Найкраще комбо')}</span><span class="stat-val">x${this.level.combo.best}</span></div>
+      <div class="stat"><span class="stat-icon">🎯</span><span class="stat-name">${t('Точність')}</span><span class="stat-val">${acc}%</span></div>
+      <div class="stat"><span class="stat-icon">💰</span><span class="stat-name">${t('Монет здобуто')}</span><span class="stat-val">${s.coinsEarned}</span></div>
+      <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">${t('Смертей')}</span><span class="stat-val">${s.deaths}</span></div>`;
     // конфеті
     const conf = document.getElementById('confetti');
     conf.innerHTML = '';
@@ -1694,12 +1707,12 @@ class Game {
       forceMissions: (types) => { g._forceMissionSet = types; },
       // 🤝 кооп
       coopCreate: async (nick) => {
-        const code = await g.coop.session.create(nick || 'Хост');
+        const code = await g.coop.session.create(nick || t('Хост'));
         g.coop._openLobby(); // як у UI: вмикає лобі-пінги (анонс кімнати)
         return code;
       },
       coopJoin: async (code, nick) => {
-        await g.coop.session.join(code, nick || 'Гість');
+        await g.coop.session.join(code, nick || t('Гість'));
         g.coop._openLobby();
       },
       coopSetCountry: (c) => g.coop.session.setCountry(c),

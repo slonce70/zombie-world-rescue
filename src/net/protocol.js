@@ -2,7 +2,7 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 2;
+export const PROTO_VERSION = 3; // v16: 4 місії (слот D), нові типи activate/fetch
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {

@@ -1,6 +1,7 @@
 // 💾 Панель «Мій прогрес»: статус хмари, постійний код відновлення,
 // резервна копія файлом. Логіка хмари — у net/cloudsave.js.
 import { saveHasProgress } from '../net/cloudsave.js';
+import { t } from '../i18n.js';
 
 export class SaveUI {
   constructor(game) {
@@ -26,24 +27,24 @@ export class SaveUI {
       out.textContent = '…';
       const code = await g.cloud.fetchCode();
       if (!code) {
-        out.textContent = '😕 хмара недоступна';
+        out.textContent = t('😕 хмара недоступна');
         return;
       }
       out.textContent = `${code.slice(0, 4)}-${code.slice(4)}`;
-      this._status('🔑 Запиши цей код у безпечному місці — він повертає прогрес назавжди!');
+      this._status(t('🔑 Запиши цей код у безпечному місці — він повертає прогрес назавжди!'));
     });
 
     document.getElementById('btn-cloud-claim').addEventListener('click', async () => {
       g.audio.click();
       const inp = document.getElementById('cloud-code-input');
       const code = (inp.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (code.length !== 8) { this._status('Код має 8 знаків — перевір і спробуй ще раз'); return; }
-      this._status('Шукаю твій прогрес…');
+      if (code.length !== 8) { this._status(t('Код має 8 знаків — перевір і спробуй ще раз')); return; }
+      this._status(t('Шукаю твій прогрес…'));
       const res = await g.cloud.claim(code);
-      if (!res || !res.data) { this._status('😕 Не знайшов прогрес за цим кодом'); return; }
+      if (!res || !res.data) { this._status(t('😕 Не знайшов прогрес за цим кодом')); return; }
       if (saveHasProgress(g.save)
-        && !confirm('Знайшов збережений прогрес! Замінити ним поточний? Теперішній прогрес на ЦЬОМУ пристрої зникне.')) return;
-      if (!g.cloud.adopt(res.data)) this._status('😕 Сейв пошкоджений — не можу відновити');
+        && !confirm(t('Знайшов збережений прогрес! Замінити ним поточний? Теперішній прогрес на ЦЬОМУ пристрої зникне.'))) return;
+      if (!g.cloud.adopt(res.data)) this._status(t('😕 Сейв пошкоджений — не можу відновити'));
     });
 
     document.getElementById('btn-save-export').addEventListener('click', () => {
@@ -54,7 +55,7 @@ export class SaveUI {
       a.download = 'zr-progres.json';
       a.click();
       URL.revokeObjectURL(a.href);
-      this._status('⬇️ Файл збережено — поклади його в надійне місце');
+      this._status(t('⬇️ Файл збережено — поклади його в надійне місце'));
     });
 
     const fileInput = document.getElementById('save-file-input');
@@ -69,9 +70,9 @@ export class SaveUI {
       const text = await f.text();
       let parsed = null;
       try { parsed = JSON.parse(text); } catch (e) { /* нижче скажемо */ }
-      if (!parsed || typeof parsed !== 'object') { this._status('😕 Це не файл прогресу гри'); return; }
+      if (!parsed || typeof parsed !== 'object') { this._status(t('😕 Це не файл прогресу гри')); return; }
       if (saveHasProgress(g.save)
-        && !confirm('Відновити прогрес із файлу? Теперішній прогрес на ЦЬОМУ пристрої зникне.')) return;
+        && !confirm(t('Відновити прогрес із файлу? Теперішній прогрес на ЦЬОМУ пристрої зникне.'))) return;
       g.cloud.adopt(text);
     });
   }
@@ -84,14 +85,15 @@ export class SaveUI {
   // тому не сміє чіпати поле вводу коду (гонка з користувачем)
   _renderStatus() {
     const g = this.game;
-    if (!g.cloud.enabled) { this._status('☁️ Хмара вимкнена (тестовий режим)'); return; }
+    if (!g.cloud.enabled) { this._status(t('☁️ Хмара вимкнена (тестовий режим)')); return; }
     if (g.cloud.lastOkTs) {
-      const t = new Date(g.cloud.lastOkTs);
-      const hh = String(t.getHours()).padStart(2, '0');
-      const mm = String(t.getMinutes()).padStart(2, '0');
-      this._status(`☁️ Прогрес у хмарі • остання синхронізація ${hh}:${mm}`);
+      // не t: затінило б функцію перекладу нижче
+      const d = new Date(g.cloud.lastOkTs);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      this._status(t('☁️ Прогрес у хмарі • остання синхронізація {h}:{m}', { h: hh, m: mm }));
     } else {
-      this._status('☁️ Синхронізую з хмарою…');
+      this._status(t('☁️ Синхронізую з хмарою…'));
     }
   }
 }

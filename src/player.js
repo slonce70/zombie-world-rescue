@@ -339,9 +339,23 @@ export class Player {
       this.onGround = false;
     }
     this.vel.y -= 21 * dt;
+    const preSlopeX = this.pos.x, preSlopeZ = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.y += this.vel.y * dt;
     this.pos.z += this.vel.z * dt;
+
+    // 🏔️ чесні схили: пішки у відвісну кручу не зайти (стрибком на уступ — можна).
+    // Межа ~55°; перевіряємо лише на картах із великим рельєфом
+    if (world._terrainMod && this.onGround) {
+      const gh0 = world.groundH(preSlopeX, preSlopeZ);
+      const allow = (ax, az) =>
+        world.groundH(ax, az) - gh0 <= Math.hypot(ax - preSlopeX, az - preSlopeZ) * 1.45 + 0.3;
+      if (!allow(this.pos.x, this.pos.z)) {
+        if (allow(this.pos.x, preSlopeZ)) this.pos.z = preSlopeZ;
+        else if (allow(preSlopeX, this.pos.z)) this.pos.x = preSlopeX;
+        else { this.pos.x = preSlopeX; this.pos.z = preSlopeZ; }
+      }
+    }
 
     const gh = Math.max(world.groundH(this.pos.x, this.pos.z), world.floorAt(this.pos.x, this.pos.z, this.pos.y));
     if (this.pos.y <= gh) {

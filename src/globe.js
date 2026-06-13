@@ -1,5 +1,6 @@
 // Глобальна карта: 3D-глобус, захоплені країни, прогресія кампанії
 import * as THREE from 'three';
+import { t } from './i18n.js';
 import { COUNTRIES, nextTarget, isCountryOpen } from './countries.js';
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
@@ -158,7 +159,7 @@ export class Globe {
       this._placeBeacon(pos);
       this.beamMesh.material.color.setHex(0x58c14c);
       this.ringMesh.material.color.setHex(0x58c14c);
-      this._drawBeaconLabel('УСІ КРАЇНИ ВІЛЬНІ!', 'ти врятував світ! 🏆', '#58c14c');
+      this._drawBeaconLabel(t('УСІ КРАЇНИ ВІЛЬНІ!'), t('ти врятував світ! 🏆'), '#58c14c');
       return;
     }
     const c = COUNTRIES[id] || COUNTRIES.UKR;
@@ -166,7 +167,7 @@ export class Globe {
     this._placeBeacon(pos);
     this.beamMesh.material.color.setHex(0xffd23f);
     this.ringMesh.material.color.setHex(0xffd23f);
-    this._drawBeaconLabel(c.name.toUpperCase(), 'натисни — почни місію!');
+    this._drawBeaconLabel(c.name.toUpperCase(), t('натисни — почни місію!'));
   }
 
   _placeBeacon(pos) {
@@ -330,13 +331,13 @@ export class Globe {
       tooltip.style.top = (e.clientY - 10) + 'px';
       const known = COUNTRIES[c.id];
       if ((this.game.save.liberated || {})[c.id]) {
-        tooltip.innerHTML = `✅ <b>${known ? known.name : c.name}</b> — звільнено! Натисни, щоб зіграти ще раз`;
+        tooltip.innerHTML = t('✅ <b>{n}</b> — звільнено! Натисни, щоб зіграти ще раз', { n: known ? known.name : c.name });
         tooltip.classList.add('available');
       } else if (isCountryOpen(this.game.save.liberated, c.id)) {
-        tooltip.innerHTML = `🔴 ${known ? known.flag : ''} <b>${known ? known.name : c.name}</b> — тут зомбі! Натисни, щоб звільнити`;
+        tooltip.innerHTML = t('🔴 {f} <b>{n}</b> — тут зомбі! Натисни, щоб звільнити', { f: known ? known.flag : '', n: known ? known.name : c.name });
         tooltip.classList.add('available');
       } else {
-        tooltip.innerHTML = `🔒 <b>${c.name}</b> — спочатку звільни Україну`;
+        tooltip.innerHTML = t('🔒 <b>{n}</b> — спочатку звільни Україну', { n: c.name });
         tooltip.classList.remove('available');
       }
       document.body.style.cursor = 'pointer';
@@ -365,7 +366,7 @@ export class Globe {
       this.game.startLevel(c.id);
     } else {
       this.game.audio.denied();
-      this.game.hud.toast(`🔒 ${c.name}: спочатку звільни Україну!`);
+      this.game.hud.toast(t('🔒 {n}: спочатку звільни Україну!', { n: c.name }));
     }
   }
 

@@ -810,6 +810,17 @@ export class Zombies {
               mz += (sz / sd) * (minD - sd) * 0.5;
             }
           }
+          // 🏔️ чесні схили: у відвісну кручу зомбі не лізе — обходить уздовж стіни
+          if (this.world._terrainMod) {
+            const ghO = this.world.groundH(z.x, z.z);
+            const ok = (ax, az) =>
+              this.world.groundH(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
+            if (!ok(z.x + mx, z.z + mz)) {
+              if (ok(z.x + mx, z.z)) mz = 0;
+              else if (ok(z.x, z.z + mz)) mx = 0;
+              else { mx = 0; mz = 0; }
+            }
+          }
           z.x += mx;
           z.z += mz;
           moving = true;

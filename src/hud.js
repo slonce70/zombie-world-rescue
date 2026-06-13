@@ -1,6 +1,7 @@
 // HUD: приціл, здоров'я, патрони, монети, місії, мінікарта, банери, стрілка до цілі
 
 import * as THREE from 'three';
+import { t } from './i18n.js';
 import { WEAPONS } from './player.js';
 import { clamp } from './utils.js';
 
@@ -74,16 +75,16 @@ export class HUD {
     bus.on('playerHurt', () => this.damageFlash());
     bus.on('toast', (text) => this.toast(text));
     bus.on('missionDone', (m) => {
-      this.banner('✅ МІСІЮ ВИКОНАНО!', `${m.title} · +${m.reward} монет 💰`);
+      this.banner(t('✅ МІСІЮ ВИКОНАНО!'), t('{title} · +{r} монет 💰', { title: m.title, r: m.reward }));
       this._bump(this.el.missionPanel);
     });
-    bus.on('hordeWarning', () => this.banner('⚠️ УВАГА!', 'Наближається орда зомбі!'));
-    bus.on('hordeStart', () => this.banner('🧟 ОРДА!', 'Відбий напад!'));
-    bus.on('hordeEnd', () => this.banner('🎉 Орду відбито!', '+60 монет 💰'));
-    bus.on('bossUnlocked', () => this.banner('👑 АРЕНА ВІДКРИТА!', 'Іди до фіолетового маркера і переможи БОСА!'));
+    bus.on('hordeWarning', () => this.banner(t('⚠️ УВАГА!'), t('Наближається орда зомбі!')));
+    bus.on('hordeStart', () => this.banner(t('🧟 ОРДА!'), t('Відбий напад!')));
+    bus.on('hordeEnd', () => this.banner(t('🎉 Орду відбито!'), t('+60 монет 💰')));
+    bus.on('bossUnlocked', () => this.banner(t('👑 АРЕНА ВІДКРИТА!'), t('Іди до фіолетового маркера і переможи БОСА!')));
     bus.on('bossStart', () => {
       const c = this.game.level && this.game.level.country;
-      this.banner('👑 БОС КРАЇНИ!', c ? `Звільни країну: ${c.name}!` : 'Переможи боса!');
+      this.banner(t('👑 БОС КРАЇНИ!'), c ? t('Звільни країну: {c}!', { c: c.name }) : t('Переможи боса!'));
     });
     bus.on('bossCharge', () => this.toast('⚠️ Бос розганяється — тікай убік!'));
     bus.on('bossSummon', () => this.toast('🧟 Бос кличе підмогу!'));
@@ -222,8 +223,8 @@ export class HUD {
     if (activeG && gadgets) {
       const icon = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱', turret: '🤖' }[activeG];
       gHtml = gadgets.cd > 0
-        ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}с</span>`
-        : `${icon} ГОТОВО (F)`;
+        ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}${t('с')}</span>`
+        : `${icon} ${t('ГОТОВО (F)')}`;
     }
     if (this._lastGadgetHtml !== gHtml) {
       this.el.gadgetChips.innerHTML = gHtml;
@@ -348,7 +349,7 @@ export class HUD {
     // шторм: якщо гравець поза колом — веди в безпечну зону
     if (level.storm && level.storm.isOutside()) {
       const s = level.storm;
-      return { x: s.cx, z: s.cz, icon: '🟢', label: 'БІЖИ В КОЛО!' };
+      return { x: s.cx, z: s.cz, icon: '🟢', label: t('БІЖИ В КОЛО!') };
     }
     const ms = level.missions;
     const boss = level.zombies.boss;
@@ -360,26 +361,26 @@ export class HUD {
 
   _updateWaypoint(level, p) {
     const wp = this.el.waypoint;
-    const t = this._waypointTarget(level);
-    if (!t || this.game.victoryShown || p.health <= 0) {
+    const wt = this._waypointTarget(level);
+    if (!wt || this.game.victoryShown || p.health <= 0) {
       wp.classList.remove('show');
       return;
     }
     const cam = p.camera;
-    const ty = t.y !== undefined ? t.y : level.world.groundH(t.x, t.z) + 2.4;
-    const v = this._v3.set(t.x, ty, t.z).project(cam);
+    const ty = wt.y !== undefined ? wt.y : level.world.groundH(wt.x, wt.z) + 2.4;
+    const v = this._v3.set(wt.x, ty, wt.z).project(cam);
     const behind = v.z > 1;
     let sx = (v.x * 0.5 + 0.5) * innerWidth;
     let sy = (-v.y * 0.5 + 0.5) * innerHeight;
-    const dist = Math.hypot(t.x - p.pos.x, t.z - p.pos.z);
-    const label = t.label || `${t.icon} ${Math.round(dist)}м`;
+    const dist = Math.hypot(wt.x - p.pos.x, wt.z - p.pos.z);
+    const label = wt.label || `${wt.icon} ${Math.round(dist)}${t('м')}`;
     if (this._lastWpLabel !== label) {
       this.el.wpLabel.textContent = label;
       this._lastWpLabel = label;
     }
     wp.classList.add('show');
     // близько до цілі — ховаємо, щоб не миготіло перед носом
-    if (dist < 7 && !t.label) {
+    if (dist < 7 && !wt.label) {
       wp.classList.remove('show');
       return;
     }

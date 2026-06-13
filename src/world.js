@@ -1,5 +1,6 @@
 // Відкритий світ: терен, село, ліс, дороги, особливі будівлі, колайдери
 import * as THREE from 'three';
+import { t } from './i18n.js';
 import { toonMat, bakeGroupMeshes } from './characters.js';
 import { makeFBM, smoothstep, lerp, clamp, distToSeg, closestRaySeg, RNG } from './utils.js';
 import { BIOMES } from './countries.js';
@@ -27,6 +28,16 @@ export class World {
     this.rng = new RNG(seed);
     this.fbmLow = makeFBM(seed, 2);
     this.fbmHi = makeFBM(seed + 7, 2);
+    // 🏔️ великий рельєф країни (гори/долини/дюни). Чиста функція (x,z)->Δвисота,
+    // тече у groundH ПЕРЕД згладжуванням доріг і майданчиків, тож дороги
+    // драпіруються по схилах, а майданчики місій лишаються пласкими на схилі.
+    this._terrainMod = typeof map.terrain === 'function' ? map.terrain : null;
+    // 🌊 ріки: дно вирізається до АБСОЛЮТНОЇ позначки level-depth, вода — стрічка на level.
+    // Сегменти рахуємо один раз; формат map.rivers = [{pts:[[x,z]..], width, level, depth}]
+    this.rivers = (map.rivers || []).map((r) => ({
+      ...r,
+      segs: r.pts.slice(0, -1).map((p, i) => [p[0], p[1], r.pts[i + 1][0], r.pts[i + 1][1]]),
+    }));
     this.colliders = []; // {x, z, r} — для руху
     this.occluders = []; // {x, z, r, h} — вертикальні капсули для куль
     this.grid = new Map();
@@ -410,7 +421,7 @@ export class World {
     this.lootSpots.push({ x, z, y: gy + 19.65, type: 'coins' });
     this.lootSpots.push({ x: x + 1, z, y: gy + 19.65, type: 'grenade' });
     this.lootSpots.push({ x: x - 1, z, y: gy + 19.65, type: 'rage' });
-    this._makeSign(x + 7, z + 7, 'ВЕЖА: СКАРБ НАГОРІ!', 0.5);
+    this._makeSign(x + 7, z + 7, t('ВЕЖА: СКАРБ НАГОРІ!'), 0.5);
   }
 
   // ☕ кафе з круасанами
@@ -448,7 +459,7 @@ export class World {
       this._addCollider(tx, tz, 0.75, ty + 1, 0.6);
       this.lootSpots.push({ x: tx, z: tz, y: ty + 1.0, type: 'food' });
     }
-    this._makeSign(x - 4, z - 2, 'КАФЕ «У ЗОМБІ»', -0.4);
+    this._makeSign(x - 4, z - 2, t('КАФЕ «У ЗОМБІ»'), -0.4);
   }
 
   // 💜 лавандове поле
@@ -1143,26 +1154,38 @@ export class World {
     const low = this.fbmLow(x * 0.011, z * 0.011) * 6.0;
     const hi = this.fbmHi(x * 0.045, z * 0.045) * 1.1;
     const hill = this._hillsAt(x, z);
-    let h = low + hi + hill;
-    // дороги — прибираємо дрібні горби
+    const terr = this._terrainMod ? this._terrainMod(x, z) : 0;
+    let h = low + hi + hill + terr;
+    // дороги — прибираємо дрібні горби (але драпіруються по великому рельєфу terr)
     let roadD = Infinity;
     for (const s of this.roadSegs) {
       const d = distToSeg(x, z, s[0], s[1], s[2], s[3]);
       if (d < roadD) roadD = d;
     }
     const rw = smoothstep(6.0, 2.4, roadD);
-    if (rw > 0) h = lerp(h, low * 0.9 + hill, rw);
-    // майданчики місій та додаткові рівні зони — пласкі
+    if (rw > 0) h = lerp(h, low * 0.9 + hill + terr, rw);
+    // майданчики місій та додаткові рівні зони — пласкі (на рівні великого рельєфу)
     if (this._flatList === undefined) {
       this._flatList = Object.values(this.map.sites).concat(this.map.flats || []);
       this._flatH = this._flatList.map((site) =>
-        this.fbmLow(site.x * 0.011, site.z * 0.011) * 6.0 + this._hillsAt(site.x, site.z));
+        this.fbmLow(site.x * 0.011, site.z * 0.011) * 6.0 + this._hillsAt(site.x, site.z)
+          + (this._terrainMod ? this._terrainMod(site.x, site.z) : 0));
     }
     for (let i = 0; i < this._flatList.length; i++) {
       const site = this._flatList[i];
       const d = Math.hypot(x - site.x, z - site.z);
       const w = smoothstep(site.r + 12, site.r * 0.5, d);
       if (w > 0) h = lerp(h, this._flatH[i], w);
+    }
+    // 🌊 русла рік: дно — абсолютна позначка, береги плавно зливаються з рельєфом
+    for (const rv of this.rivers) {
+      let d = Infinity;
+      for (const s of rv.segs) {
+        const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
+        if (v < d) d = v;
+      }
+      const w = smoothstep(rv.width, rv.width * 0.45, d);
+      if (w > 0) h = lerp(h, rv.level - rv.depth, w);
     }
     return h;
   }
@@ -1358,7 +1381,9 @@ export class World {
 
   // ---------- терен ----------
   _buildTerrain() {
-    const SIZE = 460, SEG = 130;
+    // на картах із великим рельєфом — густіша сітка, щоб скелі були чіткі
+    const SIZE = 460;
+    const SEG = this._terrainMod && this.quality.shadow >= 2048 ? 176 : 130;
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -1369,6 +1394,9 @@ export class World {
     const cDirt = new THREE.Color(this.biome.dirt);
     const cPlaza = new THREE.Color(this.biome.plaza);
     const cArena = new THREE.Color(this.biome.arenaGround);
+    const cRock = new THREE.Color(this.biome.rock || 0x8d8377);
+    const cPeak = new THREE.Color(this.biome.peak || this.biome.rock || 0x8d8377);
+    const cBed = new THREE.Color(this.biome.riverbed || 0x9a8a64);
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
@@ -1378,6 +1406,22 @@ export class World {
       tmp.copy(cGrass1);
       if (n > 0.25) tmp.lerp(cGrass3, smoothstep(0.25, 0.6, n));
       else if (n < -0.2) tmp.lerp(cGrass2, smoothstep(-0.2, -0.6, n));
+      // 🏔️ високо — скеля, ще вище — вершина (сніг/світла порода)
+      if (this._terrainMod) {
+        const rockW = smoothstep(8.5, 13.5, h);
+        if (rockW > 0) tmp.lerp(cRock, rockW * 0.9);
+        const peakW = smoothstep(14, 19, h);
+        if (peakW > 0) tmp.lerp(cPeak, peakW);
+      }
+      // 🌊 дно і береги рік — пісок/мул
+      for (const rv of this.rivers) {
+        let d = Infinity;
+        for (const s of rv.segs) {
+          const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
+          if (v < d) d = v;
+        }
+        if (d < rv.width + 2) tmp.lerp(cBed, smoothstep(rv.width + 2, rv.width * 0.5, d) * 0.85);
+      }
       const roadD = this.roadDist(x, z);
       if (roadD < 3.4) tmp.lerp(cDirt, smoothstep(3.4, 2.0, roadD));
       const dV = Math.hypot(x - this.layout.village.x - 4, z - this.layout.village.z - 6);
@@ -1392,6 +1436,45 @@ export class World {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
+    this._buildWater();
+  }
+
+  // ---------- 🌊 водні стрічки рік ----------
+  _buildWater() {
+    if (!this.rivers.length) return;
+    for (const rv of this.rivers) {
+      const positions = [];
+      const half = rv.width * 0.82;
+      for (let s = 0; s < rv.pts.length - 1; s++) {
+        const [ax, az] = rv.pts[s];
+        const [bx, bz] = rv.pts[s + 1];
+        const len = Math.hypot(bx - ax, bz - az);
+        const nx = -(bz - az) / len, nz = (bx - ax) / len;
+        const steps = Math.max(2, Math.ceil(len / 6));
+        for (let i = 0; i < steps; i++) {
+          const t0 = i / steps, t1 = (i + 1) / steps;
+          const x0 = lerp(ax, bx, t0), z0 = lerp(az, bz, t0);
+          const x1 = lerp(ax, bx, t1), z1 = lerp(az, bz, t1);
+          positions.push(
+            x0 - nx * half, rv.level, z0 - nz * half,
+            x0 + nx * half, rv.level, z0 + nz * half,
+            x1 - nx * half, rv.level, z1 - nz * half,
+            x0 + nx * half, rv.level, z0 + nz * half,
+            x1 + nx * half, rv.level, z1 + nz * half,
+            x1 - nx * half, rv.level, z1 - nz * half
+          );
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshToonMaterial({
+        color: this.biome.water || 0x4dc3e8, transparent: true, opacity: 0.78,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.renderOrder = 1;
+      this.scene.add(mesh);
+    }
   }
 
   // ---------- дорожня стрічка з чітким краєм ----------
@@ -2330,7 +2413,7 @@ export class World {
     rim.scale.set(1, 1, 0.5);
     this.staticGroup.add(rim);
     // табличка "ОБЕРЕЖНО: СЛИЗЬКО!"
-    this._makeSign(x, z + r + 3, 'ОБЕРЕЖНО: СЛИЗЬКО! ⛸', 0);
+    this._makeSign(x, z + r + 3, t('ОБЕРЕЖНО: СЛИЗЬКО! ⛸'), 0);
   }
 
   // 🏰 руїни замку — арена боса
@@ -2397,7 +2480,7 @@ export class World {
       this.scene.add(flag);
       this.animatedFlags.push(flag);
     }
-    this._makeSign(x + 10, z + r + 6, 'НЕБЕЗПЕКА: БОС!', 0);
+    this._makeSign(x + 10, z + r + 6, t('НЕБЕЗПЕКА: БОС!'), 0);
   }
 
   // 🚂 залізничне депо: рейки, вагони, платформа
@@ -2824,7 +2907,7 @@ export class World {
       }
       this.staticGroup.add(skull);
     }
-    this._makeSign(x + 10, z + r + 6, 'НЕБЕЗПЕКА: БОС!', 0);
+    this._makeSign(x + 10, z + r + 6, t('НЕБЕЗПЕКА: БОС!'), 0);
   }
 
   // ---------- хмари ----------

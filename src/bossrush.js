@@ -2,6 +2,7 @@
 // Реалізує той самий інтерфейс, що й Missions/StormMode (update/getHudList/...),
 // тож HUD і main працюють без змін. У коопі — дзеркало як у Шторму.
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
+import { t } from './i18n.js';
 
 export class BossRush {
   constructor(level) {
@@ -31,15 +32,15 @@ export class BossRush {
   }
 
   getHudList() {
-    const t = Math.floor(this.level.stats.time);
+    const sec = Math.floor(this.level.stats.time); // не t: затінило б переклад
     const out = [
-      { icon: '👑', title: `АРЕНА БОСІВ — ${this.idx}/${this.total}`, done: false },
-      { icon: '⏱️', title: `Час: ${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`, done: false },
+      { icon: '👑', title: t('АРЕНА БОСІВ — {a}/{b}', { a: this.idx, b: this.total }), done: false },
+      { icon: '⏱️', title: t('Час: {m}', { m: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` }), done: false },
     ];
     if (this.state === 'fight' && this.idx < this.total) {
       out.push({ icon: '⚔️', title: this._bossCfg(this.idx).name.replace('👑 ', ''), done: false });
     } else if (!this.over && this.idx < this.total) {
-      out.push({ icon: '⏳', title: `Наступний бос за ${Math.ceil(this.breakT)}с…`, done: false });
+      out.push({ icon: '⏳', title: t('Наступний бос за {n}с…', { n: Math.ceil(this.breakT) }), done: false });
     }
     return out;
   }
@@ -81,8 +82,8 @@ export class BossRush {
     this.bossStarted = true;
     const name = cfg.name.replace('👑 ', '');
     document.getElementById('boss-name').textContent = cfg.name;
-    level.game.hud.banner(`👑 БОС ${this.idx + 1}/${this.total}`, name, 3.5);
-    level.netEv('banner', `👑 БОС ${this.idx + 1}/${this.total}`, name, 3.5);
+    level.game.hud.banner(t('👑 БОС {a}/{b}', { a: this.idx + 1, b: this.total }), name, 3.5);
+    level.netEv('banner', t('👑 БОС {a}/{b}', { a: this.idx + 1, b: this.total }), name, 3.5);
     level.audio.bossRoar();
   }
 
@@ -103,8 +104,8 @@ export class BossRush {
     level.game.progress.addXp(40 + this.idx * 15);
     this.state = 'break';
     this.breakT = 8;
-    level.game.hud.banner(`✅ ${this.idx}/${this.total} ПЕРЕМОЖЕНО!`, `+${bonus} монет · наступний за 8с — підбери припаси!`, 3.5);
-    level.netEv('banner', `✅ ${this.idx}/${this.total} ПЕРЕМОЖЕНО!`, `+${bonus} монет · наступний за 8с!`, 3.5);
+    level.game.hud.banner(t('✅ {a}/{b} ПЕРЕМОЖЕНО!', { a: this.idx, b: this.total }), t('+{n} монет · наступний за 8с — підбери припаси!', { n: bonus }), 3.5);
+    level.netEv('banner', t('✅ {a}/{b} ПЕРЕМОЖЕНО!', { a: this.idx, b: this.total }), t('+{n} монет · наступний за 8с!', { n: bonus }), 3.5);
     level.audio.mission();
     const { x, z } = level.world.layout.arena;
     for (let i = 0; i < 6; i++) {

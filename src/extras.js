@@ -1,5 +1,6 @@
 // Іграшки рівня: 🦙 Мегабокс, 🐶 пес Дружок, 🛴 самокати, 🦘🧱 гаджети
 import * as THREE from 'three';
+import { t } from './i18n.js';
 import {
   makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
 } from './characters.js';
@@ -59,10 +60,10 @@ export class Megabox {
     const d = Math.hypot(p.pos.x - this.x, p.pos.z - this.z);
     if (d < 28 && !this._hinted) {
       this._hinted = true;
-      level.bus.emit('toast', '🦙 МЕГАБОКС поблизу! Знайди фіолетовий промінь!');
+      level.bus.emit('toast', t('🦙 МЕГАБОКС поблизу! Знайди фіолетовий промінь!'));
     }
     if (d < 3.6 && !level.missions.prompt) {
-      level.missions.prompt = { text: '🦙 Натисни E — відкрий МЕГАБОКС!', hold: false };
+      level.missions.prompt = { text: t('🦙 Натисни E — відкрий МЕГАБОКС!'), hold: false };
       if (allowControl && input.pressed('KeyE')) {
         if (level.mirror) level.net.sendUse('megabox');
         else this.open(1);
@@ -208,7 +209,7 @@ export class Pet {
           );
           if (!this._barkHint) {
             this._barkHint = true;
-            level.bus.emit('toast', '🐶 Гав-гав! Дружок щось відчуває поблизу…');
+            level.bus.emit('toast', t('🐶 Гав-гав! Дружок щось відчуває поблизу…'));
           }
           break;
         }
@@ -281,7 +282,7 @@ export class Vehicles {
       const d = Math.hypot(p.pos.x - r.x, p.pos.z - r.z);
       if (d < 2.4) {
         if (!level.missions.prompt) {
-          level.missions.prompt = { text: '🛴 Натисни E — поїхали!', hold: false };
+          level.missions.prompt = { text: t('🛴 Натисни E — поїхали!'), hold: false };
         }
         if (allowControl && input.pressed('KeyE')) {
           input.justPressed.delete('KeyE');
@@ -332,7 +333,7 @@ export class Vehicles {
     p._applyView();
     r.sc.group.rotation.z = 0;
     this.level.audio.bell();
-    this.level.bus.emit('toast', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти');
+    this.level.bus.emit('toast', t('🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
   }
 
   dismountLocal(x, z) {
@@ -385,12 +386,12 @@ export class Vehicles {
 // 🧰 Гаджети: обираєш ОДИН перед боєм (Гардероб), клавіша F, перезарядка
 // ============================================================
 export const GADGETS = {
-  shield: { name: 'Щит', icon: '🛡️', cd: 30, price: 300, desc: 'Аварійна бульбашка: поглинає 50 шкоди' },
-  heal: { name: 'Відновлення', icon: '💚', cd: 25, price: 250, desc: '+50 здоров\'я миттєво' },
-  tramp: { name: 'Кишеньковий батут', icon: '🦘', cd: 20, price: 150, desc: 'Постав і застрибни на дах' },
-  wall: { name: 'Барикада', icon: '🧱', cd: 25, price: 200, desc: 'Стіна на 100 міцності (E — забрати)' },
+  shield: { name: t('Щит'), icon: '🛡️', cd: 30, price: 300, desc: t('Аварійна бульбашка: поглинає 50 шкоди') },
+  heal: { name: t('Відновлення'), icon: '💚', cd: 25, price: 250, desc: t('+50 здоров\'я миттєво') },
+  tramp: { name: t('Кишеньковий батут'), icon: '🦘', cd: 20, price: 150, desc: t('Постав і застрибни на дах') },
+  wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 200, desc: t('Стіна на 100 міцності (E — забрати)') },
   // 🤖 преміум: автоматична вогнева підтримка
-  turret: { name: 'Турель', icon: '🤖', cd: 45, price: 450, desc: 'Сторожова турель: 30с сама обстрілює зомбі поруч' },
+  turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 450, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
 };
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
@@ -447,7 +448,7 @@ export class Gadgets {
             level.net.sendUse('wallback', { i: w.nid });
           } else {
             this._removeWall(i, false);
-            level.bus.emit('toast', '🧱 Барикаду забрано назад');
+            level.bus.emit('toast', t('🧱 Барикаду забрано назад'));
             level.audio.pickup();
           }
           break;
@@ -458,7 +459,7 @@ export class Gadgets {
     if (!level.missions.prompt) {
       for (const w of this.walls) {
         if (Math.hypot(p.pos.x - w.x, p.pos.z - w.z) < 3.2) {
-          level.missions.prompt = { text: '🧱 Натисни E — забрати барикаду', hold: false };
+          level.missions.prompt = { text: t('🧱 Натисни E — забрати барикаду'), hold: false };
           break;
         }
       }
@@ -502,11 +503,11 @@ export class Gadgets {
     const game = level.game;
     const id = this.active;
     if (!id) {
-      level.bus.emit('toast', '🧰 Обери гаджет у Гардеробі на глобусі!');
+      level.bus.emit('toast', t('🧰 Обери гаджет у Гардеробі на глобусі!'));
       return false;
     }
     if (this.cd > 0) {
-      level.bus.emit('toast', `${GADGETS[id].icon} Ще ${Math.ceil(this.cd)}с перезарядки…`);
+      level.bus.emit('toast', t('{i} Ще {n}с перезарядки…', { i: GADGETS[id].icon, n: Math.ceil(this.cd) }));
       game.audio.denied();
       return false;
     }
@@ -515,18 +516,18 @@ export class Gadgets {
     if (id === 'shield') {
       p.gadgetShield = 50;
       level.audio.powerup();
-      level.bus.emit('toast', '🛡️ Щит увімкнено: поглине 50 шкоди!');
+      level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине 50 шкоди!'));
       ok = true;
     } else if (id === 'heal') {
       if (p.health >= p.maxHealth) {
-        level.bus.emit('toast', 'Здоров\'я і так повне! 💪');
+        level.bus.emit('toast', t('Здоров\'я і так повне! 💪'));
         game.audio.denied();
         return false;
       }
       p.heal(50);
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
-      level.bus.emit('toast', '💚 +50 здоров\'я!');
+      level.bus.emit('toast', t('💚 +50 здоров\'я!'));
       ok = true;
     } else if (id === 'tramp') {
       if (level.mirror) ok = this._requestPlace('tramp', 2.1);
@@ -558,8 +559,8 @@ export class Gadgets {
   _requestPlace(kind, dist) {
     const pos = this._placePos(dist);
     if (!pos) {
-      this.level.bus.emit('toast', kind === 'wall' ? 'Тут не можна поставити барикаду 🙈'
-        : kind === 'turret' ? 'Тут не можна поставити турель 🙈' : 'Тут не можна поставити батут 🙈');
+      this.level.bus.emit('toast', kind === 'wall' ? t('Тут не можна поставити барикаду 🙈')
+        : kind === 'turret' ? t('Тут не можна поставити турель 🙈') : t('Тут не можна поставити батут 🙈'));
       return false;
     }
     this.level.net.sendGadget(kind, pos.x, pos.z, this.level.player.yaw);
@@ -569,7 +570,7 @@ export class Gadgets {
   _placeTramp() {
     const pos = this._placePos(2.1);
     if (!pos) {
-      this.level.bus.emit('toast', 'Тут не можна поставити батут 🙈');
+      this.level.bus.emit('toast', t('Тут не можна поставити батут 🙈'));
       return false;
     }
     this.placeTrampAt(pos.x, pos.z, 1);
@@ -625,7 +626,7 @@ export class Gadgets {
     const level = this.level;
     const pos = this._placePos(2.6);
     if (!pos) {
-      level.bus.emit('toast', 'Тут не можна поставити барикаду 🙈');
+      level.bus.emit('toast', t('Тут не можна поставити барикаду 🙈'));
       return false;
     }
     this.placeWallAt(pos.x, pos.z, level.player.yaw, 1);
@@ -705,7 +706,7 @@ export class Gadgets {
   _placeTurret() {
     const pos = this._placePos(2.2);
     if (!pos) {
-      this.level.bus.emit('toast', 'Тут не можна поставити турель 🙈');
+      this.level.bus.emit('toast', t('Тут не можна поставити турель 🙈'));
       return false;
     }
     this.placeTurretAt(pos.x, pos.z, 1);
@@ -745,19 +746,19 @@ export class Gadgets {
 
   _removeTurret(i, broken) {
     const level = this.level;
-    const t = this.turrets[i];
-    if (!t) return;
+    const tu = this.turrets[i]; // не t: затінило б переклад
+    if (!tu) return;
     this.turrets.splice(i, 1);
-    if (level.net && level.net.authority) level.netEv('turrgo', t.nid, broken ? 1 : 0);
-    level.scene.remove(t.mesh.group);
-    level.world.colliders = level.world.colliders.filter((c) => c !== t.collider);
+    if (level.net && level.net.authority) level.netEv('turrgo', tu.nid, broken ? 1 : 0);
+    level.scene.remove(tu.mesh.group);
+    level.world.colliders = level.world.colliders.filter((c) => c !== tu.collider);
     level.world._buildGrid();
     if (broken) {
-      level.effects.burst(new THREE.Vector3(t.x, t.y + 1, t.z), 0x7d8aa0, 14, { speed: 4, up: 3.5, life: 0.7, size: 1.1 });
+      level.effects.burst(new THREE.Vector3(tu.x, tu.y + 1, tu.z), 0x7d8aa0, 14, { speed: 4, up: 3.5, life: 0.7, size: 1.1 });
       level.audio.shieldBreak();
-      level.bus.emit('toast', '🤖 Турель зламали!');
+      level.bus.emit('toast', t('🤖 Турель зламали!'));
     } else {
-      level.effects.burst(new THREE.Vector3(t.x, t.y + 1, t.z), 0x4fd8ff, 8, { speed: 2.5, up: 2, life: 0.5, size: 0.8 });
+      level.effects.burst(new THREE.Vector3(tu.x, tu.y + 1, tu.z), 0x4fd8ff, 8, { speed: 2.5, up: 2, life: 0.5, size: 0.8 });
     }
   }
 
@@ -774,14 +775,14 @@ export class Gadgets {
 
   // гість: постріл турелі — поворот голови, трасер, звук
   netTurretShot(nid, tx, ty, tz) {
-    const t = this.turrets.find((x) => x.nid === nid);
-    if (!t) return;
-    t.mesh.head.rotation.y = Math.atan2(-(tx - t.x), -(tz - t.z));
+    const tu = this.turrets.find((x) => x.nid === nid);
+    if (!tu) return;
+    tu.mesh.head.rotation.y = Math.atan2(-(tx - tu.x), -(tz - tu.z));
     const muzzle = new THREE.Vector3();
-    t.mesh.muzzle.getWorldPosition(muzzle);
+    tu.mesh.muzzle.getWorldPosition(muzzle);
     this.level.effects.tracer(muzzle, new THREE.Vector3(tx, ty, tz));
     const p = this.level.player.pos;
-    if (Math.hypot(t.x - p.x, t.z - p.z) < 55) this.level.audio.shot('pistol');
+    if (Math.hypot(tu.x - p.x, tu.z - p.z) < 55) this.level.audio.shot('pistol');
   }
 
   // господар турелі (хост/соло): вибір цілі, стрільба, тиск зомбі, час життя
@@ -840,7 +841,7 @@ export class Gadgets {
     if (broken) {
       level.effects.burst(new THREE.Vector3(w.x, w.y + 1, w.z), 0xb08a5a, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
       level.audio.shieldBreak();
-      level.bus.emit('toast', '🧱 Барикаду зламали!');
+      level.bus.emit('toast', t('🧱 Барикаду зламали!'));
     }
   }
 }

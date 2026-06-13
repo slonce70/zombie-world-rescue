@@ -1,40 +1,41 @@
 // Прогресія акаунта: зірковий досвід (XP), «Зоряний шлях» (безкоштовний пасс),
 // щоденні завдання. Все зберігається в сейві й живе ПОВЕРХ рівнів.
 import { RNG } from './utils.js';
+import { t } from './i18n.js';
 
 // ---------- Зоряний шлях ----------
 // нагороди за рівні: монети, танці, скіни, гаджети, сліди куль
 export const PASS_REWARDS = {
-  2: { type: 'coins', n: 100, icon: '💰', name: '100 монет' },
-  3: { type: 'dance', id: 'spin', icon: '🌪️', name: 'Танець «Дзиґа»' },
-  4: { type: 'gadget', id: 'tramp', icon: '🦘', name: 'Гаджет «Кишеньковий батут»' },
-  5: { type: 'skin', id: 'ninja', icon: '🥷', name: 'Скін «Ніндзя»' },
-  6: { type: 'coins', n: 150, icon: '💰', name: '150 монет' },
-  7: { type: 'tracer', id: 'gold', icon: '✨', name: 'Золоті кулі' },
-  8: { type: 'gadget', id: 'wall', icon: '🧱', name: 'Гаджет «Барикада»' },
-  9: { type: 'dance', id: 'robot', icon: '🤖', name: 'Танець «Робот»' },
-  10: { type: 'skin', id: 'astro', icon: '👨‍🚀', name: 'Скін «Космонавт»' },
-  11: { type: 'coins', n: 200, icon: '💰', name: '200 монет' },
-  12: { type: 'coins', n: 200, icon: '💰', name: '200 монет' },
-  13: { type: 'dance', id: 'wave', icon: '🌊', name: 'Танець «Хвиля»' },
-  14: { type: 'skin', id: 'pirate', icon: '🏴‍☠️', name: 'Скін «Пірат»' },
-  15: { type: 'coins', n: 250, icon: '💰', name: '250 монет' },
-  16: { type: 'tracer', id: 'rainbow', icon: '🌈', name: 'Веселкові кулі' },
-  17: { type: 'coins', n: 250, icon: '💰', name: '250 монет' },
-  18: { type: 'coins', n: 300, icon: '💰', name: '300 монет' },
-  19: { type: 'coins', n: 350, icon: '💰', name: '350 монет' },
-  20: { type: 'skin', id: 'robot', icon: '🤖', name: 'Скін «Робот»' },
+  2: { type: 'coins', n: 100, icon: '💰', name: t('100 монет') },
+  3: { type: 'dance', id: 'spin', icon: '🌪️', name: t('Танець «Дзиґа»') },
+  4: { type: 'gadget', id: 'tramp', icon: '🦘', name: t('Гаджет «Кишеньковий батут»') },
+  5: { type: 'skin', id: 'ninja', icon: '🥷', name: t('Скін «Ніндзя»') },
+  6: { type: 'coins', n: 150, icon: '💰', name: t('150 монет') },
+  7: { type: 'tracer', id: 'gold', icon: '✨', name: t('Золоті кулі') },
+  8: { type: 'gadget', id: 'wall', icon: '🧱', name: t('Гаджет «Барикада»') },
+  9: { type: 'dance', id: 'robot', icon: '🤖', name: t('Танець «Робот»') },
+  10: { type: 'skin', id: 'astro', icon: '👨‍🚀', name: t('Скін «Космонавт»') },
+  11: { type: 'coins', n: 200, icon: '💰', name: t('200 монет') },
+  12: { type: 'coins', n: 200, icon: '💰', name: t('200 монет') },
+  13: { type: 'dance', id: 'wave', icon: '🌊', name: t('Танець «Хвиля»') },
+  14: { type: 'skin', id: 'pirate', icon: '🏴‍☠️', name: t('Скін «Пірат»') },
+  15: { type: 'coins', n: 250, icon: '💰', name: t('250 монет') },
+  16: { type: 'tracer', id: 'rainbow', icon: '🌈', name: t('Веселкові кулі') },
+  17: { type: 'coins', n: 250, icon: '💰', name: t('250 монет') },
+  18: { type: 'coins', n: 300, icon: '💰', name: t('300 монет') },
+  19: { type: 'coins', n: 350, icon: '💰', name: t('350 монет') },
+  20: { type: 'skin', id: 'robot', icon: '🤖', name: t('Скін «Робот»') },
   // Оновлення 9: шлях продовжується до 30
-  21: { type: 'coins', n: 400, icon: '💰', name: '400 монет' },
-  22: { type: 'tracer', id: 'neon', icon: '🟢', name: 'Неонові кулі' },
-  23: { type: 'coins', n: 450, icon: '💰', name: '450 монет' },
-  24: { type: 'coins', n: 500, icon: '💰', name: '500 монет' },
-  25: { type: 'skin', id: 'legend', icon: '🏆', name: 'Скін «Легенда»' },
-  26: { type: 'coins', n: 550, icon: '💰', name: '550 монет' },
-  27: { type: 'coins', n: 600, icon: '💰', name: '600 монет' },
-  28: { type: 'coins', n: 650, icon: '💰', name: '650 монет' },
-  29: { type: 'coins', n: 700, icon: '💰', name: '700 монет' },
-  30: { type: 'tracer', id: 'royal', icon: '👑', name: 'Королівські кулі + слава' },
+  21: { type: 'coins', n: 400, icon: '💰', name: t('400 монет') },
+  22: { type: 'tracer', id: 'neon', icon: '🟢', name: t('Неонові кулі') },
+  23: { type: 'coins', n: 450, icon: '💰', name: t('450 монет') },
+  24: { type: 'coins', n: 500, icon: '💰', name: t('500 монет') },
+  25: { type: 'skin', id: 'legend', icon: '🏆', name: t('Скін «Легенда»') },
+  26: { type: 'coins', n: 550, icon: '💰', name: t('550 монет') },
+  27: { type: 'coins', n: 600, icon: '💰', name: t('600 монет') },
+  28: { type: 'coins', n: 650, icon: '💰', name: t('650 монет') },
+  29: { type: 'coins', n: 700, icon: '💰', name: t('700 монет') },
+  30: { type: 'tracer', id: 'royal', icon: '👑', name: t('Королівські кулі + слава') },
 };
 export const PASS_MAX_LEVEL = 30;
 
@@ -92,55 +93,55 @@ export class Progress {
     const r = PASS_REWARDS[lvl];
     game.audio.levelUp();
     if (!r) {
-      game.hud.banner(`🎖️ ЗІРКОВИЙ РІВЕНЬ ${lvl}!`, 'Так тримати!');
+      game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), t('Так тримати!'));
       return;
     }
-    let sub = `Нагорода: ${r.icon} ${r.name}`;
+    let sub = t('Нагорода: {i} {n}', { i: r.icon, n: r.name });
     if (r.type === 'coins') {
       game.save.coins += r.n;
     } else if (r.type === 'gadget') {
       if (game.save.gadgetsOwned.includes(r.id)) {
         game.save.coins += 150;
-        sub = 'Нагорода: гаджет уже є — тримай 💰 150 монет!';
+        sub = t('Нагорода: гаджет уже є — тримай 💰 150 монет!');
       } else {
         game.save.gadgetsOwned.push(r.id);
         if (!game.save.activeGadget) game.save.activeGadget = r.id;
-        sub += ' — клавіша F!';
+        sub += t(' — клавіша F!');
       }
     } else if (r.type === 'skin') {
       if (!game.save.skins.includes(r.id)) game.save.skins.push(r.id);
-      sub += ' — одягни в Гардеробі 🎒';
+      sub += t(' — одягни в Гардеробі 🎒');
     } else if (r.type === 'dance') {
       if (!game.save.dances.includes(r.id)) game.save.dances.push(r.id);
-      sub += ' — обери в Гардеробі 🎒';
+      sub += t(' — обери в Гардеробі 🎒');
     } else if (r.type === 'tracer') {
       if (!game.save.tracers.includes(r.id)) game.save.tracers.push(r.id);
       game.save.activeTracer = r.id;
       if (game.level) game.level.effects.tracerStyle = r.id;
     }
-    game.hud.banner(`🎖️ ЗІРКОВИЙ РІВЕНЬ ${lvl}!`, sub, 4.2);
+    game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), sub, 4.2);
   }
 }
 
 // ---------- Щоденні завдання ----------
 // Пул завдань. check-події надходять із гри через onEvent(type, data).
 const QUEST_POOL = [
-  { id: 'kills', icon: '🧟', target: 40, title: (t) => `Перемоги ${t} зомбі`, ev: 'kill' },
+  { id: 'kills', icon: '🧟', target: 40, title: (n) => t('Перемоги {n} зомбі', { n }), ev: 'kill' },
   { id: 'killsWeapon', icon: '🔫', target: 15, weaponPick: true, ev: 'kill' },
-  { id: 'headshots', icon: '🎯', target: 12, title: (t) => `Влучи в голову ${t} разів`, ev: 'headshot' },
-  { id: 'coins', icon: '💰', target: 250, title: (t) => `Назбирай ${t} монет`, ev: 'coins' },
-  { id: 'pickups', icon: '🎁', target: 8, title: (t) => `Підбери ${t} знахідок`, ev: 'pickup' },
-  { id: 'shields', icon: '🛡', target: 2, title: (t) => `Зламай ${t} щити щитоносців`, ev: 'shield' },
-  { id: 'megabox', icon: '🦙', target: 1, title: () => 'Відкрий Мегабокс', ev: 'megabox' },
-  { id: 'dance', icon: '💃', target: 1, title: () => 'Станцюй переможний танець (N)', ev: 'dance' },
-  { id: 'golden', icon: '🏆', target: 1, title: () => 'Дожени золотого зомбі', ev: 'golden' },
-  { id: 'boss', icon: '👑', target: 1, title: () => 'Переможи боса будь-якої країни', ev: 'boss' },
-  { id: 'horde', icon: '🌊', target: 2, title: (t) => `Відбий ${t} орди`, ev: 'horde' },
+  { id: 'headshots', icon: '🎯', target: 12, title: (n) => t('Влучи в голову {n} разів', { n }), ev: 'headshot' },
+  { id: 'coins', icon: '💰', target: 250, title: (n) => t('Назбирай {n} монет', { n }), ev: 'coins' },
+  { id: 'pickups', icon: '🎁', target: 8, title: (n) => t('Підбери {n} знахідок', { n }), ev: 'pickup' },
+  { id: 'shields', icon: '🛡', target: 2, title: (n) => t('Зламай {n} щити щитоносців', { n }), ev: 'shield' },
+  { id: 'megabox', icon: '🦙', target: 1, title: () => t('Відкрий Мегабокс'), ev: 'megabox' },
+  { id: 'dance', icon: '💃', target: 1, title: () => t('Станцюй переможний танець (N)'), ev: 'dance' },
+  { id: 'golden', icon: '🏆', target: 1, title: () => t('Дожени золотого зомбі'), ev: 'golden' },
+  { id: 'boss', icon: '👑', target: 1, title: () => t('Переможи боса будь-якої країни'), ev: 'boss' },
+  { id: 'horde', icon: '🌊', target: 2, title: (n) => t('Відбий {n} орди', { n }), ev: 'horde' },
 ];
 const QUEST_REWARD_COINS = 120;
 const WEAPON_NAMES = {
-  pistol: 'пістолета', rifle: 'автомата', shotgun: 'дробовика',
-  smg: 'швидкостріла', magnum: 'магнума', sniper: 'снайперки', bazooka: 'базуки',
+  pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
+  smg: t('швидкостріла'), magnum: t('магнума'), sniper: t('снайперки'), bazooka: t('базуки'),
 };
 
 export class DailyQuests {
@@ -171,7 +172,7 @@ export class DailyQuests {
       const quest = { id: q.id, ev: q.ev, icon: q.icon, target: q.target, progress: 0, done: false };
       if (q.weaponPick) {
         quest.weapon = owned[rng.int(0, owned.length - 1)];
-        quest.title = `Перемоги ${q.target} зомбі з ${WEAPON_NAMES[quest.weapon] || 'зброї'}`;
+        quest.title = t('Перемоги {n} зомбі з {w}', { n: q.target, w: WEAPON_NAMES[quest.weapon] || t('зброї') });
       } else {
         quest.title = q.title(q.target);
       }
@@ -209,7 +210,7 @@ export class DailyQuests {
     const game = this.game;
     game.save.coins += QUEST_REWARD_COINS;
     game.audio.questDone();
-    game.hud.toast(`📅 Завдання виконано: ${q.icon} ${q.title}! +${QUEST_REWARD_COINS} монет, +40 ⭐`);
+    game.hud.toast(t('📅 Завдання виконано: {i} {q}! +{c} монет, +40 ⭐', { i: q.icon, q: q.title, c: QUEST_REWARD_COINS }));
     game.progress.addXp(40);
   }
 }
