@@ -639,8 +639,9 @@ export class World {
     const mat = new THREE.MeshToonMaterial({
       color: 0x3f9fd4, transparent: true, opacity: 0.82,
       gradientMap: toonMat(0).gradientMap,
+      side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4,
     });
-    this._drapeXZGeometry(geo, x, z, 0.18);
+    this._drapeXZGeometry(geo, x, z, 0.34);
     const water = new THREE.Mesh(geo, mat);
     water.position.set(x, 0, z);
     this.scene.add(water);
@@ -676,7 +677,7 @@ export class World {
       const lz = z + this.rng.range(-r * 0.6, r * 0.6);
       const lily = new THREE.Mesh(new THREE.CircleGeometry(0.45, 8), toonMat(0x57b83e));
       lily.rotation.x = -Math.PI / 2;
-      lily.position.set(lx, this.groundH(lx, lz) + 0.24, lz);
+      lily.position.set(lx, this.groundH(lx, lz) + 0.4, lz);
       this.scene.add(lily);
     }
   }
@@ -1461,7 +1462,7 @@ export class World {
     for (const rv of this.rivers) {
       const positions = [];
       const half = rv.width * 0.82;
-      const pushWaterVertex = (x, z) => positions.push(x, this.groundH(x, z) + 0.08, z);
+      const pushWaterVertex = (x, z) => positions.push(x, this.groundH(x, z) + 0.2, z);
       for (let s = 0; s < rv.pts.length - 1; s++) {
         const [ax, az] = rv.pts[s];
         const [bx, bz] = rv.pts[s + 1];
@@ -1485,6 +1486,7 @@ export class World {
       geo.computeVertexNormals();
       const mat = new THREE.MeshToonMaterial({
         color: this.biome.water || 0x4dc3e8, transparent: true, opacity: 0.78,
+        side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.renderOrder = 1;

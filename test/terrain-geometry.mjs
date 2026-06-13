@@ -49,10 +49,10 @@ for (const country of ['UKR', 'DEU']) {
     };
   });
   check(river.meshCount > 0, `${country}: river water mesh exists`);
-  check(river.maxAboveGround <= 0.3,
+  check(river.maxAboveGround <= 0.35,
     `${country}: river water follows terrain, max +${river.maxAboveGround}m`);
-  check(river.minAboveGround >= -0.05,
-    `${country}: river water stays above terrain, min ${river.minAboveGround}m`);
+  check(river.minAboveGround >= 0.15,
+    `${country}: river water stays visibly above terrain, min ${river.minAboveGround}m`);
 }
 
 await loadCountry('UKR');
@@ -86,10 +86,10 @@ const pond = await page.evaluate(() => {
   };
 });
 check(pond.meshCount > 0, 'UKR: pond water mesh exists');
-check(pond.maxAboveGround <= 0.4,
+check(pond.maxAboveGround <= 0.55,
   `UKR: animated pond water follows terrain, max +${pond.maxAboveGround}m`);
-check(pond.minAboveGround >= -0.02,
-  `UKR: animated pond water stays above terrain, min ${pond.minAboveGround}m`);
+check(pond.minAboveGround >= 0.12,
+  `UKR: animated pond water stays visibly above terrain, min ${pond.minAboveGround}m`);
 
 await loadCountry('POL');
 const poland = await page.evaluate(() => {
