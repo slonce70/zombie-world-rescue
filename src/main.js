@@ -263,11 +263,17 @@ class Game {
     });
     this._applyQuality();
 
-    // 🐣 Режим Малюк: автоприціл+автовогонь і великі кнопки для найменших
+    // 🐣 Режим Малюк: за замовчуванням УВІМКНЕНО на телефоні, ВИМКНЕНО на десктопі.
+    // kidMode === null/undefined → ще не обрано вручну → беремо тип пристрою.
+    // Щойно дитина/батько торкнеться кнопки, вибір стає явним (true/false) і більше не перезаписується.
+    if (this.save.kidMode === null || this.save.kidMode === undefined) {
+      this.save.kidMode = isTouchDevice();
+      this.saveGame();
+    }
     const kidBtn = document.getElementById('btn-kid');
     if (kidBtn) {
       kidBtn.addEventListener('click', () => {
-        this.save.kidMode = !this.save.kidMode;
+        this.save.kidMode = !this.save.kidMode; // явний вибір — фіксуємо булеан
         this.saveGame();
         this._applyKidMode();
         this.audio.click();
@@ -312,7 +318,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
-      missionRuns: {}, kidMode: false,
+      missionRuns: {}, kidMode: null,
     };
   }
 
