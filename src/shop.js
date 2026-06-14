@@ -137,17 +137,17 @@ export class Shop {
     // аптечка при повному HP — не продаємо
     if (id === 'medkit' && player.health >= player.maxHealth) {
       game.audio.denied();
-      game.hud.toast('Здоров’я і так повне! 💪');
+      game.hud.toast(t('Здоров’я і так повне! 💪'));
       return;
     }
     // бронепластина при повній броні — теж ні
     if (id === 'armorplate' && player.armor >= player.maxArmor) {
       game.audio.denied();
-      game.hud.toast('Броня вже повна! 🛡️');
+      game.hud.toast(t('Броня вже повна! 🛡️'));
       return;
     }
     save.coins -= price;
-    if (item.max !== Infinity && !item.weapon) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget) save.upgrades[id] = count + 1;
     switch (id) {
       case 'medkit': player.heal(50); break;
       case 'maxhp':
@@ -193,7 +193,7 @@ export class Shop {
         break;
       case 'dog':
         game.spawnPet();
-        game.hud.toast('🐶 Дружок тепер з тобою! Він збирає монети сам');
+        game.hud.toast(t('🐶 Дружок тепер з тобою! Він збирає монети сам'));
         break;
     }
     game.audio.purchase();

@@ -86,12 +86,12 @@ export class HUD {
       const c = this.game.level && this.game.level.country;
       this.banner(t('👑 БОС КРАЇНИ!'), c ? t('Звільни країну: {c}!', { c: c.name }) : t('Переможи боса!'));
     });
-    bus.on('bossCharge', () => this.toast('⚠️ Бос розганяється — тікай убік!'));
-    bus.on('bossSummon', () => this.toast('🧟 Бос кличе підмогу!'));
+    bus.on('bossCharge', () => this.toast(t('⚠️ Бос розганяється — тікай убік!')));
+    bus.on('bossSummon', () => this.toast(t('🧟 Бос кличе підмогу!')));
     bus.on('shieldBroken', () => {
       if (!this._shieldTipShown) {
         this._shieldTipShown = true;
-        this.toast('🛡 Щит розбито! Тепер щитоносець беззахисний — добивай!');
+        this.toast(t('🛡 Щит розбито! Тепер щитоносець беззахисний — добивай!'));
       }
     });
   }

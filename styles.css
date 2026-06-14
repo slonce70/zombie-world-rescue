@@ -460,15 +460,21 @@ body.kid-mode .tb.tb-small { width: 52px; height: 52px; font-size: 22px; }
 body.kid-mode #tb-dance,
 body.kid-mode #tb-camera,
 body.kid-mode #tb-scope { display: none; }
+/* сітка кластера мусить повторювати розмір кнопки Малюка (60px), інакше сусідні кнопки налазять */
+body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 
-/* дуже низькі екрани — все трохи менше */
-@media (max-height: 400px) {
+/* телефон у ландшафті (низька висота, типово з адрес-баром браузера ~360–460px):
+   кластер дій мусить прочистити мінімапу, тож опускаємо його нижче, трохи стискаємо
+   мінімапу й кнопку вогню Малюка, а службовий рядок тримаємо лівіше мінімапи */
+@media (max-height: 460px) {
   .tb { width: 44px; height: 44px; font-size: 18px; }
   .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
-  #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(70px + env(safe-area-inset-bottom)); }
-  body.touch-mode #minimap { width: 98px; height: 98px; }
-  /* службовий рядок не повинен залазити під мінімапу (мінімапа: 98px + 8px справа) */
-  body.touch-mode #touch-util { right: calc(114px + env(safe-area-inset-right)); }
+  #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+  body.touch-mode #minimap { width: 84px; height: 84px; }
+  /* службовий рядок не повинен залазити під мінімапу (мінімапа: 84px + 8px справа) */
+  body.touch-mode #touch-util { right: calc(100px + env(safe-area-inset-right)); }
+  /* 🐣 Малюк: трохи менша кнопка вогню, щоб увесь високий кластер прочистив мінімапу */
+  body.kid-mode .tb.tb-big { width: 72px; height: 72px; font-size: 30px; }
 }
 
 /* компактний HUD на малих екранах */

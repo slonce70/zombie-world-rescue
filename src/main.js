@@ -53,7 +53,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -504,7 +504,7 @@ class Game {
         this.audio.click();
         if (mode === 'campaign') {
           this._hideOverlay('overlay-solo');
-          this.hud.toast('🔴 Натисни червону країну на глобусі — там зомбі!');
+          this.hud.toast(t('🔴 Натисни червону країну на глобусі — там зомбі!'));
         } else if (mode === 'arena') {
           this._hideOverlay('overlay-solo');
           this.startArena();
@@ -615,14 +615,14 @@ class Game {
   // ---------- шторм ----------
   startStorm(countryId = null) {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast('⛈️🤝 У коопі Шторм запускається з лобі кімнати — обери режим «Шторм»!');
+      this.hud.toast(t('⛈️🤝 У коопі Шторм запускається з лобі кімнати — обери режим «Шторм»!'));
       this.audio.denied();
       return;
     }
     const lib = Object.keys(this.save.liberated);
     if (!lib.length) {
       this.audio.denied();
-      this.hud.toast('⛈️ Шторм відкриється після звільнення першої країни!');
+      this.hud.toast(t('⛈️ Шторм відкриється після звільнення першої країни!'));
       return;
     }
     // найсвіжіша звільнена країна кампанії
@@ -638,14 +638,14 @@ class Game {
   // ---------- 👑 Арена босів ----------
   startArena() {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast('👑🤝 У коопі Арена запускається з лобі кімнати — обери режим «Арена»!');
+      this.hud.toast(t('👑🤝 У коопі Арена запускається з лобі кімнати — обери режим «Арена»!'));
       this.audio.denied();
       return;
     }
     const lib = Object.keys(this.save.liberated).length;
     if (lib < 2) {
       this.audio.denied();
-      this.hud.toast('👑 Арена босів відкриється після звільнення 2 країн!');
+      this.hud.toast(t('👑 Арена босів відкриється після звільнення 2 країн!'));
       return;
     }
     this.audio.click();
@@ -704,7 +704,7 @@ class Game {
       this.level = null;
       this.state = 'globe';
       this._showGlobeUI(true);
-      this.hud.toast('😵 Ой! Щось пішло не так. Спробуй ще раз.');
+      this.hud.toast(t('😵 Ой! Щось пішло не так. Спробуй ще раз.'));
     } finally {
       this._hideOverlay('overlay-level-loading');
       this._startingLevel = false;
@@ -851,7 +851,7 @@ class Game {
         level.addCoins(value);
         this.audio.coin();
       } else if (type === 'medkit') {
-        if (level.player.heal(30)) this.hud.toast('🩹 +30 здоров’я');
+        if (level.player.heal(30)) this.hud.toast(t('🩹 +30 здоров’я'));
         this.audio.heal();
       } else if (type === 'grenade') {
         level.player.grenades++;
@@ -864,11 +864,11 @@ class Game {
       } else if (type === 'armor') {
         level.player.addArmor(value || 40);
         this.audio.pickup();
-        this.hud.toast('🛡️ +40 броні!');
+        this.hud.toast(t('🛡️ +40 броні!'));
       } else if (type === 'rocket') {
         level.player.addRockets(value || 2);
         this.audio.pickup();
-        this.hud.toast('🧨 +2 ракети для базуки!');
+        this.hud.toast(t('🧨 +2 ракети для базуки!'));
       } else if (type === 'bazooka') {
         this.unlockWeapon('bazooka');
         level.player.addRockets(3);
@@ -881,7 +881,7 @@ class Game {
       } else {
         level.player.addAmmo(30);
         this.audio.pickup();
-        this.hud.toast('🔋 +30 набоїв');
+        this.hud.toast(t('🔋 +30 набоїв'));
       }
     };
     // вибух (граната/бочка 135 за замовч., ракета базуки 220 — передається явно): шкода зомбі по радіусу.
@@ -1100,7 +1100,7 @@ class Game {
     if (!this.level) return;
     if (this.save.weapons.includes(id)) {
       this.level.addCoins(300);
-      this.hud.toast('🪙 Така зброя в тебе вже є — тримай +300 монет!');
+      this.hud.toast(t('🪙 Така зброя в тебе вже є — тримай +300 монет!'));
       return;
     }
     this.level.player.giveWeapon(id);
@@ -1125,6 +1125,9 @@ class Game {
       }, 50);
     }
     if (this.level) {
+      // standalone-ресурси Effects (оригінал tracerMat, гео монет/снарядів/гранат) обхід сцени
+      // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
+      if (this.level.effects && this.level.effects.dispose) this.level.effects.dispose();
       // звільняємо ресурси сцени — але НЕ спільні кешовані (matCache/geoCache/gradMap/bakedMat
       // із characters.js): вони живуть на весь сеанс і переюзаються наступними рівнями.
       // Диспоз спільного матеріалу/геометрії змусив би GPU перезаливати їх щоразу (ривок) і
@@ -1374,6 +1377,9 @@ class Game {
       this.level.addCoins(120);
       this.progress.addXp(60);
       this.hud.banner(t('👑 МІНІ-БОСА ПЕРЕМОЖЕНО!'), t('+120 монет · шторм триває!'));
+      // кооп: гостю — той самий бонус монет + банер (XP лишається локальним: це особиста прогресія)
+      this.level.netEv('sbb', 120);
+      this.level.netEv('banner', t('👑 МІНІ-БОСА ПЕРЕМОЖЕНО!'), t('+120 монет · шторм триває!'), 3.2);
       this.audio.mission();
       return;
     }
@@ -1593,10 +1599,10 @@ class Game {
     const isNight = k > 0.5;
     if (isNight && !this._nightAnnounced) {
       this._nightAnnounced = true;
-      this.hud.toast('🌙 НІЧ! Зомбі бачать далі — твій ліхтарик увімкнено');
+      this.hud.toast(t('🌙 НІЧ! Зомбі бачать далі — твій ліхтарик увімкнено'));
     } else if (!isNight && this._nightAnnounced) {
       this._nightAnnounced = false;
-      this.hud.toast('☀️ Світанок! Зомбі знову сонні');
+      this.hud.toast(t('☀️ Світанок! Зомбі знову сонні'));
     }
   }
 

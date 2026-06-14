@@ -41,9 +41,24 @@ try {
   check('кімната заповнена 4 гравцями', host.msg.you === 1 && g2.msg.you === 2 && g3.msg.you === 3 && g4.msg.you === 4,
     `ids ${host.msg.you},${g2.msg.you},${g3.msg.you},${g4.msg.you}`);
 
-  const replacement = await connect('&resume=2');
+  const g2key = g2.msg.rk;
+  check('relay видає секрет слота (rk)', typeof g2key === 'string' && g2key.length >= 8, String(g2key));
+
+  // 🔒 АДВЕРСАРІАЛЬНО: resume без правильного ключа НЕ перехоплює чужий слот
+  const noKey = await connect('&resume=2');
+  opened.push(noKey.ws);
+  check('resume БЕЗ ключа не перехоплює слот (повна кімната → full)',
+    noKey.msg.t === 'err' && noKey.msg.code === 'full', JSON.stringify(noKey.msg));
+  const badKey = await connect('&resume=2&resumeKey=nonsense-key');
+  opened.push(badKey.ws);
+  check('resume з НЕВІРНИМ ключем не перехоплює слот (→ full)',
+    badKey.msg.t === 'err' && badKey.msg.code === 'full', JSON.stringify(badKey.msg));
+  // старий сокет pid=2 НЕ постраждав від спроб перехоплення
+  check('живий гість pid=2 не вибитий хибним resume', g2.ws.readyState === WebSocket.OPEN);
+
+  const replacement = await connect('&resume=2&resumeKey=' + encodeURIComponent(g2key));
   opened.push(replacement.ws);
-  check('resume у повній кімнаті повертає той самий pid', replacement.msg.t === 'relay' && replacement.msg.you === 2,
+  check('resume з ПРАВИЛЬНИМ ключем повертає той самий pid', replacement.msg.t === 'relay' && replacement.msg.you === 2,
     JSON.stringify(replacement.msg));
 
   let oldClosed = false;

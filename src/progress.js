@@ -180,7 +180,15 @@ export class DailyQuests {
     // 🕒 анти-фарм: переведення годинника НАЗАД не дає нових квестів — лише рух уперед.
     // Ключі формату YYYY-MM-DD порівнюються лексикографічно = хронологічно.
     const maxKey = (saved && saved.maxKey) || (saved && saved.date) || '';
-    if (!forceKey && key < maxKey && saved && Array.isArray(saved.list) && saved.list.length) return;
+    if (!forceKey && key < maxKey && saved && Array.isArray(saved.list) && saved.list.length) {
+      // набір квестів заморожено анти-фармом, але мова інтерфейсу може йти за активною
+      if (saved.lang !== lang) {
+        for (const q of saved.list) q.title = this._resolveTitle(q);
+        saved.lang = lang;
+        this.game.saveGame();
+      }
+      return;
+    }
     // сід із дати
     let seed = 0;
     for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;

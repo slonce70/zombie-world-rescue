@@ -3,6 +3,17 @@ import * as THREE from 'three';
 import { toonMat } from './characters.js';
 import { closestRaySeg, disposeObject } from './utils.js';
 
+// квадрат найкоротшої відстані від точки (px,py,pz) до відрізка a→b (обидва THREE.Vector3)
+function segPointDist2(a, b, px, py, pz) {
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const apx = px - a.x, apy = py - a.y, apz = pz - a.z;
+  const ab2 = abx * abx + aby * aby + abz * abz;
+  let t = ab2 > 1e-9 ? (apx * abx + apy * aby + apz * abz) / ab2 : 0;
+  if (t < 0) t = 0; else if (t > 1) t = 1;
+  const dx = apx - abx * t, dy = apy - aby * t, dz = apz - abz * t;
+  return dx * dx + dy * dy + dz * dz;
+}
+
 export class Effects {
   constructor(scene, world, audio) {
     this.scene = scene;
@@ -44,6 +55,7 @@ export class Effects {
     }
     this._up = new THREE.Vector3(0, 1, 0);
     this._tmpDir = new THREE.Vector3();
+    this._sbOld = new THREE.Vector3(); // позиція снаряда ДО руху (swept-перевірка влучання)
 
     // спалах пострілу
     this.flashLight = new THREE.PointLight(0xffc966, 0, 9);
@@ -92,6 +104,21 @@ export class Effects {
       this.dmgPool.push({ spr, cv, tex, life: 0, vy: 0 });
     }
     this._dmgIdx = 0;
+  }
+
+  // звільнити standalone GPU-ресурси цього рівня (НЕ спільні toon-матеріали з userData.shared).
+  // Частину з них (оригінал tracerMat, гео монет/набоїв/снарядів/гранат) обхід сцени в endLevel
+  // не дістає, бо вони не висять у сцені окремими вузлами — тож звільняємо явно. Викликає endLevel.
+  dispose() {
+    const sc = this.scene;
+    sc.remove(this.pMesh, this.flashLight);
+    for (const t of this.tracerPool) { sc.remove(t.mesh); if (t.mesh.material) t.mesh.material.dispose(); }
+    for (const d of this.dmgPool) { sc.remove(d.spr); if (d.spr.material) d.spr.material.dispose(); if (d.tex) d.tex.dispose(); }
+    this.pMesh.geometry.dispose();
+    this.pMesh.material.dispose();
+    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo]) g.dispose();
+    for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat]) m.dispose();
+    // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
   }
 
   // предмет створено: дати мережевий id і (на хості) розіслати гостям
@@ -771,14 +798,17 @@ export class Effects {
         this._tmpDir.copy(pr.v).divideScalar(speed);
         blockedAt = this.world.shotBlockDist(pr.mesh.position, this._tmpDir, frameDist + pr.size);
       }
+      this._sbOld.copy(pr.mesh.position); // ДО руху — для swept-перевірки влучання
       pr.mesh.position.addScaledVector(pr.v, dt);
       const mp = pr.mesh.position;
       let hit = blockedAt <= frameDist + pr.size;
+      // влучання в гравця рахуємо вздовж усього відрізка [стара→нова позиція], а не лише
+      // в кінцевій точці: інакше швидкий снаряд на низькому FPS «перестрибує» гравця за кадр
+      const rr = (pr.size + 0.62) * (pr.size + 0.62);
       if (!hit && pr.dmg > 0) {
         for (const tgt of dmgTargets) {
           const tpv = tgt.pos;
-          const dx = mp.x - tpv.x, dy = mp.y - (tpv.y + 1.1), dz = mp.z - tpv.z;
-          if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) {
+          if (segPointDist2(this._sbOld, mp, tpv.x, tpv.y + 1.1, tpv.z) < rr) {
             if (this.onProjectileHit) this.onProjectileHit(pr.dmg, mp.x, mp.z, tgt);
             hit = true;
             break;
@@ -786,8 +816,7 @@ export class Effects {
         }
       } else if (!hit && ppos) {
         // dmg=0 (дзеркало): зникає біля свого гравця без шкоди
-        const dx = mp.x - ppos.x, dy = mp.y - (ppos.y + 1.1), dz = mp.z - ppos.z;
-        if (dx * dx + dy * dy + dz * dz < (pr.size + 0.62) * (pr.size + 0.62)) hit = true;
+        if (segPointDist2(this._sbOld, mp, ppos.x, ppos.y + 1.1, ppos.z) < rr) hit = true;
       }
       if (!hit && mp.y < this.world.groundH(mp.x, mp.z) + pr.size * 0.5) hit = true;
       if (pr.spin) pr.mesh.rotation.x += dt * 9; // багет крутиться в польоті

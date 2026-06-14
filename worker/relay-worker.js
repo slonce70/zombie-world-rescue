@@ -80,9 +80,10 @@ export class Room {
     }
     const create = url.searchParams.get('create') === '1';
     const resume = parseInt(url.searchParams.get('resume') || '0', 10);
+    const resumeKey = url.searchParams.get('resumeKey') || '';
     const peers = this._peers();
 
-    let id;
+    let id, validResume = false;
     if (create) {
       if (peers.has(1)) return new Response('taken', { status: 409 });
       id = 1;
@@ -91,9 +92,15 @@ export class Room {
     } else {
       const alive = await this.state.storage.get('alive');
       if (!alive) return this._rejectSocket('noroom');
-      if (resume >= 2) {
+      // resume чесний лише з правильним СЕКРЕТНИМ ключем цього pid (видається при першому вході).
+      // Без нього будь-хто з кодом кімнати міг би вибити конкретного гостя й зайняти його слот
+      // (impersonation), тож невалідний resume трактуємо як звичайне нове приєднання.
+      if (resume >= 2 && resumeKey) {
+        const stored = await this.state.storage.get('key:' + resume);
+        if (stored && resumeKey === stored) validResume = true;
+      }
+      if (validResume) {
         // resume замінює старий сокет тим самим id навіть якщо кімната формально повна.
-        // Інакше reconnect отримував би новий pid або "full", а close старого сокета викидав би гостя.
         if (!peers.has(resume) && peers.size >= MAX_PLAYERS) return this._rejectSocket('full');
         id = resume;
       } else {
@@ -103,15 +110,20 @@ export class Room {
       }
     }
 
+    // секрет слота: при валідному resume лишаємо той самий, інакше — новий невгадуваний
+    let key = validResume ? await this.state.storage.get('key:' + id) : null;
+    if (!key) key = crypto.randomUUID();
+    await this.state.storage.put('key:' + id, key);
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
-    server.serializeAttachment({ id });
+    server.serializeAttachment({ id, key });
     server.send(JSON.stringify({
-      t: 'relay', you: id, isHost: id === 1,
+      t: 'relay', you: id, isHost: id === 1, rk: key,
       peers: [...peers.keys()].filter((p) => p !== id),
     }));
-    const replaced = resume >= 2 ? peers.get(id) : null;
+    const replaced = validResume ? peers.get(id) : null;
     if (replaced) {
       try { replaced.close(1000, 'resume'); } catch (e) { /* ignore */ }
     }
@@ -234,11 +246,27 @@ export class Lobby {
     this.state = state;
     this.players = new Map(); // cid -> {nick, ts}
     this.rooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
+    this._ping = new Map();   // ip -> {n, t0} (анти-флуд пінгів, як _claimAllowed у SaveVault)
+  }
+
+  // нормальний клієнт пінгує раз на ~8с; 30/10с з однієї IP — щедрий запас, але стеля проти флуду
+  _pingAllowed(ip) {
+    const now = Date.now();
+    let r = this._ping.get(ip);
+    if (!r || now - r.t0 > 10_000) { r = { n: 0, t0: now }; this._ping.set(ip, r); }
+    if (this._ping.size > 5000) this._ping.clear();
+    return ++r.n <= 30;
   }
 
   _prune(now) {
     for (const [cid, p] of this.players) if (now - p.ts > LOBBY_TTL) this.players.delete(cid);
     for (const [code, r] of this.rooms) if (now - r.ts > LOBBY_TTL) this.rooms.delete(code);
+    // жорстка стеля: якщо після прибирання простроченого мапа все одно завелика
+    // (флуд унікальними cid у межах TTL) — викидаємо найстаріші записи
+    if (this.players.size > 800) {
+      const old = [...this.players.entries()].sort((a, b) => a[1].ts - b[1].ts);
+      for (let i = 0; i < old.length - 800; i++) this.players.delete(old[i][0]);
+    }
   }
 
   _view(now) {
@@ -274,6 +302,8 @@ export class Lobby {
     try {
       if (url.pathname === '/lobby/state') return this.json(this._view(now));
       if (url.pathname === '/lobby/ping' && request.method === 'POST') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        if (!this._pingAllowed(ip)) return this.json({ error: 'rate' }, 429);
         const d = await request.json();
         const cid = String(d.cid || '').slice(0, 40);
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);

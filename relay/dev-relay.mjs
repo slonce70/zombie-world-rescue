@@ -220,20 +220,23 @@ wss.on('connection', (ws, req) => {
   const code = (url.searchParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
   const create = url.searchParams.get('create') === '1';
   const resumeId = parseInt(url.searchParams.get('resume') || '0', 10);
+  const resumeKey = url.searchParams.get('resumeKey') || '';
   if (!code) { send(ws, { t: 'err', code: 'badroom' }); ws.close(); return; }
 
   let room = rooms.get(code);
   if (create) {
     if (room && room.sockets.has(1)) { send(ws, { t: 'err', code: 'taken' }); ws.close(); return; }
-    if (!room) { room = { sockets: new Map(), nextId: 2, hostTimer: null }; rooms.set(code, room); }
+    if (!room) { room = { sockets: new Map(), nextId: 2, hostTimer: null, keys: new Map() }; rooms.set(code, room); }
   } else if (!room) {
     send(ws, { t: 'err', code: 'noroom' }); ws.close(); return;
   }
+  if (!room.keys) room.keys = new Map();
 
-  let id;
+  let id, validResume = false;
   if (create) id = 1;
-  else if (resumeId >= 2) {
-    // resume замінює старий сокет тим самим id навіть коли кімната повна
+  else if (resumeId >= 2 && resumeKey && room.keys.get(resumeId) === resumeKey) {
+    // resume чесний лише з правильним секретом слота (дзеркалить воркер: анти-перехоплення pid)
+    validResume = true;
     if (!room.sockets.has(resumeId) && room.sockets.size >= MAX_PLAYERS) { send(ws, { t: 'err', code: 'full' }); ws.close(); return; }
     id = resumeId;
   } else {
@@ -242,9 +245,11 @@ wss.on('connection', (ws, req) => {
   }
 
   if (id === 1 && room.hostTimer) { clearTimeout(room.hostTimer); room.hostTimer = null; }
-  const replaced = resumeId >= 2 ? room.sockets.get(id) : null;
+  const key = validResume ? room.keys.get(id) : (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+  room.keys.set(id, key);
+  const replaced = validResume ? room.sockets.get(id) : null;
   room.sockets.set(id, ws);
-  send(ws, { t: 'relay', you: id, isHost: id === 1, peers: [...room.sockets.keys()].filter((p) => p !== id) });
+  send(ws, { t: 'relay', you: id, isHost: id === 1, rk: key, peers: [...room.sockets.keys()].filter((p) => p !== id) });
   if (replaced) replaced.close(1000, 'resume');
   for (const [pid, sock] of room.sockets) if (pid !== id) send(sock, { t: 'peer', id, on: true });
   console.log(`[relay] ${code}: +${id} (${room.sockets.size} у кімнаті)`);

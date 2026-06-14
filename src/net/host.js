@@ -107,6 +107,11 @@ export class HostNet {
       case 'p': {
         // гість, якого вже прибрали з ростера — ігноруємо (не воскрешаємо рігів)
         if (!this.session.roster.has(from)) return true;
+        // позиція — найчастіший пакет і потрапляє у снапшот для ВСІХ; NaN/Infinity тут зламали б
+        // інтерполяцію рига в усієї кімнати (JSON перетворює їх на null). Відкидаємо такий пакет —
+        // як уже роблять nade/rocket через isVec3. hp/mhp теж тримаємо скінченними.
+        if (!(Number.isFinite(d.x) && Number.isFinite(d.y) && Number.isFinite(d.z)
+              && Number.isFinite(d.yaw) && Number.isFinite(d.pi))) return true;
         let rp = this.remotes.get(from);
         if (!rp) {
           const info = this.session.roster.get(from) || {};
@@ -116,7 +121,9 @@ export class HostNet {
           this.remotes.set(from, rp);
           this._rebuildPlayers();
         }
-        rp.apply(d.x, d.y, d.z, d.yaw, d.pi, d.hp, d.mhp, d.w, d.f, d.ri ?? -1, d.em || null);
+        const hp = Math.max(0, Math.min(100000, Number(d.hp) || 0));
+        const mhp = Math.max(1, Math.min(100000, Number(d.mhp) || 100));
+        rp.apply(d.x, d.y, d.z, d.yaw, d.pi, hp, mhp, d.w, d.f, d.ri ?? -1, d.em || null);
         rp.holdE = (d.f & PF.HOLDE) !== 0;
         rp.magnet = (d.f & 1024) !== 0;
         rp._lastP = performance.now();
@@ -272,7 +279,11 @@ export class HostNet {
   _onGadget(from, d) {
     const level = this.level;
     const rp = this.remotes.get(from);
-    if (!rp || Math.hypot(rp.pos.x - d.x, rp.pos.z - d.z) > 6) return;
+    if (!rp) return;
+    // NaN/Infinity-координати обходять перевірки відстані нижче (NaN > 6 === false), тож гаджет
+    // міг би лягти в NaN-точку й піти у снапшот усім. Відкидаємо нескінченні координати/кут.
+    if (!Number.isFinite(d.x) || !Number.isFinite(d.z) || (d.yaw != null && !Number.isFinite(d.yaw))) return;
+    if (Math.hypot(rp.pos.x - d.x, rp.pos.z - d.z) > 6) return;
     const solved = level.world.collide(d.x, d.z, 0.7);
     if (Math.hypot(solved.x - d.x, solved.z - d.z) > 0.4) return;
     if (d.kind === 'wall') level.gadgets.placeWallAt(d.x, d.z, d.yaw, from);

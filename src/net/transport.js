@@ -31,6 +31,7 @@ export class Transport {
     this.isHost = false;
     this.room = null;
     this.connected = false;
+    this.resumeKey = ''; // секрет слота від relay — echo-ається при reconnect (анти-перехоплення pid)
     this.onMessage = null;   // (fromId, data)
     this.onPeer = null;      // (id, on)
     this.onOpen = null;      // ({you, isHost, peers})
@@ -51,7 +52,7 @@ export class Transport {
     this._q.length = 0;
     const base = relayUrl().replace(/\/+$/, '');
     if (base.includes('YOUR-ACCOUNT')) return Promise.reject(new Error('norelay'));
-    const url = `${base}/ws?room=${encodeURIComponent(room)}${create ? '&create=1' : ''}${resume ? `&resume=${resume}` : ''}`;
+    const url = `${base}/ws?room=${encodeURIComponent(room)}${create ? '&create=1' : ''}${resume ? `&resume=${resume}` : ''}${resume && this.resumeKey ? `&resumeKey=${encodeURIComponent(this.resumeKey)}` : ''}`;
     return new Promise((resolve, reject) => {
       let settled = false;
       let ws;
@@ -71,6 +72,7 @@ export class Transport {
         if (msg.t === 'relay') {
           this.you = msg.you;
           this.isHost = msg.isHost;
+          if (msg.rk) this.resumeKey = msg.rk; // запам'ятовуємо секрет слота для майбутнього reconnect
           this.connected = true;
           if (!settled) { settled = true; clearTimeout(timer); resolve(msg); }
           if (this.onOpen) this.onOpen(msg);

@@ -126,7 +126,7 @@ export class CoopUI {
         game._hideOverlay('overlay-net-wait');
         this.session.leave();
         if (game.state === 'level') game.endLevel();
-        game.hud.toast('🚪 Ти вийшов з кімнати');
+        game.hud.toast(t('🚪 Ти вийшов з кімнати'));
         this._syncPolling();
         this.updateRoomChip();
       });

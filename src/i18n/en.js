@@ -663,6 +663,7 @@ export const EN = {
 "G — кинути": "G to throw",
 "E — забрати": "E to pick up",
 "тягни джойстик до краю — біг": "drag the stick to the edge — run",
+"Shift — біг": "Shift — run",
 "G": "G",
 "F": "F",
 "E": "E",
