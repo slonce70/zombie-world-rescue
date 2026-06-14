@@ -373,21 +373,21 @@ body.in-level #hud { display: block; }
 }
 /* бойовий кластер: сітка 3×2 + велика кнопка вогню внизу праворуч */
 #touch-right {
-  position: fixed; right: 10px; bottom: 78px; display: grid;
+  position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); display: grid;
   grid-template-columns: repeat(3, 50px); gap: 6px;
   justify-items: center; align-items: center; pointer-events: auto;
 }
 #tb-fire { grid-column: 2 / 4; justify-self: end; }
 /* службові кнопки — рядок угорі, лівіше мінімапи */
 #touch-util {
-  position: fixed; top: 8px; right: 108px; display: flex; gap: 6px; pointer-events: auto;
+  position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(108px + env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto;
 }
 /* компактний HUD у тач-режимі: нічого не накладається */
-body.touch-mode #ammo { right: 178px; bottom: 10px; }
-body.touch-mode #health { bottom: 14px; left: 12px; }
-body.touch-mode #topright { top: 8px; right: 8px; gap: 4px; }
-body.touch-mode #minimap { width: 88px; height: 88px; }
-body.touch-mode #coins { position: fixed; top: 8px; right: 318px; padding: 6px 12px; font-size: 17px; }
+body.touch-mode #ammo { right: calc(178px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); }
+body.touch-mode #health { bottom: calc(14px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left)); }
+body.touch-mode #topright { top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); gap: 4px; }
+body.touch-mode #minimap { width: 116px; height: 116px; }
+body.touch-mode #coins { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(318px + env(safe-area-inset-right)); padding: 6px 12px; font-size: 17px; }
 body.touch-mode #bossbar { top: 48px; width: min(280px, 34vw); }
 body.touch-mode #boss-name { font-size: 12px; letter-spacing: 1px; margin-bottom: 3px; }
 body.touch-mode #boss-bar-bg { height: 12px; }
@@ -413,10 +413,10 @@ body.touch-mode #waypoint { font-size: 13px; }
 @media (max-height: 400px) {
   .tb { width: 44px; height: 44px; font-size: 18px; }
   .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
-  #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: 70px; }
-  body.touch-mode #minimap { width: 74px; height: 74px; }
-  body.touch-mode #touch-util { right: 92px; }
-  body.touch-mode #coins { right: 298px; }
+  #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(70px + env(safe-area-inset-bottom)); }
+  body.touch-mode #minimap { width: 98px; height: 98px; }
+  body.touch-mode #touch-util { right: calc(92px + env(safe-area-inset-right)); }
+  body.touch-mode #coins { right: calc(298px + env(safe-area-inset-right)); }
 }
 
 /* компактний HUD на малих екранах */
@@ -615,7 +615,7 @@ body.touch-mode #waypoint { font-size: 13px; }
 .scope-t1 { top: calc(50% + 7vh); }
 .scope-t2 { top: calc(50% + 12vh); }
 /* кнопка оптики на мобільному — біля кнопки вогню, лише коли в руках снайперка */
-#tb-scope { position: fixed; right: 100px; bottom: 84px; display: none; pointer-events: auto; }
+#tb-scope { position: fixed; right: calc(100px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom)); display: none; pointer-events: auto; }
 #tb-scope.avail { display: block; }
 #tb-scope.on { background: rgba(255, 210, 63, 0.45); border-color: var(--accent); }
 

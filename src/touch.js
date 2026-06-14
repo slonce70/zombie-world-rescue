@@ -31,7 +31,7 @@ export class TouchControls {
     canvas.addEventListener('touchcancel', (e) => this._onEnd(e), { passive: false });
 
     // кнопки
-    this._bindButton('tb-fire', () => { this.input.mouseDown = true; this.input.justClicked = true; }, () => { this.input.mouseDown = false; });
+    this._bindButton('tb-fire', () => { this.input.mouseDown = true; this.input.justClicked = true; this._vibe(15); }, () => { this.input.mouseDown = false; });
     this._bindButton('tb-jump', () => this._press('Space'));
     this._bindButton('tb-reload', () => this._press('KeyR'));
     this._bindButton('tb-interact', () => this._press('KeyE'), () => this.input.keys.delete('KeyE'), true);
@@ -44,6 +44,12 @@ export class TouchControls {
     this._bindButton('tb-shop', () => {
       if (this.game.state === 'level') this.game.shop.toggle();
     });
+    this._bindButton('tb-mute', () => {
+      const a = this.game.audio;
+      a.setMuted(!a.muted);
+      this._syncMute();
+    });
+    this._syncMute();
     this._bindButton('tb-pause', () => {
       const g = this.game;
       if (g.state === 'level' && !g.paused && g.deathT < 0 && !g.victoryShown && !g.shop.isOpen) {
@@ -67,6 +73,7 @@ export class TouchControls {
       e.preventDefault();
       e.stopPropagation();
       el.classList.add('active');
+      this._vibe(8); // тактильний «клік» — дитина відчуває натискання
       onDown();
     }, { passive: false });
     const up = (e) => {
@@ -143,5 +150,17 @@ export class TouchControls {
 
   _setKnob(dx, dy) {
     this.joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+
+  // тактильний відгук (вібро) — лише якщо пристрій підтримує і звук не вимкнено
+  _vibe(ms) {
+    if (this.game.audio && this.game.audio.muted) return;
+    if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } }
+  }
+
+  // іконка кнопки звуку віддзеркалює стан mute
+  _syncMute() {
+    const el = document.getElementById('tb-mute');
+    if (el) el.textContent = (this.game.audio && this.game.audio.muted) ? '🔇' : '🔊';
   }
 }

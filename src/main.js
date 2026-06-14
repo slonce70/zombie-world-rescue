@@ -1493,7 +1493,9 @@ class Game {
             this.level.player.respawn();
             if (!this.level.mirror) this.level.zombies.clearNear(this.level.world.layout.SPAWN.x, this.level.world.layout.SPAWN.z, 30);
             this.deathT = -1;
-            if (!this.testMode && !this.input.locked) this._showOverlay('overlay-start');
+            // на тачі pointer-lock не потрібен (і input.locked завжди false) — не показуємо
+            // зайвий екран «торкнись, щоб грати» після кожного респавну
+            if (!this.testMode && !this.input.locked && !this.input.touchMode) this._showOverlay('overlay-start');
           }
         }
       }

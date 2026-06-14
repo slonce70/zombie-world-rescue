@@ -237,6 +237,13 @@ export class HUD {
       if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
     }
 
+    // 🔫 тач: на кнопці перемикання показуємо ПОТОЧНУ зброю — дитина бачить, що тримає
+    if (this._lastWeaponBtn !== p.cur) {
+      this._lastWeaponBtn = p.cur;
+      const wbtn = document.getElementById('tb-weapon');
+      if (wbtn) wbtn.firstChild ? (wbtn.firstChild.textContent = p.weapon.icon) : (wbtn.textContent = p.weapon.icon);
+    }
+
     // стрілка-вказівник до поточної цілі
     this._updateWaypoint(level, p);
 
@@ -466,7 +473,7 @@ export class HUD {
           gx = C + (gdx / gd) * (R - 10);
           gy = C + (gdy / gd) * (R - 10);
         }
-        ctx.font = '13px serif';
+        ctx.font = '18px serif';
         ctx.textAlign = 'center';
         ctx.fillText('⭐', gx, gy + 5);
         continue;
@@ -475,12 +482,12 @@ export class HUD {
       if (d > VIEW) continue;
       const [mx, my] = toMap(z.x, z.z);
       if (z.type === 'boss') {
-        ctx.font = '14px serif';
+        ctx.font = '18px serif';
         ctx.textAlign = 'center';
         ctx.fillText('👑', mx, my + 5);
       } else {
         ctx.beginPath();
-        ctx.arc(mx, my, 3, 0, 6.29);
+        ctx.arc(mx, my, 4.2, 0, 6.29);
         ctx.fillStyle = z.aggroed ? '#ff5544' : '#cc8888';
         ctx.fill();
       }
@@ -526,7 +533,7 @@ export class HUD {
         mx = C + (ddx / dd) * (R - 12);
         my = C + (ddy / dd) * (R - 12);
       }
-      ctx.font = '13px serif';
+      ctx.font = '18px serif';
       ctx.textAlign = 'center';
       ctx.fillText(m.icon, mx, my + 5);
     }
