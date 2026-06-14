@@ -9,6 +9,10 @@ page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 let failed = 0;
 const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
 
+const ignoreExpectedReloadRace = (e) => {
+  if (!/Execution context was destroyed|navigation/i.test(String(e && e.message))) throw e;
+};
+
 // 1. Звичайне завантаження: тег версії, без перезавантажень
 await page.goto('http://localhost:8741/');
 await page.evaluate(() => localStorage.setItem('zr-save-v1', JSON.stringify({ coins: 500, upgrades: {}, liberated: { UKR: true, POL: true }, weapons: [], records: {} })));
@@ -25,8 +29,15 @@ check(r1.tag === 'v' + r1.appV, `тег = v${r1.appV}`);
 
 // 2. Симуляція нової версії на сервері → авто-reload на глобусі (v вище за поточну)
 const newV = r1.appV + 1;
-await page.evaluate((v) => window.__game._onNewVersion(v), newV);
-await page.waitForTimeout(3000);
+const reload = page.waitForEvent('framenavigated', { timeout: 15000 }).catch(() => null);
+await page.evaluate((v) => window.__game._onNewVersion(v), newV).catch(ignoreExpectedReloadRace);
+await reload;
+await page.waitForFunction((v) => (
+  window.__game &&
+  window.__game.state === 'globe' &&
+  sessionStorage.getItem('zr-reload-for') === String(v) &&
+  document.getElementById('version-tag')
+), newV, { timeout: 15000 });
 const r2 = await page.evaluate(() => ({
   reloadedMark: sessionStorage.getItem('zr-reload-for'),
   tag: document.getElementById('version-tag').textContent,
