@@ -22,7 +22,7 @@ export class TouchControls {
     this._wheelLongPressed = false;// чи спрацювало довге натискання (тоді короткий цикл не робимо)
 
     this.root = document.getElementById('touch-ui');
-    this.root.style.display = 'block';
+    // видимість #touch-ui керується CSS (body.touch-mode.in-level) — лише в бою, не в меню
     document.body.classList.add('touch-mode');
     this.joyBase = document.getElementById('joy-base');
     this.joyKnob = document.getElementById('joy-knob');

@@ -369,7 +369,9 @@ body.touch-mode .grenade-key { display: none; }
 .stat.best { background: rgba(255, 210, 63, 0.12); }
 
 /* ================= МОБІЛЬНЕ КЕРУВАННЯ ================= */
+/* тач-кермо видно ЛИШЕ в бою (body.in-level) — на глобусі/в меню джойстик і кнопки сховані */
 #touch-ui { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 15; }
+body.touch-mode.in-level #touch-ui { display: block; }
 /* нижні кнопки прив'язані до low edge малого вьюпорта → завжди над адресним рядком */
 #touch-ui { height: 100dvh; }
 #joy-base {
@@ -677,17 +679,19 @@ body.kid-mode #tb-scope { display: none; }
 .shop-tab:hover { border-color: var(--accent); }
 .shop-tab.on { background: rgba(255, 210, 63, 0.16); border-color: var(--accent); color: var(--accent); }
 
-/* 🔄 портретна орієнтація на телефоні — просимо повернути */
+/* 🔄 портретна орієнтація на телефоні — чистий повноекранний екран «поверни телефон».
+   Непрозоре тло + перехоплення дотиків повністю ховають захаращене меню, що клекоче знизу. */
 #rotate-hint {
   display: none; position: fixed; inset: 0; z-index: 200;
-  background: rgba(10, 18, 30, 0.96); color: #fff;
+  background: radial-gradient(circle at 50% 38%, #16263b 0%, #0a121e 70%, #060b13 100%);
+  color: #fff; pointer-events: auto;
   flex-direction: column; align-items: center; justify-content: center;
   text-align: center; gap: 14px; padding: 30px;
 }
-#rotate-hint .rh-icon { font-size: 64px; animation: rh-spin 2s ease-in-out infinite; }
+#rotate-hint .rh-icon { font-size: 96px; animation: rh-spin 2s ease-in-out infinite; }
 @keyframes rh-spin { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
-#rotate-hint .rh-text { font-size: 20px; font-weight: 900; }
-#rotate-hint .rh-sub { font-size: 14px; color: #9fb8d4; font-weight: 700; }
+#rotate-hint .rh-text { font-size: 24px; font-weight: 900; }
+#rotate-hint .rh-sub { font-size: 15px; color: #9fb8d4; font-weight: 700; }
 @media (orientation: portrait) and (max-width: 620px) {
   body.touch-mode #rotate-hint { display: flex; }
 }
@@ -711,10 +715,10 @@ body.touch-mode .touch-legend {
 #touch-coach { display: none; position: fixed; inset: 0; z-index: 60;
   background: rgba(6, 12, 20, 0.82); backdrop-filter: blur(2px);
   color: #fff; font-family: var(--font);
-  animation: coach-in .35s ease both;
+  opacity: 1; /* видимість гарантована display+opacity, НЕ анімацією (інакше reduced-motion/headless лишає коуч прозорим) */
+  transition: opacity .35s ease;
 }
 body.touch-mode #touch-coach.show { display: block; }
-@keyframes coach-in { from { opacity: 0; } to { opacity: 1; } }
 .coach-zone { position: absolute; top: 0; bottom: 0; width: 42%;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .coach-left { left: 0; border-right: 3px dashed rgba(90, 212, 101, 0.55); }

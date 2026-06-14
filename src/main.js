@@ -408,6 +408,8 @@ class Game {
       el.classList.remove('show');
       el.setAttribute('aria-hidden', 'true');
       try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      // 🔊 тап по коучу = той самий жест, що й клік по «торкнись, щоб грати»: розблоковуємо звук
+      if (this.input.onUserGesture) this.input.onUserGesture();
       el.removeEventListener('touchstart', dismiss);
       el.removeEventListener('mousedown', dismiss);
     };
@@ -999,10 +1001,14 @@ class Game {
 
     if (this.testMode) {
       this.audio.setMode('calm');
+    } else if (this.touch) {
+      // 📱 ТЕЛЕФОН: жодного стеку оверлеїв. Перший раз — лише коуч (він і є «торкнись, щоб почати»
+      // + його тап розблоковує звук). Далі звук уже розблоковано → нічого не перекриває гру.
+      this._maybeShowTouchCoach();
     } else {
+      // 🖱️ ДЕСКТОП: екран «клікни, щоб грати» (захоплення курсора) — без змін.
       this._showOverlay('overlay-start');
     }
-    this._maybeShowTouchCoach(); // 👆 перше знайомство з керуванням (раз, лише на телефоні)
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, bannerSub, 4.5);
   }
