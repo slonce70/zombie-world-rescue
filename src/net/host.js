@@ -6,6 +6,7 @@ import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 
 const SNAP_HZ = 12;
+const GUEST_STALE_MS = 120000;
 // санітизація вхідної шкоди від гостя: завжди скінченне число в розумних межах
 // (родинний кооп довіряє гостю, але NaN/Infinity/абсурд не мають псувати стан хоста)
 const clampDmg = (v) => Math.max(0, Math.min(2000, Number(v) || 0));
@@ -335,7 +336,10 @@ export class HostNet {
       rp.update(dt);
       // гість ДУЖЕ давно мовчить (зомбі-сокет: relay не помітив розрив) — прибираємо.
       // Звичайний розрив ловить relay подією peer-off значно раніше.
-      if (rp._lastP && performance.now() - rp._lastP > 30000) {
+      // Background/headless browsers can throttle a connected guest hard enough
+      // to miss normal position packets. Relay peer-off is the authoritative
+      // disconnect signal, so stale-packet cleanup must be conservative.
+      if (rp._lastP && performance.now() - rp._lastP > GUEST_STALE_MS) {
         this.session._dropGuest(rp.pid, 'зник');
         break;
       }

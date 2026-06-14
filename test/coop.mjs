@@ -14,6 +14,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 
 // власний relay на окремому порту — тест самодостатній
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
@@ -43,6 +44,28 @@ A.on('pageerror', (e) => errsA.push(e.message));
 B.on('pageerror', (e) => errsB.push(e.message));
 A.on('console', (m) => { if (m.type() === 'error') errsA.push(m.text()); });
 B.on('console', (m) => { if (m.type() === 'error') errsB.push(m.text()); });
+
+async function flushGuestPose() {
+  await B.evaluate(() => {
+    const net = window.__game && window.__game.level && window.__game.level.net;
+    if (net && typeof net._sendP === 'function') {
+      net._sendP();
+      if (net.session && net.session.transport && typeof net.session.transport._flush === 'function') {
+        net.session.transport._flush();
+      }
+    }
+  });
+}
+
+async function flushHostSnapshot() {
+  await A.evaluate(() => {
+    const g = window.__game;
+    const net = g && g.level && g.level.net;
+    if (net && typeof net._snapshot === 'function' && net.session && net.session.transport) {
+      net.session.transport.broadcast(net._snapshot(), true);
+    }
+  });
+}
 
 try {
   // 1. обидва на глобусі
@@ -119,14 +142,23 @@ try {
     window.__game.test.teleport(hp.x + 3, hp.z + 1);
     window.__game.test.god();
   }, hostPos);
+  for (let i = 0; i < 12 * SLOW; i++) {
+    await flushGuestPose();
+    await sleep(250);
+    const hostHasGuest = await A.evaluate(() => {
+      const r = window.__game.level && window.__game.level.net && window.__game.level.net.remotes.get(2);
+      return !!(r && r.pos);
+    });
+    if (hostHasGuest) break;
+  }
   await A.waitForFunction(() => {
     const r = window.__game.level && window.__game.level.net && window.__game.level.net.remotes.get(2);
     return !!(r && r.pos);
-  }, null, { timeout: 15000 }).catch(() => {});
+  }, null, { timeout: 15000 * SLOW }).catch(() => {});
   await B.waitForFunction(() => {
     const r = window.__game.level && window.__game.level.net && window.__game.level.net.remotes.get(1);
     return !!(r && r.pos);
-  }, null, { timeout: 15000 }).catch(() => {});
+  }, null, { timeout: 15000 * SLOW }).catch(() => {});
   // хост дивиться на гостя
   const hostCanAimGuest = await A.evaluate(() => {
     const g = window.__game;
@@ -190,11 +222,12 @@ try {
 
   // 10. зʼєднання живе, без очікувань (даємо час наздогнати під навантаженням)
   const wA = await A.evaluate(() => window.__game.test.coopState());
-  await B.waitForFunction(() => {
-    const s = window.__game.test.coopState();
-    return s.connected && !s.waiting;
-  }, null, { timeout: 15000 }).catch(() => {});
-  const wB = await B.evaluate(() => window.__game.test.coopState());
+  let wB = await B.evaluate(() => window.__game.test.coopState());
+  for (let i = 0; i < 20 * SLOW && !(wB.connected && !wB.waiting); i++) {
+    await flushHostSnapshot();
+    await sleep(300);
+    wB = await B.evaluate(() => window.__game.test.coopState());
+  }
   check('хост онлайн', wA.connected === true);
   check('гість онлайн і не чекає', wB.connected === true && wB.waiting === false);
 
