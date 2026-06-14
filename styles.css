@@ -409,6 +409,14 @@ body.touch-mode #waypoint { font-size: 13px; }
   background: var(--accent); color: #5a3c00; border-radius: 9px;
   font-size: 11px; font-weight: 900; line-height: 18px; padding: 0 3px;
 }
+/* 🐣 Режим Малюк: більші кнопки + ховаємо рідковживане для найменших */
+body.kid-mode .tb { width: 60px; height: 60px; font-size: 26px; }
+body.kid-mode .tb.tb-big { width: 92px; height: 92px; font-size: 40px; }
+body.kid-mode .tb.tb-small { width: 52px; height: 52px; font-size: 22px; }
+body.kid-mode #tb-dance,
+body.kid-mode #tb-camera,
+body.kid-mode #tb-scope { display: none; }
+
 /* дуже низькі екрани — все трохи менше */
 @media (max-height: 400px) {
   .tb { width: 44px; height: 44px; font-size: 18px; }

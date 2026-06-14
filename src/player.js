@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, bakeGroupMeshes } from './characters.js';
 
-import { clamp, damp, lerp } from './utils.js';
+import { clamp, damp, lerp, dampAngle } from './utils.js';
 
 export const WEAPONS = {
   pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, infinite: true },
@@ -275,6 +275,10 @@ export class Player {
       input.consumeMouse();
     }
 
+    // --- 🐣 Режим Малюк: автоприціл + автовогонь (тільки тач, не ламає десктоп) ---
+    this._kidFire = false;
+    if (allowControl) this._kidAimAssist(dt, input);
+
     // --- рух ---
     let mx = 0, mz = 0;
     if (allowControl) {
@@ -441,7 +445,8 @@ export class Player {
     else if (this._clickBuffer > 0) this._clickBuffer -= dt;
     if (allowControl && this.reloading <= 0 && !this.emoting) {
       const w = this.weapon;
-      const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
+      // 🐣 Малюк: ціль у прицілі → стріляємо самі, наче дитина тримає вогонь
+      const trigger = this._kidFire || (w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0));
       if (trigger && this.shootCd <= 0) {
         this._clickBuffer = 0;
         if (this.curAmmo.mag > 0) this._shoot();
@@ -566,6 +571,43 @@ export class Player {
       }
       updateRig(this.rig, dt);
     }
+  }
+
+  // 🐣 Режим Малюк: ніжно довертаємо приціл на найближчого зомбі у передньому
+  // конусі й вмикаємо автовогонь. Працює ЛИШЕ на тачі з увімкненим kidMode —
+  // десктоп/клавіатура не зачіпаються.
+  _kidAimAssist(dt, input) {
+    const level = this.level;
+    const game = level && level.game;
+    if (!game || !game.save.kidMode || !input.touchMode) return;
+    if (this.health <= 0 || this.riding || this.emoting) return;
+    if (!level.zombies) return;
+
+    const eyeY = this.pos.y + 1.62;
+    const fwd = this.forwardVec(this._fwd); // вже нормований
+    let best = null, bestDot = 0.91, bestD = 0; // конус ~24° (cos 24° ≈ 0.913)
+    for (const z of level.zombies.list) {
+      if (z.state === 'dead') continue;
+      const dx = z.x - this.pos.x;
+      const dz = z.z - this.pos.z;
+      const torsoY = z.y + z.rig.height * 0.55;
+      const dy = torsoY - eyeY;
+      const d = Math.hypot(dx, dy, dz);
+      if (d < 0.3 || d > 70) continue;
+      const dot = (fwd.x * dx + fwd.y * dy + fwd.z * dz) / d;
+      if (dot > bestDot) { bestDot = dot; best = z; bestD = Math.hypot(dx, dz); }
+    }
+    if (!best) return;
+
+    // (a) автоприціл — м'яко (rate 9), дитина все одно грубо наводить сама
+    const dx = best.x - this.pos.x, dz = best.z - this.pos.z;
+    const targetYaw = Math.atan2(-dx, -dz);
+    const targetPitch = clamp(Math.atan2((best.y + best.rig.height * 0.55) - eyeY, bestD), -1.45, 1.45);
+    this.yaw = dampAngle(this.yaw, targetYaw, 9, dt);
+    this.pitch = clamp(damp(this.pitch, targetPitch, 9, dt), -1.45, 1.45);
+
+    // (b) автовогонь — сам тисне на гачок (звичайний шлях _shoot із кулдауном/набоями)
+    this._kidFire = true;
   }
 
   _shoot() {

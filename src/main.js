@@ -263,6 +263,18 @@ class Game {
     });
     this._applyQuality();
 
+    // 🐣 Режим Малюк: автоприціл+автовогонь і великі кнопки для найменших
+    const kidBtn = document.getElementById('btn-kid');
+    if (kidBtn) {
+      kidBtn.addEventListener('click', () => {
+        this.save.kidMode = !this.save.kidMode;
+        this.saveGame();
+        this._applyKidMode();
+        this.audio.click();
+      });
+    }
+    this._applyKidMode();
+
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
       this.globe.onResize();
@@ -300,7 +312,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
-      missionRuns: {},
+      missionRuns: {}, kidMode: false,
     };
   }
 
@@ -361,6 +373,14 @@ class Game {
     else this.pixelRatio = Math.min(devicePixelRatio, 1.5);
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(innerWidth, innerHeight);
+  }
+
+  // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (вмикає авто-вогонь і CSS)
+  _applyKidMode() {
+    const on = !!this.save.kidMode;
+    document.body.classList.toggle('kid-mode', on);
+    const btn = document.getElementById('btn-kid');
+    if (btn) btn.textContent = on ? t('🐣 Малюк: вкл') : t('🐣 Малюк: викл');
   }
 
   _qualityWorldOpts() {
@@ -937,6 +957,7 @@ class Game {
 
     this.level = level;
     this.state = 'level';
+    this._applyKidMode(); // 🐣 клас kid-mode активний і в бою
     this.victoryShown = false;
     this._nightAnnounced = false;
     this.paused = false;
