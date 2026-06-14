@@ -409,6 +409,36 @@ body.touch-mode #waypoint { font-size: 13px; }
   background: var(--accent); color: #5a3c00; border-radius: 9px;
   font-size: 11px; font-weight: 900; line-height: 18px; padding: 0 3px;
 }
+/* 🔫 Колесо зброї — велике, дитяче, по центру з напівпрозорим тлом */
+#weapon-wheel {
+  display: none; position: fixed; inset: 0; z-index: 30;
+  background: rgba(6, 12, 22, 0.62);
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none;
+}
+#weapon-wheel.show { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#weapon-wheel-title {
+  color: #fff; font-size: 22px; font-weight: 900; margin-bottom: 16px;
+  text-shadow: 0 2px 8px rgba(0,0,0,.8); letter-spacing: 0.5px;
+}
+#weapon-wheel-grid {
+  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+  max-width: 92vw; padding: 0 12px;
+}
+.ww-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 96px; min-height: 96px; padding: 10px 12px;
+  border-radius: 18px; border: 3px solid rgba(255,255,255,0.45);
+  background: rgba(20, 34, 52, 0.92); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,.5);
+}
+.ww-item:active { transform: scale(0.94); }
+.ww-item.ww-current { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,200,60,0.35), 0 6px 18px rgba(0,0,0,.5); }
+.ww-icon { font-size: 40px; line-height: 1; }
+.ww-name { color: #fff; font-size: 14px; font-weight: 800; margin-top: 5px; }
+.ww-ammo { color: #ffd24a; font-size: 13px; font-weight: 800; margin-top: 2px; }
+
 /* 🐣 Режим Малюк: більші кнопки + ховаємо рідковживане для найменших */
 body.kid-mode .tb { width: 60px; height: 60px; font-size: 26px; }
 body.kid-mode .tb.tb-big { width: 92px; height: 92px; font-size: 40px; }
