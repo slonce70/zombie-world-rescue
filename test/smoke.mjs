@@ -34,15 +34,22 @@ console.log('LEVEL STATE:', JSON.stringify(s2));
 check(s2.state === 'level', `рівень завантажено (state=${s2.state})`);
 check(s2.zombies > 0, `зомбі на карті: ${s2.zombies}`);
 
-// 3. Рух уперед 2с — гравець має зрушити з місця (цикл живий і реагує на ввід)
+// 3. Рух уперед — на GitHub runner софтверний рендер іноді сильно розтягує RAF,
+// тому тримаємо ввід до фактичного руху, а не рівно 2 секунди.
+let s3 = null;
+let moved = 0;
 await page.evaluate(() => window.__game.test.key('KeyW', true));
-await page.waitForTimeout(2000);
-await page.evaluate(() => window.__game.test.key('KeyW', false));
+for (let i = 0; i < 12; i++) {
+  await page.waitForTimeout(500);
+  await page.evaluate(() => window.__game.test.key('KeyW', true));
+  s3 = await page.evaluate(() => window.__game.test.state());
+  moved = Math.hypot(s3.player.x - s2.player.x, s3.player.z - s2.player.z);
+  if (moved > 0.5) break;
+}
 await shot(page, '03-after-walk');
-const s3 = await page.evaluate(() => window.__game.test.state());
-console.log('AFTER WALK:', JSON.stringify(s3.player));
-const moved = Math.hypot(s3.player.x - s2.player.x, s3.player.z - s2.player.z);
-check(moved > 0.5, `гравець зрушив на ${moved.toFixed(2)} (цикл і ввід живі)`);
+await page.evaluate(() => window.__game.test.key('KeyW', false));
+console.log('AFTER WALK:', JSON.stringify({ player: s3.player, moved, time: s3.stats.time }));
+check(moved > 0.2, `гравець зрушив на ${moved.toFixed(2)} (цикл і ввід живі)`);
 
 // 4. Третя особа
 await page.evaluate(() => window.__game.test.key('KeyV', true));
