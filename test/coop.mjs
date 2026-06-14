@@ -119,24 +119,37 @@ try {
     window.__game.test.teleport(hp.x + 3, hp.z + 1);
     window.__game.test.god();
   }, hostPos);
-  await sleep(700);
+  await A.waitForFunction(() => {
+    const r = window.__game.level && window.__game.level.net && window.__game.level.net.remotes.get(2);
+    return !!(r && r.pos);
+  }, null, { timeout: 15000 }).catch(() => {});
+  await B.waitForFunction(() => {
+    const r = window.__game.level && window.__game.level.net && window.__game.level.net.remotes.get(1);
+    return !!(r && r.pos);
+  }, null, { timeout: 15000 }).catch(() => {});
   // хост дивиться на гостя
-  await A.evaluate(() => {
+  const hostCanAimGuest = await A.evaluate(() => {
     const g = window.__game;
     const rp = g.level.net.remotes.get(2);
+    if (!rp || !rp.pos) return false;
     const p = g.level.player;
     const dx = rp.pos.x - p.pos.x, dz = rp.pos.z - p.pos.z;
     g.test.setAim(Math.atan2(-dx, -dz), 0);
+    return true;
   });
+  check('хост має позицію гостя для огляду', hostCanAimGuest);
   await sleep(400);
   await A.screenshot({ path: 'shots/coop-03-host-sees-guest.png' });
-  await B.evaluate(() => {
+  const guestCanAimHost = await B.evaluate(() => {
     const g = window.__game;
     const rp = g.level.net.remotes.get(1);
+    if (!rp || !rp.pos) return false;
     const p = g.level.player;
     const dx = rp.pos.x - p.pos.x, dz = rp.pos.z - p.pos.z;
     g.test.setAim(Math.atan2(-dx, -dz), 0);
+    return true;
   });
+  check('гість має позицію хоста для огляду', guestCanAimHost);
   await sleep(400);
   await B.screenshot({ path: 'shots/coop-04-guest-sees-host.png' });
 
