@@ -222,14 +222,12 @@ try {
   const killsAfter = await B.evaluate(() => window.__game.test.state().stats.kills);
   check('гість вполював зомбі (кредит за кіл)', killsAfter > killsBefore, `кіли: ${killsBefore} → ${killsAfter}`);
 
-  // 10. зʼєднання живе, без очікувань (даємо час наздогнати під навантаженням)
+  // 10. зʼєднання живе: kill-credit вище вже довів двосторонній канал,
+  // тут лише фіксуємо фінальний стан без довгого polling на повільному CI.
+  await flushHostSnapshot();
+  await sleep(500 * SLOW);
   const wA = await A.evaluate(() => window.__game.test.coopState());
-  let wB = await B.evaluate(() => window.__game.test.coopState());
-  for (let i = 0; i < 20 * SLOW && !(wB.connected && !wB.waiting); i++) {
-    await flushHostSnapshot();
-    await sleep(300);
-    wB = await B.evaluate(() => window.__game.test.coopState());
-  }
+  const wB = await B.evaluate(() => window.__game.test.coopState());
   check('хост онлайн', wA.connected === true);
   check('гість онлайн і не чекає', wB.connected === true && wB.waiting === false);
 

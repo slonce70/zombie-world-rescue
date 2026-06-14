@@ -6,6 +6,7 @@ import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 
 const NICK_KEY = 'zr-nick';
+const JOIN_WELCOME_TIMEOUT_MS = 30000;
 
 export function loadNick() {
   try { return localStorage.getItem(NICK_KEY) || ''; } catch (e) { return ''; }
@@ -103,7 +104,7 @@ export class CoopSession {
           this.transport.close();
           this._reset();
         }
-      }, 15000);
+      }, JOIN_WELCOME_TIMEOUT_MS);
     });
     return this.room;
   }

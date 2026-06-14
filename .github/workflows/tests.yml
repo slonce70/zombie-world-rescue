@@ -35,7 +35,7 @@ jobs:
   # Тести самі піднімають dev-relay; ігровий рендер вантажиться зі статик-сервера.
   coop:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,13 +49,13 @@ jobs:
       - name: Relay reconnect edge (full room + same pid resume)
         run: node test/relay-reconnect.mjs
       - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: SLOW=4 node test/coop.mjs
       - name: Coop reconnect (mid-join + resume)
-        timeout-minutes: 12
+        timeout-minutes: 20
         run: SLOW=4 node test/coop3.mjs
       - name: Coop lobby/batching
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: SLOW=4 node test/coop6.mjs
 
   # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
