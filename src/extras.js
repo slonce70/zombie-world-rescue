@@ -1,6 +1,6 @@
 // Іграшки рівня: 🦙 Мегабокс, 🐶 пес Дружок, 🛴 самокати, 🦘🧱 гаджети
 import * as THREE from 'three';
-import { t } from './i18n.js';
+import { t, keyHint } from './i18n.js';
 import {
   makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
 } from './characters.js';
@@ -389,7 +389,8 @@ export const GADGETS = {
   shield: { name: t('Щит'), icon: '🛡️', cd: 30, price: 300, desc: t('Аварійна бульбашка: поглинає 50 шкоди') },
   heal: { name: t('Відновлення'), icon: '💚', cd: 25, price: 250, desc: t('+50 здоров\'я миттєво') },
   tramp: { name: t('Кишеньковий батут'), icon: '🦘', cd: 20, price: 150, desc: t('Постав і застрибни на дах') },
-  wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 200, desc: t('Стіна на 100 міцності (E — забрати)') },
+  // desc — getter: текст «забрати» залежить від керування і читається у момент показу
+  wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 200, get desc() { return t('Стіна на 100 міцності ({k})', { k: keyHint('кнопка ✋ — забрати', 'E — забрати') }); } },
   // 🤖 преміум: автоматична вогнева підтримка
   turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 450, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
 };

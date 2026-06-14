@@ -37,6 +37,27 @@ export function setLang(l) {
   location.reload();
 }
 
+// 📱 Чи зараз сенсорне керування (телефон/планшет або ?touch).
+// Читаємо ЖИВИЙ стан гри, бо словники й описи будуються при завантаженні
+// модулів, коли input ще не існує — тому перевірка має бути у момент показу.
+export function isTouchUI() {
+  try {
+    if (window.__game && window.__game.input) return !!window.__game.input.touchMode;
+  } catch (e) { /* ignore */ }
+  try {
+    return document.body && document.body.classList.contains('touch-mode');
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+// 🎮 Підказка, що залежить від керування:
+// на сенсорі показуємо екранну кнопку/жест, на ПК — назву клавіші.
+// Обидва тексти проганяємо через t(), щоб переклад працював.
+// keyHint('тягни джойстик до краю', 'Shift') → потрібний варіант уже перекладений.
+export function keyHint(touchText, keyText, params) {
+  return t(isTouchUI() ? touchText : keyText, params);
+}
+
 // t('Привіт, {name}!', {name}) → переклад за активною мовою + підстановка
 export function t(key, params) {
   let s = key;

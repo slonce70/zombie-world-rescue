@@ -1,6 +1,6 @@
 // Конфігурація країн кампанії: біоми, карти, складність, нагороди, боси
 import ukraineMap from './maps/ukraine.js';
-import { t } from './i18n.js';
+import { t, keyHint } from './i18n.js';
 import polandMap from './maps/poland.js';
 import germanyMap from './maps/germany.js';
 import franceMap from './maps/france.js';
@@ -139,11 +139,11 @@ export const COUNTRIES = {
     map: ukraineMap,
     difficulty: { hp: 1, dmg: 1, counts: 1 },
     weaponReward: 'rifle',
-    weaponRewardToast: t('Ти отримав АВТОМАТ! Клавіша 2 — перемкнути зброю 🔥'),
+    weaponRewardToast: () => t('Ти отримав АВТОМАТ! {k} — перемкнути зброю 🔥', { k: keyHint('кнопка 🔁', 'Клавіша 2') }),
     extraZombie: null,
     shieldGuards: 2,
     boss: { name: t('👑 ЗОМБІ-КОРОЛЬ БУЛЬ-БУЛЬ'), hp: 1800, frost: false, style: 'king' },
-    banner: t('Виконай 3 завдання і переможи БОСА! (Shift — біг)'),
+    banner: () => t('Виконай 3 завдання і переможи БОСА! ({k})', { k: keyHint('тягни джойстик до краю — біг', 'Shift — біг') }),
     food: t('вареник'),
   },
   POL: {
@@ -154,7 +154,7 @@ export const COUNTRIES = {
     map: polandMap,
     difficulty: { hp: 1.3, dmg: 1.2, counts: 1.2 },
     weaponReward: 'shotgun',
-    weaponRewardToast: t('Ти отримав ДРОБОВИК! Клавіша 3 — зброя для ближнього бою 💥'),
+    weaponRewardToast: () => t('Ти отримав ДРОБОВИК! {k} — зброя для ближнього бою 💥', { k: keyHint('кнопка 🔁', 'Клавіша 3') }),
     extraZombie: 'snowman',
     shieldGuards: 3,
     boss: { name: t('👑 КОРОЛЬ МОРОЗ'), hp: 2400, frost: true, style: 'frost' },
@@ -169,7 +169,7 @@ export const COUNTRIES = {
     map: germanyMap,
     difficulty: { hp: 1.55, dmg: 1.35, counts: 1.35 },
     weaponReward: 'smg',
-    weaponRewardToast: t('Ти отримав ШВИДКОСТРІЛ! Клавіша 4 — злива куль 🌀'),
+    weaponRewardToast: () => t('Ти отримав ШВИДКОСТРІЛ! {k} — злива куль 🌀', { k: keyHint('кнопка 🔁', 'Клавіша 4') }),
     extraZombie: 'shield',
     shieldGuards: 4,
     boss: { name: t('👑 ЗАЛІЗНИЙ БАРОН'), hp: 3200, frost: false, style: 'iron' },
@@ -184,7 +184,7 @@ export const COUNTRIES = {
     map: franceMap,
     difficulty: { hp: 1.8, dmg: 1.5, counts: 1.45 },
     weaponReward: 'sniper',
-    weaponRewardToast: t('Ти отримав СНАЙПЕРКУ! Клавіша 6 — пробиває трьох наскрізь 🎯'),
+    weaponRewardToast: () => t('Ти отримав СНАЙПЕРКУ! {k} — пробиває трьох наскрізь 🎯', { k: keyHint('кнопка 🔁', 'Клавіша 6') }),
     extraZombie: 'spitter',
     shieldGuards: 3,
     boss: { name: t('👑 ШЕФ БАГЕТ'), hp: 4200, frost: false, style: 'chef' },
@@ -199,7 +199,7 @@ export const COUNTRIES = {
     map: turkeyMap,
     difficulty: { hp: 2.0, dmg: 1.6, counts: 1.5 },
     weaponReward: 'magnum',
-    weaponRewardToast: t('Ти отримав МАГНУМ! Клавіша 5 — один постріл, один зомбі 🤠'),
+    weaponRewardToast: () => t('Ти отримав МАГНУМ! {k} — один постріл, один зомбі 🤠', { k: keyHint('кнопка 🔁', 'Клавіша 5') }),
     extraZombie: 'gunner',
     shieldGuards: 4,
     boss: { name: t('👑 ПАША КЕБАБ'), hp: 5200, frost: false, style: 'sultan' },
@@ -214,7 +214,7 @@ export const COUNTRIES = {
     map: egyptMap,
     difficulty: { hp: 2.25, dmg: 1.7, counts: 1.55 },
     weaponReward: 'bazooka',
-    weaponRewardToast: t('Ти отримав БАЗУКУ ФАРАОНА! Клавіша 7 — рознеси їх усіх 🚀'),
+    weaponRewardToast: () => t('Ти отримав БАЗУКУ ФАРАОНА! {k} — рознеси їх усіх 🚀', { k: keyHint('кнопка 🔁', 'Клавіша 7') }),
     extraZombie: 'mummy',
     shieldGuards: 3,
     boss: { name: t('👑 ФАРАОН ТУТ-АНХ-ЗОМБ'), hp: 6400, frost: false, style: 'pharaoh' },

@@ -1,25 +1,26 @@
 // Магазин (клавіша B): вкладки категорій, зброя, гаджети, спорядження, прокачування
 import { GADGETS } from './extras.js';
-import { t } from './i18n.js';
+import { t, keyHint } from './i18n.js';
 
 export const SHOP_ITEMS = [
   // --- припаси ---
   { id: 'medkit', icon: '🩹', name: t('Аптечка'), desc: t('+50 здоров’я зараз'), price: 50, max: Infinity, cat: t('Припаси') },
   { id: 'ammo', icon: '🔋', name: t('Патрони'), desc: t('Набої для всієї зброї'), price: 40, max: Infinity, cat: t('Припаси') },
-  { id: 'grenade', icon: '💣', name: t('Граната'), desc: t('+1 граната (G — кинути)'), price: 35, max: Infinity, cat: t('Припаси') },
+  { id: 'grenade', icon: '💣', name: t('Граната'), desc: () => t('+1 граната ({k})', { k: keyHint('кнопка 💣', 'G — кинути') }), price: 35, max: Infinity, cat: t('Припаси') },
   { id: 'rocket', icon: '🧨', name: t('Ракета'), desc: t('+1 ракета для базуки'), price: 60, max: Infinity, cat: t('Припаси'), needsBazooka: true },
   { id: 'armorplate', icon: '🛡️', name: t('Бронепластина'), desc: t('+40 броні зараз'), price: 80, max: Infinity, cat: t('Припаси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
-  { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: GADGETS.turret.desc + t(' · перезарядка {n}с', { n: GADGETS.turret.cd }), price: GADGETS.turret.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
+  { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: () => GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: () => GADGETS.turret.desc + t(' · перезарядка {n}с', { n: GADGETS.turret.cd }), price: GADGETS.turret.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'dog', icon: '🐶', name: t('Песик Дружок'), desc: t('Збирає монети і гавкає на сюрпризи!'), price: 350, max: 1, cat: t('Гаджети й друзі') },
   // --- зброя ---
-  { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: t('Дуже швидка черга (клавіша 4)'), price: 250, max: 1, cat: t('Зброя'), weapon: true },
-  { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: t('Могутній револьвер (клавіша 5)'), price: 350, max: 1, cat: t('Зброя'), weapon: true },
-  { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: t('Пробиває 3 зомбі наскрізь (клавіша 6)'), price: 500, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -104,7 +105,8 @@ export class Shop {
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
       const priceLabel = locked ? '🔒' : maxed ? (item.weapon || item.gadget ? t('Є!') : t('МАКС')) : price + surge + ' <span class="coin-icon">₴</span>';
-      const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂') : item.desc;
+      const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
+        : (typeof item.desc === 'function' ? item.desc() : item.desc);
       html += `
         <div class="shop-item ${maxed || locked ? 'maxed' : afford ? '' : 'poor'}" data-id="${item.id}">
           <div class="shop-icon">${item.icon}</div>
@@ -169,16 +171,16 @@ export class Shop {
       case 'vest':
         player.applyGear(save.upgrades);
         player.armor = Math.min(player.maxArmor, player.armor + 50);
-        game.hud.toast('🦺 Бронежилет одягнено! Подивись на себе — клавіша V');
+        game.hud.toast(t('🦺 Бронежилет одягнено! Подивись на себе — {k}', { k: keyHint('кнопка 📷', 'клавіша V') }));
         break;
       case 'helmet':
         player.applyGear(save.upgrades);
-        game.hud.toast('⛑️ Шолом одягнено! Подивись на себе — клавіша V');
+        game.hud.toast(t('⛑️ Шолом одягнено! Подивись на себе — {k}', { k: keyHint('кнопка 📷', 'клавіша V') }));
         break;
       case 'sneakers':
         player.applyGear(save.upgrades);
         player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08;
-        game.hud.toast('👟 Кросівки-ракети! Стрибай вище — Space');
+        game.hud.toast(t('👟 Кросівки-ракети! Стрибай вище — {k}', { k: keyHint('кнопка ⬆️', 'Space') }));
         break;
       case 'shield':
       case 'heal':

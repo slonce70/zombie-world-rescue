@@ -349,6 +349,8 @@ body.in-level #hud { display: block; }
 }
 #grenades.none { opacity: 0.45; }
 .grenade-key { color: #8aa3be; font-size: 13px; }
+/* на телефоні немає клавіші G — підказка зайва (граната кидається кнопкою 💣) */
+body.touch-mode .grenade-key { display: none; }
 
 /* комбо */
 #combo {

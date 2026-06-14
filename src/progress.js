@@ -1,7 +1,7 @@
 // Прогресія акаунта: зірковий досвід (XP), «Зоряний шлях» (безкоштовний пасс),
 // щоденні завдання. Все зберігається в сейві й живе ПОВЕРХ рівнів.
 import { RNG } from './utils.js';
-import { t, getLang } from './i18n.js';
+import { t, keyHint, getLang } from './i18n.js';
 
 // ---------- Зоряний шлях ----------
 // нагороди за рівні: монети, танці, скіни, гаджети, сліди куль
@@ -106,7 +106,7 @@ export class Progress {
       } else {
         game.save.gadgetsOwned.push(r.id);
         if (!game.save.activeGadget) game.save.activeGadget = r.id;
-        sub += t(' — клавіша F!');
+        sub += t(' — {k}!', { k: keyHint('кнопка 🦘', 'клавіша F') });
       }
     } else if (r.type === 'skin') {
       if (!game.save.skins.includes(r.id)) game.save.skins.push(r.id);
