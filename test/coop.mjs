@@ -19,7 +19,7 @@ const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 // власний relay на окремому порту — тест самодостатній
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
+  stdio: ['ignore', 'ignore', 'pipe'],
 });
 relay.stderr.on('data', (d) => console.error('[relay-err]', d.toString().trim()));
 await sleep(600);
@@ -29,6 +29,8 @@ await sleep(600);
 const LAUNCH = {
   args: [
     '--use-angle=swiftshader',
+    '--disable-dev-shm-usage',
+    '--no-sandbox',
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',

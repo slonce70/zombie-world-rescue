@@ -16,12 +16,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
+  stdio: ['ignore', 'ignore', 'pipe'],
 });
 await sleep(600);
 
 const LAUNCH = {
-  args: ['--use-angle=swiftshader', '--disable-background-timer-throttling',
+  args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
 };
 const browserA = await chromium.launch(LAUNCH);

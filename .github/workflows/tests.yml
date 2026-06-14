@@ -49,10 +49,13 @@ jobs:
       - name: Relay reconnect edge (full room + same pid resume)
         run: node test/relay-reconnect.mjs
       - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
+        timeout-minutes: 10
         run: SLOW=4 node test/coop.mjs
       - name: Coop reconnect (mid-join + resume)
+        timeout-minutes: 12
         run: SLOW=4 node test/coop3.mjs
       - name: Coop lobby/batching
+        timeout-minutes: 10
         run: SLOW=4 node test/coop6.mjs
 
   # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
@@ -71,4 +74,5 @@ jobs:
       - name: Start static server
         run: python3 -m http.server 8741 &
       - name: E2E кампанія UKR (SLOW=4 — софтверний рендер ранера)
+        timeout-minutes: 45
         run: SLOW=4 node test/e2e.mjs

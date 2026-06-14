@@ -6,7 +6,7 @@ import { mkdirSync } from 'fs';
 const BASE = 'http://localhost:8741';
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
