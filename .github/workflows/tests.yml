@@ -1,5 +1,6 @@
-# Швидкий CI для Pages-релізу: push у main одразу деплоїться,
-# тому тут лишаються короткі обов'язкові smoke/version/cloud/i18n + relay-edge гейти.
+# CI для Pages-релізу: push у main одразу деплоїться.
+# Швидкий гейт `smoke` має червоніти миттєво; кооп і UKR e2e — окремі джоби
+# (повільніші на безкоштовному раннері з софтверним рендером), тож не тримають швидкий гейт.
 name: tests
 on:
   push:
@@ -32,3 +33,48 @@ jobs:
         run: node test/cloudsave.mjs
       - name: i18n (українська/English/русский)
         run: node test/i18n.mjs
+
+  # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі
+  # smoke), щоб регресії синхронізації/реконекту/лобі не їхали на прод непомітно.
+  # Тести самі піднімають dev-relay; ігровий рендер вантажиться зі статик-сервера.
+  coop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start static server
+        run: python3 -m http.server 8741 &
+      - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
+        timeout-minutes: 25
+        run: SLOW=4 node test/coop.mjs
+      - name: Coop reconnect (mid-join + resume)
+        timeout-minutes: 20
+        run: SLOW=4 node test/coop3.mjs
+      - name: Coop lobby/batching
+        timeout-minutes: 15
+        run: SLOW=4 node test/coop6.mjs
+
+  # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
+  # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start static server
+        run: python3 -m http.server 8741 &
+      - name: E2E кампанія UKR (SLOW=4 — софтверний рендер ранера)
+        timeout-minutes: 45
+        run: SLOW=4 node test/e2e.mjs
