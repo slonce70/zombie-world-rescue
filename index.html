@@ -134,6 +134,23 @@
   <div id="heal-glow"></div>
   <div id="fps"></div>
 
+  <!-- 👆 Перше знайомство з керуванням (один раз, лише на телефоні) -->
+  <div id="touch-coach" aria-hidden="true">
+    <div class="coach-zone coach-left">
+      <div class="coach-arrow">🕹</div>
+      <div class="coach-label">РУХ<br><small>тягни пальцем</small></div>
+    </div>
+    <div class="coach-zone coach-right">
+      <div class="coach-arrow">👆</div>
+      <div class="coach-label">ОГЛЯД<br><small>веди пальцем</small></div>
+    </div>
+    <div class="coach-fire">
+      <div class="coach-arrow coach-arrow-down">👇</div>
+      <div class="coach-label">ВОГОНЬ<br><small>тисни 🔫</small></div>
+    </div>
+    <div class="coach-tap">Торкнись будь-де, щоб почати 🎮</div>
+  </div>
+
   <!-- Мобільне керування -->
   <div id="touch-ui">
     <div id="joy-base"><div id="joy-knob"></div></div>
@@ -183,7 +200,7 @@
   <div id="overlay-start" class="overlay">
     <div class="overlay-card clickable">
       <h2>🖱️ КЛІКНИ, ЩОБ ГРАТИ</h2>
-      <div class="controls-grid">
+      <div class="controls-grid keyboard-grid">
         <span><b>WASD</b> — рух</span>
         <span><b>Мишка</b> — огляд і стрільба</span>
         <span><b>Shift</b> — біг</span>
@@ -198,6 +215,12 @@
         <span><b>V</b> — вид 1-ї/3-ї особи</span>
         <span><b>B</b> — магазин · <b>M</b> — звук</span>
       </div>
+      <div class="touch-legend">
+        <span><b>🕹</b> ліворуч — рух <i>(до краю — біг)</i></span>
+        <span><b>👆</b> праворуч — огляд</span>
+        <span><b>🔫</b> — вогонь</span>
+        <span><b>🦘</b> 💣 🔄 ✋ — стрибок / граната / перезарядка / взяти</span>
+      </div>
     </div>
   </div>
 
@@ -209,7 +232,7 @@
         <button id="btn-resume" class="btn btn-primary">▶️ Продовжити</button>
         <button id="btn-pause-globe" class="btn">🌍 На глобус</button>
       </div>
-      <div class="controls-grid small">
+      <div class="controls-grid small keyboard-grid">
         <span><b>WASD</b> — рух · <b>Shift</b> — біг</span>
         <span><b>Space</b> — стрибок</span>
         <span><b>Мишка</b> — огляд і стрільба</span>
@@ -225,7 +248,12 @@
         <span><b>На самокаті:</b> W газ · S гальмо · A/D кермо</span>
         <span><b>Esc</b> — пауза</span>
       </div>
-      <p class="touch-controls-hint">📱 На телефоні: лівий бік екрана — джойстик (до упору — біг), правий — огляд, кнопки праворуч — дії</p>
+      <div class="touch-legend">
+        <span><b>🕹</b> ліворуч — рух <i>(до краю — біг)</i></span>
+        <span><b>👆</b> праворуч — огляд</span>
+        <span><b>🔫</b> — вогонь</span>
+        <span><b>🦘</b> 💣 🔄 ✋ — стрибок / граната / перезарядка / взяти</span>
+      </div>
     </div>
   </div>
 

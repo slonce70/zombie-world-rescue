@@ -383,6 +383,28 @@ class Game {
     if (btn) btn.textContent = on ? t('🐣 Малюк: вкл') : t('🐣 Малюк: викл');
   }
 
+  // 👆 Перше знайомство з керуванням: показуємо раз, лише на телефоні
+  _maybeShowTouchCoach() {
+    if (!this.touch) return; // тільки телефон: на десктопі this.touch === null
+    let coached = false;
+    try { coached = localStorage.getItem('zr-touch-coached') === '1'; } catch (e) { /* ignore */ }
+    if (coached) return;
+    const el = document.getElementById('touch-coach');
+    if (!el) return;
+    el.classList.add('show');
+    el.setAttribute('aria-hidden', 'false');
+    const dismiss = (e) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      el.classList.remove('show');
+      el.setAttribute('aria-hidden', 'true');
+      try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      el.removeEventListener('touchstart', dismiss);
+      el.removeEventListener('mousedown', dismiss);
+    };
+    el.addEventListener('touchstart', dismiss, { passive: false });
+    el.addEventListener('mousedown', dismiss);
+  }
+
   _qualityWorldOpts() {
     const q = this.save.quality || 'auto';
     return q === 'fast'
@@ -969,6 +991,7 @@ class Game {
     } else {
       this._showOverlay('overlay-start');
     }
+    this._maybeShowTouchCoach(); // 👆 перше знайомство з керуванням (раз, лише на телефоні)
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, country.banner, 4.5);
   }
 
