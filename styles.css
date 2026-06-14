@@ -390,16 +390,18 @@ body.touch-mode.in-level #touch-ui { display: block; }
   justify-items: center; align-items: center; pointer-events: auto;
 }
 #tb-fire { grid-column: 2 / 4; justify-self: end; }
-/* службові кнопки — рядок угорі, лівіше мінімапи */
+/* службові кнопки — рядок угорі, лівіше мінімапи (мінімапа 116px + 8px справа = 124px) */
 #touch-util {
-  position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(108px + env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto;
+  position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(132px + env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto;
 }
 /* компактний HUD у тач-режимі: нічого не накладається */
 body.touch-mode #ammo { right: calc(178px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); }
 body.touch-mode #health { bottom: calc(14px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left)); }
 body.touch-mode #topright { top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); gap: 4px; }
 body.touch-mode #minimap { width: 116px; height: 116px; }
-body.touch-mode #coins { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(318px + env(safe-area-inset-right)); padding: 6px 12px; font-size: 17px; }
+/* монети стоять у колонці #topright НАД мінімапою (справа), а не окремим блоком ліворуч —
+   так увесь верхній лівий простір вільний для службового рядка, і ніщо не накладається */
+body.touch-mode #coins { padding: 6px 12px; font-size: 17px; }
 body.touch-mode #bossbar { top: 48px; width: min(280px, 34vw); }
 body.touch-mode #boss-name { font-size: 12px; letter-spacing: 1px; margin-bottom: 3px; }
 body.touch-mode #boss-bar-bg { height: 12px; }
@@ -465,8 +467,8 @@ body.kid-mode #tb-scope { display: none; }
   .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
   #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(70px + env(safe-area-inset-bottom)); }
   body.touch-mode #minimap { width: 98px; height: 98px; }
-  body.touch-mode #touch-util { right: calc(92px + env(safe-area-inset-right)); }
-  body.touch-mode #coins { right: calc(298px + env(safe-area-inset-right)); }
+  /* службовий рядок не повинен залазити під мінімапу (мінімапа: 98px + 8px справа) */
+  body.touch-mode #touch-util { right: calc(114px + env(safe-area-inset-right)); }
 }
 
 /* компактний HUD на малих екранах */

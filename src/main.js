@@ -401,6 +401,10 @@ class Game {
     if (coached) return;
     const el = document.getElementById('touch-coach');
     if (!el) return;
+    // 🌍 локалізуємо підписи коуча зараз: ключ — оригінальний укр. рядок (data-i18n)
+    for (const node of el.querySelectorAll('[data-i18n]')) {
+      node.textContent = t(node.getAttribute('data-i18n'));
+    }
     el.classList.add('show');
     el.setAttribute('aria-hidden', 'false');
     const dismiss = (e) => {

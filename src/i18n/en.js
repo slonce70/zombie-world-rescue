@@ -699,4 +699,13 @@ export const EN = {
 "Кнопка 🔭 — оптика снайперки": "🔭 button — sniper scope",
 "На самокаті 🛴: газуй джойстиком уперед, керуй ліворуч/праворуч": "On the scooter 🛴: push the stick forward to go, steer left/right",
 "Зомбі-гнізда 🟣 знешкоджуються утриманням {k} — стережись охорони!": "Zombie nests 🟣 are cleared by holding {k} — watch for guards!",
+"🐣 Малюк: вкл": "🐣 Kid mode: ON",
+"🐣 Малюк: викл": "🐣 Kid mode: OFF",
+"РУХ": "MOVE",
+"тягни пальцем": "drag here",
+"ОГЛЯД": "LOOK",
+"веди пальцем": "swipe here",
+"ВОГОНЬ": "FIRE",
+"тисни 🔫": "tap 🔫",
+"Торкнись будь-де, щоб почати 🎮": "Tap anywhere to start 🎮",
 };
