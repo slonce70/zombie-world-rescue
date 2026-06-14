@@ -145,6 +145,12 @@ export class GuestNet {
   }
 
   _applySnapshot(s) {
+    // відкидаємо застарілі/позачергові снапшоти (окремі ~100мс пачки, гонка під час reconnect),
+    // щоб позиції/HP/час не «відкочувались» назад
+    if (s.n != null) {
+      if (this._lastSnapSeq != null && s.n <= this._lastSnapSeq) return;
+      this._lastSnapSeq = s.n;
+    }
     this.lastSnapAt = performance.now();
     this.lost = false;
     const level = this.level;
@@ -195,7 +201,9 @@ export class GuestNet {
       case 'it': level.effects.spawnNetItem(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
       case 'lt': {
         const item = level.effects.removeItemByNid(a[0]);
-        if (a[1] === me && level.effects.onPickup) level.effects.onPickup(a[2], a[3]);
+        // подія могла продублюватись (reconnect/повторна пачка) — кредитуємо ЛИШЕ якщо предмет ще існував,
+        // інакше монета/аптечка/набої/зброя зарахувалися б удруге з одного підбору
+        if (item && a[1] === me && level.effects.onPickup) level.effects.onPickup(a[2], a[3]);
         else if (item && a[2] === 'coin') level.audio.coin();
         break;
       }
@@ -292,6 +300,8 @@ export class GuestNet {
 
   _applyState(st) {
     const level = this.level;
+    // повна пересинхронізація (вхід/реконект): дозволяємо наступному снапшоту з будь-яким seq
+    this._lastSnapSeq = null;
     level.stats.time = st.tm || 0;
     // зомбі
     level.zombies.clearAllPuppets();

@@ -89,8 +89,10 @@ check(JSON.stringify(questsA) !== JSON.stringify(questsC), 'інший день 
 // прогрес і нагорода
 const questReward = await page.evaluate(() => {
   const g = window.__game;
-  // СЬОГОДНІШНЯ дата: onEvent робить ensureToday() і чужий день стер би прогрес
-  g.test.regenQuests(new Date().toISOString().slice(0, 10));
+  // СЬОГОДНІШНЯ дата: onEvent робить ensureToday() і чужий день стер би прогрес.
+  // Беремо ключ ГРИ (todayKey — локальна дата), а не UTC-зріз toISOString — інакше у
+  // не-UTC поясі дати розходяться і onEvent перегенерує квести (тест був TZ-залежним)
+  g.test.regenQuests(g.quests.todayKey());
   const q = g.quests.list[0];
   const coinsBefore = g.save.coins;
   const xpBefore = g.save.xp;

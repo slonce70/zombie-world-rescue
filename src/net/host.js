@@ -6,6 +6,11 @@ import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 
 const SNAP_HZ = 12;
+// санітизація вхідної шкоди від гостя: завжди скінченне число в розумних межах
+// (родинний кооп довіряє гостю, але NaN/Infinity/абсурд не мають псувати стан хоста)
+const clampDmg = (v) => Math.max(0, Math.min(2000, Number(v) || 0));
+const isVec3 = (a) => Array.isArray(a) && a.length >= 3
+  && isFinite(a[0]) && isFinite(a[1]) && isFinite(a[2]);
 
 export class HostNet {
   constructor(session, level) {
@@ -16,6 +21,7 @@ export class HostNet {
     this.authority = true;
     this.spec = null;          // заповнить main після побудови
     this.remotes = new Map();  // pid -> RemotePlayer (і проксі для AI)
+    this._downedAt = new Map(); // pid -> час, коли хост востаннє бачив гостя полеглим (для чесного 'respawned')
     this.readyGuests = new Set();
     this.evQueue = [];
     this.snapT = 0;
@@ -113,22 +119,30 @@ export class HostNet {
         rp.holdE = (d.f & PF.HOLDE) !== 0;
         rp.magnet = (d.f & 1024) !== 0;
         rp._lastP = performance.now();
+        if (rp.health <= 0) this._downedAt.set(from, rp._lastP); // зафіксували факт смерті — для 'respawned'
         return true;
       }
       case 'shot': return (this._onShot(from, d), true);
       case 'nade': {
         const o = d.o, v = d.v;
-        this.spawnNetGrenade(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(v[0], v[1], v[2]));
+        if (!isVec3(o) || !isVec3(v)) return true;
+        this.spawnNetGrenade(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(v[0], v[1], v[2]), from);
         return true;
       }
       case 'rocket': {
         const o = d.o, dir = d.d;
-        this.spawnNetRocket(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(dir[0], dir[1], dir[2]), d.dmg);
+        if (!isVec3(o) || !isVec3(dir)) return true;
+        this.spawnNetRocket(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(dir[0], dir[1], dir[2]), clampDmg(d.dmg), from);
         return true;
       }
       case 'use': return (this._onUse(from, d), true);
       case 'gadget': return (this._onGadget(from, d), true);
       case 'respawned': {
+        // чистимо спавн лише якщо хост СПРАВДІ бачив гостя полеглим нещодавно (анти-гриф/анти-флуд):
+        // інакше гість міг би спамити 'respawned', тримаючи зону вічно чистою і збиваючи лічильник орди
+        const dAt = this._downedAt.get(from);
+        if (!dAt || (performance.now() - dAt) > 30000) return true;
+        this._downedAt.delete(from); // спожито: повторний 'respawned' без нової смерті — ігнор
         const L = level.world.layout;
         level.zombies.clearNear(L.SPAWN.x, L.SPAWN.z, 30);
         return true;
@@ -170,24 +184,27 @@ export class HostNet {
       if (dd < 70) level.audio.shot(w);
     }
     this.ev('sh', from, d.w, d.e || 0);
-    // влучання: довіряємо гостю (сімейний кооп), б'ємо по живих цілях
-    if (d.hits) {
-      for (const [nid, dmg, hs] of d.hits) {
-        const zb = level.zombies.byNid(nid);
+    // влучання: довіряємо гостю (сімейний кооп), але форму перевіряємо і шкоду санітизуємо
+    if (Array.isArray(d.hits)) {
+      for (const h of d.hits) {
+        if (!Array.isArray(h)) continue;
+        const zb = level.zombies.byNid(h[0]);
         if (!zb || zb.state === 'dead') continue;
         const dir = this._tmpV.set(zb.x - (rp ? rp.pos.x : 0), 0, zb.z - (rp ? rp.pos.z : 0));
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
-        zb.damage(dmg, dir, !!hs);
+        zb.damage(clampDmg(h[1]), dir, !!h[2]);
       }
     }
-    if (d.bar) for (const [idx, dmg] of d.bar) {
-      const b = level.effects.barrels && level.effects.barrels[idx];
-      if (b) level.effects.damageBarrel(b, dmg);
+    if (Array.isArray(d.bar)) for (const e of d.bar) {
+      if (!Array.isArray(e)) continue;
+      const b = level.effects.barrels && level.effects.barrels[e[0]];
+      if (b) level.effects.damageBarrel(b, clampDmg(e[1]));
     }
-    if (d.wl) for (const [wid, dmg] of d.wl) {
-      const wall = level.gadgets.walls.find((x) => x.nid === wid);
-      if (wall) level.gadgets.damageWall(wall, dmg);
+    if (Array.isArray(d.wl)) for (const e of d.wl) {
+      if (!Array.isArray(e)) continue;
+      const wall = level.gadgets.walls.find((x) => x.nid === e[0]);
+      if (wall) level.gadgets.damageWall(wall, clampDmg(e[1]));
     }
     if (d.ball && level.effects.ball && rp) {
       const bp = level.effects.ball.mesh.position;
@@ -299,15 +316,15 @@ export class HostNet {
     this.session.transport.send(pid, { t: 'revived', by: this.session.nick }, true);
   }
 
-  spawnNetGrenade(pos, vel) {
+  spawnNetGrenade(pos, vel, ownerPid = 1) {
     const gid = this.allocId();
-    this.level.effects.spawnGrenade(pos, vel, gid);
+    this.level.effects.spawnGrenade(pos, vel, gid, ownerPid);
     this.ev('gn', gid, r2(pos.x), r2(pos.y), r2(pos.z), r2(vel.x), r2(vel.y), r2(vel.z));
   }
 
-  spawnNetRocket(origin, dir, dmg) {
+  spawnNetRocket(origin, dir, dmg, ownerPid = 1) {
     const gid = this.allocId();
-    this.level.effects.spawnRocket(origin, dir, dmg, gid);
+    this.level.effects.spawnRocket(origin, dir, dmg, gid, ownerPid);
     this.ev('rk', gid, r2(origin.x), r2(origin.y), r2(origin.z), r2(dir.x), r2(dir.y), r2(dir.z));
   }
 

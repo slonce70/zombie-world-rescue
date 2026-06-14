@@ -39,6 +39,8 @@ export class World {
       segs: r.pts.slice(0, -1).map((p, i) => [p[0], p[1], r.pts[i + 1][0], r.pts[i + 1][1]]),
     }));
     this.colliders = []; // {x, z, r} — для руху
+    this._sbP0 = new THREE.Vector3(); // scratch для shotBlockDist (без алокацій щокадру)
+    this._sbP1 = new THREE.Vector3();
     this.occluders = []; // {x, z, r, h} — вертикальні капсули для куль
     this.grid = new Map();
     this.time = 0;
@@ -3015,6 +3017,8 @@ export class World {
 
   _updateLeaffall(dt, px, pz) {
     if (!this.leafMesh) return;
+    // листя косметичне — висоту землі семплимо раз/кадр (а не повним groundH на кожну)
+    const gh0 = this.groundH(px, pz);
     for (let i = 0; i < this.leaves.length; i++) {
       const f = this.leaves[i];
       f.y -= f.spd * dt;
@@ -3027,7 +3031,7 @@ export class World {
       this._leafE.set(this.time * f.drift + f.ph, f.ph, Math.sin(this.time * 2 + f.ph) * 0.8);
       this._leafQ.setFromEuler(this._leafE);
       this._leafM4.compose(
-        this._leafV.set(px + f.x, this.groundH(px + f.x, pz + f.z) + f.y, pz + f.z),
+        this._leafV.set(px + f.x, gh0 + f.y, pz + f.z),
         this._leafQ, this._leafS
       );
       this.leafMesh.setMatrixAt(i, this._leafM4);
@@ -3037,6 +3041,9 @@ export class World {
 
   _updateSnowfall(dt, px, pz) {
     if (!this.snowMesh) return;
+    // сніжинки косметичні й падають довкола гравця — висоту землі семплимо раз/кадр,
+    // а не повним groundH() на кожну з ~380 (велика економія CPU на мобільному)
+    const gh0 = this.groundH(px, pz);
     for (let i = 0; i < this.snowFlakes.length; i++) {
       const f = this.snowFlakes[i];
       if (this.dustMode) {
@@ -3055,7 +3062,7 @@ export class World {
         f.z = this.rng.range(-35, 35);
       }
       this._snowM4.compose(
-        this._snowV.set(px + f.x, this.groundH(px + f.x, pz + f.z) + f.y, pz + f.z),
+        this._snowV.set(px + f.x, gh0 + f.y, pz + f.z),
         this._snowQ, this._snowS
       );
       this.snowMesh.setMatrixAt(i, this._snowM4);
@@ -3090,8 +3097,9 @@ export class World {
           const list = this.grid.get(GKEY(cx + gx, cz + gz));
           if (!list) continue;
           for (const c of list) {
-            // над перешкодою (на даху/в стрибку) — колайдер не діє
-            if (y > c.top + 0.1) continue;
+            // над перешкодою (на даху/в стрибку) — колайдер не діє.
+            // top undefined (напр. меблі) = суцільна висота: не пропускаємо (явно, без покладання на NaN-порівняння)
+            if (c.top != null && y > c.top + 0.1) continue;
             const dx = x - c.x, dz = z - c.z;
             const minD = c.r + r;
             const d2 = dx * dx + dz * dz;
@@ -3121,7 +3129,7 @@ export class World {
   // Дистанція блокування пострілу (стіни/стовбури/терен). Infinity якщо вільно.
   shotBlockDist(origin, dir, maxT) {
     let best = Infinity;
-    const p0 = new THREE.Vector3(), p1 = new THREE.Vector3();
+    const p0 = this._sbP0, p1 = this._sbP1;
     for (const oc of this.occluders) {
       const dx = oc.x - origin.x, dz = oc.z - origin.z;
       const approx = Math.hypot(dx, dz);

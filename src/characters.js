@@ -10,6 +10,7 @@ function getGradMap() {
     gradMap.minFilter = THREE.NearestFilter;
     gradMap.magFilter = THREE.NearestFilter;
     gradMap.needsUpdate = true;
+    gradMap.userData.shared = true; // спільний на весь сеанс — endLevel його НЕ диспозить
   }
   return gradMap;
 }
@@ -21,6 +22,7 @@ export function toonMat(color, emissive = 0x000000, emissiveIntensity = 0) {
     const m = new THREE.MeshToonMaterial({
       color, gradientMap: getGradMap(), emissive, emissiveIntensity,
     });
+    m.userData.shared = true; // кешований на весь сеанс і переюзаний усіма рівнями
     matCache.set(key, m);
   }
   return matCache.get(key);
@@ -29,7 +31,11 @@ export function toonMat(color, emissive = 0x000000, emissiveIntensity = 0) {
 // Кеш геометрій: однакові примітиви ділять одну BufferGeometry
 const geoCache = new Map();
 function cachedGeo(key, make) {
-  if (!geoCache.has(key)) geoCache.set(key, make());
+  if (!geoCache.has(key)) {
+    const g = make();
+    g.userData.shared = true; // кешована геометрія живе на весь сеанс — не диспозити в endLevel
+    geoCache.set(key, g);
+  }
   return geoCache.get(key);
 }
 function capsule(r, len, mat, capSeg = 5, radSeg = 12) {
@@ -55,6 +61,7 @@ let bakedMat = null;
 function getBakedMat() {
   if (!bakedMat) {
     bakedMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradMap() });
+    bakedMat.userData.shared = true; // спільний матеріал запечених мешів — не диспозити в endLevel
   }
   return bakedMat;
 }

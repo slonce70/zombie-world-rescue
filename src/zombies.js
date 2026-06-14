@@ -8,7 +8,7 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
-  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (150 міцності)!
+  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (500 міцності)!
   shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 500 },
   snowman: {
     hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
@@ -73,8 +73,10 @@ export class Zombies {
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
-    // 🤝 кооп: зомбі сильніші пропорційно команді (2 гравці → ×2 HP, 3 → ×3)
-    const coopScale = opts.mirror ? 1 : this.coopMul();
+    // 🤝 кооп: зомбі сильніші пропорційно команді (2 гравці → ×2 HP, 3 → ×3).
+    // noCoopScale — для хвиль Шторму: їх КІЛЬКІСТЬ уже росте з гравцями (+60%/друга),
+    // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
+    const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = type === 'boss' ? 1 : this.diff.hp * coopScale;
     const z_ = {
       nid, rig, type, stats,
@@ -305,6 +307,10 @@ export class Zombies {
     const bossHp = Math.round(cfg.hp * this.coopMul());
     b.maxHp = bossHp;
     b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
+    // 🔁 відновлення боса (після смерті гравця): не повторюємо вже пройдені хвилі призову.
+    // Свіжий бос на повному HP (frac=100) лишає всі пороги невзятими — хвилі підуть штатно.
+    const frac0 = (b.hp / b.maxHp) * 100;
+    for (const thr of [75, 50, 25]) if (frac0 <= thr) b.summonedAt[thr] = true;
     b.aggroed = true;
     b.state = 'chase';
     return b;
@@ -373,7 +379,7 @@ export class Zombies {
           level.effects.burst(sparkPos, 0xc9d4e2, 4, { speed: 2.6, up: 1.5, life: 0.3, size: 0.7 });
           level.audio.clang();
         } else {
-          // 💥 щит зламано!
+          // 💥 щит зламано! (тіло лишається цілим — далі добивай уже беззахисного — навмисний 2-крок)
           z.shieldHp = 0;
           z.rig.body.remove(z.shieldObj.group);
           z.shieldObj = null;
@@ -406,6 +412,7 @@ export class Zombies {
         level.effects.burst(sparkPos, 0xc9d4e2, 3, { speed: 2.4, up: 1.4, life: 0.3, size: 0.65 });
         level.audio.clang();
       } else {
+        // 💥 нагрудник пробито! (тіло лишається — цілься в голову/добивай — навмисний 2-крок)
         z.chestHp = 0;
         if (z.chestObj) z.chestObj.visible = false;
         if (z.chestCracks1) z.chestCracks1.visible = false;
@@ -719,7 +726,8 @@ export class Zombies {
                     : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
                       : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
                         : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
-              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5, { horde: false });
+              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
+                { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;
               mz.state = 'chase';
               if (z._stormWave) mz._stormWave = true;
@@ -755,8 +763,8 @@ export class Zombies {
           level.audio.chargeWarn();
           level.bus.emit('bossCharge');
         }
-        const enraged = frac < 35;
-        if (enraged) z.enraged = true;
+        // лють лише у фазі низького HP; якщо ліш залікував боса вище 35% — спадає
+        z.enraged = frac < 35;
         // ліш: бос не покидає околиці арени — повертається і лікується
         const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);
         if (!z.noLeash && !z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;

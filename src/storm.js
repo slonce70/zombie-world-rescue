@@ -215,7 +215,8 @@ export class StormMode {
         if (Math.hypot(x - p.x, z - p.z) > 20) break;
       }
       const type = pool[rng.int(0, pool.length - 1)];
-      const zb = level.zombies.spawn(type, x, z, {});
+      // кількість хвилі вже масштабується гравцями — HP кожного НЕ множимо повторно (анти-«мішок з кулями»)
+      const zb = level.zombies.spawn(type, x, z, { noCoopScale: true });
       zb._stormWave = true;
       zb.aggroed = true;
       zb.state = 'chase';

@@ -1,5 +1,5 @@
-# Мінімальний CI: push у main одразу деплоїться на GitHub Pages,
-# тож хоч смоук+ядро мають світитись червоним, якщо щось зламалось.
+# CI для Pages-релізу: push у main одразу деплоїться,
+# тому smoke/version/cloud/i18n, кооп і UKR e2e мають червоніти при регресії.
 name: tests
 on:
   push:
@@ -17,6 +17,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Version sync (version.json ↔ APP_VERSION ↔ PROTO_VERSION)
+        run: node test/version-sync.mjs
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8741 &
@@ -28,6 +30,30 @@ jobs:
         run: node test/cloudsave.mjs
       - name: i18n (українська/English/русский)
         run: node test/i18n.mjs
+
+  # 🤝 кооп — найскладніша й найрегресійніша підсистема; раніше не йшла в CI.
+  # Тести самі піднімають dev-relay; ігровий рендер вантажиться зі статик-сервера.
+  coop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start static server
+        run: python3 -m http.server 8741 &
+      - name: Relay reconnect edge (full room + same pid resume)
+        run: node test/relay-reconnect.mjs
+      - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
+        run: SLOW=4 node test/coop.mjs
+      - name: Coop reconnect (mid-join + resume)
+        run: SLOW=4 node test/coop3.mjs
+      - name: Coop lobby/batching
+        run: SLOW=4 node test/coop6.mjs
 
   # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
   # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт

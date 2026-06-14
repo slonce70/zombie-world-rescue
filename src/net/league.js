@@ -1,18 +1,27 @@
 // 🏆 Ліга рекордів: тонкий клієнт до League DO на zr-relay.
 // Усі фейли тихі — гра ніколи не залежить від доступності Ліги.
-import { relayUrl } from './transport.js';
+import { apiBase } from './transport.js';
 import { loadNick } from './coop.js';
 
-function apiBase() {
-  // wss://host → https://host (і ws:// → http:// для локального dev-relay,
-  // але dev-relay Ліги не має — тоді запити просто тихо впадуть)
-  return relayUrl().replace(/^ws/, 'http').replace(/\/+$/, '');
+// високоентропійний резервний cid, якщо crypto.randomUUID недоступний (старі WebView):
+// 128 біт із getRandomValues — cid є «паролем» хмарного сейва, тож має бути невгадуваним
+function fallbackCid() {
+  try {
+    const c = globalThis.crypto;
+    if (!c || typeof c.getRandomValues !== 'function') throw new Error('no-crypto');
+    const b = new Uint8Array(16);
+    c.getRandomValues(b);
+    return 'cid-' + Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return `cid-${Date.now()}-${Math.floor(Math.random() * 1e9)}`; // крайній випадок: crypto немає взагалі
+  }
 }
 
 // постійний анонімний id гравця (живе в сейві)
 export function ensureCid(game) {
   if (!game.save.cid) {
-    game.save.cid = (crypto.randomUUID && crypto.randomUUID()) || `cid-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+    const c = globalThis.crypto;
+    game.save.cid = (c && typeof c.randomUUID === 'function' && c.randomUUID()) || fallbackCid();
     game.saveGame();
   }
   return game.save.cid;

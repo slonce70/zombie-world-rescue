@@ -1,7 +1,7 @@
 // Прогресія акаунта: зірковий досвід (XP), «Зоряний шлях» (безкоштовний пасс),
 // щоденні завдання. Все зберігається в сейві й живе ПОВЕРХ рівнів.
 import { RNG } from './utils.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 
 // ---------- Зоряний шлях ----------
 // нагороди за рівні: монети, танці, скіни, гаджети, сліди куль
@@ -155,11 +155,32 @@ export class DailyQuests {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  // перерахувати заголовок квеста з його полів (для пере-локалізації після зміни мови)
+  _resolveTitle(q) {
+    const def = QUEST_POOL.find((p) => p.id === q.id);
+    if (!def) return q.title;
+    if (def.weaponPick) return t('Перемоги {n} зомбі з {w}', { n: q.target, w: WEAPON_NAMES[q.weapon] || t('зброї') });
+    return def.title(q.target);
+  }
+
   // генеруємо 3 завдання дня (детерміновано від дати) або підхоплюємо збережені
   ensureToday(forceKey = null) {
     const key = forceKey || this.todayKey();
     const saved = this.game.save.quests;
-    if (saved && saved.date === key && Array.isArray(saved.list) && saved.list.length) return;
+    const lang = getLang();
+    if (saved && saved.date === key && Array.isArray(saved.list) && saved.list.length) {
+      // та сама доба — лише пере-локалізуємо заголовки, якщо мову змінили (вони зберігаються рядком)
+      if (saved.lang !== lang) {
+        for (const q of saved.list) q.title = this._resolveTitle(q);
+        saved.lang = lang;
+        this.game.saveGame();
+      }
+      return;
+    }
+    // 🕒 анти-фарм: переведення годинника НАЗАД не дає нових квестів — лише рух уперед.
+    // Ключі формату YYYY-MM-DD порівнюються лексикографічно = хронологічно.
+    const maxKey = (saved && saved.maxKey) || (saved && saved.date) || '';
+    if (!forceKey && key < maxKey && saved && Array.isArray(saved.list) && saved.list.length) return;
     // сід із дати
     let seed = 0;
     for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
@@ -178,7 +199,7 @@ export class DailyQuests {
       }
       list.push(quest);
     }
-    this.game.save.quests = { date: key, list };
+    this.game.save.quests = { date: key, list, lang, maxKey: key > maxKey ? key : maxKey };
     this.game.saveGame();
   }
 

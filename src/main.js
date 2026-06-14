@@ -53,7 +53,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -328,12 +328,22 @@ class Game {
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
+        // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
+        if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
+        if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
+        if (!out.records || typeof out.records !== 'object') out.records = {};
+        if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
+        if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
+        if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
       }
     } catch (e) { /* зіпсований сейв — почнемо заново */ }
-    // міграція: зброя за вже звільнені країни (старі сейви без weapons)
-    for (const id of Object.keys(out.liberated || {})) {
-      const w = COUNTRIES[id] && COUNTRIES[id].weaponReward;
-      if (w && !out.weapons.includes(w)) out.weapons.push(w);
+    // міграція: зброя за вже звільнені країни (старі сейви без weapons).
+    // Захищено формою (Array/object) — щоб ніколи не кинути виняток на завантаженні (інакше — вічний краш-екран).
+    if (Array.isArray(out.weapons) && out.liberated && typeof out.liberated === 'object') {
+      for (const id of Object.keys(out.liberated)) {
+        const w = COUNTRIES[id] && COUNTRIES[id].weaponReward;
+        if (w && !out.weapons.includes(w)) out.weapons.push(w);
+      }
     }
     return out;
   }
@@ -627,6 +637,9 @@ class Game {
     this._startingLevel = true;
     try {
       await this._buildLevel(countryId, opts);
+      // свіжий старт лічильника часу: перший кадр рівня не отримає величезний dt від паузи на завантаження
+      this.clock.getDelta();
+      this._timeAcc = 0;
     } catch (e) {
       // не блокуємо гру назавжди — повертаємось на глобус
       console.error(t('Помилка побудови рівня'), e);
@@ -812,8 +825,9 @@ class Game {
         this.hud.toast('🔋 +30 набоїв');
       }
     };
-    // вибух (граната 135, ракета базуки 50): шкода зомбі по радіусу
-    level.effects.onExplosion = (x, y, z, r, baseDmg = 135) => {
+    // вибух (граната/бочка 135 за замовч., ракета базуки 220 — передається явно): шкода зомбі по радіусу.
+    // ownerPid — хто підірвав (для чесного кіл-кредиту/комбо/квестів у коопі); 1 = локальний гравець/хост
+    level.effects.onExplosion = (x, y, z, r, baseDmg = 135, ownerPid = 1) => {
       // вибух трощить і барикади поблизу
       for (const w of [...level.gadgets.walls]) {
         if (Math.hypot(w.x - x, w.z - z) < r) level.gadgets.damageWall(w, baseDmg);
@@ -825,6 +839,7 @@ class Game {
           const rage = level.player.buffs.rage > 0 ? 2 : 1;
           const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * level.player.damageMult * rage);
           level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          zb.lastHitBy = ownerPid; // чесний кіл-кредит за вибухове добивання
           zb.damage(dmg, null, false);
         }
       }
@@ -1044,18 +1059,24 @@ class Game {
       }, 50);
     }
     if (this.level) {
-      // звільняємо ресурси сцени
+      // звільняємо ресурси сцени — але НЕ спільні кешовані (matCache/geoCache/gradMap/bakedMat
+      // із characters.js): вони живуть на весь сеанс і переюзаються наступними рівнями.
+      // Диспоз спільного матеріалу/геометрії змусив би GPU перезаливати їх щоразу (ривок) і
+      // покладався б на крихку ліниву реініціалізацію three. Позначка userData.shared їх береже.
       this.level.scene.traverse((o) => {
-        if (o.geometry) o.geometry.dispose();
+        if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
         if (o.material) {
           (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-            if (m.map) m.map.dispose();
+            if (m.userData && m.userData.shared) return;
+            if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
             m.dispose();
           });
         }
       });
       this.renderer.renderLists.dispose();
     }
+    if (this._burstIv) { clearInterval(this._burstIv); this._burstIv = null; } // салют боса не тикає по знесеному рівню
+    this._timeAcc = 0; // кооп-акумулятор не переносить борг між рівнями (інакше — ривок фаст-форварду на старті)
     this.level = null;
     this.state = 'globe';
     this.victoryShown = false;
@@ -1300,10 +1321,11 @@ class Game {
     const { x, z } = this.level.world.layout.arena;
     const eff = this.level.effects;
     const world = this.level.world;
-    // салют
+    // салют (зберігаємо хендл — endLevel його гасить, щоб не тикав по знесеному рівню)
     let burstN = 0;
-    const burstIv = setInterval(() => {
-      if (!this.level || burstN++ > 10) { clearInterval(burstIv); return; }
+    if (this._burstIv) clearInterval(this._burstIv);
+    const burstIv = this._burstIv = setInterval(() => {
+      if (!this.level || burstN++ > 10) { clearInterval(burstIv); this._burstIv = null; return; }
       const bx = x + (Math.random() - 0.5) * 20;
       const bz = z + (Math.random() - 0.5) * 20;
       eff.burst(new THREE.Vector3(bx, world.groundH(bx, bz) + 6 + Math.random() * 6, bz),
@@ -1321,6 +1343,13 @@ class Game {
     this._hideOverlay('overlay-death');
     const country = this.level.country;
     this.save.liberated[country.id] = true;
+    // 🎁 нагорода-зброя країни видається ОДРАЗУ в момент перемоги (раніше з'являлась лише
+    // після наступного завантаження, якщо у наборі не випала місія «зачистка складу»)
+    if (country.weaponReward && !this.save.weapons.includes(country.weaponReward)) {
+      this.save.weapons.push(country.weaponReward);
+      if (this.level.player) this.level.player.giveWeapon(country.weaponReward, false);
+      if (country.weaponRewardToast) this.hud.toast(country.weaponRewardToast);
+    }
     // наступне проходження цієї країни отримає НОВИЙ набір місій
     this.save.missionRuns[country.id] = (this.save.missionRuns[country.id] || 0) + 1;
     const s = this.level.stats;

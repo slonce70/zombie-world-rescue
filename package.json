@@ -1,7 +1,7 @@
 {
   "name": "claude",
   "version": "1.0.0",
-  "description": "",
+  "description": "3D browser zombie rescue game with campaign, co-op, Storm mode, leaderboard, cloud save, and PWA support",
   "main": "index.js",
   "directories": {
     "test": "test"

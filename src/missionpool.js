@@ -1075,10 +1075,13 @@ export class DynamicMissions {
           level.bus.emit('toast', t('⚠️ Мандрівника кусають! Захисти його!'));
         }
         if (tr.hp <= 0) {
-          // не караємо жорстко: мандрівник «ховається» і чекає на новий супровід
+          // не караємо жорстко: мандрівник «ховається» і чекає на новий супровід.
+          // Скидаємо і прапори етапів — щоб повторний супровід знову мав засідку й попередження
           level.scene.remove(tr.rig.group);
           m.traveler = null;
           m.started = false;
+          m.midWave = false;
+          m.midWarned = false;
           level.bus.emit('toast', t('😿 Мандрівник сховався у хліві. Повернись по нього!'));
           return;
         }
@@ -1499,6 +1502,16 @@ export class DynamicMissions {
       this.level.bus.emit('missionDone', m);
       // нагорода країни за зачистку складу — усім гравцям
       if (type === 'clear') this.level.game.unlockWeapon(this.level.country.weaponReward);
+    } else if (type === 'clear' && this.level.country.weaponReward) {
+      // mid-join: гість приєднався ПІСЛЯ зачистки складу — тихо видаємо нагороду-зброю
+      // в його сейв і руки (без тосту/монет/перемикання), щоб не втратив постійну нагороду
+      const w = this.level.country.weaponReward;
+      const save = this.level.game.save;
+      if (Array.isArray(save.weapons) && !save.weapons.includes(w)) {
+        save.weapons.push(w);
+        if (this.level.player) this.level.player.giveWeapon(w, false);
+        this.level.game.saveGame();
+      }
     }
   }
 

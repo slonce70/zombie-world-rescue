@@ -52,7 +52,8 @@ function lobbyPing(d) {
   }
   if (d.room && d.room.code) {
     const code = String(d.room.code).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
-    if (code) {
+    const existing = lobbyRooms.get(code);
+    if (code && (!existing || existing.cid === cid)) {
       lobbyRooms.set(code, {
         cid, host: nick,
         mode: ['campaign', 'storm', 'arena'].includes(d.room.mode) ? d.room.mode : 'campaign',
@@ -231,13 +232,20 @@ wss.on('connection', (ws, req) => {
 
   let id;
   if (create) id = 1;
-  else if (resumeId >= 2 && !room.sockets.has(resumeId)) id = resumeId; // реконект гостя зі старим id
-  else id = room.nextId++;
-  if (!create && room.sockets.size >= MAX_PLAYERS) { send(ws, { t: 'err', code: 'full' }); ws.close(); return; }
+  else if (resumeId >= 2) {
+    // resume замінює старий сокет тим самим id навіть коли кімната повна
+    if (!room.sockets.has(resumeId) && room.sockets.size >= MAX_PLAYERS) { send(ws, { t: 'err', code: 'full' }); ws.close(); return; }
+    id = resumeId;
+  } else {
+    if (room.sockets.size >= MAX_PLAYERS) { send(ws, { t: 'err', code: 'full' }); ws.close(); return; }
+    id = room.nextId++;
+  }
 
   if (id === 1 && room.hostTimer) { clearTimeout(room.hostTimer); room.hostTimer = null; }
+  const replaced = resumeId >= 2 ? room.sockets.get(id) : null;
   room.sockets.set(id, ws);
   send(ws, { t: 'relay', you: id, isHost: id === 1, peers: [...room.sockets.keys()].filter((p) => p !== id) });
+  if (replaced) replaced.close(1000, 'resume');
   for (const [pid, sock] of room.sockets) if (pid !== id) send(sock, { t: 'peer', id, on: true });
   console.log(`[relay] ${code}: +${id} (${room.sockets.size} у кімнаті)`);
 

@@ -66,7 +66,7 @@ export class Effects {
     this.projectiles = [];
     this.projGeo = new THREE.SphereGeometry(1, 8, 6);
     this.projMat = toonMat(0xf4f9ff);
-    this.onProjectileHit = null; // (dmg, x, z) => {}
+    this.onProjectileHit = null; // (dmg, x, z, target?) => {}
 
     // 🚀 ракети гравця
     this.rockets = [];
@@ -77,7 +77,7 @@ export class Effects {
     this.grenadeGeo = new THREE.SphereGeometry(0.13, 10, 8);
     this.grenadeMat = new THREE.MeshToonMaterial({ color: 0x4d5e40, gradientMap: this.coinMat.gradientMap });
     this.grenadeHotMat = new THREE.MeshToonMaterial({ color: 0xff5544, emissive: 0xff2200, emissiveIntensity: 0.8, gradientMap: this.coinMat.gradientMap });
-    this.onExplosion = null; // (x, y, z, radius) => {}
+    this.onExplosion = null; // (x, y, z, radius, damage, ownerPid?) => {}
 
     // літаючі цифри шкоди
     this.dmgPool = [];
@@ -199,7 +199,7 @@ export class Effects {
       L.netEv('bm', Math.round(pos.x * 10) / 10, Math.round(pos.y * 10) / 10, Math.round(pos.z * 10) / 10,
         radius, (meta && meta.gid) || 0, (meta && meta.barrels) || 0);
     }
-    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg);
+    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg, (meta && meta.pid) || 1);
     // ланцюгова реакція бочок
     if (this.barrels) {
       for (const ob of this.barrels) {
@@ -404,7 +404,7 @@ export class Effects {
   }
 
   // 🚀 ракета базуки: летить прямо, вибухає від першого дотику
-  spawnRocket(from, dir, dmg, gid = null) {
+  spawnRocket(from, dir, dmg, gid = null, pid = 1) {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), toonMat(0x6b7a4a));
     body.rotation.x = Math.PI / 2;
@@ -418,17 +418,17 @@ export class Effects {
     g.position.copy(from);
     g.lookAt(from.clone().add(dir));
     this.scene.add(g);
-    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid });
+    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid, pid });
   }
 
-  spawnGrenade(pos, vel, gid = null) {
+  spawnGrenade(pos, vel, gid = null, pid = 1) {
     const m = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
     m.position.copy(pos);
     const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.06), toonMat(0xb8b8b8));
     band.position.y = 0.13;
     m.add(band);
     this.scene.add(m);
-    this.grenadesLive.push({ mesh: m, v: vel.clone(), fuse: 2.0, blink: 0, gid });
+    this.grenadesLive.push({ mesh: m, v: vel.clone(), fuse: 2.0, blink: 0, gid, pid });
   }
 
   // гість: граната з мережі (вибухне лише за подією bm від хоста)
@@ -487,7 +487,7 @@ export class Effects {
   }
 
   _explodeGrenade(g) {
-    this._explodeAt(g.mesh.position, 5.5, 135, { gid: g.gid || 0 });
+    this._explodeAt(g.mesh.position, 5.5, 135, { gid: g.gid || 0, pid: g.pid || 1 });
     this.scene.remove(g.mesh);
   }
 
@@ -755,6 +755,10 @@ export class Effects {
 
     // снаряди ворогів
     const ppos = this.getPlayerPos ? this.getPlayerPos() : null;
+    // цілі шкоди рахуємо РАЗ на кадр (а не на кожен снаряд) — менше алокацій масиву/обʼєктів і викликів у кооп-замикання
+    const dmgTargets = this.getDamageTargets
+      ? this.getDamageTargets()
+      : (ppos ? [{ pos: ppos, pid: 1 }] : []);
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const pr = this.projectiles[i];
       pr.life -= dt;
@@ -771,9 +775,6 @@ export class Effects {
       const mp = pr.mesh.position;
       let hit = blockedAt <= frameDist + pr.size;
       if (!hit && pr.dmg > 0) {
-        const dmgTargets = this.getDamageTargets
-          ? this.getDamageTargets()
-          : (ppos ? [{ pos: ppos, pid: 1 }] : []);
         for (const tgt of dmgTargets) {
           const tpv = tgt.pos;
           const dx = mp.x - tpv.x, dy = mp.y - (tpv.y + 1.1), dz = mp.z - tpv.z;
@@ -829,7 +830,7 @@ export class Effects {
           rk.mesh.visible = false;
           if (rk.life <= 0) { this.scene.remove(rk.mesh); disposeObject(rk.mesh); this.rockets.splice(i, 1); }
         } else {
-          this._explodeAt(rp.clone(), 4.5, rk.dmg, { gid: rk.gid || 0 });
+          this._explodeAt(rp.clone(), 4.5, rk.dmg, { gid: rk.gid || 0, pid: rk.pid || 1 });
           this.scene.remove(rk.mesh);
           disposeObject(rk.mesh);
           this.rockets.splice(i, 1);
@@ -842,6 +843,17 @@ export class Effects {
       const g = this.grenadesLive[i];
       g.fuse -= dt;
       g.v.y -= 14 * dt;
+      // 🧱 граната не пролітає крізь стіни — горизонтальний замет з відскоком (як у ракет/снарядів).
+      // Маленька дистанція кадру означає, що террейн у shotBlockDist не семплиться — перевіряємо лише оклюдери (стіни/стовбури).
+      const ghv = Math.hypot(g.v.x, g.v.z);
+      if (ghv > 0.4) {
+        this._tmpDir.set(g.v.x / ghv, 0, g.v.z / ghv);
+        const reach = ghv * dt + 0.2;
+        if (this.world.shotBlockDist(g.mesh.position, this._tmpDir, reach) <= reach) {
+          g.v.x *= -0.4; g.v.z *= -0.4;
+          if (ghv > 3) this.audio.bounce();
+        }
+      }
       g.mesh.position.addScaledVector(g.v, dt);
       g.mesh.rotation.x += dt * 6;
       const gy = this.world.groundH(g.mesh.position.x, g.mesh.position.z) + 0.13;
@@ -1014,6 +1026,10 @@ export class Effects {
 
     // монети/підбирання
     const pp = ppos;
+    // цілі підбору рахуємо РАЗ на кадр, а не на кожну монету (фонтан боса/золотого = десятки монет → десятки алокацій/кадр)
+    const pickTargets = this.getPickupTargets
+      ? this.getPickupTargets()
+      : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), pid: 1 }] : []);
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const c = this.coins[i];
       c.t += dt;
@@ -1033,9 +1049,6 @@ export class Effects {
         c.mesh.position.y = c.baseY + 0.15 + Math.sin(c.t * 2.5) * 0.07;
       }
       const L = this.levelRef;
-      const pickTargets = this.getPickupTargets
-        ? this.getPickupTargets()
-        : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), pid: 1 }] : []);
       let granted = null;
       let pulled = false;
       for (const tgt of pickTargets) {

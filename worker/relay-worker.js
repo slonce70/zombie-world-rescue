@@ -91,10 +91,13 @@ export class Room {
     } else {
       const alive = await this.state.storage.get('alive');
       if (!alive) return this._rejectSocket('noroom');
-      if (peers.size >= MAX_PLAYERS) return this._rejectSocket('full');
-      if (resume >= 2 && !peers.has(resume)) {
+      if (resume >= 2) {
+        // resume замінює старий сокет тим самим id навіть якщо кімната формально повна.
+        // Інакше reconnect отримував би новий pid або "full", а close старого сокета викидав би гостя.
+        if (!peers.has(resume) && peers.size >= MAX_PLAYERS) return this._rejectSocket('full');
         id = resume;
       } else {
+        if (peers.size >= MAX_PLAYERS) return this._rejectSocket('full');
         id = (await this.state.storage.get('nextId')) || 2;
         await this.state.storage.put('nextId', id + 1);
       }
@@ -108,6 +111,10 @@ export class Room {
       t: 'relay', you: id, isHost: id === 1,
       peers: [...peers.keys()].filter((p) => p !== id),
     }));
+    const replaced = resume >= 2 ? peers.get(id) : null;
+    if (replaced) {
+      try { replaced.close(1000, 'resume'); } catch (e) { /* ignore */ }
+    }
     for (const [pid, sock] of peers) {
       if (pid !== id) this._safeSend(sock, JSON.stringify({ t: 'peer', id, on: true }));
     }
@@ -179,6 +186,14 @@ export class Room {
   async webSocketClose(ws) {
     const att = ws.deserializeAttachment();
     if (!att) return;
+    // 🔌 реконект (resume) міг уже прив'язати цей id до НОВОГО сокета — тоді запізніле закриття
+    // старого сокета НЕ має слати peer-off (інакше хост викине щойно повернутого гостя).
+    // Дзеркалить гард dev-relay (`room.sockets.get(id) !== ws`).
+    for (const other of this.state.getWebSockets()) {
+      if (other === ws) continue;
+      const oa = other.deserializeAttachment();
+      if (oa && oa.id === att.id) return; // id уже перебрав живий сокет — нічого не робимо
+    }
     const peers = this._peers();
     peers.delete(att.id);
     for (const [, sock] of peers) this._safeSend(sock, JSON.stringify({ t: 'peer', id: att.id, on: false }));
@@ -274,7 +289,10 @@ export class Lobby {
         if (d.room && d.room.code) {
           const code = String(d.room.code).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
           const mode = LOBBY_MODES.has(d.room.mode) ? d.room.mode : 'campaign';
-          if (code) {
+          // не дозволяємо перехопити чужий лістинг: оновлювати запис коду може лише cid,
+          // який його вперше анонсував (інакше можна було б підмінити країну/режим/стан чужої кімнати)
+          const existing = this.rooms.get(code);
+          if (code && (!existing || existing.cid === cid)) {
             this.rooms.set(code, {
               cid, host: cleanNickSrv(d.nick), mode,
               country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
@@ -518,7 +536,7 @@ export class League {
   top(params) {
     const mode = String(params.get('mode') || 'storm');
     const country = String(params.get('country') || 'UKR').slice(0, 4).toUpperCase();
-    const cid = String(params.get('cid') || '');
+    const cid = String(params.get('cid') || '').slice(0, 40); // та сама межа, що й у submit
     if (!MODES[mode]) return this.json({ error: 'bad' }, 400);
     return this.rankResponse(mode, country, cid);
   }

@@ -87,11 +87,15 @@ export class Transport {
           return;
         }
         if (msg.from === undefined || !this.onMessage) return;
-        // пачка від relay: {from, b: [d, d, …]} — у порядку надсилання
+        // пачка від relay: {from, b: [d, d, …]} — у порядку надсилання.
+        // Кожне повідомлення — у власному try/catch: одне зіпсоване/вороже не має
+        // обривати решту пачки чи кидати виняток з ws.onmessage.
         if (Array.isArray(msg.b)) {
-          for (const d of msg.b) this.onMessage(msg.from, d);
+          for (const d of msg.b) {
+            try { this.onMessage(msg.from, d); } catch (e) { console.warn('[net] dropped bad message', e); }
+          }
         } else if (msg.d !== undefined) {
-          this.onMessage(msg.from, msg.d);
+          try { this.onMessage(msg.from, msg.d); } catch (e) { console.warn('[net] dropped bad message', e); }
         }
       };
       ws.onclose = () => {
