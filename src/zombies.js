@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG } from './utils.js';
+import { t } from './i18n.js';
 
 const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
@@ -368,7 +369,7 @@ export class Zombies {
         // перша зустріч зі щитом — підказуємо механіку одразу
         if (!this._shieldHintShown) {
           this._shieldHintShown = true;
-          level.bus.emit('toast', '🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!');
+          level.bus.emit('toast', t('🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!'));
         }
         const sparkPos = new THREE.Vector3(z.x + fx * 0.75, z.y + 1.15, z.z + fz * 0.75);
         if (z.shieldHp > 0) {
@@ -403,7 +404,7 @@ export class Zombies {
       const level = this.level;
       if (!this._ironHintShown) {
         this._ironHintShown = true;
-        level.bus.emit('toast', '🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!');
+        level.bus.emit('toast', t('🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!'));
       }
       const sparkPos = new THREE.Vector3(z.x, z.y + 1.2, z.z);
       if (z.chestHp > 0) {
@@ -482,8 +483,8 @@ export class Zombies {
         level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
       }
       level.audio.goldenJingle();
-      level.bus.emit('toast', '🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!');
-      level.netEv('toast', '🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!');
+      level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
+      level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
     }
     if (z.type === 'boss') {
       this.boss = null;
@@ -599,7 +600,7 @@ export class Zombies {
           this._aggro(z);
           z.state = 'chase';
           level.audio.shriek(1, st.pitch * 1.4);
-          level.bus.emit('toast', '😱 СЮРПРИЗ! У будинку ховався зомбі!');
+          level.bus.emit('toast', t('😱 СЮРПРИЗ! У будинку ховався зомбі!'));
         } else {
           updateRig(rig, dt * 0.35); // спить — ледь погойдується
           continue;

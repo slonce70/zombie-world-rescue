@@ -709,4 +709,9 @@ export const EN = {
 "ВОГОНЬ": "FIRE",
 "тисни 🔫": "tap 🔫",
 "Торкнись будь-де, щоб почати 🎮": "Tap anywhere to start 🎮",
+"🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!": "🛡 Whoa, a shield! Shoot the cracks or go around the back!",
+"🦾 Броньовик! Нагрудник не проб'єш — цілься в ГОЛОВУ!": "🦾 Armored! Can't pierce the plate — aim for the HEAD!",
+"🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!": "🏆 GOLDEN ZOMBIE! JACKPOT +144 coins!",
+"🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!": "🏆 GOLDEN ZOMBIE CAUGHT! Coins everywhere — grab them!",
+"😱 СЮРПРИЗ! У будинку ховався зомбі!": "😱 SURPRISE! A zombie was hiding in the house!",
 };
