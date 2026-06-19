@@ -905,7 +905,11 @@ class Game {
         if (d < r) {
           const rage = level.player.buffs.rage > 0 ? 2 : 1;
           const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * level.player.damageMult * rage);
-          level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          // вибух: не малюємо число, якщо щит або нагрудник повністю поглинає удар
+          const absorbed = zb.shieldHp > 0 || (zb.chestHp > 0); // вибух не є headshot → chestHp завжди поглинає
+          if (!absorbed) {
+            level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          }
           zb.lastHitBy = ownerPid; // чесний кіл-кредит за вибухове добивання
           zb.damage(dmg, null, false);
         }
