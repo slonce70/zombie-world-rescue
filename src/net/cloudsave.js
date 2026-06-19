@@ -24,6 +24,21 @@ export class CloudSave {
     this.enabled = !game.testMode || game.params.has('cloud');
     this.lastOkTs = 0;   // коли востаннє успішно синхронізувались
     this._timer = null;
+    // дебаунс 25с не встигає при швидкому закритті вкладки → флашимо стан при відході зі сторінки,
+    // щоб остання нагорода не загубилась при переході телефон↔планшет
+    if (typeof addEventListener === 'function') {
+      const flush = () => {
+        if (!this.enabled) return;
+        clearTimeout(this._timer);
+        try {
+          const body = JSON.stringify({ cid: ensureCid(this.game), data: JSON.stringify(this.game.save) });
+          if (navigator.sendBeacon) navigator.sendBeacon(`${apiBase()}/save/put`, new Blob([body], { type: 'application/json' }));
+          else this.push();
+        } catch (e) { /* ignore */ }
+      };
+      addEventListener('pagehide', flush);
+      addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+    }
   }
 
   schedulePush() {
