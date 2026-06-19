@@ -1,6 +1,7 @@
 // Relay-протокол: reconnect має замінювати старий сокет тим самим pid навіть у повній кімнаті.
 import { spawn } from 'child_process';
 import WebSocket from 'ws';
+import { spawnRelay } from './_relay.mjs';
 
 const PORT = 8756;
 const ROOM = 'EDGE';
@@ -11,11 +12,7 @@ const check = (name, ok, extra = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const relay = spawn('node', ['relay/dev-relay.mjs'], {
-  env: { ...process.env, PORT: String(PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-await sleep(600);
+const relay = await spawnRelay(PORT);
 
 const opened = [];
 function connect(query) {

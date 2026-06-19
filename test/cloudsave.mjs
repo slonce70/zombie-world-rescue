@@ -2,6 +2,7 @@
 // аварійний екран. Сам піднімає dev-relay (у ньому — dev-SaveVault).
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
+import { spawnRelay } from './_relay.mjs';
 
 const BASE = 'http://localhost:8741';
 const RELAY_PORT = 8753;
@@ -15,11 +16,7 @@ const check = (name, ok, extra = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const relay = spawn('node', ['relay/dev-relay.mjs'], {
-  env: { ...process.env, PORT: String(RELAY_PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-await sleep(600);
+const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = { args: ['--use-angle=swiftshader'] };
 const browser = await chromium.launch(LAUNCH);

@@ -10,6 +10,7 @@ import { WebSocketServer } from 'ws';
 import { cleanNickSrv } from '../worker/nick.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
+const BOOT_TOKEN = `${process.pid}-${Date.now().toString(36)}`;
 const MAX_PLAYERS = 4;
 const HOST_GRACE_MS = 30_000;
 
@@ -101,6 +102,11 @@ function jsonRes(res, obj, status = 200) {
 }
 
 const httpServer = createServer((req, res) => {
+  if (req.url && req.url.startsWith('/health')) {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, pid: process.pid, boot: BOOT_TOKEN }));
+    return;
+  }
   const url = new URL(req.url, 'http://x');
   if (!url.pathname.startsWith('/league/') && !url.pathname.startsWith('/lobby/') && !url.pathname.startsWith('/save/')) {
     res.writeHead(200, CORS);
@@ -208,7 +214,11 @@ const httpServer = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server: httpServer });
-httpServer.listen(PORT);
+httpServer.on('error', (e) => {
+  console.error('[relay] listen FAILED', e && e.code || e);
+  process.exit(1); // напр. EADDRINUSE: не лишаємо тести підключатися до сироти
+});
+httpServer.listen(PORT, () => console.log(`[relay] BOOT ${BOOT_TOKEN}`));
 console.log(`[relay] ws://localhost:${PORT}/ws?room=CODE (+ /league/*)`);
 
 function send(ws, obj) {
