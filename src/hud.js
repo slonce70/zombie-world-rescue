@@ -135,6 +135,11 @@ export class HUD {
     this.el.bossbar.classList.toggle('show', show);
   }
 
+  setKidChip(on) {
+    const el = document.getElementById('kid-chip');
+    if (el) el.style.display = on ? '' : 'none';
+  }
+
   update(dt) {
     const level = this.game.level;
     if (!level) return;

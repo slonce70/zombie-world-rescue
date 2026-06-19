@@ -399,6 +399,13 @@ class Game {
     document.body.classList.toggle('kid-mode', on);
     const btn = document.getElementById('btn-kid');
     if (btn) btn.textContent = on ? t('🐣 Малюк: вкл') : t('🐣 Малюк: викл');
+    if (this.hud) this.hud.setKidChip(on);
+    if (this._kidInited) {
+      if (this.hud) this.hud.toast(on
+        ? t('🐣 Малюк увімкнено: авто-приціл і авто-вогонь')
+        : t('🐣 Малюк вимкнено: цілишся сам'));
+    }
+    this._kidInited = true;
   }
 
   // 👆 Перше знайомство з керуванням: показуємо раз, лише на телефоні

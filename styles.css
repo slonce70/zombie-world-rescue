@@ -453,6 +453,42 @@ body.touch-mode #waypoint { font-size: 13px; }
 .ww-name { color: #fff; font-size: 14px; font-weight: 800; margin-top: 5px; }
 .ww-ammo { color: #ffd24a; font-size: 13px; font-weight: 800; margin-top: 2px; }
 
+/* 🎯 Чип авто-прицілу: видно лише на телефоні в режимі Малюк під час гри */
+#kid-chip {
+  display: none;
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  background: rgba(30, 180, 100, 0.82);
+  border: 2px solid rgba(100, 255, 160, 0.6);
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  padding: 5px 12px;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0,0,0,.4);
+  white-space: nowrap;
+  z-index: 11;
+}
+body.touch-mode.kid-mode.in-level #kid-chip { display: block; }
+/* на малих екранах (ландшафт 360px висоти) трохи підіймаємо */
+@media (max-height: 460px) {
+  #kid-chip { bottom: calc(80px + env(safe-area-inset-bottom)); font-size: 11px; padding: 4px 10px; }
+}
+
+/* рядок авто-прицілу у тач-коучі (показується лише в kid-mode) */
+.coach-auto {
+  display: none;
+  color: #7dffb0;
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 2px 6px rgba(0,0,0,.8);
+  margin-top: 8px;
+  text-align: center;
+}
+body.kid-mode .coach-auto { display: block; }
+
 /* 🐣 Режим Малюк: більші кнопки + ховаємо рідковживане для найменших */
 body.kid-mode .tb { width: 60px; height: 60px; font-size: 26px; }
 body.kid-mode .tb.tb-big { width: 92px; height: 92px; font-size: 40px; }
