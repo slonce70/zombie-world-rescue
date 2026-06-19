@@ -374,6 +374,15 @@ export class SaveVault {
     )`);
     this._lastPut = new Map(); // cid -> ts (анти-спам, у пам'яті — ок)
     this._claims = new Map();  // ip -> {n, t0} (анти-перебір кодів)
+    this._putIp = new Map(); // ip -> {n,t0}
+  }
+
+  _putAllowed(ip) {
+    const now = Date.now();
+    let r = this._putIp.get(ip);
+    if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; this._putIp.set(ip, r); }
+    if (this._putIp.size > 2000) this._putIp.clear();
+    return ++r.n <= 30; // 30 збережень/хв/IP (норм клієнт пушить раз на 25с)
   }
 
   _claimAllowed(ip) {
@@ -405,6 +414,8 @@ export class SaveVault {
     try {
       // зберегти прогрес: {cid, data: "<рядок JSON сейва>"}
       if (url.pathname === '/save/put' && request.method === 'POST') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'x';
+        if (!this._putAllowed(ip)) return this.json({ error: 'rate' }, 429);
         const d = await request.json();
         const cid = this._cid(d.cid);
         const data = typeof d.data === 'string' ? d.data : '';
