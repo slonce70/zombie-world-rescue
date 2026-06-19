@@ -6,7 +6,7 @@ import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 
 const BASE = 'http://localhost:8741';
-const RELAY_PORT = 8753;
+const RELAY_PORT = 8754;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failures = 0;
