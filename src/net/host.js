@@ -164,6 +164,9 @@ export class HostNet {
         } else {
           const trp = this.remotes.get(target);
           if (trp && trp.health <= 0) {
+            // D3: перевірка близькості — реанімація лише впритул (≤3 од.)
+            const reviver = this.remotes.get(from);
+            if (!reviver || !trp || Math.hypot(reviver.pos.x - trp.pos.x, reviver.pos.z - trp.pos.z) > 3) return true;
             this.session.transport.send(target, { t: 'revived', by: reviverNick }, true);
           }
         }
@@ -366,8 +369,15 @@ export class HostNet {
     const level = this.level;
     const run = level.storm || level.bossRush;
     if (run && !run.over) {
-      const allDown = (level.players || []).length > 0
-        && level.players.every((p) => p.health <= 0);
+      // D4: виключаємо «привидів» — гостей, чий останній пакет старший за 8 с.
+      // Хост-проксі (pid 1) завжди враховується; RemotePlayer без _lastP — вважається свіжим.
+      const now = performance.now();
+      const activePlayers = (level.players || []).filter((p) => {
+        if (p.pid === 1) return true; // хост завжди активний
+        const rp = this.remotes.get(p.pid);
+        return !rp || !rp._lastP || (now - rp._lastP) < 8000;
+      });
+      const allDown = activePlayers.length > 0 && activePlayers.every((p) => p.health <= 0);
       if (allDown) {
         this.ev(level.storm ? 'stormend' : 'arenaend');
         this.flushEvents();
