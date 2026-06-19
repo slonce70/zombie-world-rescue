@@ -322,7 +322,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
-      missionRuns: {}, kidMode: null,
+      missionRuns: {}, kidMode: null, cloudTs: 0,
     };
   }
 

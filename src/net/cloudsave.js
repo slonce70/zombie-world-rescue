@@ -40,7 +40,16 @@ export class CloudSave {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cid: ensureCid(this.game), data: JSON.stringify(this.game.save) }),
       });
-      if (res.ok) { this.lastOkTs = Date.now(); return true; }
+      if (res.ok) {
+        this.lastOkTs = Date.now();
+        // запам'ятовуємо серверний ts цього сейва: bootSync порівнюватиме його з хмарним
+        const j = await res.json().catch(() => null);
+        if (j && j.ts) {
+          this.game.save.cloudTs = j.ts;
+          try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.game.save)); } catch (e) { /* ignore */ }
+        }
+        return true;
+      }
     } catch (e) { /* офлайн — нічого страшного */ }
     return false;
   }
@@ -98,14 +107,29 @@ export class CloudSave {
     }
   }
 
-  // на старті: локальний прогрес → пуш; порожній локальний + хмарний прогрес → тягнемо хмару
+  // на старті: узгоджуємо локальний і хмарний сейви БЕЗ втрати новішого прогресу.
+  // Правило: якщо хмара має прогрес, записаний ПІЗНІШЕ за наш останній пуш (cloud.ts > save.cloudTs),
+  // беремо хмару; інакше пушимо локальний. Так старий пристрій не затирає свіжий прогрес.
   async bootSync() {
     if (!this.enabled) return;
-    if (saveHasProgress(this.game.save)) { this.push(); return; }
+    const local = this.game.save;
+    const localHas = saveHasProgress(local);
     const cloud = await this.pull();
-    if (!cloud || !cloud.data) return;
-    try {
-      if (saveHasProgress(JSON.parse(cloud.data))) this.adopt(cloud.data);
-    } catch (e) { /* битий хмарний сейв — ігноруємо */ }
+    let cloudObj = null;
+    if (cloud && cloud.data) { try { cloudObj = JSON.parse(cloud.data); } catch (e) { /* битий хмарний */ } }
+    const cloudHas = cloudObj && saveHasProgress(cloudObj);
+    if (!cloudHas) { if (localHas) this.push(); return; }   // у хмарі порожньо → пушимо своє
+    // При adopt штампуємо серверний ts щоб наступний bootSync не тягнув хмару знову
+    const adoptWithTs = (data) => {
+      try {
+        const s = JSON.parse(data);
+        s.cloudTs = cloud.ts | 0;
+        this.adopt(JSON.stringify(s));
+      } catch (e) { this.adopt(data); }
+    };
+    if (!localHas) { adoptWithTs(cloud.data); return; }      // локально порожньо → беремо хмару
+    // обидва мають прогрес: вирішує серверний час
+    if ((cloud.ts | 0) > (local.cloudTs | 0)) adoptWithTs(cloud.data); // хмара новіша за наш останній пуш
+    else this.push();                                                    // ми не старіші → пушимо своє
   }
 }
