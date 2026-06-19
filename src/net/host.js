@@ -188,6 +188,8 @@ export class HostNet {
     const level = this.level;
     const rp = this.remotes.get(from);
     const w = idxToWeapon(d.w);
+    // D2: дальність зброї + 30 u лаг-маржа (hitscan max 140; shotgun pellets 45)
+    const reach = ((w && w.pellets) ? 45 : 140) + 30;
     // звук + трасер для всіх (і для хоста)
     if (rp) {
       const muzzle = rp.muzzleWorld(this._tmpV).clone();
@@ -202,8 +204,8 @@ export class HostNet {
         if (!Array.isArray(h)) continue;
         const zb = level.zombies.byNid(h[0]);
         if (!zb || zb.state === 'dead') continue;
-        // D2: гейт дистанції — легітимний постріл не може влучити далі 90 одиниць від гостя
-        if (rp && Math.hypot(zb.x - rp.pos.x, zb.z - rp.pos.z) > 90) continue;
+        // D2: гейт дистанції — легітимний постріл не може влучити далі reach одиниць від гостя
+        if (rp && Math.hypot(zb.x - rp.pos.x, zb.z - rp.pos.z) > reach) continue;
         const dir = this._tmpV.set(zb.x - (rp ? rp.pos.x : 0), 0, zb.z - (rp ? rp.pos.z : 0));
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
@@ -214,14 +216,14 @@ export class HostNet {
       if (!Array.isArray(e)) continue;
       const b = level.effects.barrels && level.effects.barrels[e[0]];
       // D2: гейт дистанції для бочок
-      if (b && rp && Math.hypot(b.x - rp.pos.x, b.z - rp.pos.z) > 90) continue;
+      if (b && rp && Math.hypot(b.x - rp.pos.x, b.z - rp.pos.z) > reach) continue;
       if (b) level.effects.damageBarrel(b, clampDmg(e[1]));
     }
     if (Array.isArray(d.wl)) for (const e of d.wl) {
       if (!Array.isArray(e)) continue;
       const wall = level.gadgets.walls.find((x) => x.nid === e[0]);
       // D2: гейт дистанції для стін
-      if (wall && rp && Math.hypot(wall.x - rp.pos.x, wall.z - rp.pos.z) > 90) continue;
+      if (wall && rp && Math.hypot(wall.x - rp.pos.x, wall.z - rp.pos.z) > reach) continue;
       if (wall) level.gadgets.damageWall(wall, clampDmg(e[1]));
     }
     if (d.ball && level.effects.ball && rp) {
