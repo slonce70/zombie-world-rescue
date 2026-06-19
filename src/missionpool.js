@@ -145,7 +145,7 @@ export class DynamicMissions {
     this.medicAlive = false;
     this.healPulseT = 0;
     this.pendingHorde = null;
-    this.pendingWave = null;
+    this.pendingWaves = [];
     this.bossUnlocked = false;
     this.bossStarted = false;
     this.bossBeam = null;
@@ -711,14 +711,11 @@ export class DynamicMissions {
         this.pendingHorde = null;
       }
     }
-    // відкладена хвиля (ремонт/оборона)
-    if (this.pendingWave) {
-      this.pendingWave.t -= dt;
-      if (this.pendingWave.t <= 0) {
-        this._towerWave(this.pendingWave.n, this.pendingWave.onlyWalkers, this.pendingWave.site);
-        this.pendingWave = null;
-      }
-    }
+    // відкладені хвилі (ремонт/оборона) — черга, щоб друга не затирала першу
+    for (const pw of this.pendingWaves) pw.t -= dt;
+    const fired = this.pendingWaves.filter((pw) => pw.t <= 0);
+    this.pendingWaves = this.pendingWaves.filter((pw) => pw.t > 0);
+    for (const pw of fired) this._towerWave(pw.n, pw.onlyWalkers, pw.site);
 
     for (const m of this.missions) {
       if (m.state !== 'active') continue;
@@ -807,6 +804,7 @@ export class DynamicMissions {
           level.audio.door();
           this.spawnCivilians();
           level.netEv('barn');
+          input.justPressed.delete('KeyE');
         }
       }
     } else {
@@ -850,13 +848,13 @@ export class DynamicMissions {
         }
         if (m.progress > 0.15 && !m.waves[0]) {
           m.waves[0] = true;
-          this.pendingWave = { t: 2.5, n: 4, onlyWalkers: true, site: m.site };
+          this.pendingWaves.push({ t: 2.5, n: 4, onlyWalkers: true, site: m.site });
           level.audio.horde();
           level.bus.emit('toast', t('👂 Чуєш гарчання? Приготуйся! ⚠️'));
         }
         if (m.progress > 0.55 && !m.waves[1]) {
           m.waves[1] = true;
-          this.pendingWave = { t: 2.5, n: 5, onlyWalkers: false, site: m.site };
+          this.pendingWaves.push({ t: 2.5, n: 5, onlyWalkers: false, site: m.site });
           level.audio.horde();
           level.bus.emit('toast', t('👂 Ще одна хвиля наближається! ⚠️'));
         }
@@ -888,6 +886,7 @@ export class DynamicMissions {
           level.world.openCrate();
           level.audio.door();
           level.netEv('crate');
+          input.justPressed.delete('KeyE');
         }
       }
     } else {
@@ -918,6 +917,7 @@ export class DynamicMissions {
           level.effects.burst(new THREE.Vector3(c.x, c.y + 0.8, c.z), 0x4cff7a, 8, { speed: 2.5, up: 3, life: 0.6 });
           level.bus.emit('toast', m.found < 4 ? t('🧺 Ящик {n}/4! Шукай наступний за маркером', { n: m.found }) : t('🧺 Усі припаси зібрано!'));
           if (m.found >= 4) this._complete(m.id);
+          input.justPressed.delete('KeyE');
         }
         break;
       }
@@ -1027,7 +1027,8 @@ export class DynamicMissions {
         if (allowControl && input.pressed('KeyE')) {
           m.started = true;
           this._spawnTraveler(m);
-          this.pendingWave = { t: 3, n: 4, onlyWalkers: true, site: m.site };
+          this.pendingWaves.push({ t: 3, n: 4, onlyWalkers: true, site: m.site });
+          input.justPressed.delete('KeyE');
         }
       }
       return;
@@ -1091,7 +1092,7 @@ export class DynamicMissions {
     const half = Math.hypot(tr.x - m.dest.x, tr.z - m.dest.z);
     if (!m.midWave && half < Math.hypot(m.site.x - m.dest.x, m.site.z - m.dest.z) * 0.5) {
       m.midWave = true;
-      this.pendingWave = { t: 1.5, n: 4, onlyWalkers: false, site: { x: tr.x, z: tr.z, r: 8 } };
+      this.pendingWaves.push({ t: 1.5, n: 4, onlyWalkers: false, site: { x: tr.x, z: tr.z, r: 8 } });
     }
     // дійшли!
     if (Math.hypot(tr.x - m.dest.x, tr.z - m.dest.z) < m.dest.r) {
@@ -1180,7 +1181,10 @@ export class DynamicMissions {
         const d = Math.hypot(player.pos.x - it.x, player.pos.z - it.z);
         if (d < 3.4) {
           this.prompt = { text: cfg.prompt.replace('{n}', m.found).replace('{total}', cfg.n), hold: false };
-          if (allowControl && input.pressed('KeyE')) this._fetchTake(m, cfg, m.items.indexOf(it));
+          if (allowControl && input.pressed('KeyE')) {
+            this._fetchTake(m, cfg, m.items.indexOf(it));
+            input.justPressed.delete('KeyE');
+          }
           break;
         }
       }
@@ -1203,7 +1207,7 @@ export class DynamicMissions {
         m.delivered = true;
         // ⚱️ засідка з гробниці!
         if (cfg.ambush) {
-          this.pendingWave = { t: 1.2, n: cfg.ambush, onlyWalkers: false, site: { x: m.dest.x, z: m.dest.z, r: 8 } };
+          this.pendingWaves.push({ t: 1.2, n: cfg.ambush, onlyWalkers: false, site: { x: m.dest.x, z: m.dest.z, r: 8 } });
         }
         level.bus.emit('toast', cfg.doneToast);
         this._complete(m.id);
@@ -1283,7 +1287,7 @@ export class DynamicMissions {
     if (!near(m.site.x, m.site.z + 2, 5)) return;
     m.started = true;
     this._spawnTraveler(m);
-    this.pendingWave = { t: 3, n: 4, onlyWalkers: true, site: m.site };
+    this.pendingWaves.push({ t: 3, n: 4, onlyWalkers: true, site: m.site });
     this.level.netEv('esc', 1);
   }
 
@@ -1539,7 +1543,7 @@ export class DynamicMissions {
     if (this.bossBeam) this.bossBeam.update(dt);
 
     const near = (x, z, r) => Math.hypot(player.pos.x - x, player.pos.z - z) < r;
-    const pressE = allowControl && input.pressed('KeyE');
+    let pressE = allowControl && input.pressed('KeyE');
 
     for (const m of this.missions) {
       if (m.state !== 'active') continue;
@@ -1547,7 +1551,7 @@ export class DynamicMissions {
         const door = level.world.barnDoorCollider;
         if (near(door.x, door.z - 1, 3.2)) {
           this.prompt = { text: t('Натисни E — відчини хлів'), hold: false };
-          if (pressE) net.sendUse('barn');
+          if (pressE) { net.sendUse('barn'); input.justPressed.delete('KeyE'); pressE = false; }
         }
       } else if (m.type === 'repair') {
         const rp = level.world.repairPoint;
@@ -1563,7 +1567,7 @@ export class DynamicMissions {
           const wc = level.world.weaponCrate;
           if (near(wc.x, wc.z, 3.4)) {
             this.prompt = { text: t('Натисни E — відкрий ящик'), hold: false };
-            if (pressE) net.sendUse('crate');
+            if (pressE) { net.sendUse('crate'); input.justPressed.delete('KeyE'); pressE = false; }
           }
         }
       } else if (m.type === 'collect') {
@@ -1573,7 +1577,7 @@ export class DynamicMissions {
           c.mesh.position.y = c.y + Math.abs(Math.sin(performance.now() / 400 + c.x)) * 0.12;
           if (near(c.x, c.z, 3.4)) {
             this.prompt = { text: t('🧺 Натисни E — забери припаси ({n}/4)', { n: m.found }), hold: false };
-            if (pressE) net.sendUse('supply', { i });
+            if (pressE) { net.sendUse('supply', { i }); input.justPressed.delete('KeyE'); pressE = false; }
             break;
           }
         }
@@ -1595,7 +1599,7 @@ export class DynamicMissions {
       } else if (m.type === 'escort' && !m.started) {
         if (near(m.site.x, m.site.z + 2, 5)) {
           this.prompt = { text: t('🧳 Натисни E — забери мандрівника'), hold: false };
-          if (pressE) net.sendUse('escort');
+          if (pressE) { net.sendUse('escort'); input.justPressed.delete('KeyE'); pressE = false; }
         }
       } else if (m.points) {
         const cfg = ACT_CFG[m.type];
@@ -1618,7 +1622,7 @@ export class DynamicMissions {
             it.mesh.position.y = it.y + Math.abs(Math.sin(performance.now() / 400 + it.x)) * 0.14;
             if (near(it.x, it.z, 3.4)) {
               this.prompt = { text: cfg.prompt.replace('{n}', m.found).replace('{total}', m.items.length), hold: false };
-              if (pressE) net.sendUse('fitem', { slot: m.slotIndex, i });
+              if (pressE) { net.sendUse('fitem', { slot: m.slotIndex, i }); input.justPressed.delete('KeyE'); pressE = false; }
               break;
             }
           }
