@@ -178,7 +178,7 @@ export class HUD {
     const a = p.curAmmo;
     this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
     this.el.ammoReserve.textContent = a.reserve === Infinity ? '∞' : a.reserve;
-    this.el.weaponName.textContent = `${p.weapon.icon} ${p.weapon.name}`;
+    this.el.weaponName.textContent = `${p.weapon.icon} ${t(p.weapon.name)}`;
     this.el.ammoMag.classList.toggle('low', a.mag <= 4 && p.reloading <= 0);
 
     // гранати
