@@ -117,6 +117,8 @@ export class CloudSave {
     try {
       const s = JSON.parse(rawJson);
       if (!s || typeof s !== 'object') return false;
+      // захист від випадкового імпорту порожнього/обрізаного файлу поверх реального прогресу
+      if (!saveHasProgress(s) && saveHasProgress(this.game.save)) return false;
       localStorage.setItem(SAVE_KEY, rawJson);
       location.reload();
       return true;
