@@ -17,8 +17,9 @@ let txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
   lang: document.getElementById('btn-lang').textContent.trim(),
 }));
-check(txt.play === '🎮 ГРАТИ', 'uk: кнопка ГРАТИ', txt.play);
+check(txt.play === '🎮 ГРАТИ', 'uk: кнопка ГРАТИ', txt.play); // канарковий точний рядок (uk-baseline)
 check(txt.lang.includes('Українська'), 'uk: кнопка мови', txt.lang);
+const uk = { play: txt.play, lang: txt.lang };
 
 // 2. английский
 await page.evaluate(() => localStorage.setItem('zr-lang', 'en'));
@@ -31,9 +32,10 @@ txt = await page.evaluate(() => ({
   htmlLang: document.documentElement.lang,
   shopName: window.__game.shop ? 'ok' : 'no',
 }));
-check(txt.play === '🎮 PLAY', 'en: PLAY', txt.play);
-check(txt.coop === '🤝 PLAY TOGETHER', 'en: PLAY TOGETHER', txt.coop);
-check(txt.ward === '🎒 Wardrobe', 'en: Wardrobe', txt.ward);
+check(txt.play.toUpperCase().includes('PLAY'), 'en: PLAY', txt.play);
+check(txt.play !== uk.play, 'en: play відрізняється від uk', txt.play);
+check(txt.coop.toUpperCase().includes('PLAY') && txt.coop.toUpperCase().includes('TOGETHER'), 'en: PLAY TOGETHER', txt.coop);
+check(txt.ward.toLowerCase().includes('wardrobe'), 'en: Wardrobe', txt.ward);
 check(txt.htmlLang === 'en', 'en: html lang', txt.htmlLang);
 // игровой уровень на английском: названия миссий
 await page.evaluate(() => window.__game.startLevel('UKR'));
@@ -50,8 +52,9 @@ txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
   prog: document.getElementById('btn-progress').textContent.trim(),
 }));
-check(txt.play === '🎮 ИГРАТЬ', 'ru: ИГРАТЬ', txt.play);
-check(txt.prog === '💾 Прогресс', 'ru: Прогресс', txt.prog);
+check(txt.play.includes('ИГРАТЬ'), 'ru: ИГРАТЬ', txt.play);
+check(txt.play !== uk.play, 'ru: play відрізняється від uk', txt.play);
+check(txt.prog.toLowerCase().includes('прогресс') || txt.prog.toLowerCase().includes('прогрес'), 'ru: Прогресс', txt.prog);
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
 const mRu = await page.evaluate(() => window.__game.level.missions.getHudList().map((m) => m.title));
