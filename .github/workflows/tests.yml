@@ -82,3 +82,25 @@ jobs:
       - name: E2E кампанія UKR (SLOW=4 — софтверний рендер ранера)
         timeout-minutes: 45
         run: SLOW=4 node test/e2e.mjs
+
+  # 🧪 розширена батарея: update*/campaign/maps/replay/terrain — НЕ блокує деплой
+  # (як coop), але червоніє в Actions при регресії квестів/Шторму/гаджетів/карт.
+  extended:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start static server
+        run: python3 -m http.server 8741 &
+      - name: Save migration guard
+        run: node test/save-migration.mjs
+      - name: Extended battery
+        run: |
+          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 campaign maps flows replay terrain-geometry; do
+            echo "=== $t ==="; SLOW=4 node test/$t.mjs || exit 1
+          done
