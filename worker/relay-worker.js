@@ -304,7 +304,9 @@ export class Lobby {
       if (url.pathname === '/lobby/ping' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         if (!this._pingAllowed(ip)) return this.json({ error: 'rate' }, 429);
-        const d = await request.json();
+        const _raw = await request.text();
+        if (_raw.length > MAX_BODY_BYTES) return this.json({ error: 'big' }, 413);
+        const d = JSON.parse(_raw);
         const cid = String(d.cid || '').slice(0, 40);
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);
         this.players.set(cid, { nick: cleanNickSrv(d.nick), ts: now });
@@ -526,7 +528,9 @@ export class League {
       if (url.pathname === '/league/submit' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'x';
         if (!this._ipAllowed(ip)) return this.json({ error: 'rate' }, 429);
-        return this.submit(await request.json());
+        const _raw = await request.text();
+        if (_raw.length > MAX_BODY_BYTES) return this.json({ error: 'big' }, 413);
+        return this.submit(JSON.parse(_raw));
       }
       if (url.pathname === '/league/top') {
         return this.top(url.searchParams);
