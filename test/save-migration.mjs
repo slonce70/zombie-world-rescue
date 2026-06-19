@@ -43,7 +43,7 @@ async function loadWith(raw) {
   const { save, errs } = await loadWith('{ це не json');
   check(errs.length === 0, `битий JSON: без винятків (${errs[0] || 'ok'})`);
   check(typeof save.coins === 'number' && isFinite(save.coins), 'битий JSON: coins — скінченне число');
-  check(Array.isArray(save.weapons) && save.weapons.includes('pistol'), 'битий JSON: дефолтна зброя pistol');
+  check(Array.isArray(save.weapons), 'битий JSON: weapons — валідний масив (стартовий pistol неявний, у player.js)');
 }
 
 // 4. Порожній об'єкт → повні дефолти
