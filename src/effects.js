@@ -56,6 +56,7 @@ export class Effects {
     this._up = new THREE.Vector3(0, 1, 0);
     this._tmpDir = new THREE.Vector3();
     this._sbOld = new THREE.Vector3(); // позиція снаряда ДО руху (swept-перевірка влучання)
+    this._hidePos = new THREE.Vector3(0, -100, 0); // scratch для приховування інстансів
 
     // спалах пострілу
     this.flashLight = new THREE.PointLight(0xffc966, 0, 9);
@@ -89,6 +90,7 @@ export class Effects {
     this.grenadeGeo = new THREE.SphereGeometry(0.13, 10, 8);
     this.grenadeMat = new THREE.MeshToonMaterial({ color: 0x4d5e40, gradientMap: this.coinMat.gradientMap });
     this.grenadeHotMat = new THREE.MeshToonMaterial({ color: 0xff5544, emissive: 0xff2200, emissiveIntensity: 0.8, gradientMap: this.coinMat.gradientMap });
+    this.bandGeo = new THREE.BoxGeometry(0.06, 0.07, 0.06); // кешована геометрія смуги гранати
     this.onExplosion = null; // (x, y, z, radius, damage, ownerPid?) => {}
 
     // літаючі цифри шкоди
@@ -116,7 +118,7 @@ export class Effects {
     for (const d of this.dmgPool) { sc.remove(d.spr); if (d.spr.material) d.spr.material.dispose(); if (d.tex) d.tex.dispose(); }
     this.pMesh.geometry.dispose();
     this.pMesh.material.dispose();
-    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo]) g.dispose();
+    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo]) g.dispose();
     for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat]) m.dispose();
     // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
   }
@@ -451,7 +453,7 @@ export class Effects {
   spawnGrenade(pos, vel, gid = null, pid = 1) {
     const m = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
     m.position.copy(pos);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.06), toonMat(0xb8b8b8));
+    const band = new THREE.Mesh(this.bandGeo, toonMat(0xb8b8b8));
     band.position.y = 0.13;
     m.add(band);
     this.scene.add(m);
@@ -745,7 +747,7 @@ export class Effects {
       }
     }
     // приховуємо решту інстансів
-    this._m4.compose(new THREE.Vector3(0, -100, 0), this._q, this._s.set(0.001, 0.001, 0.001));
+    this._m4.compose(this._hidePos, this._q, this._s.set(0.001, 0.001, 0.001));
     for (let i = idx; i < this.MAX_P; i++) this.pMesh.setMatrixAt(i, this._m4);
     this.pMesh.instanceMatrix.needsUpdate = true;
     if (this.pMesh.instanceColor) this.pMesh.instanceColor.needsUpdate = true;

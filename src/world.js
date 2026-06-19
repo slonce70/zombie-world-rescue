@@ -39,8 +39,10 @@ export class World {
       segs: r.pts.slice(0, -1).map((p, i) => [p[0], p[1], r.pts[i + 1][0], r.pts[i + 1][1]]),
     }));
     this.colliders = []; // {x, z, r} — для руху
+    this._collideOut = { x: 0, z: 0 }; // scratch для collide() — без алокацій щокадру
     this._sbP0 = new THREE.Vector3(); // scratch для shotBlockDist (без алокацій щокадру)
     this._sbP1 = new THREE.Vector3();
+    this._raySegOut = { dist: 0, t: 0, u: 0 }; // scratch для closestRaySeg у shotBlockDist
     this.occluders = []; // {x, z, r, h} — вертикальні капсули для куль
     this.grid = new Map();
     this.time = 0;
@@ -3123,7 +3125,9 @@ export class World {
       x *= this.layout.BOUND / dC;
       z *= this.layout.BOUND / dC;
     }
-    return { x, z };
+    this._collideOut.x = x;
+    this._collideOut.z = z;
+    return this._collideOut;
   }
 
   // Дистанція блокування пострілу (стіни/стовбури/терен). Infinity якщо вільно.
@@ -3136,7 +3140,7 @@ export class World {
       if (approx - oc.r > Math.min(maxT, best)) continue;
       p0.set(oc.x, -2, oc.z);
       p1.set(oc.x, oc.h, oc.z);
-      const res = closestRaySeg(origin, dir, p0, p1);
+      const res = closestRaySeg(origin, dir, p0, p1, this._raySegOut);
       if (res.dist < oc.r && res.t > 0.1 && res.t < Math.min(maxT, best)) best = res.t;
     }
     // терен — крокуємо променем
