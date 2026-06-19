@@ -422,11 +422,11 @@ export class HostNet {
     snap.h = [zm.hordeActive ? 1 : 0, zm.hordeRemaining];
     if (level.storm) {
       const st = level.storm;
-      snap.st = [r1(st.r), st.phase === 'shrink' ? 1 : 0, r1(st.phaseT), st.wave, st.waveAlive];
+      snap.st = [r1(st.r), st.phase === 'shrink' ? 1 : 0, r1(st.phaseT), st.wave, st.waveAlive, st.over ? 1 : 0];
     }
     if (level.bossRush) {
       const br = level.bossRush;
-      snap.br = [br.idx, br.state === 'fight' ? 1 : 0, r1(br.breakT)];
+      snap.br = [br.idx, br.state === 'fight' ? 1 : 0, r1(br.breakT), br.over ? 1 : 0];
     }
     return snap;
   }

@@ -179,8 +179,20 @@ export class GuestNet {
       level.zombies.hordeActive = !!s.h[0];
       level.zombies.hordeRemaining = s.h[1];
     }
-    if (s.st && level.storm && level.storm.applyNet) level.storm.applyNet(s.st);
-    if (s.br && level.bossRush) level.bossRush.applyNet(s.br);
+    if (s.st && level.storm && level.storm.applyNet) {
+      level.storm.applyNet(s.st);
+      if (s.st[5] === 1 && !this._endedRun) {
+        this._endedRun = true;
+        this.game._endStormRun();
+      }
+    }
+    if (s.br && level.bossRush) {
+      level.bossRush.applyNet(s.br);
+      if (s.br[3] === 1 && !this._endedRun) {
+        this._endedRun = true;
+        this.game._endArenaRun();
+      }
+    }
   }
 
   _applyEv(e) {
@@ -302,6 +314,8 @@ export class GuestNet {
     const level = this.level;
     // повна пересинхронізація (вхід/реконект): дозволяємо наступному снапшоту з будь-яким seq
     this._lastSnapSeq = null;
+    // скидаємо прапорець завершення рану, щоб реконект-гість сходився до фінального екрана
+    this._endedRun = false;
     level.stats.time = st.tm || 0;
     // зомбі
     level.zombies.clearAllPuppets();
