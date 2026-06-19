@@ -757,6 +757,21 @@ class Game {
     this._showGlobeUI(false);
     // даємо браузеру намалювати екран завантаження
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    /**
+     * Спільний контекст забігу (per-run), передається в усі підсистеми як перший аргумент або через замикання.
+     * Поля, що існують ЗАВЖДИ (у всіх режимах):
+     *   game, countryId, country, scene, bus, rng, audio, stats, combo,
+     *   bossDefeated, net, mirror, netEv, players, runIndex,
+     *   world, effects, addCoins, player, zombies, missions,
+     *   vehicles, gadgets, pet.
+     *
+     * РЕЖИМО-УМОВНІ поля (присутні тільки в певних режимах):
+     *   storm    — тільки в режимі Шторм (isStorm); інакше — undefined.
+     *   bossRush — тільки в режимі Арени (isArena); інакше — undefined.
+     *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
+     *
+     * Правило: перед доступом до режимо-умовних полів завжди перевіряй наявність (level.storm?.foo).
+     */
     const level = {
       game: this,
       countryId,
