@@ -371,7 +371,15 @@ class Game {
   }
 
   saveGame() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* ignore */ }
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.save));
+    } catch (e) {
+      // Safari Private Mode / заблокований сторедж: попереджаємо РАЗ, щоб дитина встигла експортувати
+      if (!this._storageWarned) {
+        this._storageWarned = true;
+        if (this.hud) this.hud.toast(t('⚠️ Браузер не зберігає прогрес — увімкни звичайний режим або експортуй файл'));
+      }
+    }
     if (this.cloud) this.cloud.schedulePush();
   }
 
