@@ -59,6 +59,7 @@ export class Zombies {
     this.hordeSpawnT = 0;
     this.hordeActive = false;
     this._hordeIdleT = 0;
+    this._hordePrevAlive = undefined;
     this._p0 = new THREE.Vector3();
     this._p1 = new THREE.Vector3();
   }
@@ -287,6 +288,7 @@ export class Zombies {
     this.hordeRemaining = Math.max(0, this.hordeRemaining) + count;
     this.hordePending += count;
     this._hordeIdleT = 0; // скидаємо таймер простою при старті нової орди
+    this._hordePrevAlive = undefined;
   }
 
   // сплячий зомбі-сюрприз у будинку: прокидається, коли гравець поруч
@@ -554,9 +556,15 @@ export class Zombies {
     }
     if (this.hordeActive && this.hordePending <= 0) {
       // самокорекція лічильника + таймаут захист від застряглих зомбі
-      this._hordeIdleT += dt;
       const aliveHorde = this.list.filter((z) => z.horde && z.state !== 'dead').length;
       if (aliveHorde !== this.hordeRemaining) this.hordeRemaining = aliveHorde;
+      // скидаємо таймер простою якщо гравець робить прогрес (вбивства)
+      if (this._hordePrevAlive === undefined || aliveHorde < this._hordePrevAlive) {
+        this._hordeIdleT = 0;
+      } else {
+        this._hordeIdleT += dt;
+      }
+      this._hordePrevAlive = aliveHorde;
       if (this._hordeIdleT > 25 && this.hordeRemaining > 0) {
         for (const z of this.list) if (z.horde && z.state !== 'dead') z.horde = false;
         this.hordeRemaining = 0;
