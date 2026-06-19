@@ -1,6 +1,5 @@
 // 🤝 Кооп-тест 3: приєднання ПОСЕРЕД гри + реконект після розриву звʼязку
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 

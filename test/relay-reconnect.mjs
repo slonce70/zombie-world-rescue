@@ -1,5 +1,4 @@
 // Relay-протокол: reconnect має замінювати старий сокет тим самим pid навіть у повній кімнаті.
-import { spawn } from 'child_process';
 import WebSocket from 'ws';
 import { spawnRelay } from './_relay.mjs';
 

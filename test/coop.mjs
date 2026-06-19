@@ -1,6 +1,5 @@
 // 🤝 Кооп-тест: дві вкладки → кімната → лобі → спільний рівень → синхронізація
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 

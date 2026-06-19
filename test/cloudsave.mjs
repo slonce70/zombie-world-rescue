@@ -1,7 +1,6 @@
 // 💾🚑 v15 «Надійний світ»: хмарний сейв, код відновлення, файл-копія,
 // аварійний екран. Сам піднімає dev-relay (у ньому — dev-SaveVault).
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
 import { spawnRelay } from './_relay.mjs';
 
 const BASE = 'http://localhost:8741';

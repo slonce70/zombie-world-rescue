@@ -3,7 +3,6 @@
 // гравцю і відкривається кнопкою «Зайти» без кода; закриття прибирає її зі списку.
 // Транспорт: повідомлення летять пачками (~10 ws-send/с замість 25+).
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 

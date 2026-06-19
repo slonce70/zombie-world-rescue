@@ -12,7 +12,7 @@ export async function spawnRelay(port, { quiet = true } = {}) {
     stdio: quiet ? ['ignore', 'ignore', 'inherit'] : 'inherit',
   });
   let exited = null;
-  relay.on('exit', (code) => { exited = code == null ? 0 : code; });
+  relay.on('exit', (code, signal) => { exited = code == null ? (signal ? `signal:${signal}` : 'signal') : code; });
   // даємо час на bind, потім перевіряємо живість і токен
   for (let i = 0; i < 30 && exited === null; i++) {
     await sleep(100);
@@ -20,6 +20,7 @@ export async function spawnRelay(port, { quiet = true } = {}) {
       const r = await fetch(`http://localhost:${port}/health`);
       if (r.ok) {
         const j = await r.json();
+        if (j.pid !== relay.pid) continue; // чужий процес (сирота) — ігноруємо, чекаємо далі
         relay._bootToken = j.boot;
         return relay; // наш процес відповів — усе гаразд
       }
