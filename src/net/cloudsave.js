@@ -42,7 +42,10 @@ export class CloudSave {
       });
       if (res.ok) {
         this.lastOkTs = Date.now();
-        // запам'ятовуємо серверний ts цього сейва: bootSync порівнюватиме його з хмарним
+        // запам'ятовуємо серверний ts цього сейва: bootSync порівнюватиме його з хмарним.
+        // ВАЖЛИВО: /save/put МАЄ повертати {ts} — без цього cloudTs залишається 0 і
+        // bootSync при наступному запуску може знову взяти хмарний сейв. Самолікується
+        // щойно сервер почне повертати ts (не критично, але рекомендована поведінка сервера).
         const j = await res.json().catch(() => null);
         if (j && j.ts) {
           this.game.save.cloudTs = j.ts;
@@ -123,13 +126,13 @@ export class CloudSave {
     const adoptWithTs = (data) => {
       try {
         const s = JSON.parse(data);
-        s.cloudTs = cloud.ts | 0;
+        s.cloudTs = Number(cloud.ts) || 0;
         this.adopt(JSON.stringify(s));
       } catch (e) { this.adopt(data); }
     };
     if (!localHas) { adoptWithTs(cloud.data); return; }      // локально порожньо → беремо хмару
     // обидва мають прогрес: вирішує серверний час
-    if ((cloud.ts | 0) > (local.cloudTs | 0)) adoptWithTs(cloud.data); // хмара новіша за наш останній пуш
+    if ((Number(cloud.ts) || 0) > (Number(local.cloudTs) || 0)) adoptWithTs(cloud.data); // хмара новіша за наш останній пуш
     else this.push();                                                    // ми не старіші → пушимо своє
   }
 }
