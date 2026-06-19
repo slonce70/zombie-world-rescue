@@ -57,7 +57,7 @@ export class CoopSession {
 
   // ---------- створення / приєднання ----------
   async create(nick) {
-    this.nick = cleanNick(nick) || 'Гравець';
+    this.nick = cleanNick(nick) || t('Гравець');
     saveNick(this.nick);
     // кілька спроб на випадок зайнятого коду
     let lastErr = null;
@@ -78,7 +78,7 @@ export class CoopSession {
   }
 
   async join(code, nick) {
-    this.nick = cleanNick(nick) || 'Гравець';
+    this.nick = cleanNick(nick) || t('Гравець');
     saveNick(this.nick);
     await this.transport.connect(code, {});
     this.role = 'guest';
@@ -221,7 +221,7 @@ export class CoopSession {
       this.transport.send(from, { t: 'reject', why: 'full' }, true);
       return;
     }
-    let nick = cleanNick(d.nick) || `Гравець ${from}`;
+    let nick = cleanNick(d.nick) || t('Гравець {n}', { n: from });
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
     this.roster.set(from, { pid: from, nick, skin: d.skin, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
     this.transport.send(from, {

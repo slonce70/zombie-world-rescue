@@ -4,6 +4,7 @@
 import { apiBase } from './transport.js';
 import { ensureCid } from './league.js';
 import { loadNick, cleanNick } from './coop.js';
+import { t } from '../i18n.js';
 
 const PING_MS = 8000;
 
@@ -40,7 +41,7 @@ export class LobbyClient {
     try {
       const body = {
         cid: ensureCid(this.game),
-        nick: cleanNick(loadNick()) || 'Гравець',
+        nick: cleanNick(loadNick()) || t('Гравець'),
         ...extra,
       };
       const room = this.getRoom && this.getRoom();

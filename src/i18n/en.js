@@ -617,6 +617,8 @@ export const EN = {
 "Як тебе звати? Цей нік побачать інші гравці.": "What's your name? Other players will see this nick.",
 "Твій нік": "Your nick",
 "Гравець": "Player",
+"Гравець {n}": "Player {n}",
+"Друг": "Friend",
 "✅ ДАЛІ": "✅ NEXT",
 "Ти:": "You:",
 "Змінити нік": "Change nick",

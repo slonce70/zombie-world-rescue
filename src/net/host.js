@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
+import { t } from '../i18n.js';
 
 const SNAP_HZ = 12;
 const GUEST_STALE_MS = 120000;
@@ -158,7 +159,7 @@ export class HostNet {
       case 'revdone': {
         // гість підняв когось: перевіряємо, що ціль і досі лежить, і повідомляємо її
         const target = d.target | 0;
-        const reviverNick = (this.session.roster.get(from) || {}).nick || 'Друг';
+        const reviverNick = (this.session.roster.get(from) || {}).nick || t('Друг');
         if (target === 1) {
           this.game.applyRevive(reviverNick);
         } else {
