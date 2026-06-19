@@ -728,4 +728,5 @@ export const EN = {
 "🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!": "🏆 GOLDEN ZOMBIE! JACKPOT +144 coins!",
 "🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!": "🏆 GOLDEN ZOMBIE CAUGHT! Coins everywhere — grab them!",
 "😱 СЮРПРИЗ! У будинку ховався зомбі!": "😱 SURPRISE! A zombie was hiding in the house!",
+"❓ Як грати": "❓ How to play",
 };

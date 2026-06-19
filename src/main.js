@@ -198,6 +198,10 @@ class Game {
       this._hideOverlay('overlay-pause');
       this.endLevel();
     });
+    document.getElementById('btn-how-to-play').addEventListener('click', () => {
+      this._hideOverlay('overlay-pause');
+      this._showTouchCoach(true);
+    });
     document.getElementById('btn-victory-globe').addEventListener('click', () => {
       this._hideOverlay('overlay-victory');
       this.endLevel();
@@ -410,10 +414,17 @@ class Game {
 
   // 👆 Перше знайомство з керуванням: показуємо раз, лише на телефоні
   _maybeShowTouchCoach() {
+    this._showTouchCoach(false);
+  }
+
+  // 👆 Показати коуч керування. force=true — ігнорує localStorage-гейт (для кнопки «Як грати»)
+  _showTouchCoach(force) {
     if (!this.touch) return; // тільки телефон: на десктопі this.touch === null
-    let coached = false;
-    try { coached = localStorage.getItem('zr-touch-coached') === '1'; } catch (e) { /* ignore */ }
-    if (coached) return;
+    if (!force) {
+      let coached = false;
+      try { coached = localStorage.getItem('zr-touch-coached') === '1'; } catch (e) { /* ignore */ }
+      if (coached) return;
+    }
     const el = document.getElementById('touch-coach');
     if (!el) return;
     // 🌍 локалізуємо підписи коуча зараз: ключ — оригінальний укр. рядок (data-i18n)
@@ -426,7 +437,9 @@ class Game {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       el.classList.remove('show');
       el.setAttribute('aria-hidden', 'true');
-      try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      if (!force) {
+        try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      }
       // 🔊 тап по коучу = той самий жест, що й клік по «торкнись, щоб грати»: розблоковуємо звук
       if (this.input.onUserGesture) this.input.onUserGesture();
       el.removeEventListener('touchstart', dismiss);
