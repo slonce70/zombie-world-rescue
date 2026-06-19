@@ -137,6 +137,7 @@ export class HUD {
 
   setKidChip(on) {
     const el = document.getElementById('kid-chip');
+    // display:'' навмисно — видимість делегується правилу CSS .touch-mode.kid-mode.in-level #kid-chip
     if (el) el.style.display = on ? '' : 'none';
   }
 

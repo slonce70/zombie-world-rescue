@@ -11,7 +11,7 @@ for (const [name, w, h] of [['iphone-land', 844, 390], ['small-land', 740, 360],
   await page.waitForTimeout(2000);
   await page.screenshot({ path: `shots/touch-${name}.png` });
   const overlaps = await page.evaluate(() => {
-    const sel = '#touch-ui .tb, #ammo, #health, #minimap, #mission-panel, #coins, #grenades';
+    const sel = '#touch-ui .tb, #ammo, #health, #minimap, #mission-panel, #coins, #grenades, #kid-chip';
     const els = [...document.querySelectorAll(sel)];
     const rects = els.map(e => ({ id: e.id || e.className, r: e.getBoundingClientRect() })).filter(x => x.r.width > 0 && x.r.height > 0);
     const out = [];

@@ -283,7 +283,7 @@ class Game {
         this.audio.click();
       });
     }
-    this._applyKidMode();
+    this._applyKidMode({ silent: true }); // boot init — тост не потрібен
 
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
@@ -394,18 +394,18 @@ class Game {
   }
 
   // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (вмикає авто-вогонь і CSS)
-  _applyKidMode() {
+  // opts.silent — не показувати тост (при авто-init та вході в рівень)
+  _applyKidMode(opts = {}) {
     const on = !!this.save.kidMode;
     document.body.classList.toggle('kid-mode', on);
     const btn = document.getElementById('btn-kid');
     if (btn) btn.textContent = on ? t('🐣 Малюк: вкл') : t('🐣 Малюк: викл');
     if (this.hud) this.hud.setKidChip(on);
-    if (this._kidInited) {
+    if (!opts.silent) {
       if (this.hud) this.hud.toast(on
         ? t('🐣 Малюк увімкнено: авто-приціл і авто-вогонь')
         : t('🐣 Малюк вимкнено: цілишся сам'));
     }
-    this._kidInited = true;
   }
 
   // 👆 Перше знайомство з керуванням: показуємо раз, лише на телефоні
@@ -1015,7 +1015,7 @@ class Game {
 
     this.level = level;
     this.state = 'level';
-    this._applyKidMode(); // 🐣 клас kid-mode активний і в бою
+    this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;
     this.paused = false;
