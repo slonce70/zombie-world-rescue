@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { PF, weaponToIdx, idxToWeapon } from './protocol.js';
+import { t } from '../i18n.js';
 
 const SEND_HZ = 15;
 
@@ -82,7 +83,7 @@ export class GuestNet {
       const el = document.getElementById('overlay-net-wait');
       if (el) el.classList.toggle('show', shouldWait);
       const sub = document.getElementById('net-wait-sub');
-      if (sub) sub.textContent = this.lost ? 'Відновлюємо зʼєднання…' : 'Хост відволікся — чекаємо…';
+      if (sub) sub.textContent = this.lost ? t('Відновлюємо зʼєднання…') : t('Хост відволікся — чекаємо…');
     }
   }
 

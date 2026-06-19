@@ -4,6 +4,7 @@ import { Transport } from './transport.js';
 import { makeRoomCode, PROTO_VERSION } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
+import { t } from '../i18n.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -174,7 +175,7 @@ export class CoopSession {
 
     if (this.role === 'host') {
       if (d.t === 'hello') this._hostHello(from, d);
-      else if (d.t === 'bye') this._dropGuest(from, 'вийшов');
+      else if (d.t === 'bye') this._dropGuest(from, 'left');
     } else {
       if (d.t === 'welcome') {
         this.myPid = d.pid;
@@ -230,7 +231,7 @@ export class CoopSession {
     }, true);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
-    this.game.hud.toast(`🤝 ${nick} приєднався!`);
+    this.game.hud.toast(t('🤝 {n} приєднався!', { n: nick }));
     this.game.audio.click();
     if (this.state === 'level' && this.net) {
       // гість серед бою: шлемо start і чекаємо lvlready
@@ -253,7 +254,7 @@ export class CoopSession {
 
   _onPeer(id, on) {
     if (this.role !== 'host') return;
-    if (!on) this._dropGuest(id, 'зник');
+    if (!on) this._dropGuest(id, 'lost');
   }
 
   _dropGuest(pid, why) {
@@ -263,7 +264,7 @@ export class CoopSession {
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
     if (this.net) this.net.removeGuest(pid);
-    this.game.hud.toast(`👋 ${r.nick} ${why === 'вийшов' ? 'вийшов з гри' : 'втратив звʼязок'}`);
+    this.game.hud.toast(t('👋 {n} {how}', { n: r.nick, how: why === 'left' ? t('вийшов з гри') : t('втратив звʼязок') }));
   }
 
   _onClose(reason) {
