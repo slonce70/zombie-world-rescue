@@ -488,6 +488,15 @@ export class League {
       PRIMARY KEY (cid, mode, country)
     )`);
     this._lastSubmit = new Map(); // cid -> ts (анти-спам)
+    this._subIp = new Map(); // ip -> {n,t0}
+  }
+
+  _ipAllowed(ip) {
+    const now = Date.now();
+    let r = this._subIp.get(ip);
+    if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; this._subIp.set(ip, r); }
+    if (this._subIp.size > 2000) this._subIp.clear();
+    return ++r.n <= 20; // 20 сабмітів/хв/IP
   }
 
   json(obj, status = 200) {
@@ -504,6 +513,8 @@ export class League {
     }
     try {
       if (url.pathname === '/league/submit' && request.method === 'POST') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'x';
+        if (!this._ipAllowed(ip)) return this.json({ error: 'rate' }, 429);
         return this.submit(await request.json());
       }
       if (url.pathname === '/league/top') {
@@ -559,6 +570,16 @@ export class League {
     } else {
       // нік міг змінитись — оновлюємо м'яко
       this.sql.exec('UPDATE entries SET nick = ? WHERE cid = ? AND mode = ? AND country = ?', nick, cid, mode, country);
+    }
+    // показуємо лише топ-50 → тримаємо щонайбільше 500 на (mode,country), решту прибираємо
+    const ord = MODES[mode] === 'desc' ? 'DESC' : 'ASC';
+    const cnt = this.sql.exec('SELECT COUNT(*) AS n FROM entries WHERE mode = ? AND country = ?', mode, country).toArray();
+    if ((cnt[0].n | 0) > 500) {
+      this.sql.exec(
+        `DELETE FROM entries WHERE mode = ? AND country = ? AND cid IN (
+           SELECT cid FROM entries WHERE mode = ? AND country = ? ORDER BY score ${ord} LIMIT -1 OFFSET 500)`,
+        mode, country, mode, country
+      );
     }
     return this.rankResponse(mode, country, cid);
   }
