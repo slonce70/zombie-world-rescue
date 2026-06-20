@@ -108,9 +108,9 @@ const shieldRes = await page.evaluate(() => {
   z.rig.group.rotation.y = Math.PI; // щит дивиться на гравця
   g.test.aimAtNearestZombie();
   const sh0 = z.shieldHp;
-  // достатньо кадрів зблизька, щоб гарантовано розбити щит (250 міцності)
+  // достатньо кадрів зблизька, щоб розбити щит (з v47 міцність 1000 → треба більше вогню)
   let broke = false;
-  for (let i = 0; i < 120 && !broke; i++) {
+  for (let i = 0; i < 320 && !broke; i++) {
     g.test.aimAtNearestZombie();
     pl._fireContinuous(0.05, true);
     if (!z.shieldObj || z.shieldHp <= 0) broke = true;
@@ -119,7 +119,7 @@ const shieldRes = await page.evaluate(() => {
   return { sh0, shNow: z.shieldHp, broke, shieldFireMarker: !!z.shieldFire };
 });
 console.log('  SHIELD:', JSON.stringify(shieldRes));
-check(shieldRes.sh0 === 250, 'щитоносець стартує з 250 міцності щита');
+check(shieldRes.sh0 === 1000, 'щитоносець стартує з 1000 міцності щита (v47)');
 check(shieldRes.broke, 'вогнемет зблизька руйнує звичайний щит (нічого не блокуємо у v46)');
 check(shieldRes.shieldFireMarker, 'тип шкоди «вогонь» проведено до щита (z.shieldFire=true) — гак для v47');
 

@@ -47,8 +47,8 @@ check(cfg.biome === 'spainSun' && cfg.hasBiome, 'біом spainSun зареєс�
 check(cfg.reward === 'flamethrower', 'нагорода — ВОГНЕМЕТ (flamethrower)', cfg.reward);
 check(cfg.extra === 'toro', 'extraZombie = toro', cfg.extra);
 check(cfg.bossStyle === 'matador' && cfg.bossHp === 7000, `бос matador, ${cfg.bossHp} HP`);
-check(cfg.idx === 4 && cfg.order[3] === 'FRA' && cfg.order[5] === 'TUR',
-  `ESP стоїть після FRA, перед TUR: ${cfg.order.join('→')}`);
+check(cfg.idx === 4 && cfg.order[3] === 'FRA' && cfg.order.indexOf('TUR') > cfg.idx,
+  `ESP стоїть після FRA, перед TUR (між ними тепер ITA): ${cfg.order.join('→')}`);
 // монотонність складності FRA < ESP < TUR
 const mono = cfg.fraDiff.hp < cfg.diff.hp && cfg.diff.hp < cfg.turDiff.hp
   && cfg.fraDiff.dmg < cfg.diff.dmg && cfg.diff.dmg < cfg.turDiff.dmg
