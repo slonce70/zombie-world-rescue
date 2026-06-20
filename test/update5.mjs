@@ -21,7 +21,7 @@ async function loadCountry(c) {
 }
 
 // ============ ⚖️ БАЛАНС ============
-console.log('▸ Баланс: щит 500, базука 220');
+console.log('▸ Баланс: щит 250, базука 220');
 await loadCountry('UKR');
 await page.evaluate(() => window.__game.test.god());
 const balance = await page.evaluate(() => {
@@ -37,18 +37,18 @@ const balance = await page.evaluate(() => {
   const fdir = { x: dx / d, y: 0, z: dz / d };
   z.rig.group.rotation.y = Math.atan2(dx, dz);
   const sh0 = z.shieldHp;
-  z.damage(130, fdir, false);
+  z.damage(65, fdir, false); // 250-65=185 → стадія 1 (≤187.5)
   const c1 = { sh: z.shieldHp, cr1: z.shieldObj.cracks1.visible, cr2: z.shieldObj.cracks2.visible, cr3: z.shieldObj.cracks3.visible };
-  z.damage(130, fdir, false); // 500-260=240
+  z.damage(65, fdir, false); // 120 → стадія 2 (≤125)
   const c2 = { sh: z.shieldHp, cr1: z.shieldObj.cracks1.visible, cr2: z.shieldObj.cracks2.visible, cr3: z.shieldObj.cracks3.visible };
-  z.damage(130, fdir, false); // 110 → стадія 3
+  z.damage(65, fdir, false); // 55 → стадія 3 (≤62.5)
   const c3 = { sh: z.shieldHp, cr3: z.shieldObj.cracks3.visible };
-  z.damage(200, fdir, false); // злам
+  z.damage(100, fdir, false); // злам
   const broken = { sh: z.shieldHp, gone: !z.shieldObj };
   return { sh0, c1, c2, c3, broken, bazooka: null };
 });
-check(balance.sh0 === 500, `щит щитоносця 500 (${balance.sh0})`);
-check(!balance.c1.cr1 === false || balance.c1.sh === 370, `після 130 шкоди: 370 (${balance.c1.sh}), тріщини 1: ${balance.c1.cr1}`);
+check(balance.sh0 === 250, `щит щитоносця 250 (${balance.sh0})`);
+check(balance.c1.sh === 185, `після 65 шкоди: 185 (${balance.c1.sh}), тріщини 1: ${balance.c1.cr1}`);
 check(balance.c1.cr1 && !balance.c1.cr2, 'стадія 1 тріщин при ≤75%');
 check(balance.c2.cr2 && !balance.c2.cr3, 'стадія 2 при ≤50%');
 check(balance.c3.cr3, 'стадія 3 при ≤25%');

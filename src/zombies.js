@@ -9,8 +9,8 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
-  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (500 міцності)!
-  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 500 },
+  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (250 міцності — здоланно навіть стартовим пістолетом)!
+  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 250 },
   snowman: {
     hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
     ranged: { min: 7, max: 30, hold: 13, cd: 3.0, projSpeed: 16, dmg: 9, size: 0.22 },
@@ -58,6 +58,9 @@ export class Zombies {
     this.diff = _star > 1
       ? { hp: _base.hp * (1 + 0.6 * (_star - 1)), dmg: _base.dmg * (1 + 0.25 * (_star - 1)), counts: _base.counts }
       : _base;
+    // 🔫 стрільці-зомбі лише у складнішому контексті: НЕ перша країна (UKR dmg=1) на ★1.
+    // Будь-яка пізніша країна (dmg>1) або підняті зірки (diffStar>1) → дозволено.
+    this._allowGunner = this.diff.dmg > 1 || this.diffStar > 1;
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
     this.byNidMap = new Map();
@@ -196,7 +199,8 @@ export class Zombies {
         const r = this.rng.range(2, 9);
         let type = this.rng.chance(0.25) ? 'runner' : 'walker';
         if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
-        else if (this.rng.chance(0.1)) type = 'gunner'; // 🔫 стрілець трапляється всюди
+        // 🔫 стрілець — лише у складнішому контексті (НЕ перша Україна на ★1)
+        else if (this._allowGunner && this.rng.chance(0.1)) type = 'gunner';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });
@@ -372,8 +376,9 @@ export class Zombies {
     if (z.shieldHp > 0) {
       const fx = -Math.sin(z.rig.group.rotation.y);
       const fz = -Math.cos(z.rig.group.rotation.y);
-      // dir — напрямок пострілу (від гравця до зомбі); null (вибух) — теж у щит
-      const onShield = !dir || (dir.x * fx + dir.z * fz) < -0.15;
+      // dir — напрямок пострілу (від гравця до зомбі); null (вибух) — теж у щит.
+      // поріг -0.45 (раніше -0.15): вужчий фронтальний конус → дитині легше зайти збоку.
+      const onShield = !dir || (dir.x * fx + dir.z * fz) < -0.45;
       if (onShield) {
         z.shieldHp -= amt;
         this._aggro(z);
@@ -549,7 +554,7 @@ export class Zombies {
           const withShield = (this.level.country && this.level.country.shieldGuards) > 0;
           const hard = this.diff.hp >= 1.5; // DEU/FRA — броньовики в ордах
           let type;
-          if (this.rng.chance(0.08)) type = 'gunner';
+          if (this._allowGunner && this.rng.chance(0.08)) type = 'gunner';
           else if (hard && this.rng.chance(0.09)) type = 'ironclad';
           else if (this.extraZombie && withShield) {
             type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie

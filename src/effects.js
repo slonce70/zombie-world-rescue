@@ -447,7 +447,9 @@ export class Effects {
     g.position.copy(from);
     g.lookAt(from.clone().add(dir));
     this.scene.add(g);
-    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid, pid });
+    // traveled — пройдена дистанція: до зведення (~3 м) ракета не вибухає,
+    // тож постріл у натовп упритул не рве гравця власним вибухом (F10).
+    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid, pid, traveled: 0 });
   }
 
   spawnGrenade(pos, vel, gid = null, pid = 1) {
@@ -839,14 +841,19 @@ export class Effects {
       // перешкоди світу
       let hitT = this.world.shotBlockDist(rk.mesh.position, this._tmpDir, frameDist + 0.3);
       // зомбі на шляху
+      let hitZombie = false;
       if (this.zombieHitTest) {
         const zh = this.zombieHitTest(rk.mesh.position, this._tmpDir, frameDist + 0.6);
-        if (zh && zh.t < hitT) hitT = zh.t;
+        if (zh && zh.t < hitT) { hitT = zh.t; hitZombie = true; }
       }
       let boom = hitT <= frameDist + 0.3;
       rk.mesh.position.addScaledVector(rk.v, dt);
+      rk.traveled += frameDist;
       const rp = rk.mesh.position;
       if (!boom && rp.y < this.world.groundH(rp.x, rp.z) + 0.15) boom = true;
+      // 🚀 зведення: у перші ~3 м ракета НЕ детонує від землі/стіни/повітря (щоб дитина не
+      // підірвала себе зблизька, F10), АЛЕ пряме влучання у ворога детонує завжди (ревью).
+      if (boom && !hitZombie && rk.traveled < 3) boom = false;
       // димний слід
       rk.smokeT -= dt;
       if (rk.smokeT <= 0) {

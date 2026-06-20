@@ -413,7 +413,11 @@ export class CoopUI {
 
   _connErr(e) {
     const m = String(e && e.message || e);
-    if (m === 'norelay') return t('Сервер кооперативу ще не налаштовано — потрібно задеплоїти worker/ і вписати адресу в src/net/transport.js (див. README)');
+    if (m === 'norelay') {
+      // 🤝 F15: дитині — дружнє повідомлення; технічну деталь лишаємо в консолі для дорослих
+      console.warn('[coop] norelay: deploy worker/ and set its address in src/net/transport.js (see README)');
+      return t('🤝 Гра разом поки недоступна');
+    }
     if (m === 'noroom') return t('Кімнати з таким кодом немає 🤔 Перевір код!');
     if (m === 'full') return t('Кімната вже повна (4 гравці) 😅');
     if (m === 'taken') return t('Спробуй ще раз — код зайнятий');
