@@ -93,7 +93,9 @@ const codeA = await A.evaluate(async () => {
 check('А отримав код відновлення', typeof codeA === 'string' && codeA.length === 8, codeA);
 const cidA = await A.evaluate(() => window.__game.save.cid);
 
-// панель: відкривається кнопкою, показує статус
+// панель: відкривається кнопкою (v34: кнопки тепер у ☰-меню — спершу відкриваємо його)
+await A.click('#btn-menu');
+await sleep(300);
 await A.click('#btn-progress');
 await sleep(700);
 const panelVisible = await A.evaluate(() => document.getElementById('overlay-progress').classList.contains('show'));
@@ -111,16 +113,21 @@ const B = await ctxB.newPage();
 await B.goto(`${BASE}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
 await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
 B.on('dialog', (d) => d.accept());
+await B.click('#btn-menu');
+await sleep(300);
 await B.click('#btn-progress');
 await B.fill('#cloud-code-input', codeA);
 await Promise.all([
   B.waitForNavigation({ timeout: 10000 }).catch(() => null), // adopt → location.reload()
   B.click('#btn-cloud-claim'),
 ]);
-await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
-const restored = await B.evaluate(() => ({
-  coins: window.__game.save.coins, ukr: !!window.__game.save.liberated.UKR, cid: window.__game.save.cid,
-}));
+// adopt робить ще один location.reload() — чекаємо стабільний контекст і читаємо дані ОДНИМ
+// waitForFunction (він авто-ретраїться крізь навігацію, тож «execution context destroyed» не валить тест)
+const restored = await B.waitForFunction(() => {
+  const g = window.__game;
+  if (!g || g.state !== 'globe' || !g.save) return null;
+  return { coins: g.save.coins, ukr: !!g.save.liberated.UKR, cid: g.save.cid };
+}, null, { timeout: 25000, polling: 300 }).then((h) => h.jsonValue());
 check('Б відновив монети і країну', restored.coins === 7777 && restored.ukr);
 check('Б успадкував cid (далі синхрон той самий)', restored.cid === cidA);
 

@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -225,6 +225,10 @@ class Game {
     document.getElementById('btn-menu').addEventListener('click', () => {
       this.audio.click();
       this._showOverlay('overlay-menu');
+    });
+    // тап по пункту ☰-меню закриває саме меню, щоб його панель не перекривала відкриту (v36)
+    document.getElementById('overlay-menu').addEventListener('click', (e) => {
+      if (e.target.closest('.globe-act')) this._hideOverlay('overlay-menu');
     });
     document.getElementById('btn-pass').addEventListener('click', () => {
       this.renderPassPanel();
