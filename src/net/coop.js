@@ -5,6 +5,7 @@ import { makeRoomCode, PROTO_VERSION } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
+import { nickIsBad } from '../../worker/nick.mjs';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -27,6 +28,8 @@ export function saveNick(nick) {
 export function cleanNick(raw) {
   let s = String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   if (s.length > 12) s = s.slice(0, 12);
+  // 🧼 безпека дітей: груба лайка в ніку (видно над головою/в пінгах) → нейтральний нік
+  if (s && nickIsBad(s)) return t('Гравець');
   return s;
 }
 
@@ -255,6 +258,8 @@ export class CoopSession {
       return;
     }
     let nick = cleanNick(d.nick) || t('Гравець {n}', { n: from });
+    // 🧼 безпека дітей: захист від клієнта, що оминає cleanNick (нік видно іншій дитині)
+    if (nickIsBad(nick)) nick = t('Гравець');
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
     this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
     this.transport.send(from, {

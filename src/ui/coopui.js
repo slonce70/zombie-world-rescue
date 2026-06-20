@@ -3,6 +3,7 @@
 // лічильник онлайна, хто в мережі, відкриті кімнати з кнопкою «Зайти» без кода.
 import { CoopSession, loadNick, saveNick, cleanNick, PING_PHRASES } from '../net/coop.js';
 import { t } from '../i18n.js';
+import { nickIsBad } from '../../worker/nick.mjs';
 import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
@@ -275,6 +276,12 @@ export class CoopUI {
   }
 
   _acceptNick() {
+    // 🧼 безпека дітей: лайку в ніку не приймаємо тихо — просимо обрати інший
+    if (nickIsBad(this.el.nick.value)) {
+      this.el.nickErr.textContent = t('Обери, будь ласка, інший нік 🙂');
+      this.el.nickErr.style.display = 'block';
+      return;
+    }
     const nick = cleanNick(this.el.nick.value);
     if (nick.length < 2) {
       this.el.nickErr.textContent = t('Введи нік (хоча б 2 символи) 😊');
