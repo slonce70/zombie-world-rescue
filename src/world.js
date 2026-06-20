@@ -12,7 +12,7 @@ export class World {
     this.scene = scene;
     this.biome = biome || BIOMES.summer;
     this.map = map;
-    this.quality = quality || { shadow: 2048, snow: 380 };
+    this.quality = quality || { shadow: 2048, snow: 380, lights: true };
     // layout сумісний зі старим глобальним LAYOUT: BOUND, SPAWN + сайти місій
     this.layout = Object.assign(
       { BOUND: map.bound, SPAWN: map.spawn },
@@ -1249,10 +1249,12 @@ export class World {
     sun.position.set(b.sunPos[0], b.sunPos[1], b.sunPos[2]);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.quality.shadow, this.quality.shadow);
-    sun.shadow.camera.left = -75;
-    sun.shadow.camera.right = 75;
-    sun.shadow.camera.top = 75;
-    sun.shadow.camera.bottom = -75;
+    // 🪶 Тіні потрібні лише поблизу гравця: менша камера (±45) = вища ефективна
+    // роздільність тіні навіть на меншій мапі. Дальні обʼєкти тіней не кидають.
+    sun.shadow.camera.left = -45;
+    sun.shadow.camera.right = 45;
+    sun.shadow.camera.top = 45;
+    sun.shadow.camera.bottom = -45;
     sun.shadow.camera.near = 10;
     sun.shadow.camera.far = 320;
     sun.shadow.bias = -0.0004;
@@ -1938,7 +1940,10 @@ export class World {
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), toonMat(0xfff2c2, 0xffd56b, 0.9));
     lamp.position.set(0, 0.4 + h - 0.25, 0);
     g.add(lamp);
-    if (this.quality.shadow >= 2048) {
+    // Реальне точкове світло у кожному будинку — лише на явному «high».
+    // distance=9 надворі майже не видно; на 'auto'/'fast' лишається тільки
+    // емісивна лампа (без втрат для ока, але без зайвого GPU-pass на телефоні).
+    if (this.quality.lights) {
       const pl = new THREE.PointLight(0xffd9a0, 5, 9, 1.4);
       pl.position.set(0, 0.4 + h - 0.4, 0);
       g.add(pl);

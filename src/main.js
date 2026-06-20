@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -494,11 +494,28 @@ class Game {
     el.addEventListener('mousedown', dismiss);
   }
 
+  // 📱 Слабкий/тач-пристрій? Дитячий телефон/планшет не тягне найдорожчий GPU-pass.
+  // Тач (телефон/планшет) АБО мало ядер (<=4) АБО мало памʼяті (<=4 ГБ).
+  _isWeakDevice() {
+    try {
+      if (isTouchDevice()) return true;
+      const cores = navigator.hardwareConcurrency;
+      if (typeof cores === 'number' && cores <= 4) return true;
+      const mem = navigator.deviceMemory;
+      if (typeof mem === 'number' && mem <= 4) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
   _qualityWorldOpts() {
     const q = this.save.quality || 'auto';
-    return q === 'fast'
-      ? { shadow: 1024, snow: 160 }
-      : { shadow: 2048, snow: 380 };
+    // Явний вибір користувача поважаємо як є.
+    if (q === 'fast') return { shadow: 1024, snow: 160, lights: false };
+    if (q === 'high') return { shadow: 2048, snow: 380, lights: true };
+    // 'auto': на слабкому/тач-пристрої — проміжний профіль (легші тіні, без зайвих світел);
+    // на потужному ПК — повна якість, як було.
+    if (this._isWeakDevice()) return { shadow: 1024, snow: 220, lights: false };
+    return { shadow: 2048, snow: 380, lights: true };
   }
 
   async _boot() {
