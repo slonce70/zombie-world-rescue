@@ -341,6 +341,7 @@ class Game {
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [],
+      diffStar: 1,
     };
   }
 
@@ -382,6 +383,9 @@ class Game {
         if (!out.chapter.p || typeof out.chapter.p !== 'object') out.chapter.p = {};
         if (!Array.isArray(out.medals)) out.medals = [];
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
+        // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
+        if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
+        out.diffStar = Math.round(out.diffStar);
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
@@ -842,6 +846,12 @@ class Game {
       players: null,
       runIndex: coop && coop.spec ? coop.spec.runIndex : undefined,
     };
+    // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
+    // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
+    // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
+    const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
+    const soloReplay = !isStorm && !isArena && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
+    level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
