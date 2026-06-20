@@ -1075,6 +1075,56 @@ function buildZombie(type, rng) {
     rig.ztype = 'wizard';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'toro') {
+    // 🐂 торо: кремезний зомбі-бичок, нахилений уперед, з рогами — готовий до ривка
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.18, belly: 1.5, armsForward: 1.1, headR: 0.26, lean: -0.28,
+      skin: 0x6e5a52, shirt: 0x4a3a34, pants: 0x37302a, shoes: 0x232020,
+      eyeWhite: 0xffd24a, eyeL: 0.07, eyeR: 0.07, pupilColor: 0xc62828, brow: 0.55,
+      bellySkin: true, nose: false, mouth: 'open', teeth: true,
+    }));
+    const hornM = toonMat(0xe8dcc4);   // кістяні роги
+    const noseM = toonMat(0x2a2422);
+    // велика бичача морда
+    const snout = box(0.26, 0.18, 0.16, toonMat(0x5a4a42));
+    snout.position.set(0, -0.05, -0.27);
+    rig.parts.head.add(snout);
+    // ніздрі-кільце
+    const nring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 12), toonMat(0xc9b06a, 0x8a6a2a, 0.2));
+    nring.position.set(0, -0.1, -0.35);
+    nring.rotation.x = Math.PI / 2;
+    rig.parts.head.add(nring);
+    for (const side of [-1, 1]) {
+      const nostril = sphere(0.025, noseM, 5, 4);
+      nostril.position.set(side * 0.07, -0.04, -0.35);
+      rig.parts.head.add(nostril);
+    }
+    // 🐂 вигнуті роги
+    for (const side of [-1, 1]) {
+      const horn = cone(0.06, 0.34, hornM, 7);
+      horn.position.set(side * 0.2, 0.22, -0.08);
+      horn.rotation.z = side * -1.15;
+      horn.rotation.x = -0.35;
+      rig.parts.head.add(horn);
+      const tip = sphere(0.05, hornM, 6, 5);
+      tip.position.set(side * 0.36, 0.34, -0.12);
+      rig.parts.head.add(tip);
+    }
+    // вуха обабіч
+    for (const side of [-1, 1]) {
+      const ear = box(0.12, 0.07, 0.04, toonMat(0x5a4a42));
+      ear.position.set(side * 0.27, 0.06, 0.02);
+      ear.rotation.z = side * 0.4;
+      rig.parts.head.add(ear);
+    }
+    // горб на спині (бичача загривок)
+    const hump = sphere(0.26, toonMat(0x5a4a42), 10, 8);
+    hump.position.set(0, 0.5, 0.16);
+    hump.scale.set(1.1, 0.7, 1);
+    rig.parts.torso.add(hump);
+    rig.ztype = 'toro';
+    addZombieWear(rig);
+    return rig;
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,
@@ -1127,6 +1177,11 @@ const BOSS_SPECS = {
   pharaoh: {
     skin: 0xb8c49a, shirt: 0xe8e0cc, pants: 0xd9d2bc, shoes: 0xc9b88a,
     eyeWhite: 0x9be8ff, pupilColor: 0x1a6a8a, browColor: 0x8a6a2a,
+  },
+  // 🇪🇸 Матадор-зомбі: бичача шкура, золотий «traje de luces» (костюм світла)
+  matador: {
+    skin: 0x6e5a52, shirt: 0xffd23f, pants: 0xc62828, shoes: 0x2a2220,
+    eyeWhite: 0xffd24a, pupilColor: 0xc62828, browColor: 0x2e2620,
   },
 };
 
@@ -1244,6 +1299,74 @@ export function makeBoss(style = 'king') {
     const loop = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.03, 6, 12), goldM);
     loop.position.set(0, -1.12, 0);
     rig.parts.armL.add(staff, loop);
+  } else if (style === 'matador') {
+    // 🐂 МАТАДОР-ЗОМБІ: велетенський зомбі-бик у золотому костюмі тореадора
+    const hornM = toonMat(0xe8dcc4);
+    const goldM = toonMat(0xffd23f, 0xcc8800, 0.3);
+    const capeM = toonMat(0xc62828);   // червоний плащ-мулета
+    // величезні бичачі роги
+    for (const side of [-1, 1]) {
+      const horn = cone(0.1, 0.5, hornM, 8);
+      horn.position.set(side * 0.24, 0.34, -0.06);
+      horn.rotation.z = side * -1.1;
+      horn.rotation.x = -0.3;
+      rig.parts.head.add(horn);
+      const tip = sphere(0.08, hornM, 7, 6);
+      tip.position.set(side * 0.46, 0.5, -0.1);
+      rig.parts.head.add(tip);
+    }
+    // бичача морда + ніздряне кільце
+    const snout = box(0.3, 0.2, 0.18, toonMat(0x5a4a42));
+    snout.position.set(0, -0.04, -0.27);
+    rig.parts.head.add(snout);
+    const nring = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 12), goldM);
+    nring.position.set(0, -0.1, -0.37);
+    nring.rotation.x = Math.PI / 2;
+    rig.parts.head.add(nring);
+    // montera — чорний капелюх тореадора
+    const hat = sphere(0.26, toonMat(0x2a2620), 14, 10);
+    hat.position.set(0, 0.34, 0);
+    hat.scale.set(1, 0.8, 1.05);
+    rig.parts.head.add(hat);
+    for (const side of [-1, 1]) {
+      const bobble = sphere(0.1, toonMat(0x2a2620), 8, 6);
+      bobble.position.set(side * 0.26, 0.34, 0);
+      rig.parts.head.add(bobble);
+    }
+    // золота вишивка на куртці (traje de luces) + еполети
+    for (const side of [-1, 1]) {
+      const epaulet = sphere(0.16, goldM, 8, 6);
+      epaulet.position.set(side * 0.34, 0.5, 0);
+      epaulet.scale.set(1, 0.6, 1);
+      rig.parts.torso.add(epaulet);
+    }
+    for (let i = 0; i < 3; i++) {
+      const braid = box(0.4, 0.05, 0.02, goldM);
+      braid.position.set(0, 0.42 - i * 0.18, -0.3);
+      rig.parts.torso.add(braid);
+    }
+    // червоний кушак
+    const sash = box(0.6, 0.16, 0.5, capeM);
+    sash.position.set(0, 0.0, 0);
+    rig.parts.torso.add(sash);
+    // 🔴 червоний плащ-мулета на лівій руці
+    const cape = box(0.55, 0.85, 0.05, capeM);
+    cape.position.set(0, -0.5, 0.05);
+    cape.rotation.x = 0.12;
+    rig.parts.armL.add(cape);
+    // 🗡️ бандерилья (прикрашений дротик) у правій руці
+    const dartM = toonMat(0x8a6a3a);
+    const dart = cylinder(0.025, 0.025, 0.9, dartM, 6);
+    dart.position.set(0, -0.6, 0);
+    const dartTip = cone(0.05, 0.14, toonMat(0xb0b0b8), 6);
+    dartTip.position.set(0, -1.08, 0);
+    dartTip.rotation.x = Math.PI;
+    for (const c of [0xc62828, 0xffd23f]) {
+      const ribbon = box(0.12, 0.18, 0.02, toonMat(c));
+      ribbon.position.set(c === 0xc62828 ? -0.07 : 0.07, -0.1, 0);
+      rig.parts.armR.add(ribbon);
+    }
+    rig.parts.armR.add(dart, dartTip);
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

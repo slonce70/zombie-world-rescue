@@ -4,6 +4,7 @@ import { t, keyHint } from './i18n.js';
 import polandMap from './maps/poland.js';
 import germanyMap from './maps/germany.js';
 import franceMap from './maps/france.js';
+import spainMap from './maps/spain.js';
 import turkeyMap from './maps/turkey.js';
 import egyptMap from './maps/egypt.js';
 
@@ -86,6 +87,27 @@ export const BIOMES = {
     flowers: true, hay: false,
     lampGlow: 0.8,
     signText: t('МІСТЕЧКО ЛАВАНДОВЕ'),
+  },
+  // 🇪🇸 спекотне іспанське сонце — теракотові тони, ясне небо, корида
+  spainSun: {
+    skyTop: 0x3f93e8, skyHorizon: 0xffeac2, skyBottom: 0xe6c898,
+    fogColor: 0xf2dcb0, fogNear: 130, fogFar: 430,
+    hemiSky: 0xfbeccc, hemiGround: 0xb89a62, hemiIntensity: 1.0,
+    sunColor: 0xfff0cc, sunIntensity: 2.05, sunPos: [80, 115, 45],
+    sunDisc: 0xfff2c2, sunDiscPos: [330, 430, 230],
+    grass1: 0xc2ad5e, grass2: 0xa89a48, grass3: 0xd4bf6e, // суха золотиста земля
+    rock: 0xc09868, peak: 0xd8b888, water: 0x49b8e8, riverbed: 0xc4a474,
+    dirt: 0xbf9a64, plaza: 0xd0b888, arenaGround: 0xe0c074,
+    roadMain: 0xbfa074, roadEdge: 0x8a7350,
+    treeGreens: [0x8aa86a, 0x9ab47a, 0x7a9a5a, 0xa8c084, 0x84a464], // олива — срібляста зелень
+    pineGreens: [0x4f7a44, 0x5a8a4c, 0x436838],
+    pineRatio: 0.2, snow: false, snowfall: false, dustfall: true,
+    sparseTrees: true,
+    housePalette: [0xf2dcb4, 0xf5e2c2, 0xe8cba0, 0xf2c9a4, 0xe2c49a], // теракота/охра
+    roofPalette: [0xc0563b, 0xb04e34, 0xa8542f, 0xc96a3a],
+    flowers: true, hay: false,
+    lampGlow: 0.85,
+    signText: t('СЕЛО СОНЯЧНЕ'),
   },
   // 🇹🇷 теплий вечір над Босфором
   bosphorus: {
@@ -191,6 +213,21 @@ export const COUNTRIES = {
     banner: t('Лаванда, вежа до неба і ШЕФ БАГЕТ. Стережись черствих багетів! 🥖'),
     food: t('круасан'),
   },
+  ESP: {
+    id: 'ESP', name: t('Іспанія'), flag: '🇪🇸', seed: 4848,
+    lat: 40.4, lon: -3.7,
+    victoryTitle: t('🇪🇸 ІСПАНІЮ ЗВІЛЬНЕНО!'),
+    biome: 'spainSun',
+    map: spainMap,
+    difficulty: { hp: 1.9, dmg: 1.37, counts: 1.48 },
+    weaponReward: 'flamethrower',
+    weaponRewardToast: () => t('Ти отримав ВОГНЕМЕТ! {k} — спопели орду струменем вогню 🔥', { k: keyHint('кнопка 🔁', 'Клавіша 9') }),
+    extraZombie: 'toro',
+    shieldGuards: 3,
+    boss: { name: t('👑 МАТАДОР-ЗОМБІ'), hp: 7000, frost: false, style: 'matador' },
+    banner: t('Сонячна Іспанія, корида й МАТАДОР-ЗОМБІ! Стережись рогів зомбі-биків! 🐂'),
+    food: t('чурос'),
+  },
   TUR: {
     id: 'TUR', name: t('Туреччина'), flag: '🇹🇷', seed: 6060,
     lat: 39.0, lon: 35.2,
@@ -223,7 +260,7 @@ export const COUNTRIES = {
   },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'TUR', 'EGY'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'TUR', 'EGY'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;
