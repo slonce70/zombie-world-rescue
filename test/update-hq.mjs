@@ -127,6 +127,21 @@ const hqHtml = await page.evaluate(() => document.getElementById('hq-content').i
 check(/Мої цифри|My Stats|Мои цифры/.test(hqHtml), 'Штаб рендерить секцію «Мої цифри»');
 check(/hq-stat-n/.test(hqHtml), 'Штаб показує картки-цифри');
 
+// ============ 🗺️ ШТАБ: секція «Моя пригода» (печаті країн) ============
+console.log('▸ Штаб: Моя пригода (печаті країн)');
+// До звільнення: Україна відкрита, решта світу затемнена (???)
+// (isCountryOpen: УКР завжди відкрита, увесь світ — лише після звільнення УКР)
+await page.evaluate(() => { window.__game.save.liberated = {}; window.__game.hq.render(); });
+let advHtml = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/hq-country/.test(advHtml), 'Штаб показує картки країн');
+check(/🇺🇦/.test(advHtml), 'Україна — у списку пригоди');
+check(/locked/.test(advHtml), 'незвільнені країни затемнені (???)');
+// Після звільнення УКР: печать «врятовано» (saved) з'являється на картці країни
+await page.evaluate(() => { window.__game.save.liberated = { UKR: true }; window.__game.hq.render(); });
+advHtml = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+const sealCount = (advHtml.match(/hq-country saved/g) || []).length;
+check(sealCount >= 1, `звільнена країна має печать saved (${sealCount})`);
+
 // підсумок
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));
