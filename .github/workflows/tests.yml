@@ -21,7 +21,7 @@ jobs:
       - name: Version sync (version.json ↔ APP_VERSION ↔ PROTO_VERSION)
         run: node test/version-sync.mjs
       - name: Relay reconnect edge (full room + same pid resume)
-        run: node test/relay-reconnect.mjs
+        run: SLOW=4 node test/relay-reconnect.mjs
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8741 &
@@ -30,7 +30,7 @@ jobs:
       - name: Version check (авто-оновлення клієнта)
         run: node test/version-check.mjs
       - name: Cloud save (хмарний сейв, фільтр ніків, краш-екран)
-        run: node test/cloudsave.mjs
+        run: SLOW=4 node test/cloudsave.mjs
       - name: i18n (українська/English/русский)
         run: node test/i18n.mjs
 
