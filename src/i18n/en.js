@@ -596,6 +596,7 @@ export const EN = {
 "💀 Зомбі тебе схопили!": "💀 The zombies got you!",
 "Ти переміг Зомбі-Короля і врятував країну!": "You defeated the Zombie King and saved the country!",
 "🎖️ ЗОРЯНИЙ ШЛЯХ": "🎖️ STAR PATH",
+"🎖️ ШТАБ РЯТІВНИКА": "🎖️ RESCUE HQ",
 "📅 ЗАВДАННЯ ДНЯ": "📅 DAILY QUESTS",
 "Нові завдання — щодня! Нагорода: монети та зірковий досвід ⭐": "New quests every day! Reward: coins and star XP ⭐",
 "💾 МІЙ ПРОГРЕС": "💾 MY PROGRESS",
