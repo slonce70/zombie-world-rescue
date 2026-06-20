@@ -605,7 +605,9 @@ export class Zombies {
         // оновлюємо повний риг лише поки програється сама die-анімація (~0.85с);
         // далі поза вже статична — заморожуємо її й не тратимо CPU на риг трупа
         if (rig.anim.dieT < 1) updateRig(rig, dt);
-        if (z.deadT > 1.6) rig.group.position.y -= dt * 0.7;
+        // занурюємо тіло в землю в останні ~0.7с перед прибиранням — щоб і на тачі
+        // (короткий TTL 1.6с) труп плавно зникав, а не «вистрибував»
+        if (z.deadT > this._corpseTtl - 0.7) rig.group.position.y -= dt * 0.9;
         if (z.deadT > this._corpseTtl) {
           z.gone = true;
           removeAny = true;
@@ -1069,7 +1071,9 @@ export class Zombies {
         z.deadT += dt;
         // риг трупа оновлюємо лише поки грає die-анімація — потім поза заморожена
         if (rig.anim.dieT < 1) updateRig(rig, dt);
-        if (z.deadT > 1.6) rig.group.position.y -= dt * 0.7;
+        // занурюємо тіло в землю в останні ~0.7с перед прибиранням — щоб і на тачі
+        // (короткий TTL 1.6с) труп плавно зникав, а не «вистрибував»
+        if (z.deadT > this._corpseTtl - 0.7) rig.group.position.y -= dt * 0.9;
         if (z.deadT > this._corpseTtl) {
           z.gone = true;
           removeAny = true;
