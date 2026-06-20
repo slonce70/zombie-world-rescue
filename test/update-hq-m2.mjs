@@ -50,6 +50,16 @@ await page.goto(`${BASE}/?test&country=UKR`);
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 30000, 'reload');
 check((await save()).goal === 'sniper', 'ціль переживає reload');
 
+// ============ 🎯 МОЯ ЦІЛЬ — ШТАБ ============
+console.log('▸ M2: Моя ціль — Штаб');
+await page.evaluate(() => { window.__game.save.coins = 120; window.__game.save.goal = 'vest'; window.__game.hq.render(); });
+const hq = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/hq-goal/.test(hq), 'Штаб має секцію «Моя ціль»');
+check(/Бронежилет|Vest|Бронежилет/.test(hq) && /\d/.test(hq), 'ціль показує назву і скільки ще монет');
+await page.evaluate(() => { window.__game.save.goal = null; window.__game.hq.render(); });
+const hq2 = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/hq-goal/.test(hq2), 'без цілі — запрошення обрати ціль');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

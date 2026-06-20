@@ -1024,6 +1024,12 @@ body.touch-mode #touch-coach.show { display: block; }
 
 /* Штаб Рятівника: Мої цифри */
 .hq-h { margin: 14px 0 6px; font-size: 18px; }
+.hq-goal { display:flex; gap:10px; align-items:center; background:rgba(245,197,66,.12); border:1px solid rgba(245,197,66,.5); border-radius:12px; padding:10px; }
+.hq-goal.empty { opacity:.8; font-size:13px; }
+.hq-goal-i { font-size:30px; }
+.hq-goal-n { font-weight:800; }
+.hq-goal-r { font-weight:700; color:#f5c542; }
+.hq-goal-d { font-size:12px; opacity:.8; }
 .hq-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .hq-stat { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08); border-radius: 12px; padding: 8px 10px; }
 .hq-stat-i { font-size: 22px; }
