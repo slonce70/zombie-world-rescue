@@ -1125,6 +1125,71 @@ function buildZombie(type, rng) {
     rig.ztype = 'toro';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'gladiator') {
+    // 🛡️ зомбі-гладіатор: кремезний боєць у бронзовому шоломі з гребенем,
+    // зі щитом у лівій руці й коротким мечем (гладіусом) у правій.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.22, belly: 1.35, armsForward: 0.85, headR: 0.24, lean: -0.12,
+      skin: 0x7a6354, shirt: 0x8a5a32, pants: 0x6e4a2a, shoes: 0x3a2a1c,
+      eyeWhite: 0xffe08a, pupilColor: 0xc62828, brow: 0.5,
+      sleeves: 'skin', mouth: 'open', teeth: true, nose: false,
+    }));
+    const bronzeM = toonMat(0xc89b4a, 0x8a6a2a, 0.25);   // бронза/латунь
+    const bronzeD = toonMat(0xb0863a);
+    const crestM = toonMat(0xc62828);   // багряний кінський гребінь
+    // 🪖 бронзовий шолом-каска (галея) з нащічниками
+    const helm = sphere(0.3, bronzeM, 14, 10);
+    helm.position.y = 0.2;
+    helm.scale.set(1.04, 0.82, 1.04);
+    rig.parts.head.add(helm);
+    const rim = cylinder(0.31, 0.33, 0.06, bronzeD, 14);
+    rim.position.y = 0.1;
+    rig.parts.head.add(rim);
+    // нащічники
+    for (const side of [-1, 1]) {
+      const cheek = box(0.07, 0.18, 0.18, bronzeD);
+      cheek.position.set(side * 0.26, -0.02, -0.04);
+      rig.parts.head.add(cheek);
+    }
+    // переніссник
+    const nasal = box(0.06, 0.2, 0.06, bronzeD);
+    nasal.position.set(0, 0.02, -0.27);
+    rig.parts.head.add(nasal);
+    // 🔺 поперечний кінський гребінь (crista) — головна впізнавана риса
+    for (let i = 0; i < 7; i++) {
+      const h = 0.26 - Math.abs(i - 3) * 0.04;
+      const tuft = box(0.05, h, 0.07, crestM);
+      tuft.position.set(0, 0.46, 0.16 - i * 0.05);
+      rig.parts.head.add(tuft);
+    }
+    // бронзовий нагрудник (мускульна кіраса)
+    const cuirass = box(0.5, 0.5, 0.16, bronzeM);
+    cuirass.position.set(0, 0.34, -0.26);
+    rig.parts.torso.add(cuirass);
+    // наплічник на правому плечі
+    const pauldron = sphere(0.18, bronzeD, 8, 6);
+    pauldron.position.set(0.36, 0.56, 0);
+    pauldron.scale.set(1.2, 0.7, 1.2);
+    rig.parts.torso.add(pauldron);
+    // 🛡️ круглий щит (parma) у лівій руці
+    const shield = cylinder(0.34, 0.34, 0.07, bronzeD, 16);
+    shield.rotation.x = Math.PI / 2;
+    shield.position.set(0, -0.42, -0.18);
+    const boss = sphere(0.1, bronzeM, 10, 8);   // умбон у центрі щита
+    boss.position.set(0, -0.42, -0.26);
+    rig.parts.armL.add(shield, boss);
+    // ⚔️ короткий меч (гладіус) у правій руці
+    const bladeM = toonMat(0xc9d0d8);
+    const blade = box(0.07, 0.62, 0.03, bladeM);
+    blade.position.set(0, -0.78, 0);
+    const hilt = box(0.16, 0.07, 0.07, toonMat(0x6b4226));
+    hilt.position.set(0, -0.46, 0);
+    const pommel = sphere(0.06, bronzeD, 8, 6);
+    pommel.position.set(0, -0.4, 0);
+    rig.parts.armR.add(blade, hilt, pommel);
+    rig.ztype = 'gladiator';
+    addZombieWear(rig);
+    return rig;
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,
@@ -1182,6 +1247,11 @@ const BOSS_SPECS = {
   matador: {
     skin: 0x6e5a52, shirt: 0xffd23f, pants: 0xc62828, shoes: 0x2a2220,
     eyeWhite: 0xffd24a, pupilColor: 0xc62828, browColor: 0x2e2620,
+  },
+  // 🇮🇹 Цезар-зомбі (бос Італії): бронзова кіраса, багряна туніка, золото імператора
+  gladiator: {
+    skin: 0x7a6354, shirt: 0x8c2f3e, pants: 0xc89b4a, shoes: 0x3a2a1c,
+    eyeWhite: 0xffe08a, pupilColor: 0xc62828, browColor: 0x2e2620,
   },
 };
 
@@ -1367,6 +1437,82 @@ export function makeBoss(style = 'king') {
       rig.parts.armR.add(ribbon);
     }
     rig.parts.armR.add(dart, dartTip);
+  } else if (style === 'gladiator') {
+    // 👑 ЦЕЗАР-ЗОМБІ: велетенський зомбі-імператор-гладіатор у бронзовій кірасі,
+    // зі шоломом-гребенем, лавровим вінком і великим списом-пілумом.
+    const bronzeM = toonMat(0xc89b4a, 0x8a6a2a, 0.3);
+    const bronzeD = toonMat(0xb0863a);
+    const goldM = toonMat(0xffd23f, 0xcc8800, 0.3);
+    const crestM = toonMat(0xc62828);     // багряний гребінь
+    const laurelM = toonMat(0x57a83e);    // лавровий вінок
+    // 🪖 величезний бронзовий шолом
+    const helm = sphere(0.34, bronzeM, 16, 12);
+    helm.position.y = 0.2;
+    helm.scale.set(1.05, 0.86, 1.05);
+    rig.parts.head.add(helm);
+    const rim = cylinder(0.36, 0.38, 0.07, bronzeD, 16);
+    rim.position.y = 0.08;
+    rig.parts.head.add(rim);
+    const nasal = box(0.07, 0.24, 0.07, bronzeD);
+    nasal.position.set(0, 0.0, -0.31);
+    rig.parts.head.add(nasal);
+    // 🔺 високий поздовжній гребінь (crista)
+    for (let i = 0; i < 9; i++) {
+      const h = 0.4 - Math.abs(i - 4) * 0.05;
+      const tuft = box(0.06, h, 0.09, crestM);
+      tuft.position.set(0, 0.56, 0.22 - i * 0.055);
+      rig.parts.head.add(tuft);
+    }
+    // 🌿 лавровий вінок поверх шолома (золото імперії)
+    const wreath = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.05, 6, 16), laurelM);
+    wreath.rotation.x = Math.PI / 2 - 0.1;
+    wreath.position.y = 0.28;
+    rig.parts.head.add(wreath);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const leaf = box(0.07, 0.04, 0.12, laurelM);
+      leaf.position.set(Math.cos(a) * 0.33, 0.3, Math.sin(a) * 0.33);
+      leaf.rotation.y = -a;
+      rig.parts.head.add(leaf);
+    }
+    // бронзова мускульна кіраса з золотим орлом (aquila)
+    const cuirass = box(0.66, 0.6, 0.16, bronzeM);
+    cuirass.position.set(0, 0.36, -0.4);
+    rig.parts.torso.add(cuirass);
+    const eagle = box(0.22, 0.22, 0.05, goldM);
+    eagle.position.set(0, 0.42, -0.49);
+    eagle.rotation.z = 0.78;
+    rig.parts.torso.add(eagle);
+    // багряний імператорський плащ (палудаментум) за спиною
+    const cloak = box(0.74, 1.0, 0.06, crestM);
+    cloak.position.set(0, 0.1, 0.44);
+    rig.parts.torso.add(cloak);
+    // золоті наплічники-фібули
+    for (const side of [-1, 1]) {
+      const fib = sphere(0.14, goldM, 8, 6);
+      fib.position.set(side * 0.4, 0.62, 0.1);
+      rig.parts.torso.add(fib);
+    }
+    // птеруги (шкіряні смуги спідниці-броні)
+    for (let i = -2; i <= 2; i++) {
+      const strip = box(0.14, 0.34, 0.05, toonMat(0x8a5a32));
+      strip.position.set(i * 0.16, -0.18, -0.34);
+      rig.parts.torso.add(strip);
+    }
+    // 🔱 великий спис-пілум у правій руці
+    const spearM = toonMat(0x8a6a3a);
+    const shaft = cylinder(0.05, 0.05, 1.6, spearM, 8);
+    shaft.position.set(0, -0.5, 0);
+    const tip = cone(0.09, 0.32, toonMat(0xc9d0d8), 8);
+    tip.position.set(0, -1.4, 0);
+    tip.rotation.x = Math.PI;
+    rig.parts.armR.add(shaft, tip);
+    // 🛡️ великий прямокутний щит (scutum) у лівій руці
+    const scutum = box(0.55, 0.85, 0.08, crestM);
+    scutum.position.set(0, -0.5, -0.16);
+    const scBoss = sphere(0.12, goldM, 10, 8);
+    scBoss.position.set(0, -0.5, -0.24);
+    rig.parts.armL.add(scutum, scBoss);
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

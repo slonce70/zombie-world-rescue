@@ -210,7 +210,7 @@ console.log('▸ Арена босів');
 await page.evaluate(() => {
   const g = window.__game;
   g.endLevel();
-  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, TUR: true, EGY: true };
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, ITA: true, TUR: true, EGY: true };
   g.saveGame();
   g.test.startArena();
 });
@@ -252,8 +252,8 @@ const arenaRun = await page.evaluate(async () => {
     overlay: document.getElementById('overlay-arena-end').classList.contains('show'),
   };
 });
-check(arenaRun.over && arenaRun.completed, 'усі 7 босів переможено — забіг завершено');
-check(arenaRun.styles.length === 7, `усі стилі босів зустрілись (${arenaRun.styles.join(',')})`);
+check(arenaRun.over && arenaRun.completed, 'усі 8 босів переможено — забіг завершено');
+check(arenaRun.styles.length === 8, `усі стилі босів зустрілись (${arenaRun.styles.join(',')})`);
 check(arenaRun.best > 0, `рекорд часу записано (${Math.round(arenaRun.best / 1000)}с)`);
 check(arenaRun.overlay, 'фінальний екран Арени показано');
 const arenaPlace = await page.waitForFunction(() => {

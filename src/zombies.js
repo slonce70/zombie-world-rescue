@@ -40,6 +40,10 @@ const TYPE_STATS = {
   mummy: { hp: 160, speed: 1.0, chaseSpeed: 2.3, aggro: 26, dmg: 18, attackR: 2.0, coins: 18, pitch: 0.6 },
   // 🐂 торо: зомбі-бичок Іспанії. Середній hp, швидкий; здаля РОЗГАНЯЄТЬСЯ й б'є рогами (charge)
   toro: { hp: 130, speed: 1.6, chaseSpeed: 4.2, aggro: 30, dmg: 14, attackR: 2.1, coins: 16, pitch: 0.7, charger: true },
+  // 🛡️ гладіатор: зомбі-гладіатор Італії зі шоломом-гребенем, мечем і щитом.
+  // МІЦНИЙ ближній боєць (високий hp, боляче рубає мечем), середня швидкість.
+  // Здаля РОЗГАНЯЄТЬСЯ у випад мечем (charger): телеграф → ривок → удар.
+  gladiator: { hp: 175, speed: 1.4, chaseSpeed: 3.6, aggro: 28, dmg: 19, attackR: 2.2, coins: 22, pitch: 0.62, charger: true },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -52,6 +56,8 @@ const KEBAB_RANGED = { min: 8, max: 40, hold: 0, cd: 3.2, projSpeed: 23, dmg: 17
 const SCARAB_RANGED = { min: 7, max: 42, hold: 0, cd: 2.8, projSpeed: 17, dmg: 19, size: 0.34, color: 0xd4af37 };
 // 🗡️ Матадор-зомбі жбурляє бандерильї (червоно-золоті дротики)
 const BANDERILLA_RANGED = { min: 8, max: 40, hold: 0, cd: 3.0, projSpeed: 24, dmg: 18, size: 0.3, color: 0xc62828, stretch: true };
+// 🔱 Цезар-зомбі (бос Італії) метає вогняні списи-пілуми (видовжені золоті снаряди)
+const PILUM_RANGED = { min: 8, max: 42, hold: 0, cd: 2.9, projSpeed: 26, dmg: 20, size: 0.32, color: 0xffb030, stretch: true };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -145,7 +151,8 @@ export class Zombies {
         || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null)
         || (type === 'boss' && bossStyle === 'sultan' ? KEBAB_RANGED : null)
         || (type === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null)
-        || (type === 'boss' && bossStyle === 'matador' ? BANDERILLA_RANGED : null),
+        || (type === 'boss' && bossStyle === 'matador' ? BANDERILLA_RANGED : null)
+        || (type === 'boss' && bossStyle === 'gladiator' ? PILUM_RANGED : null),
       rangedCd: this.rng.range(0.5, 2.5),
       throwProj: false,
       // 🛡 щит
@@ -873,7 +880,8 @@ export class Zombies {
                     : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
                       : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
                         : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
-                          : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                          : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
+                            : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
                 { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;

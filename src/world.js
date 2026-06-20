@@ -109,6 +109,9 @@ export class World {
     if (lm.includes('plazaFountain')) this._lmPlazaFountain(P.plazaFountain);
     if (lm.includes('oliveGrove')) this._lmOliveGrove(P.oliveGrove);
     if (lm.includes('cathedral')) this._lmCathedral(P.cathedral);
+    if (lm.includes('colosseum')) this._lmColosseum(P.colosseum);
+    if (lm.includes('leaningTower')) this._lmLeaningTower(P.leaningTower);
+    if (lm.includes('romanRuins')) this._lmRomanRuins(P.romanRuins);
     if (lm.includes('birds')) this._lmBirds();
   }
 
@@ -1045,6 +1048,244 @@ export class World {
     this.floors.push({ x, z, ry: 0, w: 6.8, d: 9.8, top: gy + 7.0 });
     this.lootSpots.push({ x, z, y: gy + 7.1, type: 'coins' });
     this._makeSign(x + 6, z - 4, t('СОБОР СВЯТОЇ КОРИДИ'), 0.4);
+  }
+
+  // 🏛 КОЛІЗЕЙ: велика овальна арена з двома ярусами арок навколо. Усередині —
+  // ЧИСТИЙ піщаний інтер'єр (бос ЦЕЗАР спавниться на голій землі, НЕ в геометрії).
+  // На верхні яруси можна вилізти батутом — звідти видно всю карту і чекає лут.
+  _lmColosseum({ x, z }) {
+    const gy = this.groundH(x, z);
+    const Rin = 17;          // радіус піщаної арени (чистий core під ярусами)
+    const Rwall = 18.6;      // внутрішня кам'яна стінка-подіум
+    const stoneM = toonMat(0xe2cba0);   // травертин (теплий римський камінь)
+    const stoneM2 = toonMat(0xd4b886);
+    const sandM = toonMat(0xdcc488);    // золотистий пісок арени
+    // піщаний майданчик (овал — масштабуємо коло по X)
+    const sand = new THREE.Mesh(new THREE.CircleGeometry(Rin, 44), sandM);
+    sand.rotation.x = -Math.PI / 2;
+    sand.scale.x = 1.18; // овальна форма Колізею
+    this._drapeXZGeometry(sand.geometry, x, z, 0.06);
+    sand.position.set(x, 0, z);
+    this.staticGroup.add(sand);
+    // розмітка-овал у центрі (де бились гладіатори)
+    const ring1 = new THREE.Mesh(new THREE.RingGeometry(7, 7.6, 36), toonMat(0xc0563b));
+    ring1.rotation.x = -Math.PI / 2;
+    ring1.scale.x = 1.18;
+    this._drapeXZGeometry(ring1.geometry, x, z, 0.1);
+    ring1.position.set(x, 0, z);
+    this.staticGroup.add(ring1);
+    // подіум-стінка навколо арени (сегментами; прохід на півдні для входу)
+    const segs = 44;
+    for (let i = 0; i < segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      if (a > Math.PI * 0.42 && a < Math.PI * 0.58) continue; // прохід для гравця (+z)
+      // овальна позиція подіуму (по X розтягнуто на 1.18 — форма Колізею)
+      const ox = x + Math.cos(a) * Rwall * 1.18;
+      const oz = z + Math.sin(a) * Rwall;
+      const wy = this.groundH(ox, oz);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.0, 0.7), stoneM);
+      post.position.set(ox, wy + 1.0, oz);
+      post.rotation.y = -a;
+      post.castShadow = true;
+      this.staticGroup.add(post);
+      this._addCollider(ox, oz, 1.3, wy + 2.0, 1.1);
+    }
+    // 🏛 ДВА ЯРУСИ АРОК навколо — головна впізнавана риса Колізею
+    for (let tier = 0; tier < 2; tier++) {
+      const rr = Rwall + 2.6 + tier * 4.2;     // зовнішнє кільце ярусу
+      const ty = 3.6 + tier * 4.0;             // висота низу ярусу
+      const tierH = 4.0;                       // висота ярусу
+      const archN = 26;
+      for (let i = 0; i < archN; i++) {
+        const a = (i / archN) * Math.PI * 2;
+        if (a > Math.PI * 0.44 && a < Math.PI * 0.56) continue; // вхідний тунель
+        const px = x + Math.cos(a) * rr * 1.18;
+        const pz = z + Math.sin(a) * rr;
+        const py = this.groundH(px, pz);
+        const mat = tier % 2 ? stoneM2 : stoneM;
+        // пілон (стовп між арками)
+        const pier = new THREE.Mesh(new THREE.BoxGeometry(1.1, tierH, 1.1), mat);
+        pier.position.set(px, py + ty + tierH / 2, pz);
+        pier.rotation.y = -a;
+        pier.castShadow = true;
+        this.staticGroup.add(pier);
+        // напівкругла арка зверху (тор-півколо)
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.28, 6, 12, Math.PI), mat);
+        arch.position.set(px, py + ty + tierH - 0.2, pz);
+        arch.rotation.y = -a + Math.PI / 2;
+        this.staticGroup.add(arch);
+        if (tier === 0) this._addCollider(px, pz, 0.9, py + ty + tierH, 0.7);
+      }
+      // карниз-кільце над ярусом (де можна стояти на верхньому ярусі)
+      const ledgeN = 22;
+      for (let i = 0; i < ledgeN; i++) {
+        const a = (i / ledgeN) * Math.PI * 2;
+        const px = x + Math.cos(a) * rr * 1.18;
+        const pz = z + Math.sin(a) * rr;
+        const py = this.groundH(px, pz);
+        const ledge = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 1.4), stoneM2);
+        ledge.position.set(px, py + ty + tierH + 0.25, pz);
+        ledge.rotation.y = -a;
+        this.staticGroup.add(ledge);
+        if (tier === 1 && !(a > Math.PI * 0.42 && a < Math.PI * 0.58)) {
+          this.floors.push({ x: px, z: pz, ry: -a, w: 2.0, d: 1.4, top: py + ty + tierH + 0.5 });
+        }
+      }
+    }
+    // часткова руїна-пролом: один кусок верхнього ярусу «обвалено» (нижчі пілони)
+    // — додаємо впізнаваний силует напівзруйнованого Колізею з боку (+x)
+    for (let k = 0; k < 3; k++) {
+      const a = -0.25 + k * 0.22;
+      const px = x + Math.cos(a) * (Rwall + 6.8) * 1.18;
+      const pz = z + Math.sin(a) * (Rwall + 6.8);
+      const py = this.groundH(px, pz);
+      const stub = new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.0 - k * 0.6, 1.1), stoneM);
+      stub.position.set(px, py + (3.0 - k * 0.6) / 2, pz);
+      stub.castShadow = true;
+      this.staticGroup.add(stub);
+    }
+    // лаврові прапори навколо (золото-багрянець Риму)
+    const flagCols = [0xffd23f, 0x8c2f3e];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const px = x + Math.cos(a) * (Rwall + 11.5) * 1.18;
+      const pz = z + Math.sin(a) * (Rwall + 11.5);
+      const py = this.groundH(px, pz);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.0, 6), stoneM2);
+      pole.position.set(px, py + 2.0, pz);
+      this.staticGroup.add(pole);
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), toonMat(flagCols[i % 2]));
+      flag.position.set(px + Math.cos(a) * 0.5, py + 3.7, pz + Math.sin(a) * 0.5);
+      flag.rotation.y = -a;
+      this.staticGroup.add(flag);
+    }
+    // 💎 лут на верхньому ярусі — нагорода за вилазку
+    this.lootSpots.push({ x: x, z: z + (Rwall + 6.8) * 1.0, y: gy + 11.0, type: 'coins' });
+    this.lootSpots.push({ x: x - 6, z: z - (Rwall + 6.8), y: gy + 11.0, type: 'grenade' });
+    this._makeSign(x + 12, z + 30, t('🏛 КОЛІЗЕЙ'), -0.5);
+  }
+
+  // 🏯 ПІЗАНСЬКА (похила) ВЕЖА: круглий білий циліндр з ярусами колонад, нахилений!
+  _lmLeaningTower({ x, z }) {
+    const gy = this.groundH(x, z);
+    const marbleM = toonMat(0xf2ead8);    // білий мармур
+    const marbleM2 = toonMat(0xe6dcc4);
+    const tilt = 0.16;                     // характерний нахил вежі
+    const dirX = Math.sin(tilt), dirZ = 0;
+    const g = new THREE.Group();
+    const tiers = 7;
+    const tierH = 2.1;
+    const R = 2.0;
+    // основа (товстіший перший ярус)
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.15, R + 0.3, tierH, 18), marbleM);
+    base.position.y = tierH / 2;
+    base.castShadow = true;
+    g.add(base);
+    // колонадні яруси з мініатюрними арками-колонами
+    for (let tr = 1; tr < tiers; tr++) {
+      const y = tr * tierH;
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.18, R - 0.18, tierH * 0.55, 18), tr % 2 ? marbleM2 : marbleM);
+      drum.position.y = y + tierH * 0.28;
+      drum.castShadow = true;
+      g.add(drum);
+      // кільце колон навколо ярусу
+      const colN = 12;
+      for (let i = 0; i < colN; i++) {
+        const a = (i / colN) * Math.PI * 2;
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, tierH * 0.85, 6), marbleM);
+        col.position.set(Math.cos(a) * (R - 0.02), y - tierH * 0.05, Math.sin(a) * (R - 0.02));
+        g.add(col);
+      }
+    }
+    // дзвонова камера на вершині
+    const belfry = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.5, R - 0.4, tierH * 0.9, 16), marbleM2);
+    belfry.position.y = tiers * tierH + tierH * 0.2;
+    belfry.castShadow = true;
+    g.add(belfry);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, R - 0.4, 0.5, 16), marbleM);
+    cap.position.y = tiers * tierH + tierH * 0.75;
+    g.add(cap);
+    // 📐 нахиляємо всю вежу — впізнавана Піза! (нахил навколо основи)
+    g.rotation.z = -tilt;
+    g.position.set(x, gy, z);
+    this.staticGroup.add(g);
+    // колайдер біля основи (нахилений верх не заважає руху)
+    this._addCollider(x, z, R + 0.6, gy + 5, R);
+    this._addCollider(x + dirX * 6, z + dirZ * 6, R, gy + 11, R * 0.7);
+    this._makeSign(x + 5, z + 4, t('🏯 ПОХИЛА ВЕЖА'), 0.4);
+  }
+
+  // 🏛 РИМСЬКІ РУЇНИ: ряд античних колон (деякі зламані) + тріумфальна арка.
+  // На верх арки веде батут — нагорода нагорі.
+  _lmRomanRuins({ x, z }) {
+    const stoneM = toonMat(0xe2d6b8);     // вивітрений травертин
+    const stoneM2 = toonMat(0xd0c2a0);
+    // ряд із 5 колон (висота різна — частина «зламана»)
+    const heights = [4.5, 2.4, 4.5, 3.2, 4.5];
+    for (let i = 0; i < 5; i++) {
+      const cx = x - 8 + i * 4;
+      const cz = z - 4;
+      const cy = this.groundH(cx, cz);
+      const h = heights[i];
+      // канельований стовбур (рифлений циліндр — кілька тонких ребер)
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, h, 12), stoneM);
+      shaft.position.set(cx, cy + h / 2, cz);
+      shaft.castShadow = true;
+      this.staticGroup.add(shaft);
+      // база
+      const cbase = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 0.4, 12), stoneM2);
+      cbase.position.set(cx, cy + 0.2, cz);
+      this.staticGroup.add(cbase);
+      this._addCollider(cx, cz, 0.6, cy + h, 0.5);
+      // капітель (тільки на цілих колонах)
+      if (h > 3.5) {
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 1.1), stoneM2);
+        cap.position.set(cx, cy + h + 0.2, cz);
+        this.staticGroup.add(cap);
+      } else {
+        // зламаний верх — нерівний уламок
+        const broke = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5, 0), stoneM);
+        broke.position.set(cx, cy + h + 0.2, cz);
+        broke.rotation.set(0.4, 0.7, 0.3);
+        this.staticGroup.add(broke);
+      }
+    }
+    // антаблемент-балка лежить на двох цілих колонах (перекриття)
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.6, 1.0), stoneM2);
+    lintel.position.set(x - 4, this.groundH(x - 8, z - 4) + 4.9, z - 4);
+    lintel.castShadow = true;
+    this.staticGroup.add(lintel);
+    // 🏛 тріумфальна арка (як Арка Тита) — дві опори + напівкругла арка + аттик
+    const ax = x + 5, az = z + 2;
+    const ay = this.groundH(ax, az);
+    const archH = 6.5;
+    for (const side of [-1, 1]) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(1.6, archH, 1.6), stoneM);
+      pier.position.set(ax + side * 2.4, ay + archH / 2, az);
+      pier.castShadow = true;
+      this.staticGroup.add(pier);
+      this._addCollider(ax + side * 2.4, az, 1.0, ay + archH, 0.9);
+    }
+    // напівкругла арка-проліт
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.55, 8, 16, Math.PI), stoneM2);
+    arch.position.set(ax, ay + archH, az);
+    arch.rotation.z = 0;
+    this.staticGroup.add(arch);
+    // аттик зверху (на нього стрибати батутом)
+    const attic = new THREE.Mesh(new THREE.BoxGeometry(6.8, 1.4, 1.8), stoneM);
+    attic.position.set(ax, ay + archH + 1.4, az);
+    attic.castShadow = true;
+    this.staticGroup.add(attic);
+    this.floors.push({ x: ax, z: az, ry: 0, w: 6.8, d: 1.8, top: ay + archH + 2.1 });
+    // напис SPQR (золоті блоки) на аттику
+    for (let i = 0; i < 4; i++) {
+      const letter = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.1), toonMat(0xffd23f, 0xcc8800, 0.3));
+      letter.position.set(ax - 1.5 + i * 1.0, ay + archH + 1.4, az - 0.95);
+      this.staticGroup.add(letter);
+    }
+    // 💎 лут на аттику арки
+    this.lootSpots.push({ x: ax, z: az, y: ay + archH + 2.2, type: 'coins' });
+    this._makeSign(x - 9, z + 1, t('🏛 РИМСЬКІ РУЇНИ'), 0.5);
   }
 
   // 🛍 Великий базар: критий ринок з арками, килимами і лампами (лут усередині!)
