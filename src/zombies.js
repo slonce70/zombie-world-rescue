@@ -52,8 +52,11 @@ export class Zombies {
     const _base = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
     const _star = Math.max(1, Math.min(5, level.diffStar || 1));
     this.diffStar = _star;
+    // зірка піднімає МІЦНІСТЬ (hp) та ШКОДУ (dmg) зомбі; counts (розмір орди)
+    // лишається базовим — масштабування розміру орди свідомо відкладено
+    // (це чіпає делікатну логіку спавну орди, яка читає country.difficulty.counts напряму).
     this.diff = _star > 1
-      ? { hp: _base.hp * (1 + 0.6 * (_star - 1)), dmg: _base.dmg * (1 + 0.25 * (_star - 1)), counts: _base.counts * (1 + 0.2 * (_star - 1)) }
+      ? { hp: _base.hp * (1 + 0.6 * (_star - 1)), dmg: _base.dmg * (1 + 0.25 * (_star - 1)), counts: _base.counts }
       : _base;
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
