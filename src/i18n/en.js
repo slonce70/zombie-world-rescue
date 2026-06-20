@@ -764,6 +764,8 @@ export const EN = {
 "Повільна, але жилава і боляче хапає.": "Slow but sturdy, and its grab hurts.",
 "Золотий зомбі": "Golden Zombie",
 "Тікає від тебе — дожени і отримай джекпот!": "Runs away from you — catch it for the jackpot!",
+"Бос": "Boss",
+"Велетенський ватажок орди. Переможи — і врятуй країну!": "A giant horde leader. Defeat it — and save the country!",
 "🎖️ РАНГ РЯТІВНИКА {n}!": "🎖️ RESCUER RANK {n}!",
 "Так тримати, легендо!": "Keep it up, legend!",
 "Зробити ціллю": "Set as goal",

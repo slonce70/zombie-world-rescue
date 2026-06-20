@@ -53,6 +53,26 @@ async function loadWith(raw) {
   check(save.activeSkin === 'classic' && Array.isArray(save.skins), 'порожній {}: дефолти скінів на місці');
 }
 
+// 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.
+// Бракуючі під-поля мають братися з дефолтів (без NaN/undefined), а наявні — зберегтися.
+{
+  const { save, errs } = await loadWith(JSON.stringify({
+    liberated: { UKR: true }, weapons: ['pistol'],
+    stats: { killed: 42 },          // лише одне поле — решта мають доповнитись дефолтами
+    hero: { shirt: 0x123456 },      // лише сорочка — pants/skin з дефолтів
+    chapter: { p: { kill: 3 } },    // без done — має зʼявитись false
+  }));
+  check(errs.length === 0, `F26 неповні вкладені: без винятків (${errs[0] || 'ok'})`);
+  check(save.stats.killed === 42, 'F26: наявне stats.killed збережено');
+  for (const k of ['headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo']) {
+    check(typeof save.stats[k] === 'number' && isFinite(save.stats[k]), `F26: stats.${k} — число (не NaN)`);
+  }
+  check(save.hero.shirt === 0x123456, 'F26: наявний hero.shirt збережено');
+  check(typeof save.hero.pants === 'number' && typeof save.hero.skin === 'number', 'F26: hero.pants/skin доповнено дефолтами');
+  check(save.chapter.p && save.chapter.p.kill === 3, 'F26: наявний chapter.p збережено');
+  check(save.chapter.done === false, 'F26: chapter.done доповнено дефолтом (false)');
+}
+
 await browser.close();
 console.log(failed === 0 ? '\n🎉 МІГРАЦІЯ СЕЙВА НАДІЙНА' : `\n❌ МІГРАЦІЯ: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);

@@ -231,7 +231,10 @@ export class Shop {
     }
     game.audio.purchase();
     game.saveGame();
-    if (game.save.goal === id) {
+    // F42: ціль очищаємо лише коли товар РЕАЛЬНО вичерпано (getCount >= max), а не після
+    // першої з кількох покупок багаторівневого апгрейда. Одноразові (max:1, зброя, гаджети)
+    // одразу досягають max — поведінка для них незмінна.
+    if (game.save.goal === id && this.getCount(item) >= item.max) {
       game.save.goal = null;
       game.hud.toast(t('🎯 Ціль досягнута! Обери нову в магазині'));
       game.saveGame();

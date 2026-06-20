@@ -73,6 +73,47 @@ console.log('▸ Фільтр ніків');
   check('нормальний нік не чіпаємо', v.players.includes('Владик'));
 }
 
+// ---------- F24/F27: saveHasProgress бачить ВЕСЬ прогрес (не лише 4 старі поля) ----------
+// Раніше кастом-герой/ціль/монети/медалі тощо лишались «невидимими» → claim/імпорт тихо
+// перезаписував без попередження, а bootSync міг adopt-нути хмару поверх живого локального.
+console.log('▸ F24: saveHasProgress бачить новий прогрес');
+{
+  const ctxU = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const U = await ctxU.newPage();
+  await U.goto(`${BASE}/?test&fresh`);
+  await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+  const res = await U.evaluate(async () => {
+    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS } = await import('/src/net/cloudsave.js');
+    const fresh = window.__game._newSave();
+    const out = {};
+    out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
+    const hero = { ...fresh, hero: { ...DEFAULT_HERO, shirt: 0x123456 } };
+    out.customHero = saveHasProgress(hero) === true;
+    out.goal = saveHasProgress({ ...fresh, goal: 'sniper' }) === true;
+    out.coins = saveHasProgress({ ...fresh, coins: NEW_SAVE_COINS + 100 }) === true;
+    out.startCoinsNotProgress = saveHasProgress({ ...fresh, coins: NEW_SAVE_COINS }) === false;
+    out.medals = saveHasProgress({ ...fresh, medals: ['hero'] }) === true;
+    out.bestiary = saveHasProgress({ ...fresh, bestiary: { walker: 3 } }) === true;
+    out.stats = saveHasProgress({ ...fresh, stats: { ...fresh.stats, killed: 1 } }) === true;
+    out.diffStar = saveHasProgress({ ...fresh, diffStar: 3 }) === true;
+    out.gadget = saveHasProgress({ ...fresh, gadgetsOwned: ['shield'] }) === true;
+    out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
+    return out;
+  });
+  check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
+  check('стартові 50 монет ≠ прогрес', res.startCoinsNotProgress);
+  check('кастом-герой → прогрес=true', res.customHero);
+  check('ціль → прогрес=true', res.goal);
+  check('монети понад стартові → прогрес=true', res.coins);
+  check('медалі → прогрес=true', res.medals);
+  check('бестіарій → прогрес=true', res.bestiary);
+  check('stats.killed>0 → прогрес=true', res.stats);
+  check('diffStar>1 → прогрес=true', res.diffStar);
+  check('куплений гаджет → прогрес=true', res.gadget);
+  check('прогрес глави → прогрес=true', res.chapter);
+  await ctxU.close();
+}
+
 // ---------- Гравець А: грає, пушить у хмару, бере код ----------
 console.log('▸ Гравець А: прогрес → хмара → код');
 const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } });

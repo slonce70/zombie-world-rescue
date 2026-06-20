@@ -73,7 +73,9 @@ export class SaveUI {
       if (!parsed || typeof parsed !== 'object') { this._status(t('😕 Це не файл прогресу гри')); return; }
       if (saveHasProgress(g.save)
         && !confirm(t('Відновити прогрес із файлу? Теперішній прогрес на ЦЬОМУ пристрої зникне.'))) return;
-      g.cloud.adopt(text);
+      // F25: justImported → bootSync зробить імпортований файл найновішим у хмарі,
+      // інакше новіший хмарний сейв тихо перезаписав би його після перезавантаження.
+      g.cloud.adopt(text, { justImported: true });
     });
   }
 
