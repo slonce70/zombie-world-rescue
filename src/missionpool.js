@@ -2,7 +2,7 @@
 // тож кожна країна і кожне повторне проходження граються інакше.
 // Реалізує той самий інтерфейс, що й старі Missions.
 import * as THREE from 'three';
-import { t } from './i18n.js';
+import { t, interactKey } from './i18n.js';
 import { makeCivilian, updateRig, setAnim, toonMat } from './characters.js';
 import { dampAngle, RNG } from './utils.js';
 
@@ -39,22 +39,22 @@ export const MISSION_TYPES = {
 const ACT_CFG = {
   lights: {
     n: 4, hold: 1.6, color: 0xffe066, emoji: '🔦', spread: 'village',
-    title: t('Засвіти 4 ліхтарі'), prompt: t('Тримай E — засвіти ліхтар'),
+    title: t('Засвіти 4 ліхтарі'), prompt: t('Тримай {k} — засвіти ліхтар', { k: interactKey() }),
     stepToast: t('🔦 Ліхтар світить ({n}/{total})!'), doneToast: t('🔦 Усі ліхтарі світять — стало затишно!'),
   },
   well: {
     n: 3, hold: 3, color: 0x4db8ff, emoji: '💧', spread: 'map',
-    title: t('Набери води з 3 колодязів'), prompt: t('Тримай E — набери води'),
+    title: t('Набери води з 3 колодязів'), prompt: t('Тримай {k} — набери води', { k: interactKey() }),
     stepToast: t('💧 Відро набрано ({n}/{total})!'), doneToast: t('💧 Вода є! Село каже дякую!'),
   },
   bonfire: {
     n: 3, hold: 2.5, color: 0xff8a3d, emoji: '🔥', spread: 'map',
-    title: t('Розпали 3 багаття'), prompt: t('Тримай E — розпали багаття'),
+    title: t('Розпали 3 багаття'), prompt: t('Тримай {k} — розпали багаття', { k: interactKey() }),
     stepToast: t('🔥 Багаття палає ({n}/{total})!'), doneToast: t('🔥 Усі багаття палають — мороз відступає!'),
   },
   convoy: {
     n: 3, hold: 1.2, color: 0xffd23f, emoji: '🚚', spread: 'map', guards: 3,
-    title: t('Розблокуй конвой: 3 вантажівки'), prompt: t('Тримай E — заведи вантажівку'),
+    title: t('Розблокуй конвой: 3 вантажівки'), prompt: t('Тримай {k} — заведи вантажівку', { k: interactKey() }),
     stepToast: t('🚚 Вантажівка завелась ({n}/{total})!'), doneToast: t('🚚 Конвой урятовано — їде по людей!'),
   },
 };
@@ -63,20 +63,20 @@ const ACT_CFG = {
 const FETCH_CFG = {
   balloon: {
     n: 3, hold: 2, color: 0xff6ea8, emoji: '🛢️', deliver: 'balloon', deliverEmoji: '🎈',
-    title: t('Знайди 3 балони газу для кулі'), prompt: t('Натисни E — візьми балон ({n}/{total})'),
-    deliverPrompt: t('Тримай E — заправ кулю'), stepToast: t('🛢️ Балон є ({n}/{total})!'),
+    title: t('Знайди 3 балони газу для кулі'), prompt: t('Натисни {k} — візьми балон ({n}/{total})', { k: interactKey() }),
+    deliverPrompt: t('Тримай {k} — заправ кулю', { k: interactKey() }), stepToast: t('🛢️ Балон є ({n}/{total})!'),
     foundToast: t('🎈 Усі балони зібрано — неси до кулі!'), doneToast: t('🎈 Куля летить по допомогу!'),
   },
   bazaar: {
     n: 3, hold: 2, color: 0x46c8d8, emoji: '🧶', deliver: 'grandBazaar', deliverEmoji: '🧿',
-    title: t('Поверни 3 килими на базар'), prompt: t('Натисни E — підбери килим ({n}/{total})'),
-    deliverPrompt: t('Тримай E — розклади килими'), stepToast: t('🧶 Килим знайдено ({n}/{total})!'),
+    title: t('Поверни 3 килими на базар'), prompt: t('Натисни {k} — підбери килим ({n}/{total})', { k: interactKey() }),
+    deliverPrompt: t('Тримай {k} — розклади килими', { k: interactKey() }), stepToast: t('🧶 Килим знайдено ({n}/{total})!'),
     foundToast: t('🧿 Усі килими в тебе — неси на базар!'), doneToast: t('🧿 Базар знову працює!'),
   },
   tomb: {
     n: 2, hold: 4, color: 0xd9b96a, emoji: '🪬', deliver: 'pyramids', deliverEmoji: '⚱️', ambush: 4,
-    title: t('Відкрий гробницю: 2 печатки'), prompt: t('Натисни E — візьми печатку ({n}/{total})'),
-    deliverPrompt: t('Тримай E — відкрий гробницю'), stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
+    title: t('Відкрий гробницю: 2 печатки'), prompt: t('Натисни {k} — візьми печатку ({n}/{total})', { k: interactKey() }),
+    deliverPrompt: t('Тримай {k} — відкрий гробницю', { k: interactKey() }), stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
     foundToast: t('⚱️ Печатки зібрано — до дверей гробниці!'), doneToast: t('⚱️ Гробниця відкрита! Скарб твій!'),
   },
 };
@@ -796,7 +796,7 @@ export class DynamicMissions {
       const door = level.world.barnDoorCollider;
       const d = Math.hypot(player.pos.x - door.x, player.pos.z - (door.z - 1));
       if (d < 3.2) {
-        this.prompt = { text: t('Натисни E — відчини хлів'), hold: false };
+        this.prompt = { text: t('Натисни {k} — відчини хлів', { k: interactKey() }), hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.opened = true;
           m.openedT = 0;
@@ -832,7 +832,7 @@ export class DynamicMissions {
     }
     if (d < 3.6) {
       this.prompt = {
-        text: m.progress > 0 ? t('Тримай E — ремонт') : t('Тримай E — почни ремонт'),
+        text: m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() }),
         hold: true, progress: m.progress,
       };
     }
@@ -880,7 +880,7 @@ export class DynamicMissions {
       const wc = level.world.weaponCrate;
       const d = Math.hypot(player.pos.x - wc.x, player.pos.z - wc.z);
       if (d < 3.4) {
-        this.prompt = { text: t('Натисни E — відкрий ящик'), hold: false };
+        this.prompt = { text: t('Натисни {k} — відкрий ящик', { k: interactKey() }), hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.crateOpenedT = 0;
           level.world.openCrate();
@@ -907,7 +907,7 @@ export class DynamicMissions {
       c.mesh.position.y = c.y + Math.abs(Math.sin(performance.now() / 400 + c.x)) * 0.12;
       const d = Math.hypot(player.pos.x - c.x, player.pos.z - c.z);
       if (d < 3.4) {
-        this.prompt = { text: t('🧺 Натисни E — забери припаси ({n}/4)', { n: m.found }), hold: false };
+        this.prompt = { text: t('🧺 Натисни {k} — забери припаси ({n}/4)', { k: interactKey(), n: m.found }), hold: false };
         if (allowControl && input.pressed('KeyE')) {
           c.taken = true;
           m.found++;
@@ -989,7 +989,7 @@ export class DynamicMissions {
         }
       }
       if (d < 3.8) {
-        this.prompt = { text: t('🟣 Тримай E — знешкодь гніздо'), hold: true, progress: n.progress };
+        this.prompt = { text: t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), hold: true, progress: n.progress };
       }
       if (d < 3.8 || holders > 0) {
         if (holders > 0) {
@@ -1023,7 +1023,7 @@ export class DynamicMissions {
     if (!m.started) {
       const d = Math.hypot(player.pos.x - m.site.x, player.pos.z - (m.site.z + 2));
       if (d < 5) {
-        this.prompt = { text: t('🧳 Натисни E — забери мандрівника'), hold: false };
+        this.prompt = { text: t('🧳 Натисни {k} — забери мандрівника', { k: interactKey() }), hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.started = true;
           this._spawnTraveler(m);
@@ -1550,14 +1550,14 @@ export class DynamicMissions {
       if (m.type === 'rescue' && !m.opened) {
         const door = level.world.barnDoorCollider;
         if (near(door.x, door.z - 1, 3.2)) {
-          this.prompt = { text: t('Натисни E — відчини хлів'), hold: false };
+          this.prompt = { text: t('Натисни {k} — відчини хлів', { k: interactKey() }), hold: false };
           if (pressE) { net.sendUse('barn'); input.justPressed.delete('KeyE'); pressE = false; }
         }
       } else if (m.type === 'repair') {
         const rp = level.world.repairPoint;
         if (near(rp.x, rp.z, 3.6)) {
           this.prompt = {
-            text: m.progress > 0 ? t('Тримай E — ремонт') : t('Тримай E — почни ремонт'),
+            text: m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() }),
             hold: true, progress: m.progress,
           };
           if (net) net.holdE = true;
@@ -1566,7 +1566,7 @@ export class DynamicMissions {
         if (this.crateReady) {
           const wc = level.world.weaponCrate;
           if (near(wc.x, wc.z, 3.4)) {
-            this.prompt = { text: t('Натисни E — відкрий ящик'), hold: false };
+            this.prompt = { text: t('Натисни {k} — відкрий ящик', { k: interactKey() }), hold: false };
             if (pressE) { net.sendUse('crate'); input.justPressed.delete('KeyE'); pressE = false; }
           }
         }
@@ -1576,7 +1576,7 @@ export class DynamicMissions {
           if (c.taken) continue;
           c.mesh.position.y = c.y + Math.abs(Math.sin(performance.now() / 400 + c.x)) * 0.12;
           if (near(c.x, c.z, 3.4)) {
-            this.prompt = { text: t('🧺 Натисни E — забери припаси ({n}/4)', { n: m.found }), hold: false };
+            this.prompt = { text: t('🧺 Натисни {k} — забери припаси ({n}/4)', { k: interactKey(), n: m.found }), hold: false };
             if (pressE) { net.sendUse('supply', { i }); input.justPressed.delete('KeyE'); pressE = false; }
             break;
           }
@@ -1591,14 +1591,14 @@ export class DynamicMissions {
           if (n.cleared) continue;
           n.pod.scale.y = 1.25 + Math.sin(performance.now() / 350 + n.x) * 0.07;
           if (near(n.x, n.z, 3.8)) {
-            this.prompt = { text: t('🟣 Тримай E — знешкодь гніздо'), hold: true, progress: n.progress };
+            this.prompt = { text: t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), hold: true, progress: n.progress };
             if (net) net.holdE = true;
             break;
           }
         }
       } else if (m.type === 'escort' && !m.started) {
         if (near(m.site.x, m.site.z + 2, 5)) {
-          this.prompt = { text: t('🧳 Натисни E — забери мандрівника'), hold: false };
+          this.prompt = { text: t('🧳 Натисни {k} — забери мандрівника', { k: interactKey() }), hold: false };
           if (pressE) { net.sendUse('escort'); input.justPressed.delete('KeyE'); pressE = false; }
         }
       } else if (m.points) {

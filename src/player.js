@@ -275,8 +275,7 @@ export class Player {
       input.consumeMouse();
     }
 
-    // --- 🐣 Режим Малюк: автоприціл + автовогонь (тільки тач, не ламає десктоп) ---
-    this._kidFire = false;
+    // --- 🐣 Режим Малюк: лише м'яка допомога з прицілом (тільки тач, не ламає десктоп) ---
     if (allowControl) this._kidAimAssist(dt, input);
 
     // --- рух ---
@@ -445,8 +444,7 @@ export class Player {
     else if (this._clickBuffer > 0) this._clickBuffer -= dt;
     if (allowControl && this.reloading <= 0 && !this.emoting) {
       const w = this.weapon;
-      // 🐣 Малюк: ціль у прицілі → стріляємо самі, наче дитина тримає вогонь
-      const trigger = this._kidFire || (w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0));
+      const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
       if (trigger && this.shootCd <= 0) {
         this._clickBuffer = 0;
         if (this.curAmmo.mag > 0) this._shoot();
@@ -575,8 +573,9 @@ export class Player {
     }
   }
 
-  // 🐣 Режим Малюк: ніжно довертаємо приціл на найближчого зомбі у передньому
-  // конусі й вмикаємо автовогонь. Працює ЛИШЕ на тачі з увімкненим kidMode —
+  // 🐣 Режим Малюк: лише м'який доворот прицілу на найближчого зомбі у передньому
+  // конусі — дитина сама стріляє кнопкою. БЕЗ автовогню й гарантованого хедшоту
+  // (цілимось у тулуб). Працює ЛИШЕ на тачі з увімкненим kidMode —
   // десктоп/клавіатура не зачіпаються.
   _kidAimAssist(dt, input) {
     const level = this.level;
@@ -601,15 +600,13 @@ export class Player {
     }
     if (!best) return;
 
-    // (a) автоприціл — м'яко (rate 9), дитина все одно грубо наводить сама
+    // М'який доворот — лише ніжний нудж до тулуба зомбі (rate 4 yaw / 3 pitch),
+    // дитина все одно грубо наводить й тисне на гачок сама. Жодного автовогню.
     const dx = best.x - this.pos.x, dz = best.z - this.pos.z;
     const targetYaw = Math.atan2(-dx, -dz);
     const targetPitch = clamp(Math.atan2((best.y + best.rig.height * 0.55) - eyeY, bestD), -1.45, 1.45);
-    this.yaw = dampAngle(this.yaw, targetYaw, 9, dt);
-    this.pitch = clamp(damp(this.pitch, targetPitch, 9, dt), -1.45, 1.45);
-
-    // (b) автовогонь — сам тисне на гачок (звичайний шлях _shoot із кулдауном/набоями)
-    this._kidFire = true;
+    this.yaw = dampAngle(this.yaw, targetYaw, 4, dt);
+    this.pitch = clamp(damp(this.pitch, targetPitch, 3, dt), -1.45, 1.45);
   }
 
   _shoot() {

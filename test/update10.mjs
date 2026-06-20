@@ -30,10 +30,10 @@ try {
     coop: !!document.getElementById('btn-coop'),
     oldStorm: !!document.getElementById('btn-storm'),
     oldArena: !!document.getElementById('btn-arena'),
-    side: document.querySelectorAll('.globe-side .globe-act').length,
+    side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('бічна колонка: 7 другорядних кнопок (v15 +Прогрес, v16 +Мова)', menu.side === 7, `${menu.side}`);
+  check('☰ меню: 9 другорядних кнопок у висувному меню', menu.side === 9, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');

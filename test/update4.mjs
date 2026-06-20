@@ -35,7 +35,7 @@ console.log('▸ Зірковий досвід і Зоряний шлях');
 await loadCountry('UKR');
 let st = await state();
 check(st.xp === 0 && st.passLevel === 1, `новий сейв: 0 XP, рівень 1 (${st.xp}, ${st.passLevel})`);
-check(st.skins.length === 1 && st.skins[0] === 'classic', 'на старті лише скін «Класик»');
+check(st.skins.every((s) => s === 'classic' || s === 'custom') && st.skins.includes('classic'), 'на старті лише базові скіни (Класик/Свій), без зароблених');
 check(st.gadgets.owned.length === 0, 'гаджетів немає');
 
 // вбивство дає XP
