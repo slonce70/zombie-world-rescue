@@ -131,8 +131,8 @@ const extrasRawKeys = await page.evaluate(async () => {
 check(Object.keys(extrasRawKeys).length === 0,
   `жодних сирих клавіш-leak у extras.js (${JSON.stringify(extrasRawKeys)})`);
 
-// ============ 🌍 Task 3: глобус — ☰ меню + список країн ============
-console.log('▸ Mobile: глобус — меню + список країн');
+// ============ 🌍 Task 3: глобус — ☰ меню + вибір країни ПІСЛЯ ГРАТИ ============
+console.log('▸ Mobile: глобус — меню + вибір країни у ГРАТИ → Кампанія');
 await page.goto(`${BASE}/?test&fresh&touch`);
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'globe', 30000, 'globe');
 
@@ -147,18 +147,37 @@ const inDrawer = await page.evaluate(() => {
 });
 check(inDrawer, 'усі 9 другорядних кнопок — у висувному меню #overlay-menu');
 
-// (c) список країн існує і має ≥6 елементів
-const nCty = await page.evaluate(() => document.querySelectorAll('#country-list .country-item').length);
-check(nCty >= 6, `список країн має ≥6 країн (${nCty})`);
+// (c) на головному екрані глобуса БІЛЬШЕ НЕМАЄ списку країн (він переїхав у ГРАТИ)
+const cListOnGlobe = await page.evaluate(() =>
+  document.querySelectorAll('#country-list .country-item').length);
+check(cListOnGlobe === 0, `на головному екрані немає списку країн (${cListOnGlobe})`);
 
-// (d) тап по доступній країні зі списку запускає рівень (шпигун на startLevel)
+// (d) тап ГРАТИ → відкривається оверлей соло-режимів
+await page.evaluate(() => document.getElementById('btn-solo').click());
+const soloShown = await waitFor(
+  async () => await page.evaluate(() => {
+    const o = document.getElementById('overlay-solo');
+    return o && (o.classList.contains('show') || getComputedStyle(o).display !== 'none');
+  }), 5000, 'overlay-solo show');
+check(soloShown, 'тап ГРАТИ відкриває оверлей соло-режимів');
+
+// (e) тап «Кампанія» → у #solo-countries з'являється список країн (≥6)
+await page.evaluate(() => document.querySelector('.solo-mode[data-mode="campaign"]').click());
+const nCty = await waitFor(
+  async () => await page.evaluate(() =>
+    document.querySelectorAll('#solo-countries #country-list .country-item').length >= 6),
+  5000, 'campaign country list');
+check(nCty, 'ГРАТИ → Кампанія показує список країн (≥6)');
+
+// (f) тап по доступній країні (UKR) → startLevel('UKR') (шпигун на startLevel)
 await page.evaluate(() => {
   window.__startArg = null;
   window.__game.startLevel = (c) => { window.__startArg = c; };
-  const it = document.querySelector('#country-list .country-item[data-id="UKR"]');
+  const it = document.querySelector('#solo-countries #country-list .country-item[data-id="UKR"]');
   if (it) it.click();
 });
-check((await page.evaluate(() => window.__startArg)) === 'UKR', 'тап по доступній країні в списку запускає рівень');
+check((await page.evaluate(() => window.__startArg)) === 'UKR',
+  'тап по доступній країні у Кампанії запускає рівень');
 
 // ============ ПІДСУМОК ============
 console.log('');
