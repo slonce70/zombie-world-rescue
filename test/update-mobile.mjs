@@ -92,6 +92,45 @@ const livePromptOk = await page.evaluate(() => {
 });
 check(livePromptOk, 'жива підказка місії на тачі не містить окрему «E»');
 
+// ============ ✋ Task 2b: іграшки рівня (extras.js) — без клавіш на тачі ============
+console.log('▸ Mobile: підказки extras.js (мегабокс/самокат/барикада) на тачі — без «E»');
+
+// Репрезентативні підказки extras, зібрані під тачем (interactKey()→✋),
+// мають містити ✋ і НЕ містити окрему клавішу «E».
+const extrasPrompts = await page.evaluate(async () => {
+  const { t, interactKey, keyHint } = await import('/src/i18n.js');
+  return [
+    t('🦙 Натисни {k} — відкрий МЕГАБОКС!', { k: interactKey() }),
+    t('🛴 Натисни {k} — поїхали!', { k: interactKey() }),
+    t('🧱 Натисни {k} — забрати барикаду', { k: interactKey() }),
+    keyHint('🛴 Кермуй джойстиком, ✋ — зійти', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'),
+  ];
+});
+for (const p of extrasPrompts) {
+  check(/✋/.test(p) && !/\bE\b/.test(p) && !/\bW\b/.test(p) && !/\bA\/D\b/.test(p),
+    `extras-підказка містить ✋, без клавіш: «${p}»`);
+}
+
+// Production-facing: у джерелі extras.js не лишилось сирих гравцю-видимих клавіш,
+// які потрапляють на ТАЧ. «Натисни E» в t() — завжди leak. «W — газ» тощо
+// дозволені ЛИШЕ у клавіатурній (другій) гілці keyHint(...) — на тач не йдуть.
+const extrasRawKeys = await page.evaluate(async () => {
+  const txt = await (await fetch('/src/extras.js')).text();
+  const out = {};
+  // «Натисни E —» у t() — сирий E-промпт, leak на тачі (не має лишатись жодного)
+  const e = txt.match(/Натисни E —/g);
+  if (e) out['Натисни E'] = e.length;
+  // клавіатурні рядки самоката (W — газ…) допустимі тільки всередині keyHint(...)
+  for (const line of txt.split('\n')) {
+    if (/W — газ/.test(line) && !/keyHint\(/.test(line)) {
+      out['W — газ поза keyHint'] = (out['W — газ поза keyHint'] || 0) + 1;
+    }
+  }
+  return out;
+});
+check(Object.keys(extrasRawKeys).length === 0,
+  `жодних сирих клавіш-leak у extras.js (${JSON.stringify(extrasRawKeys)})`);
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

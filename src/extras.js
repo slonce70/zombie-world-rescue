@@ -1,6 +1,6 @@
 // Іграшки рівня: 🦙 Мегабокс, 🐶 пес Дружок, 🛴 самокати, 🦘🧱 гаджети
 import * as THREE from 'three';
-import { t, keyHint } from './i18n.js';
+import { t, keyHint, interactKey } from './i18n.js';
 import {
   makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
 } from './characters.js';
@@ -63,7 +63,7 @@ export class Megabox {
       level.bus.emit('toast', t('🦙 МЕГАБОКС поблизу! Знайди фіолетовий промінь!'));
     }
     if (d < 3.6 && !level.missions.prompt) {
-      level.missions.prompt = { text: t('🦙 Натисни E — відкрий МЕГАБОКС!'), hold: false };
+      level.missions.prompt = { text: t('🦙 Натисни {k} — відкрий МЕГАБОКС!', { k: interactKey() }), hold: false };
       if (allowControl && input.pressed('KeyE')) {
         if (level.mirror) level.net.sendUse('megabox');
         else this.open(1);
@@ -282,7 +282,7 @@ export class Vehicles {
       const d = Math.hypot(p.pos.x - r.x, p.pos.z - r.z);
       if (d < 2.4) {
         if (!level.missions.prompt) {
-          level.missions.prompt = { text: t('🛴 Натисни E — поїхали!'), hold: false };
+          level.missions.prompt = { text: t('🛴 Натисни {k} — поїхали!', { k: interactKey() }), hold: false };
         }
         if (allowControl && input.pressed('KeyE')) {
           input.justPressed.delete('KeyE');
@@ -333,7 +333,7 @@ export class Vehicles {
     p._applyView();
     r.sc.group.rotation.z = 0;
     this.level.audio.bell();
-    this.level.bus.emit('toast', t('🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
+    this.level.bus.emit('toast', keyHint('🛴 Кермуй джойстиком, ✋ — зійти', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
   }
 
   dismountLocal(x, z) {
@@ -460,7 +460,7 @@ export class Gadgets {
     if (!level.missions.prompt) {
       for (const w of this.walls) {
         if (Math.hypot(p.pos.x - w.x, p.pos.z - w.z) < 3.2) {
-          level.missions.prompt = { text: t('🧱 Натисни E — забрати барикаду'), hold: false };
+          level.missions.prompt = { text: t('🧱 Натисни {k} — забрати барикаду', { k: interactKey() }), hold: false };
           break;
         }
       }
