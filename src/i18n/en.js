@@ -787,4 +787,10 @@ export const EN = {
 "Операція: Порятунок Світу": "Operation: World Rescue",
 "🔗 Посилання скопійовано — надішли другу!": "🔗 Link copied — send it to a friend!",
 "🔗 Посилання: {u}": "🔗 Link: {u}",
+"Мій герой": "My Hero",
+"Твої кольори": "Your colors",
+"<div class=\"ward-section\">🎨 Мої кольори</div>": "<div class=\"ward-section\">🎨 My Colors</div>",
+"Сорочка": "Shirt",
+"Штани": "Pants",
+"Шкіра": "Skin",
 };

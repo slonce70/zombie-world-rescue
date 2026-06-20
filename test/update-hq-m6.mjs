@@ -52,9 +52,21 @@ console.log('▸ M6: палітра в Гардеробі');
 await page.evaluate(() => { window.__game.save.activeSkin = 'custom'; window.__game._showOverlay('overlay-wardrobe'); window.__game.renderWardrobe(); });
 const hasPalette = await page.evaluate(() => !!document.querySelector('#wardrobe-content .hero-swatch'));
 check(hasPalette, 'для кастом-скіна показано палітру кольорів');
-await page.evaluate(() => { const s = document.querySelector('#wardrobe-content .hero-swatch[data-slot="shirt"]'); if (s) s.click(); });
-const changed = await page.evaluate(() => typeof window.__game.save.hero.shirt === 'number');
-check(changed, 'клік по свотчу оновлює save.hero.shirt');
+// клікаємо по конкретному свотчу й перевіряємо, що save.hero.shirt дорівнює його data-hex
+const clickedHex = await page.evaluate(() => {
+  // беремо НЕактивний свотч сорочки, щоб клік справді щось змінив
+  const all = [...document.querySelectorAll('#wardrobe-content .hero-swatch[data-slot="shirt"]')];
+  const s = all.find((el) => !el.classList.contains('on')) || all[0];
+  if (!s) return null;
+  const hex = parseInt(s.dataset.hex, 10);
+  s.click();
+  return hex;
+});
+const storedShirt = await page.evaluate(() => window.__game.save.hero.shirt);
+check(
+  clickedHex != null && Number.isFinite(clickedHex) && storedShirt === clickedHex,
+  `клік по свотчу записує його колір у save.hero.shirt (hex=${clickedHex}, stored=${storedShirt})`,
+);
 
 // ============ ПІДСУМОК ============
 console.log('');
