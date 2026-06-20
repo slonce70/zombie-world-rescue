@@ -9,6 +9,15 @@ import { t } from '../i18n.js';
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
 
+// 📣 безпечні пінги — лише 5 фіксованих фраз, без вільного тексту
+export const PING_PHRASES = [
+  { icon: '📍', text: t('Сюди!') },
+  { icon: '🆘', text: t('Допоможи!') },
+  { icon: '👍', text: t('Готовий!') },
+  { icon: '🙏', text: t('Дякую!') },
+  { icon: '🛡️', text: t('Захищаю!') },
+];
+
 export function loadNick() {
   try { return localStorage.getItem(NICK_KEY) || ''; } catch (e) { return ''; }
 }
@@ -115,6 +124,19 @@ export class CoopSession {
     else this.transport.broadcast({ t: 'end', why: 'closed' }, true);
     this.transport.close();
     this._reset();
+  }
+
+  // 📣 пінг (безпечна фраза): локальний тост + розсилка/намір. Анти-спам ≥1.2с.
+  sendPing(i) {
+    i = i | 0;
+    if (i < 0 || i >= PING_PHRASES.length) return;
+    const now = (this.game && this.game.now ? this.game.now : Date.now());
+    if (this._lastPing && now - this._lastPing < 1200) return; // анти-спам
+    this._lastPing = now;
+    const p = PING_PHRASES[i];
+    if (this.game && this.game.hud) this.game.hud.toast(t('Ти: {p}', { p: p.icon + ' ' + p.text })); // локально
+    if (this.role === 'host' && this.net && this.net.hostPing) this.net.hostPing(i);
+    else if (this.role === 'guest' && this.net && this.net.guestPing) this.net.guestPing(i);
   }
 
   _reset() {

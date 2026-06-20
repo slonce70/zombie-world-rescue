@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { PF, weaponToIdx, idxToWeapon } from './protocol.js';
+import { PING_PHRASES } from './coop.js';
 import { t } from '../i18n.js';
 
 const SEND_HZ = 15;
@@ -58,6 +59,15 @@ export class GuestNet {
   sendRespawned() { this.send({ t: 'respawned' }); }
   sendRevive(pid) { this.send({ t: 'revdone', target: pid }); }
   sendFountain(x, z) { this.send({ t: 'fountain', x: Math.round(x), z: Math.round(z) }); }
+
+  // 📣 пінг гостя: намір хосту (він розсилає подію 'pg' усім)
+  guestPing(i) { this.send({ t: 'ping', i: i | 0 }); }
+
+  _showPing(pid, i) {
+    const p = PING_PHRASES[i]; if (!p) return;
+    const nick = (this.session.roster.get(pid) || {}).nick || t('Друг');
+    if (this.level && this.level.game && this.level.game.hud) this.level.game.hud.toast(nick + ': ' + p.icon + ' ' + p.text);
+  }
 
   // ---------- цикл ----------
   update(dt) {
@@ -300,6 +310,7 @@ export class GuestNet {
         );
         break;
       }
+      case 'pg': { if (a[0] === me) break; this._showPing(a[0], a[1]); break; } // 📣 пінг від хоста/іншого гостя
       case 'toast': game.hud.toast(a[0]); break;
       case 'banner': game.hud.banner(a[0], a[1] || '', a[2] || 3.2); break;
       case 'sbb': {

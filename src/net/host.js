@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
+import { PING_PHRASES } from './coop.js';
 import { t } from '../i18n.js';
 
 const SNAP_HZ = 12;
@@ -81,6 +82,15 @@ export class HostNet {
   }
 
   ev(...args) { this.evQueue.push(args); }
+
+  // 📣 пінг хоста: розсилаємо подію всім гостям (від pid 1)
+  hostPing(i) { this.ev('pg', 1, i | 0); }
+
+  _showPing(pid, i) {
+    const p = PING_PHRASES[i]; if (!p) return;
+    const nick = (this.session.roster.get(pid) || {}).nick || t('Друг');
+    if (this.game && this.game.hud) this.game.hud.toast(nick + ': ' + p.icon + ' ' + p.text);
+  }
 
   flushEvents() {
     if (this.evQueue.length) {
@@ -178,6 +188,12 @@ export class HostNet {
           const a = (i / 14) * Math.PI * 2;
           level.effects.spawnCoin(d.x + Math.cos(a) * (1 + Math.random() * 2.2), d.z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
         }
+        return true;
+      }
+      case 'ping': {
+        // 📣 індекс гостя не довіряємо — клампимо в межі масиву фраз
+        const i = d.i | 0;
+        if (i >= 0 && i < PING_PHRASES.length) { this.ev('pg', from, i); this._showPing(from, i); }
         return true;
       }
       default: return false;
