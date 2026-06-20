@@ -21,6 +21,8 @@ export const SHOP_ITEMS = [
   { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
   { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
   { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'laser', icon: '🔫', name: t('Лазер'), desc: () => t('Промінь прошиває зомбі — балон на 5с ({k})', { k: keyHint('кнопка 🔁', 'клавіша 8') }), price: 650, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'flamethrower', icon: '🔥', name: t('Вогнемет'), desc: () => t('Палить натовп зблизька — балон на 5с ({k})', { k: keyHint('кнопка 🔁', 'клавіша 9') }), price: 550, max: 1, cat: t('Зброя'), weapon: true },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -198,6 +200,8 @@ export class Shop {
       case 'smg':
       case 'magnum':
       case 'sniper':
+      case 'laser':
+      case 'flamethrower':
         game.unlockWeapon(id);
         game.hud.toast(t('{i} {n} тепер твій! Назавжди!', { i: item.icon, n: item.name }));
         break;

@@ -12,9 +12,18 @@ export const WEAPONS = {
   magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 36, cap: 90 },
   sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
+  // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
+  // ПАЛИВО (балон = 5с безперервної дії), а не патрони-штуки. fuelMax — місткість балона.
+  // dps — шкода ЗА СЕКУНДУ (застосовується щокадру: dmg = dps * dt).
+  // 🔫 Лазер: безперервний промінь-хітскан, пробиває кількох (як снайперка, але потоком).
+  //   dps 90 → walker (70hp) ~0.8с, але балон лише 5с і ще треба тримати лінію. Потужно, не імба.
+  laser: { name: 'Лазер', icon: '🔫', dmg: 0, dps: 90, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 0, recoil: 0, infinite: false, continuous: true, beam: true, pierce: 6, range: 90, fuelMax: 5.0 },
+  // 🔥 Вогнемет: короткий конус полум'я, висока шкода зблизька, спадає з дистанцією.
+  //   dps 120 у впор, падає до ~0 на краю (range 8). Тип шкоди «вогонь» — гак для v47.
+  flamethrower: { name: 'Вогнемет', icon: '🔥', dmg: 0, dps: 120, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 0, recoil: 0, infinite: false, continuous: true, flame: true, range: 8, coneCos: 0.82, fuelMax: 5.0 },
 };
-export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
-const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka' };
+export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
+const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower' };
 
 export class Player {
   constructor(level) {
@@ -60,8 +69,11 @@ export class Player {
     this.weapons = ['pistol'];
     this.cur = 'pistol';
     this.ammo = {};
+    // 🔋 паливо паливних зброй (v46): секунди безперервної дії, що лишились. Старт — повний балон.
+    this.fuel = {};
     for (const w of WEAPON_SLOTS) {
       this.ammo[w] = { mag: WEAPONS[w].mag, reserve: WEAPONS[w].infinite ? Infinity : WEAPONS[w].reserve };
+      if (WEAPONS[w].continuous) this.fuel[w] = WEAPONS[w].fuelMax;
     }
     this.grenades = 2;
     this.grenadeCd = 0;
@@ -189,6 +201,9 @@ export class Player {
     for (const [w, k] of Object.entries(ratio)) {
       this.ammo[w].reserve = Math.min(WEAPONS[w].cap, this.ammo[w].reserve + Math.ceil(n * k));
     }
+    // 🔋 паливні зброї поповнюються фіксовано: ~2с балона за пікап набоїв (90 → +2с),
+    // масштабовано від n, щоб дрібний пікап давав менше. Балон ≤5с.
+    this.addFuel(Math.max(1, n / 45));
   }
 
   addRockets(n) {
@@ -446,16 +461,26 @@ export class Player {
     else if (this._clickBuffer > 0) this._clickBuffer -= dt;
     if (allowControl && this.reloading <= 0 && !this.emoting) {
       const w = this.weapon;
-      const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
-      if (trigger && this.shootCd <= 0) {
-        this._clickBuffer = 0;
-        if (this.curAmmo.mag > 0) this._shoot();
-        else {
-          this.level.audio.empty();
-          this.shootCd = 0.35;
-          this.startReload();
+      if (w.continuous) {
+        // 🔋 паливна зброя: тримаєш вогонь → безперервний дренаж палива + шкода щокадру
+        this._fireContinuous(dt, input.mouseDown);
+      } else {
+        const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
+        if (trigger && this.shootCd <= 0) {
+          this._clickBuffer = 0;
+          if (this.curAmmo.mag > 0) this._shoot();
+          else {
+            this.level.audio.empty();
+            this.shootCd = 0.35;
+            this.startReload();
+          }
         }
       }
+    }
+    // безперервна зброя при відпущеному гачку / неактивному керуванні — глушимо звук
+    if ((!this.weapon.continuous || !allowControl) && this._contAudio) {
+      this.level.audio.stopBeam && this.level.audio.stopBeam();
+      this._contAudio = false;
     }
 
     // --- кроки ---
@@ -764,6 +789,135 @@ export class Player {
       level.stats.shotsHit++;
       level.bus.emit('hitmarker', anyHeadshot);
     }
+  }
+
+  // 🔋 паливна зброя: безперервна стрільба з дренажем палива і щокадровою шкодою.
+  // held — тримають вогонь (mouseDown). При fuel<=0 — клац-порожньо.
+  _fireContinuous(dt, held) {
+    const w = this.weapon;
+    const fuel = this.fuel[this.cur] || 0;
+    if (!held) { this._contWasEmpty = false; return; }
+    if (fuel <= 0) {
+      // балон порожній: разовий «клац» і нічого
+      if (!this._contWasEmpty) { this._contWasEmpty = true; this.level.audio.empty(); }
+      return;
+    }
+    this._contWasEmpty = false;
+    // дренаж палива (не нижче 0)
+    this.fuel[this.cur] = Math.max(0, fuel - dt);
+    this.gunKick = Math.min(0.5, this.gunKick + dt * 2); // легке тремтіння ствола
+    const level = this.level;
+    const dmgMult = this.damageMult * (this.buffs.rage > 0 ? 2 : 1);
+    const dmgThisFrame = w.dps * dmgMult * dt;
+
+    // точка вильоту (як у _shoot)
+    const origin = this.firstPerson
+      ? this._shootOrigin.set(this.pos.x, this.pos.y + 1.62, this.pos.z)
+      : this._shootOrigin.copy(this.camera.position);
+    const dir = this.forwardVec(this._shootDir).normalize();
+    const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
+    arms.muzzle.getWorldPosition(this._muzzlePos);
+
+    // дросселюємо звук/число-маркер, щоб не сипати щокадру
+    this._contSfxT = (this._contSfxT || 0) - dt;
+    let anyHit = false;
+    if (w.beam) anyHit = this._laserBeam(origin, dir, w, dmgThisFrame, level);
+    else if (w.flame) anyHit = this._flameCone(origin, dir, w, dmgThisFrame, level);
+
+    if (this._contSfxT <= 0) {
+      this._contSfxT = 0.11;
+      if (w.beam) level.audio.beamTick(); else level.audio.flameTick();
+      this._contAudio = true;
+    }
+    if (anyHit) level.stats.shotsHit++;
+    level.stats.shotsFired++;
+  }
+
+  // 🔫 ЛАЗЕР: миттєвий промінь-хітскан уперед, пробиває кількох зомбі на лінії.
+  _laserBeam(origin, dir, w, dmg, level) {
+    const MAX_D = w.range;
+    let anyHit = false;
+    let endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
+    if (level.zombies) {
+      let pierceLeft = w.pierce;
+      let from = origin;
+      let travelled = 0;
+      let first = true;
+      while (pierceLeft > 0 && travelled < MAX_D) {
+        const hit = level.zombies.hitTest(from, dir, MAX_D - travelled);
+        if (!hit) break;
+        const wallT = this.world.shotBlockDist(from, dir, hit.t);
+        if (wallT < hit.t) { // стіна раніше за зомбі — промінь гаснемо об стіну
+          endPoint = this._shootEnd.copy(from).addScaledVector(dir, wallT);
+          first = false;
+          break;
+        }
+        // соло/хост б'є локально; гість (mirror) лише малює промінь — шкоду рахує хост
+        if (!level.mirror) { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, false); }
+        anyHit = true;
+        endPoint = hit.point;
+        // легке свічення/іскри в точці влучання (без важких ефектів)
+        level.effects.burst(hit.point, 0x66ffff, 2, { speed: 2, up: 1, life: 0.18, size: 0.5 });
+        travelled += hit.t + 0.4;
+        from = hit.point.clone().addScaledVector(dir, 0.4);
+        pierceLeft--;
+        first = false;
+      }
+      if (first) {
+        // нікого не зачепили — перевіряємо лише стіну
+        const wallT = this.world.shotBlockDist(origin, dir, MAX_D);
+        if (wallT < MAX_D) endPoint = this._shootEnd.copy(origin).addScaledVector(dir, wallT);
+      }
+    }
+    // яскравий ціановий промінь від ствола до точки влучання (перевикористовуємо trace-пул)
+    level.effects.laserBeam(this._muzzlePos, endPoint);
+    return anyHit;
+  }
+
+  // 🔥 ВОГНЕМЕТ: короткий конус полум'я. Шкода спадає з дистанцією; тип шкоди «вогонь».
+  _flameCone(origin, dir, w, dmg, level) {
+    let anyHit = false;
+    if (level.zombies) {
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead') continue;
+        const dx = z.x - origin.x;
+        const dy = (z.y + z.rig.height * 0.5) - origin.y;
+        const dz = z.z - origin.z;
+        const d = Math.hypot(dx, dy, dz);
+        if (d < 0.3 || d > w.range) continue;
+        const dot = (dir.x * dx + dir.y * dy + dir.z * dz) / d;
+        if (dot < w.coneCos) continue; // поза конусом
+        // стіна між гравцем і зомбі гасить полум'я
+        this._flameDir = this._flameDir || new THREE.Vector3();
+        this._flameDir.set(dx / d, dy / d, dz / d);
+        if (this.world.shotBlockDist(origin, this._flameDir, d) < d) continue;
+        // лінійний спад шкоди з дистанцією (повна у впор → ~0 на краю)
+        const falloff = 1 - (d / w.range) * 0.85;
+        // 🔥 ТИП ШКОДИ «вогонь» (v47-гак): передаємо опції з прапорцем fire.
+        // соло/хост б'є локально; гість (mirror) лише малює полум'я
+        if (!level.mirror) { z.lastHitBy = 1; z.damage(dmg * falloff, this._flameDir.clone(), false, { fire: true }); }
+        anyHit = true;
+      }
+    }
+    // конус вогняних частинок (перевикористовуємо систему частинок effects.js)
+    level.effects.flameCone(this._muzzlePos, dir, w.range);
+    return anyHit;
+  }
+
+  // 🔋 поповнити паливо паливних зброй (airdrop/ammo-pickup/магазин). secs — секунд балона.
+  addFuel(secs) {
+    for (const id of WEAPON_SLOTS) {
+      const cfg = WEAPONS[id];
+      if (cfg && cfg.continuous) {
+        this.fuel[id] = Math.min(cfg.fuelMax, (this.fuel[id] || 0) + secs);
+      }
+    }
+  }
+
+  // 🔋 наповнити балон конкретної зброї повністю (розблокування/старт рівня)
+  refillFuel(id) {
+    const cfg = WEAPONS[id];
+    if (cfg && cfg.continuous) this.fuel[id] = cfg.fuelMax;
   }
 
   takeDamage(amt, fromX, fromZ) {

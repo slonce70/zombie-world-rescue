@@ -1,5 +1,6 @@
 // Мобільне керування: віртуальний джойстик + огляд свайпом + кнопки
 import { WEAPONS } from './player.js';
+import { t } from './i18n.js';
 
 export function isTouchDevice() {
   return ('ontouchstart' in window && navigator.maxTouchPoints > 0)
@@ -152,7 +153,8 @@ export class TouchControls {
       btn.dataset.weapon = id;
       const am = player.ammo[id];
       let ammoText = '∞';
-      if (am && am.reserve !== Infinity) ammoText = (am.mag | 0) + ' / ' + (am.reserve | 0);
+      if (w.continuous) ammoText = '🔋 ' + (player.fuel[id] || 0).toFixed(1) + t('с');
+      else if (am && am.reserve !== Infinity) ammoText = (am.mag | 0) + ' / ' + (am.reserve | 0);
       btn.innerHTML = `<span class="ww-icon">${w.icon}</span>`
         + `<span class="ww-name">${w.name}</span>`
         + `<span class="ww-ammo">${ammoText}</span>`;
