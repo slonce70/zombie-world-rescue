@@ -115,7 +115,22 @@ try {
   check('гість отримав пінг хоста як тост', got2,
     JSON.stringify(await guestPage.evaluate(() => window.__pings || [])));
 
-  // 7. помилки консолі
+  // ============ 🎡 КОЛЕСО ПІНГІВ (Task 2: UI) ============
+  // 7. відкриваємо колесо на хості — має бути 5 кнопок-фраз
+  await hostPage.evaluate(() => window.__game.coop.openPingWheel && window.__game.coop.openPingWheel());
+  const n = await hostPage.evaluate(() => document.querySelectorAll('#ping-wheel .ping-btn').length);
+  check('колесо пінгів має 5 фраз', n === 5, `${n}`);
+  const open = await hostPage.evaluate(() => document.getElementById('overlay-ping').classList.contains('show'));
+  check('оверлей пінгів відкрито', open === true);
+  // клік по фразі #1 шле пінг і закриває оверлей
+  await hostPage.evaluate(() => { window.__pings = []; const h = window.__game.hud; const o = h.toast.bind(h); h.toast = (m) => { window.__pings.push(m); return o(m); }; });
+  await hostPage.evaluate(() => document.querySelectorAll('#ping-wheel .ping-btn')[1].click());
+  const sent = await waitFor(async () => (await hostPage.evaluate(() => window.__pings || [])).some((m) => /Ти:/.test(m)), 4000, 'click sent ping');
+  check('клік по фразі шле пінг', sent);
+  const closed = await hostPage.evaluate(() => !document.getElementById('overlay-ping').classList.contains('show'));
+  check('оверлей закрився після кліку', closed === true);
+
+  // 8. помилки консолі
   const realErrsA = errsA.filter((e) => !e.includes('favicon'));
   const realErrsB = errsB.filter((e) => !e.includes('favicon'));
   check('консоль хоста чиста', realErrsA.length === 0, realErrsA.slice(0, 3).join(' | '));

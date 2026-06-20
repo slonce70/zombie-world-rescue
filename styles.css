@@ -1006,9 +1006,17 @@ body.touch-mode #touch-coach.show { display: block; }
 #coop-room {
   background: rgba(13, 26, 38, 0.78); border: 2px solid rgba(77, 214, 168, 0.45);
   border-radius: 12px; padding: 6px 12px; color: #d7efe5; font-weight: 800; font-size: 14px;
-  text-align: center; letter-spacing: 0.5px;
+  text-align: center; letter-spacing: 0.5px; cursor: pointer;
 }
 #coop-room b { color: #4dd6a8; letter-spacing: 2px; }
+
+/* 📣 колесо пінгів: 5 фраз великими кнопками (зручно з телефона) */
+.ping-btn {
+  font-size: 18px; display: block; width: 100%; margin: 6px 0; padding: 12px;
+  border-radius: 12px; border: none; background: rgba(255, 255, 255, 0.1);
+  color: #fff; cursor: pointer; text-align: left;
+}
+.ping-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
 @media (max-width: 900px) {
   .globe-side {

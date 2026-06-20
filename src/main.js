@@ -177,6 +177,10 @@ class Game {
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }
+      // 📣 C — колесо пінгів, лише у кооп-рівні (не соло, не на паузі)
+      if (e.code === 'KeyC' && this.state === 'level' && this.coop && this.coop.session.state === 'level' && !this.paused) {
+        this.coop.openPingWheel();
+      }
       if (e.code === 'KeyM') {
         this.audio.setMuted(!this.audio.muted);
         this.hud.toast(this.audio.muted ? t('🔇 Звук вимкнено') : t('🔊 Звук увімкнено'));

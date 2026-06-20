@@ -1,7 +1,7 @@
 // UI кооперативу: модалка «Грати разом» і лобі кімнати.
 // Потік: нік (раз) → панель з кнопками ліворуч і «життям» праворуч —
 // лічильник онлайна, хто в мережі, відкриті кімнати з кнопкою «Зайти» без кода.
-import { CoopSession, loadNick, saveNick, cleanNick } from '../net/coop.js';
+import { CoopSession, loadNick, saveNick, cleanNick, PING_PHRASES } from '../net/coop.js';
 import { t } from '../i18n.js';
 import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
@@ -213,6 +213,34 @@ export class CoopUI {
       const n = s.roster.size;
       el.innerHTML = t('🤝 Код:', {}) + ` <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''}`;
     }
+    // тап по чипу = колесо пінгів (без нового HUD-елемента). Слухач навішуємо раз.
+    if (!this._chipPingWired) {
+      this._chipPingWired = true;
+      el.title = t('Пінг команді');
+      el.addEventListener('click', () => {
+        if (this.session.state === 'level') this.openPingWheel();
+      });
+    }
+  }
+
+  // 📣 колесо пінгів: 5 фіксованих фраз з PING_PHRASES, клік → sendPing + закрити
+  openPingWheel() {
+    if (this.session.state !== 'level') return;
+    const wheel = document.getElementById('ping-wheel');
+    if (!wheel) return;
+    this.game.audio.click();
+    let html = '';
+    PING_PHRASES.forEach((p, i) => {
+      html += `<button class="ping-btn" data-i="${i}">${p.icon} ${this._esc(p.text)}</button>`;
+    });
+    wheel.innerHTML = html;
+    wheel.querySelectorAll('.ping-btn').forEach((b) => {
+      b.addEventListener('click', () => {
+        this.session.sendPing(b.dataset.i | 0);
+        this.game._hideOverlay('overlay-ping');
+      });
+    });
+    this.game._showOverlay('overlay-ping');
   }
 
   // пінгуємо, поки видно модалку або жива сесія
