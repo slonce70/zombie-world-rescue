@@ -836,7 +836,7 @@ function buildShieldTpl() {
   return g;
 }
 
-export function makeShieldMesh() {
+export function makeShieldMesh(fireproof = false) {
   if (!shieldTpl) shieldTpl = buildShieldTpl();
   const g = shieldTpl.clone(true);
   const cracks1 = g.children.find((c) => c.name === 'cracks1');
@@ -845,6 +845,12 @@ export function makeShieldMesh() {
   cracks1.visible = false;
   cracks2.visible = false;
   cracks3.visible = false;
+  // 🔵 анти-вогонь щит — синювато-металевий, щоб дитина бачила різницю (вогнемет його не бере)
+  if (fireproof) {
+    const iceM = toonMat(0x5a8fd6, 0x2a5aa0, 0.25);
+    const base = g.children.find((c) => c.name !== 'cracks1' && c.name !== 'cracks2' && c.name !== 'cracks3');
+    if (base) base.traverse((o) => { if (o.isMesh) o.material = iceM; });
+  }
   return { group: g, cracks1, cracks2, cracks3 };
 }
 
@@ -1025,6 +1031,50 @@ function buildZombie(type, rng) {
       const cr2 = mkCracks('chestCracks2', [[0.14, 0.45, 0.9, 0.3], [0, 0.3, -0.9, 0.3], [-0.1, 0.5, 0.2, 0.26], [0.16, 0.14, 1.3, 0.22]]);
       r.parts.torso.add(plate, cr1, cr2);
     };
+  } else if (type === 'wizard') {
+    // 🧙 зомбі-чарівник: худорлявий у балахоні, з гострим капюшоном і світним посохом-орбом
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.06, belly: 0.8, armsForward: 0.7, lean: -0.05,
+      skin: 0x8fb56a, shirt: 0x4b2c7a, pants: 0x3a2360, shoes: 0x2a1a45,
+      eyeWhite: 0xe6d6ff, eyeL: 0.085, eyeR: 0.085, pupilColor: 0x7b2fd6, brow: 0.5,
+    }));
+    const robeM = toonMat(0x4b2c7a);
+    const trimM = toonMat(0x9b6bff, 0x6a2fd0, 0.35);
+    // мантія — спідниця-конус від пояса донизу
+    const robe = cone(0.42, 0.95, robeM, 12);
+    robe.position.set(0, -0.4, 0);
+    rig.parts.torso.add(robe);
+    // капюшон — гострий конус на голові + кільце-комір
+    const hood = cone(0.3, 0.45, robeM, 10);
+    hood.position.set(0, 0.34, 0.02);
+    const hoodTip = sphere(0.05, robeM, 6, 5);
+    hoodTip.position.set(0, 0.58, 0.04);
+    rig.parts.head.add(hood, hoodTip);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 6, 14), robeM);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 0.02, 0);
+    rig.parts.head.add(collar);
+    // зірочки на мантії
+    for (let i = 0; i < 3; i++) {
+      const star = box(0.06, 0.06, 0.02, trimM);
+      star.position.set(rng.range(-0.18, 0.18), rng.range(0.1, 0.4), -0.27);
+      star.rotation.z = 0.78;
+      rig.parts.torso.add(star);
+    }
+    // посох у правій руці: довге древко + світний орб
+    const staffM = toonMat(0x5a3a22);
+    const staff = cylinder(0.035, 0.045, 1.25, staffM, 8);
+    staff.position.set(0.04, -0.4, -0.16);
+    const orbM = toonMat(0x9b6bff, 0x9b6bff, 1.0);
+    const orb = sphere(0.13, orbM, 12, 10);
+    orb.position.set(0.04, 0.28, -0.16);
+    const orbHalo = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 6, 14), trimM);
+    orbHalo.position.copy(orb.position);
+    orbHalo.rotation.x = 0.6;
+    rig.parts.armR.add(staff, orb, orbHalo);
+    rig.ztype = 'wizard';
+    addZombieWear(rig);
+    return rig;
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,
