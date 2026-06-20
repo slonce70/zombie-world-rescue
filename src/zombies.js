@@ -9,8 +9,9 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
-  // 🛡 щитоносець: тіло слабке, але спершу зламай щит (250 міцності — здоланно навіть стартовим пістолетом)!
-  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 250 },
+  // 🛡 щитоносець: тіло слабке (20 hp), але щит дуже міцний (1000) — НЕ ламай у лоб, ОБІЙДИ збоку/ззаду!
+  // фронтальний конус щита (v42) лишається: збоку та ззаду тіло вразливе.
+  shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 1000 },
   snowman: {
     hp: 60, speed: 1.2, chaseSpeed: 2.2, aggro: 32, dmg: 11, attackR: 2.0, coins: 10, pitch: 1.8,
     ranged: { min: 7, max: 30, hold: 13, cd: 3.0, projSpeed: 16, dmg: 9, size: 0.22 },
@@ -27,6 +28,14 @@ const TYPE_STATS = {
   },
   // 🦾 броньовик: залізний нагрудник 600 міцності, повільний; голова вразлива!
   ironclad: { hp: 60, speed: 0.85, chaseSpeed: 1.7, aggro: 22, dmg: 5, attackR: 2.1, coins: 35, pitch: 0.5, chestHp: 600 },
+  // 🧙 зомбі-чарівник: кастер. Б'є посохом-орбом здалека (15), прикликає зомбі (≤5 живих),
+  // лікує своїх AoE і ставить собі щит на 100 (ре-каст через 5с). Повільний, КАЙТИТЬ.
+  wizard: {
+    hp: 200, speed: 1.1, chaseSpeed: 2.2, aggro: 30, dmg: 12, attackR: 1.9, coins: 55, pitch: 0.85,
+    // hold:28 → тримає дистанцію (кайтить) аж до 28м; min:8 → не стріляє впритул
+    ranged: { min: 8, max: 28, hold: 28, cd: 2.5, projSpeed: 16, dmg: 15, size: 0.3, color: 0x9b6bff },
+    shieldHp: 100,
+  },
   // 🧻 мумія: повільна, але жилава і боляче хапає; вночі особливо моторошна
   mummy: { hp: 160, speed: 1.0, chaseSpeed: 2.3, aggro: 26, dmg: 18, attackR: 2.0, coins: 18, pitch: 0.6 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
@@ -61,6 +70,10 @@ export class Zombies {
     // 🔫 стрільці-зомбі лише у складнішому контексті: НЕ перша країна (UKR dmg=1) на ★1.
     // Будь-яка пізніша країна (dmg>1) або підняті зірки (diffStar>1) → дозволено.
     this._allowGunner = this.diff.dmg > 1 || this.diffStar > 1;
+    // 🧙 чарівник — спец-ворог пізніших країн: НЕ на навчальній Україні ★1.
+    // Той самий гейт, що й стрілець (dmg>1 або підняті зірки).
+    this._allowWizard = this.diff.dmg > 1 || this.diffStar > 1;
+    this._wizardCount = 0; // не більше 1-2 на рівень
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
     this.byNidMap = new Map();
@@ -131,14 +144,30 @@ export class Zombies {
       throwProj: false,
       // 🛡 щит
       shieldHp: 0, shieldMax: 0, shieldObj: null,
+      // 🧙 чарівник: таймери призову / лікування / ре-касту щита
+      summonCd: 0, healCd: 0, shieldRecastCd: 0, minions: [],
     };
     if (type === 'shield') {
       z_.shieldHp = z_.shieldMax = stats.shieldHp;
-      const shield = makeShieldMesh();
+      // 🔥 v47: частина щитоносців на пізніх країнах (де вже є вогнемет) — анти-вогонь.
+      // shieldFireproof → вогнемет НЕ ламає щит (гравець мусить обійти збоку), решта шкоди — як завжди.
+      // Гейт: лише складніший контекст (НЕ перша Україна на ★1) і ~40% шанс.
+      z_.shieldFireproof = (this.diff.dmg > 1 || this.diffStar > 1) && this.rng.chance(0.4);
+      const shield = makeShieldMesh(z_.shieldFireproof);
       // щит висить перед тулубом — закриває з фронту (-Z)
       shield.group.position.set(0, 1.05, -0.62);
       rig.body.add(shield.group);
       z_.shieldObj = shield;
+    }
+    if (type === 'wizard') {
+      // 🧙 щит чарівника — той самий механізм shieldHp, але менший і відновлюваний
+      z_.shieldHp = z_.shieldMax = stats.shieldHp;
+      const shield = makeShieldMesh();
+      shield.group.position.set(0, 1.05, -0.62);
+      rig.body.add(shield.group);
+      z_.shieldObj = shield;
+      z_.summonCd = this.rng.range(3, 6);
+      z_.healCd = this.rng.range(2, 4);
     }
     if (type === 'ironclad') {
       // 🦾 нагрудник: окрема група на тулубі (клонована з шаблоном)
@@ -202,7 +231,12 @@ export class Zombies {
         const a = this.rng.next() * 6.28;
         const r = this.rng.range(2, 9);
         let type = this.rng.chance(0.25) ? 'runner' : 'walker';
-        if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
+        // 🧙 чарівник — рідкісний спец-ворог пізніших країн (~6% шанс, максимум 2 на рівень)
+        const wizardCap = this.diff.hp >= 1.8 ? 2 : 1;
+        if (this._allowWizard && this._wizardCount < wizardCap && this.rng.chance(0.06)) {
+          type = 'wizard';
+          this._wizardCount++;
+        } else if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
         // 🔫 стрілець — лише у складнішому контексті (НЕ перша Україна на ★1)
         else if (this._allowGunner && this.rng.chance(0.1)) type = 'gunner';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
@@ -388,8 +422,18 @@ export class Zombies {
       // поріг -0.45 (раніше -0.15): вужчий фронтальний конус → дитині легше зайти збоку.
       const onShield = !dir || (dir.x * fx + dir.z * fz) < -0.45;
       if (onShield) {
-        // 🔥 v47-гак: тут перевірятимемо z.shieldFireproof && fire → щит ігнорує вогонь.
-        // У v46 поведінка незмінна — вогонь руйнує щит, як будь-яка шкода.
+        // 🔥 v47-гак: анти-вогонь щит ІГНОРУЄ урон вогнеметом — гравець мусить обійти збоку.
+        // Звичайний щит вогонь руйнує, як будь-яка інша шкода.
+        if (z.shieldFireproof && fire) {
+          // короткий «шиплячий» візуал — дитина бачить, що вогонь не бере
+          const fxp = new THREE.Vector3(z.x - Math.sin(z.rig.group.rotation.y) * 0.75, z.y + 1.15, z.z - Math.cos(z.rig.group.rotation.y) * 0.75);
+          this.level.effects.burst(fxp, 0x6aa9ff, 3, { speed: 2.0, up: 1.2, life: 0.25, size: 0.5 });
+          if (!this._fireShieldHintShown) {
+            this._fireShieldHintShown = true;
+            this.level.bus.emit('toast', t('🔵 Цей щит не горить! Вогнемет не бере — обійди збоку!'));
+          }
+          return; // урон вогнем по анти-вогонь щиту — поглинається без шкоди щиту
+        }
         z.shieldFire = z.shieldFire || fire; // маркер: щит уже отримував вогняний урон
         z.shieldHp -= amt;
         this._aggro(z);
@@ -416,6 +460,8 @@ export class Zombies {
           z.shieldHp = 0;
           z.rig.body.remove(z.shieldObj.group);
           z.shieldObj = null;
+          // 🧙 чарівник: щит зламано → запускаємо ре-каст через ~5с
+          if (z.type === 'wizard') z.shieldRecastCd = 5;
           level.effects.burst(sparkPos, 0x7d8aa0, 14, { speed: 4.5, up: 4, life: 0.7, size: 1.3 });
           level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.5);
           level.audio.shieldBreak();
@@ -493,7 +539,7 @@ export class Zombies {
     // лут
     if (z.type !== 'boss') {
       const coins = z.stats.coins;
-      const n = z.type === 'tank' || z.type === 'shield' ? 3 : z.type === 'runner' ? 2 : 1;
+      const n = z.type === 'tank' || z.type === 'shield' || z.type === 'wizard' ? 3 : z.type === 'runner' ? 2 : 1;
       for (let i = 0; i < n; i++) {
         level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
       }
@@ -830,6 +876,11 @@ export class Zombies {
         }
       }
 
+      // --- 🧙 чарівник: призов / лікування / ре-каст щита ---
+      if (z.type === 'wizard' && z.state !== 'dead' && z.aggroed) {
+        this._updateWizard(z, dt);
+      }
+
       // --- рух ---
       let targetX = null, targetZ = null, spd = 0;
       if (z.state === 'flee') {
@@ -939,6 +990,75 @@ export class Zombies {
       }
     }
     if (removeAny) this.list = this.list.filter((z) => !z.gone);
+  }
+
+  // 🧙 AI чарівника: викликається з update() щокадру (лише на хості/соло).
+  _updateWizard(z, dt) {
+    const level = this.level;
+    // прибираємо мертвих/зниклих прислужників — звільняємо слоти (макс 5 живих)
+    z.minions = z.minions.filter((m) => m && !m.gone && m.state !== 'dead');
+
+    // 1) ПРИЗОВ: кожні ~6с прикликає 1-2 слабких, тримаючи ≤5 живих своїх
+    z.summonCd -= dt;
+    if (z.summonCd <= 0) {
+      z.summonCd = this.rng.range(5.5, 6.5);
+      const free = 5 - z.minions.length;
+      if (free > 0) {
+        const n = Math.min(free, this.rng.chance(0.5) ? 2 : 1);
+        for (let i = 0; i < n; i++) {
+          const a = this.rng.next() * 6.28;
+          const r = this.rng.range(1.6, 3.2);
+          const mtype = this.rng.chance(0.5) ? 'runner' : 'walker';
+          const mz = this.spawn(mtype, z.x + Math.cos(a) * r, z.z + Math.sin(a) * r, { groupId: z.groupId });
+          mz.aggroed = true;
+          mz.state = 'chase';
+          mz._summonedBy = z;
+          z.minions.push(mz);
+        }
+        // ефект призову — фіолетове кільце + іскри
+        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0x9b6bff, 2.6);
+        level.effects.burst(new THREE.Vector3(z.x, z.y + 1.2, z.z), 0x9b6bff, 10, { speed: 3.5, up: 3, life: 0.6, size: 1.1 });
+        level.audio.shriek(0.5, z.stats.pitch * 0.8);
+      }
+    }
+
+    // 2) ЛІКУВАННЯ (AoE): кожні ~4с лікує поранених сусідів-зомбі в радіусі 10 на ~15 HP
+    z.healCd -= dt;
+    if (z.healCd <= 0) {
+      z.healCd = this.rng.range(3.5, 4.5);
+      let healedAny = false;
+      for (const o of this.list) {
+        if (o === z || o.state === 'dead' || o.type === 'boss') continue;
+        if (o.hp >= o.maxHp) continue;
+        if (Math.hypot(o.x - z.x, o.z - z.z) > 10) continue;
+        o.hp = Math.min(o.maxHp, o.hp + 15);
+        healedAny = true;
+        // зелений «+» над зціленим
+        level.effects.burst(new THREE.Vector3(o.x, o.y + o.rig.height * 0.7, o.z), 0x5dff7a, 6, { speed: 1.8, up: 2.6, life: 0.7, size: 0.9 });
+      }
+      // чарівник лікує і себе трішки
+      if (z.hp < z.maxHp) { z.hp = Math.min(z.maxHp, z.hp + 15); healedAny = true; }
+      if (healedAny) {
+        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0x5dff7a, 6);
+      }
+    }
+
+    // 3) РЕ-КАСТ ЩИТА: коли щит зламано — через ~5с чарівник ставить новий (100 HP)
+    if (!z.shieldObj && z.shieldRecastCd > 0) {
+      z.shieldRecastCd -= dt;
+      if (z.shieldRecastCd <= 0) {
+        z.shieldHp = z.shieldMax = z.stats.shieldHp;
+        const shield = makeShieldMesh();
+        shield.group.position.set(0, 1.05, -0.62);
+        z.rig.body.add(shield.group);
+        z.shieldObj = shield;
+        z.shieldFire = false;
+        // ефект касту — синьо-фіолетове кільце
+        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0x6aa9ff, 3.2);
+        level.effects.burst(new THREE.Vector3(z.x, z.y + 1.1, z.z), 0x6aa9ff, 12, { speed: 3, up: 2.6, life: 0.6, size: 1.0 });
+        level.audio.clang();
+      }
+    }
   }
 
   // 🤝 множник команди: соло/дзеркало = 1, кооп = кількість гравців
