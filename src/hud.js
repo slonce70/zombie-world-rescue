@@ -51,6 +51,7 @@ export class HUD {
       missionPanel: $('mission-panel'),
       scope: $('scope'),
       tbScope: $('tb-scope'),
+      tbPing: $('tb-ping'),
       teamPanel: $('team-panel'),
     };
     this._lastCombo = 0;
@@ -269,6 +270,11 @@ export class HUD {
       const avail = p.cur === 'sniper' && p.firstPerson;
       this.el.tbScope.classList.toggle('avail', avail);
       if (!avail && this.game.input.touchScope) this.game.input.touchScope = false;
+    }
+    // 📣 тач-кнопка пінгів — лише у кооп-рівні (як клавіша C)
+    if (this.el.tbPing && this.game.input.touchMode) {
+      const coopLevel = !!(this.game.coop && this.game.coop.session.state === 'level');
+      this.el.tbPing.classList.toggle('avail', coopLevel);
     }
 
     // місії

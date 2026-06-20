@@ -16,6 +16,8 @@ html, body { height: 100dvh; }
 body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 #game-canvas { position: fixed; inset: 0; display: block; }
 #game-canvas { height: 100dvh; }
+/* палець крутить глобус (pointer events у globe.js) замість прокрутки/зуму браузера */
+#game-canvas { touch-action: none; }
 
 /* ================= ГЛОБУС ================= */
 #globe-ui {
@@ -506,6 +508,8 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
   .tb { width: 44px; height: 44px; font-size: 18px; }
   .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
   #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+  /* кластер опустився на 10px і стиснувся (44 + 5 + 66 = 115) → оптика над ним ≈ 133px */
+  #tb-scope { bottom: calc(133px + env(safe-area-inset-bottom)); }
   body.touch-mode #minimap { width: 84px; height: 84px; }
   /* службовий рядок не повинен залазити під мінімапу (мінімапа: 84px + 8px справа) */
   body.touch-mode #touch-util { right: calc(100px + env(safe-area-inset-right)); }
@@ -736,10 +740,15 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .scope-tick { position: absolute; left: 50%; width: 14px; height: 2px; background: rgba(20, 30, 40, 0.85); transform: translateX(-50%); }
 .scope-t1 { top: calc(50% + 7vh); }
 .scope-t2 { top: calc(50% + 12vh); }
-/* кнопка оптики на мобільному — біля кнопки вогню, лише коли в руках снайперка */
-#tb-scope { position: fixed; right: calc(100px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom)); display: none; pointer-events: auto; }
+/* кнопка оптики на мобільному — НАД бойовим кластером (а не поверх кнопок дій).
+   Кластер: bottom 78px + висота сітки (top-row 50 + gap 6 + fire 76 = 132) + зазор 8 → ~218px. */
+#tb-scope { position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(218px + env(safe-area-inset-bottom)); display: none; pointer-events: auto; }
 #tb-scope.avail { display: block; }
 #tb-scope.on { background: rgba(255, 210, 63, 0.45); border-color: var(--accent); }
+
+/* 📣 тач-кнопка командних пінгів: показуємо ЛИШЕ у кооп-рівні (клас .avail з hud.js) */
+#tb-ping { display: none; }
+#tb-ping.avail { display: block; }
 
 /* вкладки магазину */
 #shop-tabs { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -764,7 +773,9 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 @keyframes rh-spin { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
 #rotate-hint .rh-text { font-size: 24px; font-weight: 900; }
 #rotate-hint .rh-sub { font-size: 15px; color: #9fb8d4; font-weight: 700; }
-@media (orientation: portrait) and (max-width: 620px) {
+/* портрет на телефоні І планшеті (до 1024px) — HUD розрахований на ландшафт,
+   тож просимо повернути пристрій. Ландшафт планшета (ширина > висота) не зачіпається. */
+@media (orientation: portrait) and (max-width: 1024px) {
   body.touch-mode #rotate-hint { display: flex; }
 }
 
