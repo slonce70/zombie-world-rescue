@@ -33,6 +33,8 @@ jobs:
         run: SLOW=4 node test/cloudsave.mjs
       - name: i18n (українська/English/русский)
         run: node test/i18n.mjs
+      - name: Coop damage (шкода зомбі НЕ множиться на гравців)
+        run: node test/coop-damage.mjs
 
   # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі smoke).
   # NON-BLOCKING (continue-on-error): на безкоштовному раннері headless-вкладку гостя так

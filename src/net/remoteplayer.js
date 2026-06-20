@@ -35,7 +35,10 @@ export class RemotePlayer {
     this.skin = info.skin || 'classic';
     this.tracer = info.tracer || 'classic';
 
-    this.rig = makeHero(this.skin, info.hero || null);
+    // кольори кастом-героя приходять від іншого клієнта (untrusted) — клампимо в коректні 24-біт кольори
+    const h = info.hero;
+    const hero = h ? { shirt: (h.shirt | 0) & 0xffffff, pants: (h.pants | 0) & 0xffffff, skin: (h.skin | 0) & 0xffffff } : null;
+    this.rig = makeHero(this.skin, hero);
     level.scene.add(this.rig.group);
 
     // зброя в правій руці (як tpGuns у player.js)
