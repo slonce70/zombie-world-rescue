@@ -1020,3 +1020,11 @@ body.touch-mode #touch-coach.show { display: block; }
 .cloud-status { min-height: 20px; color: #bcd2e2; font-weight: 700; font-size: 14px; margin: 6px 0 2px; }
 .cloud-code { font-size: 30px; font-weight: 900; letter-spacing: 5px; color: #ffd54a; min-width: 150px; }
 #crash-info { max-height: 90px; overflow: hidden; color: #8aa0b5; font-size: 11px; white-space: pre-wrap; text-align: left; margin: 10px 0; }
+
+/* Штаб Рятівника: Мої цифри */
+.hq-h { margin: 14px 0 6px; font-size: 18px; }
+.hq-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.hq-stat { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08); border-radius: 12px; padding: 8px 10px; }
+.hq-stat-i { font-size: 22px; }
+.hq-stat-l { flex: 1; font-size: 13px; opacity: .85; }
+.hq-stat-n { font-weight: 800; font-size: 18px; }

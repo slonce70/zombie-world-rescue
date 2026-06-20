@@ -114,6 +114,19 @@ const statKeys = ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestC
 const allNumeric = statKeys.every(k => typeof sv.stats[k] === 'number');
 check(allNumeric, `всі 6 ключів stats числові після міграції (${statKeys.map(k => k + ':' + (sv.stats && sv.stats[k])).join(', ')})`);
 
+// ============ 🎖️ ШТАБ: рендер секції «Мої цифри» ============
+console.log('▸ Штаб: рендер секції «Мої цифри»');
+await loadCountry('UKR');
+// рендер Штабу показує цифри
+await page.evaluate(() => {
+  const g = window.__game; const p = g.level.player.pos;
+  g.test.spawnZombie('walker', p.x + 5, p.z).damage(9999, null, false);
+  g.hq.render();
+});
+const hqHtml = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/Мої цифри|My Stats|Мои цифры/.test(hqHtml), 'Штаб рендерить секцію «Мої цифри»');
+check(/hq-stat-n/.test(hqHtml), 'Штаб показує картки-цифри');
+
 // підсумок
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));

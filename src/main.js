@@ -22,6 +22,7 @@ import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
+import { RescueHQ } from './ui/hq.js';
 import { submitScore } from './net/league.js';
 import { CloudSave } from './net/cloudsave.js';
 
@@ -136,6 +137,7 @@ class Game {
     this.coop = new CoopUI(this);
     this.league = new LeagueUI(this);
     this.saveui = new SaveUI(this);
+    this.hq = new RescueHQ(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
@@ -227,6 +229,11 @@ class Game {
       this.renderWardrobe();
       this._showOverlay('overlay-wardrobe');
       this.audio.click();
+    });
+    document.getElementById('btn-hq').addEventListener('click', () => {
+      this.audio.click();
+      this.hq.render();
+      this._showOverlay('overlay-hq');
     });
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
