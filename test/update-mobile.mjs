@@ -131,6 +131,35 @@ const extrasRawKeys = await page.evaluate(async () => {
 check(Object.keys(extrasRawKeys).length === 0,
   `жодних сирих клавіш-leak у extras.js (${JSON.stringify(extrasRawKeys)})`);
 
+// ============ 🌍 Task 3: глобус — ☰ меню + список країн ============
+console.log('▸ Mobile: глобус — меню + список країн');
+await page.goto(`${BASE}/?test&fresh&touch`);
+await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'globe', 30000, 'globe');
+
+// (a) є кнопка-гамбургер ☰
+check(await page.evaluate(() => !!document.getElementById('btn-menu')), 'є кнопка меню ☰');
+
+// (b) другорядні кнопки живуть у висувному меню (#overlay-menu), а не над глобусом
+const inDrawer = await page.evaluate(() => {
+  const ids = ['btn-pass', 'btn-quests', 'btn-wardrobe', 'btn-hq', 'btn-league',
+    'btn-quality', 'btn-kid', 'btn-progress', 'btn-lang'];
+  return ids.every((id) => !!document.querySelector(`#overlay-menu #${id}`));
+});
+check(inDrawer, 'усі 9 другорядних кнопок — у висувному меню #overlay-menu');
+
+// (c) список країн існує і має ≥6 елементів
+const nCty = await page.evaluate(() => document.querySelectorAll('#country-list .country-item').length);
+check(nCty >= 6, `список країн має ≥6 країн (${nCty})`);
+
+// (d) тап по доступній країні зі списку запускає рівень (шпигун на startLevel)
+await page.evaluate(() => {
+  window.__startArg = null;
+  window.__game.startLevel = (c) => { window.__startArg = c; };
+  const it = document.querySelector('#country-list .country-item[data-id="UKR"]');
+  if (it) it.click();
+});
+check((await page.evaluate(() => window.__startArg)) === 'UKR', 'тап по доступній країні в списку запускає рівень');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

@@ -12,7 +12,7 @@ import { HUD } from './hud.js';
 import { Shop } from './shop.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
-import { COUNTRIES, CAMPAIGN_ORDER, getBiome } from './countries.js';
+import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
@@ -221,6 +221,11 @@ class Game {
         this.audio.click();
       });
     }
+    // ☰ висувне меню: другорядні кнопки (профіль/налаштування)
+    document.getElementById('btn-menu').addEventListener('click', () => {
+      this.audio.click();
+      this._showOverlay('overlay-menu');
+    });
     document.getElementById('btn-pass').addEventListener('click', () => {
       this.renderPassPanel();
       this._showOverlay('overlay-pass');
@@ -511,10 +516,45 @@ class Game {
     if (c && COUNTRIES[c]) this.startLevel(c);
   }
 
+  // 🌍 Список країн під глобусом: чіпи з прапором/назвою/станом.
+  // Глобус лишається клікабельним — список дублює таргети для тих, кому
+  // важко влучити по країні пальцем. Тап доступної країни → startLevel().
+  renderCountryList() {
+    const box = document.getElementById('country-list');
+    if (!box) return;
+    const lib = this.save.liberated || {};
+    box.innerHTML = '';
+    for (const id of CAMPAIGN_ORDER) {
+      const c = COUNTRIES[id];
+      if (!c) continue;
+      const liberated = !!lib[id];
+      const open = isCountryOpen(lib, id);
+      const playable = liberated || open;
+      const badge = liberated ? '✅' : (open ? '🔴' : '🔒');
+      const item = document.createElement('div');
+      item.className = 'country-item' + (playable ? '' : ' locked');
+      item.dataset.id = id;
+      item.innerHTML = `<span class="ci-flag">${c.flag}</span><span class="ci-name">${c.name}</span><span class="ci-badge">${badge}</span>`;
+      item.addEventListener('click', () => {
+        this.audio.ensure();
+        const nowLib = this.save.liberated || {};
+        if (nowLib[id] || isCountryOpen(nowLib, id)) {
+          this.audio.click();
+          this.startLevel(id);
+        } else {
+          this.audio.denied();
+          this.hud.toast(t('🔒 {n}: спочатку звільни Україну!', { n: c.name }));
+        }
+      });
+      box.appendChild(item);
+    }
+  }
+
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
     if (show) {
+      this.renderCountryList();
       document.getElementById('liberated-count').textContent =
         Object.keys(this.save.liberated).length;
       // бейджі: рівень пасса і незавершені завдання дня
