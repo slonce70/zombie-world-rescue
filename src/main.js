@@ -335,6 +335,7 @@ class Game {
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       missionRuns: {}, kidMode: null, cloudTs: 0,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
+      bestiary: {},
     };
   }
 
@@ -366,6 +367,7 @@ class Game {
         for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo']) {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
         }
+        if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
@@ -982,6 +984,8 @@ class Game {
       // кооп-хост: чужі перемоги зараховуються їхнім господарям (події zd)
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this.save.stats.killed++;
+      const bk = z.golden ? 'golden' : z.type;
+      this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
       if (z.golden) this.save.stats.golden++;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);

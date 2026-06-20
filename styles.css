@@ -1034,3 +1034,10 @@ body.touch-mode #touch-coach.show { display: block; }
 .hq-country.saved { outline: 2px solid #6fe06f; }
 .hq-c-name { font-size: 12px; margin-top: 4px; }
 .hq-c-seals { font-size: 13px; margin-top: 4px; }
+.hq-bestiary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.hq-beast { background: rgba(255,255,255,.07); border-radius: 12px; padding: 10px; text-align: center; }
+.hq-beast.locked { opacity: .4; }
+.hq-beast-i { font-size: 30px; }
+.hq-beast-name { font-weight: 700; font-size: 14px; margin-top: 4px; }
+.hq-beast-desc { font-size: 11px; opacity: .8; margin-top: 2px; }
+.hq-beast-n { font-size: 11px; margin-top: 4px; opacity: .9; }

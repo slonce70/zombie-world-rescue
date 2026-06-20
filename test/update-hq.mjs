@@ -142,6 +142,20 @@ advHtml = await page.evaluate(() => document.getElementById('hq-content').innerH
 const sealCount = (advHtml.match(/hq-country saved/g) || []).length;
 check(sealCount >= 1, `звільнена країна має печать saved (${sealCount})`);
 
+// ============ 📖 ШТАБ: секція «Бестіарій» (картки ворогів) ============
+console.log('▸ Штаб: Бестіарій (картки ворогів)');
+// Бестіарій: добитий тип відкриває картку
+await page.evaluate(() => {
+  const g = window.__game; const p = g.level.player.pos;
+  g.test.spawnZombie('tank', p.x + 5, p.z).damage(99999, null, false);
+  g.hq.render();
+});
+const sv2 = await page.evaluate(() => window.__game.save);
+check((sv2.bestiary.tank || 0) >= 1, `бестіарій рахує tank (${sv2.bestiary.tank})`);
+const bHtml = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/hq-beast/.test(bHtml), 'Штаб показує картки бестіарію');
+check(/Бестіарій|Bestiary|Бестиарий/.test(bHtml), 'є заголовок «Бестіарій X/Y»');
+
 // підсумок
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));
