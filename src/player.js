@@ -472,7 +472,9 @@ export class Player {
 
     // --- анімація і камера ---
     const hSpeed = hSpeed0;
-    this.bobAmp = damp(this.bobAmp, this.onGround ? Math.min(1, hSpeed / 5) : 0, 8, dt);
+    // на самокаті немає кроків — від 1-ї особи гасимо біговий боб (3-тя особа має позу 'ride')
+    const bobTarget = this.riding ? 0 : (this.onGround ? Math.min(1, hSpeed / 5) : 0);
+    this.bobAmp = damp(this.bobAmp, bobTarget, 8, dt);
     this.bobPhase += dt * (4 + hSpeed * 1.15);
     this.gunKick = Math.max(0, this.gunKick - dt * 7);
     this.camShake = Math.max(0, this.camShake - dt * 3);
