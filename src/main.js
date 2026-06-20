@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -119,6 +119,10 @@ class Game {
     this.renderer.shadowMap.autoUpdate = false; // оновлюємо тіні вручну через кадр
     this._shadowFrame = 0;
     this._lowFpsSec = 0;
+    this._highFpsSec = 0;
+    // у режимі «Авто» це рідний (бажаний) масштаб: адаптивка може тимчасово
+    // опуститись нижче, але мусить піднятись назад, коли FPS знову стабільно високий
+    this._autoTargetRatio = this.pixelRatio;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.06;
@@ -454,6 +458,10 @@ class Game {
     if (q === 'fast') this.pixelRatio = 1.0;
     else if (q === 'high') this.pixelRatio = Math.min(devicePixelRatio, 1.75);
     else this.pixelRatio = Math.min(devicePixelRatio, 1.5);
+    // рідний масштаб для авто-відновлення + скидаємо лічильники гістерезису
+    this._autoTargetRatio = this.pixelRatio;
+    this._lowFpsSec = 0;
+    this._highFpsSec = 0;
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(innerWidth, innerHeight);
   }
@@ -644,6 +652,13 @@ class Game {
           return;
         }
         this.audio.click();
+        // повторний тап по вже обраному режимі — згортає список країн назад до режимів
+        if (el.classList.contains('sel') && cRoot.style.display !== 'none') {
+          el.classList.remove('sel');
+          cRoot.style.display = 'none';
+          cRoot.innerHTML = '';
+          return;
+        }
         if (mode === 'campaign') {
           // вибір країни ТУТ (після ГРАТИ), а не на головному екрані
           root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
@@ -870,6 +885,15 @@ class Game {
       // свіжий старт лічильника часу: перший кадр рівня не отримає величезний dt від паузи на завантаження
       this.clock.getDelta();
       this._timeAcc = 0;
+      // адаптивка: кожен рівень стартує з рідного масштабу — коротка просадка на
+      // минулому рівні більше не лишає гру «мильною» весь сеанс (лише в режимі Авто)
+      if ((this.save.quality || 'auto') === 'auto' && this.pixelRatio < this._autoTargetRatio) {
+        this.pixelRatio = this._autoTargetRatio;
+        this.renderer.setPixelRatio(this.pixelRatio);
+        this.renderer.setSize(innerWidth, innerHeight);
+      }
+      this._lowFpsSec = 0;
+      this._highFpsSec = 0;
     } catch (e) {
       // не блокуємо гру назавжди — повертаємось на глобус
       console.error(t('Помилка побудови рівня'), e);
@@ -1730,16 +1754,34 @@ class Game {
         fpsEl.style.display = 'block';
         fpsEl.textContent = this.fps + ' FPS';
       }
-      // адаптивна роздільність: довго < 48 fps → знижуємо рендер-масштаб (лише в режимі Авто)
-      if ((this.save.quality || 'auto') === 'auto' && this.fps < 48 && this.state === 'level') {
-        if (++this._lowFpsSec >= 3 && this.pixelRatio > 1.0) {
-          this.pixelRatio = Math.max(1.0, this.pixelRatio - 0.25);
-          this.renderer.setPixelRatio(this.pixelRatio);
-          this.renderer.setSize(innerWidth, innerHeight);
+      // адаптивна роздільність (лише в режимі Авто, лише в бою): гістерезис, щоб не «пульсувало» —
+      // довго < 48 fps → знижуємо рендер-масштаб; довго > 57 fps → піднімаємо назад до рідного.
+      if ((this.save.quality || 'auto') === 'auto' && this.state === 'level') {
+        if (this.fps < 48) {
+          this._highFpsSec = 0;
+          if (++this._lowFpsSec >= 3 && this.pixelRatio > 1.0) {
+            this.pixelRatio = Math.max(1.0, this.pixelRatio - 0.25);
+            this.renderer.setPixelRatio(this.pixelRatio);
+            this.renderer.setSize(innerWidth, innerHeight);
+            this._lowFpsSec = 0;
+          }
+        } else if (this.fps > 57) {
           this._lowFpsSec = 0;
+          // після короткої просадки відновлюємось, коли FPS стабільно високий
+          if (++this._highFpsSec >= 4 && this.pixelRatio < this._autoTargetRatio) {
+            this.pixelRatio = Math.min(this._autoTargetRatio, this.pixelRatio + 0.25);
+            this.renderer.setPixelRatio(this.pixelRatio);
+            this.renderer.setSize(innerWidth, innerHeight);
+            this._highFpsSec = 0;
+          }
+        } else {
+          // «нейтральна» зона 48–57: не рухаємось, але й не накопичуємо лічильники
+          this._lowFpsSec = 0;
+          this._highFpsSec = 0;
         }
       } else {
         this._lowFpsSec = 0;
+        this._highFpsSec = 0;
       }
     }
     // тіні оновлюємо через кадр — для мультяшного стилю 30 Гц непомітно

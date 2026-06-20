@@ -75,6 +75,10 @@ export class Zombies {
     this._hordePrevAlive = undefined;
     this._p0 = new THREE.Vector3();
     this._p1 = new THREE.Vector3();
+    // 🪦 тривалість трупа: на тачі коротша (1.6с) — менший вторинний CPU-пік
+    // одразу після бою; на десктопі лишаємо 3.0с (видовищніше).
+    const touch = !!(level.game && level.game.input && level.game.input.touchMode);
+    this._corpseTtl = touch ? 1.6 : 3.0;
   }
 
   spawn(type, x, z, opts = {}) {
@@ -598,9 +602,11 @@ export class Zombies {
       // --- мертві ---
       if (z.state === 'dead') {
         z.deadT += dt;
-        updateRig(rig, dt);
+        // оновлюємо повний риг лише поки програється сама die-анімація (~0.85с);
+        // далі поза вже статична — заморожуємо її й не тратимо CPU на риг трупа
+        if (rig.anim.dieT < 1) updateRig(rig, dt);
         if (z.deadT > 1.6) rig.group.position.y -= dt * 0.7;
-        if (z.deadT > 3.0) {
+        if (z.deadT > this._corpseTtl) {
           z.gone = true;
           removeAny = true;
           this.scene.remove(rig.group);
@@ -1061,9 +1067,10 @@ export class Zombies {
       const rig = z.rig;
       if (z.state === 'dead') {
         z.deadT += dt;
-        updateRig(rig, dt);
+        // риг трупа оновлюємо лише поки грає die-анімація — потім поза заморожена
+        if (rig.anim.dieT < 1) updateRig(rig, dt);
         if (z.deadT > 1.6) rig.group.position.y -= dt * 0.7;
-        if (z.deadT > 3.0) {
+        if (z.deadT > this._corpseTtl) {
           z.gone = true;
           removeAny = true;
           this.scene.remove(rig.group);
