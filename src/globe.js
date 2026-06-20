@@ -287,29 +287,39 @@ export class Globe {
   _bindPointer() {
     const canvas = this.game.renderer.domElement;
     let lastX = 0, lastY = 0;
-    canvas.addEventListener('mousedown', (e) => {
+    // Pointer events покривають і мишу, і тач (та перо) одним кодом — без подвійної
+    // обробки від синтетичної миші. touch-action:none на канві (styles.css) глушить
+    // браузерну прокрутку/зум, тож палець реально крутить глобус.
+    canvas.addEventListener('pointerdown', (e) => {
       if (this.game.state !== 'globe') return;
       this.dragging = true;
       this.dragMoved = 0;
+      this._pid = e.pointerId;
       lastX = e.clientX; lastY = e.clientY;
+      if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } }
     });
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('pointermove', (e) => {
       if (this.game.state !== 'globe') return;
-      if (this.dragging) {
+      if (this.dragging && (this._pid == null || e.pointerId === this._pid)) {
         const dx = e.clientX - lastX, dy = e.clientY - lastY;
         this.dragMoved += Math.abs(dx) + Math.abs(dy);
         this.targetRotY += dx * 0.005;
         this.targetRotX = Math.max(-0.7, Math.min(0.7, this.targetRotX + dy * 0.003));
         lastX = e.clientX; lastY = e.clientY;
-      } else {
+      } else if (e.pointerType === 'mouse') {
+        // hover-тултип лише для миші — на тачі нема «наведення»
         this._hover(e);
       }
     });
-    window.addEventListener('mouseup', (e) => {
+    const end = (e) => {
       if (this.game.state !== 'globe' || !this.dragging) return;
+      if (this._pid != null && e.pointerId !== this._pid) return;
       this.dragging = false;
+      this._pid = null;
       if (this.dragMoved < 6) this._click(e);
-    });
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', () => { this.dragging = false; this._pid = null; });
   }
 
   _raycast(e) {

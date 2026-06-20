@@ -54,6 +54,10 @@ export class TouchControls {
     this._bindButton('tb-camera', () => this._press('KeyV'));
     this._bindButton('tb-dance', () => this._press('KeyN'));
     this._bindButton('tb-scope', () => { this.input.touchScope = !this.input.touchScope; });
+    // 📣 командний пінг — лише у кооп-рівні (видимість керує hud.js класом .avail)
+    this._bindButton('tb-ping', () => {
+      if (this.game.coop && this.game.coop.session.state === 'level') this.game.coop.openPingWheel();
+    });
     this._bindButton('tb-gadget', () => this._press('KeyF'));
     this._bindButton('tb-shop', () => {
       if (this.game.state === 'level') this.game.shop.toggle();

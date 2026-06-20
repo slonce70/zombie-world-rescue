@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -144,6 +144,9 @@ class Game {
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
       if (startH2) startH2.textContent = t('👆 ТОРКНИСЬ, ЩОБ ГРАТИ');
+      // підказка глобуса без іконки миші — на тачі крутимо пальцем
+      const globeHint = document.querySelector('.globe-hint');
+      if (globeHint) globeHint.textContent = t('👆 Крути глобус · 🔴 червона країна — тисни і визволяй!');
     }
 
     this.state = 'loading';

@@ -560,6 +560,7 @@ export const EN = {
 "🤝 ГРАТИ РАЗОМ": "🤝 PLAY TOGETHER",
 "🌍 Звільнено країн:": "🌍 Countries freed:",
 "🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!": "🖱️ Spin the globe · 🔴 red country — zombies there, tap to liberate!",
+"👆 Крути глобус · 🔴 червона країна — тисни і визволяй!": "👆 Swipe the globe · 🔴 red country — tap to liberate!",
 "📋 ЗАВДАННЯ": "📋 MISSIONS",
 "🔫 Пістолет": "🔫 Pistol",
 "🧟 Орда:": "🧟 Horde:",
