@@ -170,15 +170,16 @@ export class CloudSave {
   // Правило: якщо хмара має прогрес, записаний ПІЗНІШЕ за наш останній пуш (cloud.ts > save.cloudTs),
   // беремо хмару; інакше пушимо локальний. Так старий пристрій не затирає свіжий прогрес.
   async bootSync() {
-    if (!this.enabled) return;
     const local = this.game.save;
     // F25: щойно імпортований файл має стати найновішим у хмарі — пропускаємо adopt раз і пушимо.
+    // Прапорець споживаємо навіть коли хмара вимкнена, щоб він не «залип» у localStorage.
     if (local._justImported) {
       delete local._justImported;
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(local)); } catch (e) { /* ignore */ }
-      this.push();
+      if (this.enabled) this.push();
       return;
     }
+    if (!this.enabled) return;
     const localHas = saveHasProgress(local);
     const cloud = await this.pull();
     let cloudObj = null;
