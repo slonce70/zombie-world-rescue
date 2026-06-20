@@ -59,6 +59,61 @@ await waitFor(async () => (await page.evaluate(() => window.__game && window.__g
 sv = await save();
 check(sv.stats.killed >= 2, `stats переживає reload (${sv.stats.killed})`);
 
+// ============ 🔥 bestCombo: 3 вбивства підряд ============
+console.log('▸ bestCombo: 3 зомбі підряд');
+await loadCountry('UKR');
+await page.evaluate(() => {
+  const g = window.__game; const p = g.level.player.pos;
+  // скидаємо комбо перед тестом
+  g.level.combo.n = 0; g.level.combo.t = 0; g.level.combo.best = 0;
+  // вбиваємо 3 зомбі без паузи (combo.t скинеться лише через 3.2 с ігрового часу)
+  g.test.spawnZombie('walker', p.x + 5, p.z).damage(9999, null, false);
+  g.test.spawnZombie('walker', p.x + 6, p.z).damage(9999, null, false);
+  g.test.spawnZombie('walker', p.x + 7, p.z).damage(9999, null, false);
+});
+sv = await save();
+check(sv.stats.bestCombo >= 3, `bestCombo ≥ 3 після трьох вбивств підряд (${sv.stats.bestCombo})`);
+
+// ============ 💥 headshots: bus.emit('hitmarker', true) ============
+console.log('▸ headshots: emit hitmarker(crit=true)');
+await loadCountry('UKR');
+const hsBeforeRaw = await page.evaluate(() => window.__game.save.stats.headshots);
+await page.evaluate(() => { window.__game.level.bus.emit('hitmarker', true); });
+sv = await save();
+check(sv.stats.headshots === hsBeforeRaw + 1, `headshots інкрементується через bus.emit('hitmarker', true) (${sv.stats.headshots})`);
+
+// ============ 📦 megaboxes: bus.emit('megaboxOpened') ============
+console.log('▸ megaboxes: emit megaboxOpened');
+const mbBeforeRaw = await page.evaluate(() => window.__game.save.stats.megaboxes);
+await page.evaluate(() => { window.__game.level.bus.emit('megaboxOpened'); });
+sv = await save();
+check(sv.stats.megaboxes === mbBeforeRaw + 1, `megaboxes інкрементується через bus.emit('megaboxOpened') (${sv.stats.megaboxes})`);
+
+// bosses: спавн справжнього боса занадто важкий для headless — перевіряється в браузері.
+
+// ============ 🔄 МІГРАЦІЯ: старий сейв без поля stats ============
+console.log('▸ міграція: старий сейв без stats не кидає помилку');
+// Записуємо старий сейв (без stats) і перезавантажуємо БЕЗ fresh
+await page.evaluate(() => {
+  localStorage.setItem('zr-save-v1', JSON.stringify({
+    coins: 50, weapons: [], liberated: {}, records: {}, upgrades: {}, xp: 0
+  }));
+});
+await page.goto(`${BASE}/?test&country=UKR`);
+await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 30000, 'міграція-reload');
+// перевіряємо: немає оверлею крашу
+const hasCrash = await page.evaluate(() => {
+  const el = document.getElementById('crash') || document.getElementById('error-overlay');
+  return el ? el.style.display !== 'none' && el.offsetParent !== null : false;
+});
+check(!hasCrash, 'старий сейв завантажився без краш-оверлею');
+sv = await save();
+check(sv.stats && typeof sv.stats === 'object', 'stats — об\'єкт після міграції');
+check(sv.stats.killed === 0, `stats.killed дефолт 0 після міграції (${sv.stats && sv.stats.killed})`);
+const statKeys = ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo'];
+const allNumeric = statKeys.every(k => typeof sv.stats[k] === 'number');
+check(allNumeric, `всі 6 ключів stats числові після міграції (${statKeys.map(k => k + ':' + (sv.stats && sv.stats[k])).join(', ')})`);
+
 // підсумок
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));
