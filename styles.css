@@ -395,14 +395,14 @@ body.touch-mode.in-level #touch-ui { display: block; }
   position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(132px + env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto;
 }
 /* компактний HUD у тач-режимі: нічого не накладається */
-body.touch-mode #ammo { right: calc(178px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); }
+body.touch-mode #ammo { right: calc(214px + env(safe-area-inset-right)); bottom: calc(10px + env(safe-area-inset-bottom)); }
 body.touch-mode #health { bottom: calc(14px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left)); }
 body.touch-mode #topright { top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); gap: 4px; }
 body.touch-mode #minimap { width: 116px; height: 116px; }
 /* монети стоять у колонці #topright НАД мінімапою (справа), а не окремим блоком ліворуч —
    так увесь верхній лівий простір вільний для службового рядка, і ніщо не накладається */
 body.touch-mode #coins { padding: 6px 12px; font-size: 17px; }
-body.touch-mode #bossbar { top: 48px; width: min(280px, 34vw); }
+body.touch-mode #bossbar { top: 48px; width: min(240px, 26vw); }
 body.touch-mode #boss-name { font-size: 12px; letter-spacing: 1px; margin-bottom: 3px; }
 body.touch-mode #boss-bar-bg { height: 12px; }
 body.touch-mode #horde-counter { top: 108px; font-size: 14px; padding: 5px 14px; }
