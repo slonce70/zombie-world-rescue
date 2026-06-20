@@ -1307,6 +1307,13 @@ export function attachHeroGear(rig, kind) {
   return [];
 }
 
+// ---------- Палітра кастом-героя (фіксована, нуль вільного тексту) ----------
+export const HERO_PALETTE = {
+  shirt: [0x2f80c3, 0xe14b4b, 0x46b340, 0xf5a623, 0x8e44ad, 0x16a085, 0xec407a, 0x34495e],
+  pants: [0x474f63, 0x2d3436, 0x6b4f3a, 0x2c3e50, 0x7f8c8d, 0x512e5f],
+  skin: [0xffc9a3, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd9b3],
+};
+
 // ---------- Скіни героя ----------
 export const HERO_SKINS = {
   classic: { name: t('Класик'), icon: '🧢', desc: t('Перевірений герой у кепці') },
@@ -1319,6 +1326,7 @@ export const HERO_SKINS = {
   hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
   thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
+  custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
 // ---------- Танці (емоції) ----------
@@ -1342,7 +1350,7 @@ export const TRACERS = {
   royal: { name: t('Королівські'), icon: '👑' },
 };
 
-export function makeHero(skinId = 'classic') {
+export function makeHero(skinId = 'classic', heroColors = null) {
   const builders = {
     classic() {
       const rig = makeHumanoid({
@@ -1625,6 +1633,19 @@ export function makeHero(skinId = 'classic') {
       const capeKnot = box(0.46, 0.06, 0.06, toonMat(0xb03a3a));
       capeKnot.position.set(0, 0.58, 0.05);
       rig.parts.torso.add(capeKnot);
+      return rig;
+    },
+    custom() {
+      const hc = heroColors || {};
+      const rig = makeHumanoid({
+        scale: 1.0,
+        skin: hc.skin || 0xffc9a3, shirt: hc.shirt || 0x2f80c3, pants: hc.pants || 0x474f63,
+        shoes: 0x303642, eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x8a4b3a, brow: -0.08, cast: 'all',
+      });
+      // проста кепка кольору сорочки — щоб кастом не виглядав «голим»
+      const capM = toonMat(hc.shirt || 0x2f80c3);
+      const capTop = sphere(0.275, capM, 16, 10); capTop.position.y = 0.2; capTop.scale.set(1, 0.62, 1);
+      rig.parts.head.add(capTop);
       return rig;
     },
   };

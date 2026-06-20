@@ -18,7 +18,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
+import { HERO_SKINS, DANCES, TRACERS, makeHero } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -325,6 +325,7 @@ class Game {
     // хендли (spawnZombie, god…) не світяться у кожній консолі
     if (this.testMode || ['localhost', '127.0.0.1'].includes(location.hostname)) {
       window.__game = this;
+      window.__makeHeroTest = (skinId, colors) => makeHero(skinId, colors);
     }
     this._boot();
   }
@@ -332,8 +333,9 @@ class Game {
   _newSave() {
     return {
       coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {},
-      xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
+      xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
+      hero: { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 },
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
@@ -361,6 +363,11 @@ class Game {
         out.missionRuns = out.missionRuns || {};
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
+        if (!out.skins.includes('custom')) out.skins.push('custom');
+        if (!out.hero || typeof out.hero !== 'object') out.hero = {};
+        for (const k of ['shirt', 'pants', 'skin']) {
+          if (typeof out.hero[k] !== 'number') out.hero[k] = ({ shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 })[k];
+        }
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
