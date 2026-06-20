@@ -35,6 +35,8 @@ jobs:
         run: node test/i18n.mjs
       - name: Coop damage (шкода зомбі НЕ множиться на гравців)
         run: node test/coop-damage.mjs
+      - name: Coop nick (фільтр лайки в коопних ніках — безпека дітей)
+        run: node test/coop-nick.mjs
 
   # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі smoke).
   # NON-BLOCKING (continue-on-error): на безкоштовному раннері headless-вкладку гостя так
