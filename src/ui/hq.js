@@ -24,7 +24,28 @@ export class RescueHQ {
   render() {
     const root = document.getElementById('hq-content');
     if (!root) return;
-    root.innerHTML = this._goalHtml(this.game.save) + this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._chapterHtml(this.game.save) + this._bestiaryHtml(this.game.save);
+    root.innerHTML = this._goalHtml(this.game.save) + this._difficultyHtml(this.game.save) + this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._chapterHtml(this.game.save) + this._bestiaryHtml(this.game.save);
+    // ⭐ селектор складності: клік по зірці → save.diffStar = N, зберігаємо й перемальовуємо
+    for (const btn of root.querySelectorAll('.hq-star')) {
+      btn.addEventListener('click', () => {
+        const n = parseInt(btn.dataset.star, 10);
+        if (!(n >= 1 && n <= 5)) return;
+        this.game.save.diffStar = n;
+        this.game.saveGame();
+        this.render();
+      });
+    }
+  }
+
+  _difficultyHtml(save) {
+    const cur = save.diffStar || 1;
+    let h = `<h3 class="hq-h">${t('⭐ Складність (для перепроходження)')}</h3><div class="hq-stars">`;
+    for (let n = 1; n <= 5; n++) {
+      h += `<button class="hq-star ${n <= cur ? 'on' : ''}" data-star="${n}">⭐</button>`;
+    }
+    h += '</div>';
+    h += `<div class="hq-star-note">${t('Вище зірка — міцніші вороги й більше монет. Перший прохід і кооп — завжди ★1.')}</div>`;
+    return h;
   }
 
   _goalHtml(save) {

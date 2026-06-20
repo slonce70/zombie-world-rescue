@@ -47,7 +47,17 @@ export class Zombies {
     this.world = level.world;
     this.L = level.world.layout;
     this.rng = new RNG(seed);
-    this.diff = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
+    // ⭐ зірки складності (M7): множник на базову difficulty країни.
+    // ВАЖЛИВО: на ★1 — ідентичність (this.diff === _base), кампанія/e2e не змінюються.
+    const _base = (level.country && level.country.difficulty) || { hp: 1, dmg: 1, counts: 1 };
+    const _star = Math.max(1, Math.min(5, level.diffStar || 1));
+    this.diffStar = _star;
+    // зірка піднімає МІЦНІСТЬ (hp) та ШКОДУ (dmg) зомбі; counts (розмір орди)
+    // лишається базовим — масштабування розміру орди свідомо відкладено
+    // (це чіпає делікатну логіку спавну орди, яка читає country.difficulty.counts напряму).
+    this.diff = _star > 1
+      ? { hp: _base.hp * (1 + 0.6 * (_star - 1)), dmg: _base.dmg * (1 + 0.25 * (_star - 1)), counts: _base.counts }
+      : _base;
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
     this.byNidMap = new Map();
@@ -309,7 +319,9 @@ export class Zombies {
     const style = cfg.style || (cfg.frost ? 'frost' : 'king');
     const b = this.spawn('boss', x, z - 6, { horde: false, style });
     // 🤝 кооп: бос міцніший пропорційно команді (×N гравців)
-    const bossHp = Math.round(cfg.hp * this.coopMul());
+    // ⭐ зірки (M7): бос масштабується м'якше (×0.5/зірка), щоб не став «губкою для куль»; на ★1 — ×1.
+    const _bs = this.diffStar > 1 ? (1 + 0.5 * (this.diffStar - 1)) : 1;
+    const bossHp = Math.round(cfg.hp * this.coopMul() * _bs);
     b.maxHp = bossHp;
     b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
     // 🔁 відновлення боса (після смерті гравця): не повторюємо вже пройдені хвилі призову.

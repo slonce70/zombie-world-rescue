@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -341,6 +341,7 @@ class Game {
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [],
+      diffStar: 1,
     };
   }
 
@@ -382,6 +383,9 @@ class Game {
         if (!out.chapter.p || typeof out.chapter.p !== 'object') out.chapter.p = {};
         if (!Array.isArray(out.medals)) out.medals = [];
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
+        // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
+        if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
+        out.diffStar = Math.round(out.diffStar);
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
@@ -842,6 +846,12 @@ class Game {
       players: null,
       runIndex: coop && coop.spec ? coop.spec.runIndex : undefined,
     };
+    // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
+    // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
+    // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
+    const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
+    const soloReplay = !isStorm && !isArena && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
+    level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
@@ -1123,6 +1133,10 @@ class Game {
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, bannerSub, 4.5);
+    // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
+    if (level.diffStar > 1) {
+      this.hud.toast(t('⭐ Складність {n} — вороги міцніші, монет більше!', { n: level.diffStar }));
+    }
   }
 
   // 🤝 гість: мегабокс на позиції хоста
@@ -1543,6 +1557,16 @@ class Game {
         time: Math.round(s.time), kills: s.kills, deaths: s.deaths,
         combo: this.level.combo.best,
       };
+    }
+    // ⭐ бонус монет за складність: тільки соло-реплей на зірці >1 (★1 — без змін)
+    if (this.level.diffStar > 1) {
+      const baseReward = s.coinsEarned;
+      const bonus = Math.round(baseReward * 0.25 * (this.level.diffStar - 1));
+      if (bonus > 0) {
+        this.save.coins += bonus;
+        s.coinsEarned += bonus;
+        this.hud.toast(t('⭐ Бонус за складність: +{n} монет!', { n: bonus }));
+      }
     }
     this.progress.addXp(XP_VALUES.country);
     this.saveGame();
