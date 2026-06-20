@@ -1133,6 +1133,10 @@ class Game {
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
     this.hud.banner(`${country.flag} ${country.name.toUpperCase()}`, bannerSub, 4.5);
+    // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
+    if (level.diffStar > 1) {
+      this.hud.toast(t('⭐ Складність {n} — вороги міцніші, монет більше!', { n: level.diffStar }));
+    }
   }
 
   // 🤝 гість: мегабокс на позиції хоста
@@ -1553,6 +1557,16 @@ class Game {
         time: Math.round(s.time), kills: s.kills, deaths: s.deaths,
         combo: this.level.combo.best,
       };
+    }
+    // ⭐ бонус монет за складність: тільки соло-реплей на зірці >1 (★1 — без змін)
+    if (this.level.diffStar > 1) {
+      const baseReward = s.coinsEarned;
+      const bonus = Math.round(baseReward * 0.25 * (this.level.diffStar - 1));
+      if (bonus > 0) {
+        this.save.coins += bonus;
+        s.coinsEarned += bonus;
+        this.hud.toast(t('⭐ Бонус за складність: +{n} монет!', { n: bonus }));
+      }
     }
     this.progress.addXp(XP_VALUES.country);
     this.saveGame();

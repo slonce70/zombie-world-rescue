@@ -77,6 +77,14 @@ const validated = await page.evaluate(() => {
 });
 check(validated >= 1 && validated <= 5, `save.diffStar валідується в 1..5 (got ${validated})`);
 
+// ============ ⭐ СЕЛЕКТОР У ШТАБІ ============
+console.log('▸ M7: ★ селектор у Штабі');
+await page.evaluate(() => { window.__game.save.diffStar = 1; window.__game.hq.render(); });
+const stars = await page.evaluate(() => document.querySelectorAll('#hq-content .hq-star').length);
+check(stars === 5, `у Штабі 5 кнопок зірок (${stars})`);
+await page.evaluate(() => { const b = document.querySelector('#hq-content .hq-star[data-star="4"]'); if (b) b.click(); });
+check((await page.evaluate(() => window.__game.save.diffStar)) === 4, 'клік ★4 ставить save.diffStar=4');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {
