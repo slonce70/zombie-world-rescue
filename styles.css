@@ -1049,6 +1049,12 @@ body.touch-mode #touch-coach.show { display: block; }
 .hq-beast-name { font-weight: 700; font-size: 14px; margin-top: 4px; }
 .hq-beast-desc { font-size: 11px; opacity: .8; margin-top: 2px; }
 .hq-beast-n { font-size: 11px; margin-top: 4px; opacity: .9; }
+.hq-chapter { display:flex; flex-direction:column; gap:6px; }
+.hq-step { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.06); border-radius:10px; padding:7px 10px; }
+.hq-step.done { background:rgba(111,224,111,.14); }
+.hq-st-i { font-size:18px; }
+.hq-st-t { font-size:13px; }
+.hq-medal { margin-top:8px; font-weight:800; color:#f5c542; text-align:center; }
 
 /* 🎯 Моя ціль: рядок у шапці магазину + кнопка на картці товару */
 .shop-goal { text-align: center; font-weight: 700; margin: 6px 0; opacity: .95; }
