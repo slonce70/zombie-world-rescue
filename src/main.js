@@ -23,6 +23,7 @@ import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
+import { Chapter } from './chapter.js';
 import { submitScore } from './net/league.js';
 import { CloudSave } from './net/cloudsave.js';
 
@@ -138,6 +139,7 @@ class Game {
     this.league = new LeagueUI(this);
     this.saveui = new SaveUI(this);
     this.hq = new RescueHQ(this);
+    this.chapter = new Chapter(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
       const startH2 = document.querySelector('#overlay-start h2');
@@ -336,6 +338,7 @@ class Game {
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
+      chapter: { p: {}, done: false }, medals: [],
     };
   }
 
@@ -368,6 +371,9 @@ class Game {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
         }
         if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
+        if (!out.chapter || typeof out.chapter !== 'object') out.chapter = { p: {}, done: false };
+        if (!out.chapter.p || typeof out.chapter.p !== 'object') out.chapter.p = {};
+        if (!Array.isArray(out.medals)) out.medals = [];
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
@@ -991,10 +997,12 @@ class Game {
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
       this.quests.onEvent('kill', { weapon: level.player.cur });
+      this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
-      if (z.type === 'boss' && !level.storm) { this.quests.onEvent('boss'); this.save.stats.bosses++; }
+      if (z.type === 'boss' && !level.storm) { this.quests.onEvent('boss'); this.chapter.onEvent('boss'); this.save.stats.bosses++; }
     });
-    level.bus.on('missionDone', () => this.progress.addXp(XP_VALUES.mission));
+    level.bus.on('missionDone', () => { this.progress.addXp(XP_VALUES.mission); this.chapter.onEvent('mission'); });
+    level.bus.on('gadgetUsed', () => this.chapter.onEvent('gadget'));
     level.bus.on('hitmarker', (crit) => { if (crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; } });
     level.bus.on('shieldBroken', () => this.quests.onEvent('shield'));
     level.bus.on('megaboxOpened', () => {
@@ -1063,6 +1071,7 @@ class Game {
     }
 
     this.level = level;
+    if (this.chapter) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
