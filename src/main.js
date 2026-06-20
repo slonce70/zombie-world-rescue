@@ -433,7 +433,7 @@ class Game {
     this.renderer.setSize(innerWidth, innerHeight);
   }
 
-  // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (вмикає авто-вогонь і CSS)
+  // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (м'яка допомога з прицілом + CSS)
   // opts.silent — не показувати тост (при авто-init та вході в рівень)
   _applyKidMode(opts = {}) {
     const on = !!this.save.kidMode;
@@ -443,7 +443,7 @@ class Game {
     if (this.hud) this.hud.setKidChip(on);
     if (!opts.silent) {
       if (this.hud) this.hud.toast(on
-        ? t('🐣 Малюк увімкнено: авто-приціл і авто-вогонь')
+        ? t('🐣 Малюк: допомагає прицілитись — стріляй сам кнопкою 🔫')
         : t('🐣 Малюк вимкнено: цілишся сам'));
     }
   }
