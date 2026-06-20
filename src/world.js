@@ -105,6 +105,10 @@ export class World {
     if (lm.includes('sphinx')) this._lmSphinx(P.sphinx);
     if (lm.includes('oasis')) this._lmOasis(P.oasis);
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
+    if (lm.includes('bullring')) this._lmBullring(P.bullring);
+    if (lm.includes('plazaFountain')) this._lmPlazaFountain(P.plazaFountain);
+    if (lm.includes('oliveGrove')) this._lmOliveGrove(P.oliveGrove);
+    if (lm.includes('cathedral')) this._lmCathedral(P.cathedral);
     if (lm.includes('birds')) this._lmBirds();
   }
 
@@ -797,6 +801,251 @@ export class World {
     }
   }
 
+  // 🐂 Арена-корида (bullring): кругла піщана арена з кам'яною стіною й трибунами.
+  // Усередині б'ється бос-МАТАДОР. На трибуни можна вилізти (видно всю карту!).
+  _lmBullring({ x, z }) {
+    const gy = this.groundH(x, z);
+    const Rin = 18;          // радіус піщаного майданчика
+    const Rwall = 19.4;      // внутрішня кам'яна стіна (барʼєр)
+    const Rstand = 25;       // зовнішнє кільце трибун
+    const sandM = toonMat(0xe0c074);   // золотистий пісок арени
+    const wallM = toonMat(0xdfae6a);   // теракотово-вохриста стіна
+    const stoneM = toonMat(0xcaa878);
+    // піщаний майданчик (кільце-диск, драпується по плато)
+    const sand = new THREE.Mesh(new THREE.CircleGeometry(Rin, 40), sandM);
+    sand.rotation.x = -Math.PI / 2;
+    this._drapeXZGeometry(sand.geometry, x, z, 0.06);
+    sand.position.set(x, 0, z);
+    this.staticGroup.add(sand);
+    // червоно-жовте коло-розмітка в центрі (як справжня корида)
+    const ring1 = new THREE.Mesh(new THREE.RingGeometry(8, 8.6, 32), toonMat(0xd84f4f));
+    ring1.rotation.x = -Math.PI / 2;
+    this._drapeXZGeometry(ring1.geometry, x, z, 0.1);
+    ring1.position.set(x, 0, z);
+    this.staticGroup.add(ring1);
+    // кам'яний барʼєр навколо арени (сегментами, з проходом на півдні для входу)
+    const segs = 40;
+    for (let i = 0; i < segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      // прохід для гравця з боку в'їзду (+z)
+      if (a > Math.PI * 0.42 && a < Math.PI * 0.58) continue;
+      const px = x + Math.cos(a) * Rwall;
+      const pz = z + Math.sin(a) * Rwall;
+      const wy = this.groundH(px, pz);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 0.7), wallM);
+      post.position.set(px, wy + 1.1, pz);
+      post.rotation.y = -a;
+      post.castShadow = true;
+      this.staticGroup.add(post);
+      this._addCollider(px, pz, 1.4, wy + 2.2, 1.2);
+      // червона поручня по верху барʼєра
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.25, 0.85), toonMat(0xc0392b));
+      cap.position.set(px, wy + 2.35, pz);
+      cap.rotation.y = -a;
+      this.staticGroup.add(cap);
+    }
+    // трибуни: 3 яруси кам'яних сходинок-кілець навколо (можна стояти)
+    for (let tier = 0; tier < 3; tier++) {
+      const rr = Rwall + 1.4 + tier * 2.0;
+      const th = 1.4 + tier * 1.3;
+      const benchN = 36;
+      for (let i = 0; i < benchN; i++) {
+        const a = (i / benchN) * Math.PI * 2;
+        if (a > Math.PI * 0.42 && a < Math.PI * 0.58) continue; // прохід-тунель
+        const px = x + Math.cos(a) * rr;
+        const pz = z + Math.sin(a) * rr;
+        const py = this.groundH(px, pz);
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(2.6, th, 2.0), tier % 2 ? stoneM : wallM);
+        bench.position.set(px, py + th / 2, pz);
+        bench.rotation.y = -a;
+        this.staticGroup.add(bench);
+      }
+      // верхній ярус — поверхня, на якій стоять (кільце «підлог»)
+      if (tier === 2) {
+        const fN = 18;
+        for (let i = 0; i < fN; i++) {
+          const a = (i / fN) * Math.PI * 2;
+          if (a > Math.PI * 0.4 && a < Math.PI * 0.6) continue;
+          const px = x + Math.cos(a) * rr;
+          const pz = z + Math.sin(a) * rr;
+          this.floors.push({ x: px, z: pz, ry: -a, w: 2.6, d: 2.0, top: this.groundH(px, pz) + th });
+        }
+      }
+    }
+    // святкові прапорці навколо арени (червоно-жовті — кольори Іспанії)
+    const flagCols = [0xd84f4f, 0xffd23f];
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const px = x + Math.cos(a) * (Rstand + 1.5);
+      const pz = z + Math.sin(a) * (Rstand + 1.5);
+      const py = this.groundH(px, pz);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.0, 6), stoneM);
+      pole.position.set(px, py + 2.0, pz);
+      this.staticGroup.add(pole);
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.05), toonMat(flagCols[i % 2]));
+      flag.position.set(px + Math.cos(a) * 0.5, py + 3.7, pz + Math.sin(a) * 0.5);
+      flag.rotation.y = -a;
+      this.staticGroup.add(flag);
+    }
+    // лут на трибунах — нагорода за вилазку
+    this.lootSpots.push({ x: x, z: z + Rwall + 5.0, y: gy + 4.0, type: 'coins' });
+    this.lootSpots.push({ x: x - 4, z: z - Rwall - 5.0, y: gy + 4.0, type: 'grenade' });
+    this._makeSign(x + 10, z + Rstand, t('🐂 АРЕНА КОРИДИ'), -0.5);
+  }
+
+  // ⛲ Площа з фонтаном: восьмикутна кам'яна чаша з водою у центрі села
+  _lmPlazaFountain({ x, z }) {
+    const gy = this.groundH(x, z);
+    const stoneM = toonMat(0xcabfa4);
+    const trimM = toonMat(0xb0a080);
+    // нижня чаша
+    const basinO = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.9, 8), stoneM);
+    basinO.position.set(x, gy + 0.45, z);
+    basinO.castShadow = true;
+    this.staticGroup.add(basinO);
+    this._addCollider(x, z, 2.9, gy + 1.0, 0.8);
+    // вода в чаші
+    const waterM = new THREE.MeshToonMaterial({
+      color: 0x49b8e8, transparent: true, opacity: 0.8,
+      gradientMap: toonMat(0).gradientMap, polygonOffset: true, polygonOffsetFactor: -3,
+    });
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 0.2, 8), waterM);
+    water.position.set(x, gy + 0.9, z);
+    this.scene.add(water);
+    // центральна колона
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 2.0, 8), trimM);
+    col.position.set(x, gy + 1.9, z);
+    col.castShadow = true;
+    this.staticGroup.add(col);
+    // верхня менша чаша
+    const basinT = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.7, 0.4, 8), stoneM);
+    basinT.position.set(x, gy + 2.9, z);
+    this.staticGroup.add(basinT);
+    // струмінь-маківка
+    const jet = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), waterM);
+    jet.position.set(x, gy + 3.3, z);
+    this.scene.add(jet);
+    this.fountain = { jet, base: gy + 3.3, t: 0 };
+    // декоративні горщики з помаранчевими деревцями навколо площі
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.78;
+      const px = x + Math.cos(a) * 5.5;
+      const pz = z + Math.sin(a) * 5.5;
+      const py = this.groundH(px, pz);
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.6, 8), toonMat(0xc0563b));
+      pot.position.set(px, py + 0.3, pz);
+      const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), toonMat(0x57a83e));
+      foliage.position.set(px, py + 1.3, pz);
+      foliage.castShadow = true;
+      this.staticGroup.add(pot, foliage);
+      // помаранчі
+      for (let o = 0; o < 3; o++) {
+        const orange = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), toonMat(0xff8c1a));
+        orange.position.set(px + this.rng.range(-0.4, 0.4), py + 1.3 + this.rng.range(-0.3, 0.3), pz + this.rng.range(-0.4, 0.4));
+        this.staticGroup.add(orange);
+      }
+      this._addCollider(px, pz, 0.5, py + 0.6, 0);
+    }
+  }
+
+  // 🫒 Оливковий гай: рівні ряди оливкових дерев зі срібно-зеленим листям
+  _lmOliveGrove({ x, z, w, d }) {
+    const trunkM = toonMat(0x6e5a44);
+    const leafM = toonMat(0x8aa86a);   // приглушена срібляста зелень оливи
+    const olivePts = [];
+    for (let gx = -w / 2; gx <= w / 2; gx += 6) {
+      for (let gz = -d / 2; gz <= d / 2; gz += 6) {
+        const px = x + gx + this.rng.range(-0.6, 0.6);
+        const pz = z + gz + this.rng.range(-0.6, 0.6);
+        if (this.roadDist(px, pz) < 4) continue;
+        const py = this.groundH(px, pz);
+        // кривий стовбур
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 1.4, 6), trunkM);
+        trunk.position.set(px, py + 0.7, pz);
+        trunk.rotation.z = this.rng.range(-0.12, 0.12);
+        trunk.castShadow = true;
+        this.staticGroup.add(trunk);
+        // округла крона з кількох куль
+        for (let c = 0; c < 3; c++) {
+          const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(this.rng.range(0.7, 1.0), 0), leafM);
+          crown.position.set(px + this.rng.range(-0.5, 0.5), py + 1.6 + this.rng.range(-0.1, 0.4), pz + this.rng.range(-0.5, 0.5));
+          crown.castShadow = true;
+          this.staticGroup.add(crown);
+        }
+        this._addCollider(px, pz, 0.5, py + 1.6, 0.3);
+        olivePts.push([px, pz]);
+      }
+    }
+    // купка оливок у кошику — смаколик
+    if (olivePts.length) {
+      const [bx, bz] = olivePts[Math.floor(olivePts.length / 2)];
+      this.lootSpots.push({ x: bx + 1.4, z: bz, y: this.groundH(bx, bz) + 0.05, type: 'food' });
+    }
+  }
+
+  // ⛪ Собор: біла церква з куполом, дзвіницею і батутом на вершину
+  _lmCathedral({ x, z }) {
+    const gy = this.groundH(x, z);
+    const wallM = toonMat(0xf2ead8);
+    const trimM = toonMat(0xe2c044);
+    const roofM = toonMat(0xc0563b);
+    // головна нава
+    const nave = new THREE.Mesh(new THREE.BoxGeometry(7, 7, 10), wallM);
+    nave.position.set(x, gy + 3.5, z);
+    nave.castShadow = true;
+    this.staticGroup.add(nave);
+    this._addCollider(x, z, 4.2, gy + 7, 3.6);
+    // двосхилий дах нави
+    const naveRoof = new THREE.Mesh(this._prismGeo(7.4, 2.0, 10.2), roofM);
+    naveRoof.position.set(x, gy + 8.0, z);
+    naveRoof.castShadow = true;
+    this.staticGroup.add(naveRoof);
+    // великий купол
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), toonMat(0xd9b34a, 0x8a6a2a, 0.15));
+    dome.position.set(x, gy + 9.0, z + 2.5);
+    dome.castShadow = true;
+    this.staticGroup.add(dome);
+    // дзвіниця-вежа збоку
+    const tx = x - 4.6;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(3.2, 12, 3.2), wallM);
+    tower.position.set(tx, gy + 6, z - 3);
+    tower.castShadow = true;
+    this.staticGroup.add(tower);
+    this._addCollider(tx, z - 3, 2.0, gy + 12, 1.8);
+    // дзвонова камера (арки)
+    for (const side of [-1, 1]) {
+      const arch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.0, 0.3), toonMat(0x46506b));
+      arch.position.set(tx + side * 1.1, gy + 10, z - 3 - 1.65);
+      this.staticGroup.add(arch);
+    }
+    // дзвін
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 0.7, 8), trimM);
+    bell.position.set(tx, gy + 10, z - 3);
+    this.staticGroup.add(bell);
+    // дах-піраміда дзвіниці + хрест
+    const towerRoof = new THREE.Mesh(new THREE.ConeGeometry(2.4, 2.6, 4), roofM);
+    towerRoof.position.set(tx, gy + 13.3, z - 3);
+    towerRoof.rotation.y = Math.PI / 4;
+    towerRoof.castShadow = true;
+    this.staticGroup.add(towerRoof);
+    const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), trimM);
+    crossV.position.set(tx, gy + 15.2, z - 3);
+    const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.12), trimM);
+    crossH.position.set(tx, gy + 15.3, z - 3);
+    this.staticGroup.add(crossV, crossH);
+    // велике кругле вітражне вікно (роза)
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(1.5, 16), toonMat(0x6fc3ff, 0x2288cc, 0.4));
+    rose.position.set(x, gy + 4.5, z - 5.05);
+    this.staticGroup.add(rose);
+    // двері
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3.0, 0.2), toonMat(0x6b4226));
+    door.position.set(x, gy + 1.5, z - 5.05);
+    this.staticGroup.add(door);
+    // дах нави — пласка ділянка, куди підкине батут (лут нагорі)
+    this.floors.push({ x, z, ry: 0, w: 6.8, d: 9.8, top: gy + 7.0 });
+    this.lootSpots.push({ x, z, y: gy + 7.1, type: 'coins' });
+    this._makeSign(x + 6, z - 4, t('СОБОР СВЯТОЇ КОРИДИ'), 0.4);
+  }
 
   // 🛍 Великий базар: критий ринок з арками, килимами і лампами (лут усередині!)
   _lmGrandBazaar({ x, z }) {
@@ -3216,6 +3465,14 @@ export class World {
         pos.setY(i, by + Math.sin(this.pond.t * 1.7 + bx * 0.55 + bz * 0.4) * 0.16);
       }
       pos.needsUpdate = true;
+    }
+    // ⛲ фонтан на площі: струмінь-маківка пульсує вгору-вниз
+    if (this.fountain) {
+      this.fountain.t += dt;
+      const j = this.fountain.jet;
+      j.position.y = this.fountain.base + Math.abs(Math.sin(this.fountain.t * 3.2)) * 0.45;
+      const s = 0.85 + Math.sin(this.fountain.t * 4.0) * 0.18;
+      j.scale.set(s, 1.1 + (1 - s) * 1.5, s);
     }
     // дим з димарів
     if (this.smokeMesh) {

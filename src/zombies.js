@@ -38,6 +38,8 @@ const TYPE_STATS = {
   },
   // 🧻 мумія: повільна, але жилава і боляче хапає; вночі особливо моторошна
   mummy: { hp: 160, speed: 1.0, chaseSpeed: 2.3, aggro: 26, dmg: 18, attackR: 2.0, coins: 18, pitch: 0.6 },
+  // 🐂 торо: зомбі-бичок Іспанії. Середній hp, швидкий; здаля РОЗГАНЯЄТЬСЯ й б'є рогами (charge)
+  toro: { hp: 130, speed: 1.6, chaseSpeed: 4.2, aggro: 30, dmg: 14, attackR: 2.1, coins: 16, pitch: 0.7, charger: true },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -48,6 +50,8 @@ const BAGUETTE_RANGED = { min: 8, max: 38, hold: 0, cd: 3.6, projSpeed: 19, dmg:
 const KEBAB_RANGED = { min: 8, max: 40, hold: 0, cd: 3.2, projSpeed: 23, dmg: 17, size: 0.3, color: 0xb4543a };
 // 🪲 Фараон насилає золотих скарабеїв
 const SCARAB_RANGED = { min: 7, max: 42, hold: 0, cd: 2.8, projSpeed: 17, dmg: 19, size: 0.34, color: 0xd4af37 };
+// 🗡️ Матадор-зомбі жбурляє бандерильї (червоно-золоті дротики)
+const BANDERILLA_RANGED = { min: 8, max: 40, hold: 0, cd: 3.0, projSpeed: 24, dmg: 18, size: 0.3, color: 0xc62828, stretch: true };
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -128,8 +132,9 @@ export class Zombies {
       groanT: this.rng.range(2, 9),
       groupId: opts.groupId ?? -1,
       gone: false,
-      // бос
-      chargeCd: 4, charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
+      // бос + 🐂 торо (charger): телеграф-ривок-удар рогами
+      chargeCd: this.rng.range(2.5, 5), charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
+      charger: !!stats.charger,
       summonedAt: { 75: false, 50: false, 25: false },
       frost: bossStyle === 'frost',
       bossStyle: type === 'boss' ? bossStyle : null,
@@ -139,7 +144,8 @@ export class Zombies {
         || (type === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
         || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null)
         || (type === 'boss' && bossStyle === 'sultan' ? KEBAB_RANGED : null)
-        || (type === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null),
+        || (type === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null)
+        || (type === 'boss' && bossStyle === 'matador' ? BANDERILLA_RANGED : null),
       rangedCd: this.rng.range(0.5, 2.5),
       throwProj: false,
       // 🛡 щит
@@ -809,6 +815,47 @@ export class Zombies {
         }
       }
 
+      // --- 🐂 торо (charger, не-бос): телеграф → ривок рогами здаля ---
+      if (z.charger && z.type !== 'boss' && z.state !== 'dead' && z.aggroed) {
+        z.chargeCd -= dt;
+        if (z.telegraph > 0) {
+          z.telegraph -= dt;
+          if (z.telegraph <= 0) {
+            z.charging = 0.8;
+            const d = Math.max(0.5, distP);
+            z.chargeDX = dxP / d;
+            z.chargeDZ = dzP / d;
+            z.didHit = false;
+            level.audio.shriek(0.5, st.pitch * 0.9);
+          }
+        } else if (z.charging > 0) {
+          z.charging -= dt;
+          const cs = 13;
+          z.x += z.chargeDX * cs * dt;
+          z.z += z.chargeDZ * cs * dt;
+          if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.3 && !z.didHit) {
+            z.didHit = true;
+            this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z);
+            level.audio.slam();
+          }
+          if (z.charging <= 0) {
+            z.didHit = false;
+            z.chargeCd = this.rng.range(3.5, 6);
+          }
+        } else if (z.chargeCd <= 0 && z.state === 'chase' && distP > 6 && distP < 26) {
+          // телеграф ривка лише з прямою видимістю — не крізь стіни
+          this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
+          this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
+          if (this.world.shotBlockDist(this._p0, this._p1, distP) > distP - 0.5) {
+            z.telegraph = 0.7;
+            z.didHit = false;
+            level.audio.zgroan(0.7, st.pitch);
+          } else {
+            z.chargeCd = 0.8;
+          }
+        }
+      }
+
       // --- бос: чардж і призов ---
       if (z.type === 'boss' && z.state !== 'dead') {
         const frac = (z.hp / z.maxHp) * 100;
@@ -825,7 +872,8 @@ export class Zombies {
                   : st === 'chef' ? (i % 2 ? 'spitter' : 'walker')
                     : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
                       : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
-                        : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                        : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
+                          : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
                 { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;
