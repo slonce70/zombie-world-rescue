@@ -18,7 +18,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS } from './characters.js';
+import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, makeHero } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -325,6 +325,7 @@ class Game {
     // хендли (spawnZombie, god…) не світяться у кожній консолі
     if (this.testMode || ['localhost', '127.0.0.1'].includes(location.hostname)) {
       window.__game = this;
+      window.__makeHeroTest = (skinId, colors) => makeHero(skinId, colors);
     }
     this._boot();
   }
@@ -332,8 +333,9 @@ class Game {
   _newSave() {
     return {
       coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {},
-      xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
+      xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
+      hero: { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 },
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
@@ -361,6 +363,11 @@ class Game {
         out.missionRuns = out.missionRuns || {};
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
+        if (!out.skins.includes('custom')) out.skins.push('custom');
+        if (!out.hero || typeof out.hero !== 'object') out.hero = {};
+        for (const k of ['shirt', 'pants', 'skin']) {
+          if (typeof out.hero[k] !== 'number') out.hero[k] = ({ shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 })[k];
+        }
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
@@ -628,7 +635,21 @@ class Game {
     for (const [id, meta] of Object.entries(HERO_SKINS)) {
       html += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
     }
-    html += t('</div><div class="ward-section">Танці (N)</div><div class="ward-grid">');
+    html += '</div>';
+    if (save.activeSkin === 'custom') {
+      const slotLabel = { shirt: t('Сорочка'), pants: t('Штани'), skin: t('Шкіра') };
+      html += t('<div class="ward-section">🎨 Мої кольори</div>');
+      for (const slot of ['shirt', 'pants', 'skin']) {
+        html += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
+        for (const hex of HERO_PALETTE[slot]) {
+          const on = save.hero[slot] === hex ? ' on' : '';
+          const css = '#' + hex.toString(16).padStart(6, '0');
+          html += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hex}" style="background:${css}"></button>`;
+        }
+        html += '</div>';
+      }
+    }
+    html += t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
       html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
     }
@@ -656,6 +677,16 @@ class Game {
         }
         this.saveGame();
         this.audio.purchase();
+        this.renderWardrobe();
+      });
+    });
+    root.querySelectorAll('.hero-swatch').forEach((el) => {
+      el.addEventListener('click', () => {
+        const { slot, hex } = el.dataset;
+        save.hero[slot] = parseInt(hex, 10);
+        this.saveGame();
+        this.audio.purchase();
+        // Кольори застосуються на герої з наступним рівнем (на глобусі live-героя немає).
         this.renderWardrobe();
       });
     });

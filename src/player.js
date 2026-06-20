@@ -72,7 +72,7 @@ export class Player {
     this.firstPerson = true;
 
     // герой для виду від 3-ї особи (з обраним скіном)
-    this.rig = makeHero((level.game && level.game.save.activeSkin) || 'classic');
+    this.rig = makeHero((level.game && level.game.save.activeSkin) || 'classic', level.game && level.game.save.hero);
     scene.add(this.rig.group);
     this.tpGuns = {};
     for (const w of WEAPON_SLOTS) {
