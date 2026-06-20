@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -600,6 +600,8 @@ class Game {
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
+    // ховаємо тултип країни при виході з глобуса, щоб «звільнено…» не лишався над рівнем
+    if (!show) { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; }
     if (show) {
       document.getElementById('liberated-count').textContent =
         Object.keys(this.save.liberated).length;

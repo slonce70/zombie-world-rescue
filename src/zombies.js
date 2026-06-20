@@ -873,7 +873,14 @@ export class Zombies {
             if (!ok(z.x + mx, z.z + mz)) {
               if (ok(z.x + mx, z.z)) mz = 0;
               else if (ok(z.x, z.z + mz)) mx = 0;
-              else { mx = 0; mz = 0; }
+              else {
+                // обидві осі впираються в крутий схил: ковзаємо вздовж нього (дотичний крок),
+                // а не завмираємо намертво — інакше зомбі «застрягає» біля нерівностей
+                const px = -mz, pz = mx;
+                if (ok(z.x + px, z.z + pz)) { mx = px; mz = pz; }
+                else if (ok(z.x - px, z.z - pz)) { mx = -px; mz = -pz; }
+                else { mx = 0; mz = 0; }
+              }
             }
           }
           z.x += mx;
