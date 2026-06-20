@@ -45,20 +45,20 @@ const shieldFront = await page.evaluate(() => {
   const dir = { x: dx / d, y: 0, z: dz / d };
   z.rig.group.rotation.y = Math.atan2(dx, dz); // дивиться на гравця (фронт -Z → atan2(-(-dx), -(-dz)))
   const before = { shield: z.shieldHp, hp: z.hp };
-  z.damage(100, dir, false); // 500-100 = 400 (80%) — без тріщин
+  z.damage(50, dir, false); // 250-50 = 200 (80%) — без тріщин
   const after100 = { shield: z.shieldHp, hp: z.hp, cracks1: z.shieldObj.cracks1.visible, cracks2: z.shieldObj.cracks2.visible };
-  z.damage(150, dir, false); // 250 (50%) → стадії 1 і 2
+  z.damage(90, dir, false); // 110 (44%) → стадії 1 і 2
   const after250 = { shield: z.shieldHp, hp: z.hp, cracks1: z.shieldObj.cracks1.visible, cracks2: z.shieldObj.cracks2.visible };
-  z.damage(260, dir, false); // щит ламається
+  z.damage(120, dir, false); // щит ламається
   const broken = { shield: z.shieldHp, hp: z.hp, objGone: !z.shieldObj, state: z.state };
   z.damage(25, dir, false); // тепер тіло (20 HP) — смерть
   return { before, after100, after250, broken, dead: z.state === 'dead', maxHp: z.maxHp };
 });
-check(shieldFront.before.shield === 500, `щит має 500 міцності (${shieldFront.before.shield})`);
+check(shieldFront.before.shield === 250, `щит має 250 міцності (${shieldFront.before.shield})`);
 check(shieldFront.maxHp === 20, `тіло має 20 HP (${shieldFront.maxHp})`);
-check(shieldFront.after100.shield === 400 && shieldFront.after100.hp === 20, `фронтальний постріл б'є щит, не тіло (щит 400: ${shieldFront.after100.shield}, HP: ${shieldFront.after100.hp})`);
-check(!shieldFront.after100.cracks1, 'при 400/500 тріщин ще нема');
-check(shieldFront.after250.cracks1 && shieldFront.after250.cracks2, `при 250/500 видно дві стадії тріщин (${shieldFront.after250.cracks1}, ${shieldFront.after250.cracks2})`);
+check(shieldFront.after100.shield === 200 && shieldFront.after100.hp === 20, `фронтальний постріл б'є щит, не тіло (щит 200: ${shieldFront.after100.shield}, HP: ${shieldFront.after100.hp})`);
+check(!shieldFront.after100.cracks1, 'при 200/250 тріщин ще нема');
+check(shieldFront.after250.cracks1 && shieldFront.after250.cracks2, `при 110/250 видно дві стадії тріщин (${shieldFront.after250.cracks1}, ${shieldFront.after250.cracks2})`);
 check(shieldFront.broken.shield === 0 && shieldFront.broken.objGone, 'щит зламано і знято з зомбі');
 check(shieldFront.broken.hp === 20 && shieldFront.broken.state !== 'dead', 'після зламу щита тіло ще ціле');
 check(shieldFront.dead, 'без щита 25 шкоди вбивають (20 HP)');
@@ -76,7 +76,7 @@ const shieldRear = await page.evaluate(() => {
   z.damage(25, dir, false);
   return { shield: z.shieldHp, dead: z.state === 'dead' };
 });
-check(shieldRear.shield === 500 && shieldRear.dead, `постріл у спину минає щит і вбиває (щит ${shieldRear.shield})`);
+check(shieldRear.shield === 250 && shieldRear.dead, `постріл у спину минає щит і вбиває (щит ${shieldRear.shield})`);
 
 // вибух приймає щит
 const shieldBoom = await page.evaluate(() => {
@@ -88,7 +88,7 @@ const shieldBoom = await page.evaluate(() => {
   z.damage(80, null, false); // null dir = вибух
   return { before, after: z.shieldHp, hp: z.hp };
 });
-check(shieldBoom.after === 420 && shieldBoom.hp === 20, `вибух б'є у щит (500→${shieldBoom.after}), тіло ціле`);
+check(shieldBoom.after === 170 && shieldBoom.hp === 20, `вибух б'є у щит (250→${shieldBoom.after}), тіло ціле`);
 await page.screenshot({ path: 'shots/u3-shield-zombie.png' });
 
 // ============ 🪂 АЕРОДРОП З БАЗУКОЮ ============

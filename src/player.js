@@ -9,8 +9,8 @@ export const WEAPONS = {
   rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, infinite: false, reserve: 120, cap: 240 },
   shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, infinite: false, pellets: 7, reserve: 24, cap: 60 },
   smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, infinite: false, reserve: 160, cap: 320 },
-  magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 18, cap: 48 },
-  sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 10, cap: 30 },
+  magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 36, cap: 90 },
+  sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
 };
 export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
@@ -182,8 +182,10 @@ export class Player {
   }
 
   addAmmo(n) {
-    // патрони для всієї вогнепальної зброї пропорційно (ракети — окремо)
-    const ratio = { rifle: 1, smg: 1.4, shotgun: 1 / 7.5, magnum: 1 / 6, sniper: 1 / 10 };
+    // патрони для всієї вогнепальної зброї пропорційно (ракети — окремо).
+    // магнум/снайперка поповнюються щедріше (1/3, 1/4 замість 1/6, 1/10) —
+    // потужні, але тепер ними реально можна гратись, а не «стріляти крихтами».
+    const ratio = { rifle: 1, smg: 1.4, shotgun: 1 / 7.5, magnum: 1 / 3, sniper: 1 / 4 };
     for (const [w, k] of Object.entries(ratio)) {
       this.ammo[w].reserve = Math.min(WEAPONS[w].cap, this.ammo[w].reserve + Math.ceil(n * k));
     }

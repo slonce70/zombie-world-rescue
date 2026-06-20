@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1088,6 +1088,9 @@ class Game {
       }
       const pd = Math.hypot(level.player.pos.x - x, level.player.pos.z - z);
       if (pd < r + 3) level.player.camShake = Math.max(level.player.camShake, 1.2);
+      // 🚀 F10: вибух (своя ракета/бочка/граната) НЕ ранить гравця — лише струшує камеру.
+      // Разом зі зведенням ракети (~3 м, див. effects.js) дитина не підриває себе
+      // пострілом у натовп упритул. Шкода по ворогах (вище) лишається повною.
     };
     // сніжки сніговиків
     level.effects.onProjectileHit = (dmg, x, z) => {

@@ -504,7 +504,7 @@ export const EN = {
 "Введи код кімнати з 4 літер": "Enter the 4-letter room code",
 "⏳ Заходимо…": "⏳ Joining…",
 "🚪 ЗАЙТИ": "🚪 JOIN",
-"Сервер кооперативу ще не налаштовано — потрібно задеплоїти worker/ і вписати адресу в src/net/transport.js (див. README)": "Co-op server is not set up yet — deploy worker/ and put its address in src/net/transport.js (see README)",
+"🤝 Гра разом поки недоступна": "🤝 Playing together isn't available yet",
 "Кімнати з таким кодом немає 🤔 Перевір код!": "No room with that code 🤔 Check it!",
 "Кімната вже повна (4 гравці) 😅": "The room is full (4 players) 😅",
 "Спробуй ще раз — код зайнятий": "Try again — that code is taken",
