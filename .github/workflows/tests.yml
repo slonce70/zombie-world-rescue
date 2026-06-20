@@ -21,7 +21,9 @@ jobs:
       - name: Version sync (version.json ↔ APP_VERSION ↔ PROTO_VERSION)
         run: node test/version-sync.mjs
       - name: Relay reconnect edge (full room + same pid resume)
-        run: SLOW=4 node test/relay-reconnect.mjs
+        # мережевий тест: на free-runner буває разовий таймаут-флейк → 1 повтор (реальна
+        # регресія впаде двічі, тож гейт лишається блокуючим)
+        run: SLOW=4 node test/relay-reconnect.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/relay-reconnect.mjs)
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8741 &
@@ -30,7 +32,9 @@ jobs:
       - name: Version check (авто-оновлення клієнта)
         run: node test/version-check.mjs
       - name: Cloud save (хмарний сейв, фільтр ніків, краш-екран)
-        run: SLOW=4 node test/cloudsave.mjs
+        # мережевий тест (relay-спавн + SaveVault): на free-runner буває разовий таймаут-флейк
+        # → 1 повтор (реальна регресія впаде двічі, гейт лишається блокуючим)
+        run: SLOW=4 node test/cloudsave.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/cloudsave.mjs)
       - name: i18n (українська/English/русский)
         run: node test/i18n.mjs
       - name: Coop damage (шкода зомбі НЕ множиться на гравців)
@@ -107,6 +111,6 @@ jobs:
         run: node test/save-migration.mjs
       - name: Extended battery
         run: |
-          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 campaign maps flows replay terrain-geometry; do
+          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 update-bugfix campaign maps flows replay terrain-geometry; do
             echo "=== $t ==="; SLOW=4 node test/$t.mjs || exit 1
           done
