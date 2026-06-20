@@ -509,7 +509,7 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
   .tb.tb-big { width: 66px; height: 66px; font-size: 28px; }
   #touch-right { grid-template-columns: repeat(3, 44px); gap: 5px; bottom: calc(10px + env(safe-area-inset-bottom)); }
   /* кластер опустився на 10px і стиснувся (44 + 5 + 66 = 115) → оптика над ним ≈ 133px */
-  #tb-scope { bottom: calc(133px + env(safe-area-inset-bottom)); }
+  #tb-scope { bottom: calc(182px + env(safe-area-inset-bottom)); }
   body.touch-mode #minimap { width: 84px; height: 84px; }
   /* службовий рядок не повинен залазити під мінімапу (мінімапа: 84px + 8px справа) */
   body.touch-mode #touch-util { right: calc(100px + env(safe-area-inset-right)); }
@@ -742,7 +742,7 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .scope-t2 { top: calc(50% + 12vh); }
 /* кнопка оптики на мобільному — НАД бойовим кластером (а не поверх кнопок дій).
    Кластер: bottom 78px + висота сітки (top-row 50 + gap 6 + fire 76 = 132) + зазор 8 → ~218px. */
-#tb-scope { position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(218px + env(safe-area-inset-bottom)); display: none; pointer-events: auto; }
+#tb-scope { position: fixed; right: calc(10px + env(safe-area-inset-right)); bottom: calc(276px + env(safe-area-inset-bottom)); display: none; pointer-events: auto; }
 #tb-scope.avail { display: block; }
 #tb-scope.on { background: rgba(255, 210, 63, 0.45); border-color: var(--accent); }
 

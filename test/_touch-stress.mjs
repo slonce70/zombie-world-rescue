@@ -16,6 +16,7 @@ for (const [name, w, h] of [['iphone', 844, 390], ['small', 740, 360], ['tablet'
     // ВСЕ одразу: снайперка, бафи, броня, гаджет, комбо, орда, бос
     g.test.giveWeapon('sniper');
     p.switchWeapon('sniper');
+    document.getElementById('tb-scope').classList.add('avail'); // примусово показуємо оптику, щоб тест реально перевіряв її позицію
     for (const k of Object.keys(p.buffs)) p.buffs[k] = 99;
     p.armor = 50;
     g.test.unlockGadget('shield');
