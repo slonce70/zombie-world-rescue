@@ -45,6 +45,53 @@ await page.waitForTimeout(1500);
 const shotsAfter = await page.evaluate(() => window.__game.level.stats.shotsFired);
 check(shotsAfter === shotsBefore, `режим Малюк НЕ стріляє сам (${shotsBefore}→${shotsAfter})`);
 
+// ============ ✋ Task 2: жодних клавіш на тачі (E→✋) ============
+console.log('▸ Mobile: підказки взаємодії на тачі — ✋, не «E»');
+
+// interactKey() під тачем має повертати ✋ (а не «E»)
+const ik = await page.evaluate(async () => {
+  const m = await import('/src/i18n.js');
+  return m.interactKey();
+});
+check(ik === '✋', `interactKey() під тачем → «${ik}» (очікувано ✋)`);
+
+// Репрезентативна перетворена підказка місії, зібрана під тачем,
+// має містити ✋ і НЕ містити окрему клавішу «E».
+const prompts = await page.evaluate(async () => {
+  const { t, interactKey } = await import('/src/i18n.js');
+  return [
+    t('Тримай {k} — засвіти ліхтар', { k: interactKey() }),
+    t('Натисни {k} — відчини хлів', { k: interactKey() }),
+    t('💚 Тримай {k} — підніми {n}!', { k: interactKey(), n: 'Друг' }),
+  ];
+});
+for (const p of prompts) {
+  check(/✋/.test(p) && !/\bE\b/.test(p), `підказка містить ✋, без «E»: «${p}»`);
+}
+
+// Production-facing: у джерелах місій/реанімації не лишилось сирих E-підказок
+// (усі переведені на {k}+interactKey()). Перевіряємо віддані сервером модулі.
+const srcRawE = await page.evaluate(async () => {
+  const out = {};
+  for (const f of ['/src/missionpool.js', '/src/main.js']) {
+    const txt = await (await fetch(f)).text();
+    const m = txt.match(/(?:Тримай|Натисни) E —/g);
+    if (m) out[f] = m.length;
+  }
+  return out;
+});
+check(Object.keys(srcRawE).length === 0,
+  `жодних сирих «Тримай E»/«Натисни E» у місіях/реанімації (${JSON.stringify(srcRawE)})`);
+
+// Жодна жива підказка місії, показана на тачі, не має містити окрему «E».
+const livePromptOk = await page.evaluate(() => {
+  const pr = window.__game && window.__game.level && window.__game.level.missions
+    && window.__game.level.missions.prompt;
+  if (!pr || !pr.text) return true; // немає активної підказки — не валимо тест
+  return !/\bE\b/.test(pr.text);
+});
+check(livePromptOk, 'жива підказка місії на тачі не містить окрему «E»');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

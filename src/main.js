@@ -1,6 +1,6 @@
 // Головний модуль: state machine (глобус ↔ рівень), цикл гри, збереження
 import * as THREE from 'three';
-import { t, keyHint, translateHtml, getLang, setLang, LANGS, LANG_NAMES } from './i18n.js';
+import { t, keyHint, interactKey, translateHtml, getLang, setLang, LANGS, LANG_NAMES } from './i18n.js';
 import { Input } from './input.js';
 import { AudioMan } from './audio.js';
 import { World } from './world.js';
@@ -1375,7 +1375,7 @@ class Game {
     }
     if (!level.missions.prompt) {
       level.missions.prompt = {
-        text: t('💚 Тримай E — підніми {n}!', { n: target.nick }),
+        text: t('💚 Тримай {k} — підніми {n}!', { k: interactKey(), n: target.nick }),
         hold: true,
         progress: this._revProg || 0,
       };

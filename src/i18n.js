@@ -58,6 +58,10 @@ export function keyHint(touchText, keyText, params) {
   return t(isTouchUI() ? touchText : keyText, params);
 }
 
+// ✋ Підказка взаємодії: на тачі — екранна кнопка ✋ (#tb-interact),
+// на ПК — клавіша E. Жодної клавіші на сенсорі!
+export function interactKey() { return keyHint('✋', 'E'); }
+
 // t('Привіт, {name}!', {name}) → переклад за активною мовою + підстановка
 export function t(key, params) {
   let s = key;
