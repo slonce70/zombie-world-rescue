@@ -793,4 +793,8 @@ export const EN = {
 "Сорочка": "Shirt",
 "Штани": "Pants",
 "Шкіра": "Skin",
+"⭐ Складність (для перепроходження)": "⭐ Difficulty (for replays)",
+"Вище зірка — міцніші вороги й більше монет. Перший прохід і кооп — завжди ★1.": "Higher star — tougher enemies and more coins. First clear and co-op are always ★1.",
+"⭐ Складність {n} — вороги міцніші, монет більше!": "⭐ Difficulty {n} — enemies are tougher, more coins!",
+"⭐ Бонус за складність: +{n} монет!": "⭐ Difficulty bonus: +{n} coins!",
 };
