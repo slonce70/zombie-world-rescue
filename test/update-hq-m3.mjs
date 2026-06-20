@@ -48,6 +48,14 @@ await page.goto(`${BASE}/?test&country=UKR`);
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 30000, 'reload');
 check((await save()).chapter.done === true, 'глава лишається пройденою після reload');
 
+// ============ 📖 ГЛАВА У ШТАБІ ============
+console.log('▸ M3: Глава у Штабі');
+await page.evaluate(() => { window.__game.save.chapter = { p: { enterLevel:1, kill:3 }, done:false }; window.__game.hq.render(); });
+let hq = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/hq-chapter/.test(hq), 'Штаб показує секцію глави');
+check(/Я рятівник|I'm a Rescuer|Я спасатель/.test(hq), 'є назва глави');
+check((hq.match(/hq-step/g) || []).length === 5, 'рівно 5 кроків');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

@@ -3,6 +3,7 @@
 import { t } from '../i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { goalInfo } from '../shop.js';
+import { CHAPTER1 } from '../chapter.js';
 
 const BESTIARY = [
   { id: 'walker', icon: '🧟', name: t('Волоцюга'), desc: t('Повільний, зате їх багато!') },
@@ -23,7 +24,7 @@ export class RescueHQ {
   render() {
     const root = document.getElementById('hq-content');
     if (!root) return;
-    root.innerHTML = this._goalHtml(this.game.save) + this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._bestiaryHtml(this.game.save);
+    root.innerHTML = this._goalHtml(this.game.save) + this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._chapterHtml(this.game.save) + this._bestiaryHtml(this.game.save);
   }
 
   _goalHtml(save) {
@@ -68,6 +69,21 @@ export class RescueHQ {
       h += `<div class="hq-country ${saved ? 'saved' : ''}">${c.flag}<div class="hq-c-name">${c.name}</div><div class="hq-c-seals">${seals}</div></div>`;
     }
     h += '</div>';
+    return h;
+  }
+
+  _chapterHtml(save) {
+    const ch = save.chapter || { p: {}, done: false };
+    const p = ch.p || {};
+    const doneAll = !!ch.done;
+    let h = `<h3 class="hq-h">${t('📖 Глава 1: Я рятівник')} ${doneAll ? '🎖️' : ''}</h3><div class="hq-chapter">`;
+    for (const st of CHAPTER1.steps) {
+      const done = (p[st.id] || 0) >= st.target;
+      const prog = st.target > 1 ? ` (${Math.min(p[st.id] || 0, st.target)}/${st.target})` : '';
+      h += `<div class="hq-step ${done ? 'done' : ''}"><span class="hq-st-c">${done ? '✅' : '⬜'}</span><span class="hq-st-i">${st.icon}</span><span class="hq-st-t">${st.title}${prog}</span></div>`;
+    }
+    h += '</div>';
+    if (doneAll) h += `<div class="hq-medal">${t('🎖️ {m} — отримано!', { m: CHAPTER1.medalName })}</div>`;
     return h;
   }
 
