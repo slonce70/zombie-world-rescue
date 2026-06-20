@@ -58,6 +58,9 @@ export class CoopSession {
     return {
       nick: this.nick,
       skin: save.activeSkin || 'classic',
+      // 🎨 кастом-герой: 3 числа {shirt,pants,skin} — щоб друзі бачили твій вигляд.
+      // Лише для активного кастом-скіна; інакше null (дефолтна гілка makeHero).
+      hero: (save.activeSkin === 'custom' && save.hero) ? save.hero : null,
       tracer: save.activeTracer || 'classic',
       dance: save.activeDance || 'shuffle',
       dog: (save.upgrades.dog || 0) > 0 ? 1 : 0,
@@ -218,6 +221,12 @@ export class CoopSession {
         if (d.mode) this.mode = d.mode;
         if (this.onCfg) this.onCfg(d.countryId);
       } else if (d.t === 'start') {
+        // 🔌 гард реконекту: якщо ми ВЖЕ в рівні з живим мережевим шаром — це повторний
+        // start після тихого переприєднання. Перебудова зруйнувала б бій (екран завантаження
+        // + втрата позиції). Ігноруємо: свіжий стан долетить через lvlready → captureState.
+        if (this.state === 'level' && this.game?.state === 'level' && this.net) {
+          return;
+        }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
         this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena });
@@ -235,6 +244,8 @@ export class CoopSession {
       this.transport.send(from, { t: 'reject', why: 'build', hostBuild: appV }, true);
       return;
     }
+    // 🔌 чи це повернення вже відомого гостя (тихий реконект), а не новий вхід?
+    const isReconnect = this.roster.has(from);
     if (this.state === 'level' && !this.roster.has(from)) {
       // приєднання посеред рівня: пускаємо! (стан долетить батчем)
       if (this.roster.size >= 4) { this.transport.send(from, { t: 'reject', why: 'full' }, true); return; }
@@ -245,7 +256,7 @@ export class CoopSession {
     }
     let nick = cleanNick(d.nick) || t('Гравець {n}', { n: from });
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
-    this.roster.set(from, { pid: from, nick, skin: d.skin, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
+    this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId,
       roster: this._rosterList(),
@@ -256,16 +267,23 @@ export class CoopSession {
     this.game.hud.toast(t('🤝 {n} приєднався!', { n: nick }));
     this.game.audio.click();
     if (this.state === 'level' && this.net) {
-      // гість серед бою: шлемо start і чекаємо lvlready
-      this.transport.send(from, { t: 'start', ...this.net.spec }, true);
-      this.net.addGuest(from);
+      // 🔌 тихий реконект уже відомого гостя: рівень у нього вже побудований —
+      // повторний 'start' зруйнував би його (екран завантаження + втрата позиції).
+      // Покладаємось лише на його lvlready → captureState (свіжий стан долетить).
+      if (d.resume && isReconnect) {
+        this.net.addGuest(from);
+      } else {
+        // гість серед бою (перший вхід): шлемо start і чекаємо lvlready
+        this.transport.send(from, { t: 'start', ...this.net.spec }, true);
+        this.net.addGuest(from);
+      }
     }
   }
 
   _rosterList() {
     const out = [];
     for (const [pid, r] of this.roster) {
-      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, tracer: r.tracer, dog: r.dog || 0 });
+      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, hero: r.hero || null, tracer: r.tracer, dog: r.dog || 0 });
     }
     return out;
   }
