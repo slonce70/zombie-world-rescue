@@ -78,13 +78,31 @@ export class Progress {
     return xp / xpForLevel(lvl);
   }
 
+  // Сумарний XP, потрібний щоб ДОСЯГТИ максимального рівня пасу
+  get _xpToCap() {
+    let need = 0;
+    for (let l = 1; l < PASS_MAX_LEVEL; l++) need += xpForLevel(l);
+    return need;
+  }
+
+  // Нескінченний м'який престиж після стелі пасу. Без таймерів/FOMO — чистий статус.
+  get prestigeStars() {
+    const extra = this.xp - this._xpToCap;
+    return extra > 0 ? Math.floor(extra / 600) : 0;
+  }
+
   addXp(n) {
     if (n <= 0) return;
     const game = this.game;
+    const prestigeBefore = this.prestigeStars; // ДО додавання XP (до зміни save.xp)
     const before = this.level;
     game.save.xp = (game.save.xp || 0) + n;
     const after = this.level;
     for (let lvl = before + 1; lvl <= after; lvl++) this._grantLevel(lvl);
+    const prestigeAfter = this.prestigeStars;
+    if (prestigeAfter > prestigeBefore) {
+      game.hud.banner(t('🎖️ РАНГ РЯТІВНИКА {n}!', { n: prestigeAfter }), t('Так тримати, легендо!'), 4.2);
+    }
     game.saveGame();
   }
 
