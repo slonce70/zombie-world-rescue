@@ -327,6 +327,7 @@ class Game {
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       missionRuns: {}, kidMode: null, cloudTs: 0,
+      stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
     };
   }
 
@@ -354,6 +355,10 @@ class Game {
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
+        if (!out.stats || typeof out.stats !== 'object') out.stats = {};
+        for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo']) {
+          if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
+        }
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
@@ -969,18 +974,21 @@ class Game {
     level.bus.on('zombieKilled', (z) => {
       // кооп-хост: чужі перемоги зараховуються їхнім господарям (події zd)
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
+      this.save.stats.killed++;
+      if (z.golden) this.save.stats.golden++;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
       this.quests.onEvent('kill', { weapon: level.player.cur });
       if (z.golden) this.quests.onEvent('golden');
-      if (z.type === 'boss' && !level.storm) this.quests.onEvent('boss');
+      if (z.type === 'boss' && !level.storm) { this.quests.onEvent('boss'); this.save.stats.bosses++; }
     });
     level.bus.on('missionDone', () => this.progress.addXp(XP_VALUES.mission));
-    level.bus.on('hitmarker', (crit) => { if (crit) this.quests.onEvent('headshot'); });
+    level.bus.on('hitmarker', (crit) => { if (crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; } });
     level.bus.on('shieldBroken', () => this.quests.onEvent('shield'));
     level.bus.on('megaboxOpened', () => {
       this.progress.addXp(XP_VALUES.megabox);
       this.quests.onEvent('megabox');
+      this.save.stats.megaboxes++;
     });
     level.bus.on('dance', () => this.quests.onEvent('dance'));
     // комбо за серії вбивств
@@ -991,6 +999,7 @@ class Game {
       c.n++;
       c.t = 3.2;
       if (c.n > c.best) c.best = c.n;
+      if (c.best > this.save.stats.bestCombo) this.save.stats.bestCombo = c.best;
       if (c.n >= 3) this.hud.comboPop(c.n);
       if (c.n % 5 === 0) {
         const bonus = c.n * 2;
