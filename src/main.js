@@ -18,7 +18,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS, makeHero } from './characters.js';
+import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, makeHero } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -635,7 +635,21 @@ class Game {
     for (const [id, meta] of Object.entries(HERO_SKINS)) {
       html += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
     }
-    html += t('</div><div class="ward-section">Танці (N)</div><div class="ward-grid">');
+    html += '</div>';
+    if (save.activeSkin === 'custom') {
+      const slotLabel = { shirt: t('Сорочка'), pants: t('Штани'), skin: t('Шкіра') };
+      html += t('<div class="ward-section">🎨 Мої кольори</div>');
+      for (const slot of ['shirt', 'pants', 'skin']) {
+        html += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
+        for (const hex of HERO_PALETTE[slot]) {
+          const on = save.hero[slot] === hex ? ' on' : '';
+          const css = '#' + hex.toString(16).padStart(6, '0');
+          html += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hex}" style="background:${css}"></button>`;
+        }
+        html += '</div>';
+      }
+    }
+    html += t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
       html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
     }
@@ -663,6 +677,16 @@ class Game {
         }
         this.saveGame();
         this.audio.purchase();
+        this.renderWardrobe();
+      });
+    });
+    root.querySelectorAll('.hero-swatch').forEach((el) => {
+      el.addEventListener('click', () => {
+        const { slot, hex } = el.dataset;
+        save.hero[slot] = parseInt(hex, 10);
+        this.saveGame();
+        this.audio.purchase();
+        // Кольори застосуються на герої з наступним рівнем (на глобусі live-героя немає).
         this.renderWardrobe();
       });
     });

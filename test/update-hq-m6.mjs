@@ -48,6 +48,14 @@ await waitFor(async () => (await page.evaluate(() => window.__game && window.__g
 sv = await save();
 check(sv.activeSkin === 'custom' && sv.hero.shirt === 0xe14b4b, 'кастом-герой і кольори переживають reload');
 
+console.log('▸ M6: палітра в Гардеробі');
+await page.evaluate(() => { window.__game.save.activeSkin = 'custom'; window.__game._showOverlay('overlay-wardrobe'); window.__game.renderWardrobe(); });
+const hasPalette = await page.evaluate(() => !!document.querySelector('#wardrobe-content .hero-swatch'));
+check(hasPalette, 'для кастом-скіна показано палітру кольорів');
+await page.evaluate(() => { const s = document.querySelector('#wardrobe-content .hero-swatch[data-slot="shirt"]'); if (s) s.click(); });
+const changed = await page.evaluate(() => typeof window.__game.save.hero.shirt === 'number');
+check(changed, 'клік по свотчу оновлює save.hero.shirt');
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {
