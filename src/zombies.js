@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG } from './utils.js';
+import { t } from './i18n.js';
 
 const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
@@ -57,6 +58,8 @@ export class Zombies {
     this.hordePending = 0;
     this.hordeSpawnT = 0;
     this.hordeActive = false;
+    this._hordeIdleT = 0;
+    this._hordePrevAlive = undefined;
     this._p0 = new THREE.Vector3();
     this._p1 = new THREE.Vector3();
   }
@@ -284,6 +287,8 @@ export class Zombies {
     this.hordeActive = true;
     this.hordeRemaining = Math.max(0, this.hordeRemaining) + count;
     this.hordePending += count;
+    this._hordeIdleT = 0; // скидаємо таймер простою при старті нової орди
+    this._hordePrevAlive = undefined;
   }
 
   // сплячий зомбі-сюрприз у будинку: прокидається, коли гравець поруч
@@ -368,7 +373,7 @@ export class Zombies {
         // перша зустріч зі щитом — підказуємо механіку одразу
         if (!this._shieldHintShown) {
           this._shieldHintShown = true;
-          level.bus.emit('toast', '🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!');
+          level.bus.emit('toast', t('🛡 Ого, щит! Розстріляй його (дивись на тріщини) або обійди ззаду!'));
         }
         const sparkPos = new THREE.Vector3(z.x + fx * 0.75, z.y + 1.15, z.z + fz * 0.75);
         if (z.shieldHp > 0) {
@@ -403,7 +408,7 @@ export class Zombies {
       const level = this.level;
       if (!this._ironHintShown) {
         this._ironHintShown = true;
-        level.bus.emit('toast', '🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!');
+        level.bus.emit('toast', t('🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!'));
       }
       const sparkPos = new THREE.Vector3(z.x, z.y + 1.2, z.z);
       if (z.chestHp > 0) {
@@ -482,8 +487,8 @@ export class Zombies {
         level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
       }
       level.audio.goldenJingle();
-      level.bus.emit('toast', '🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!');
-      level.netEv('toast', '🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!');
+      level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
+      level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
     }
     if (z.type === 'boss') {
       this.boss = null;
@@ -511,6 +516,7 @@ export class Zombies {
 
     // спавн орди хвилями
     if (this.hordeActive && this.hordePending > 0) {
+      this._hordeIdleT = 0; // поки є незаспавнені — таймер простою не рахуємо
       this.hordeSpawnT -= dt;
       if (this.hordeSpawnT <= 0) {
         this.hordeSpawnT = 1.3;
@@ -546,6 +552,22 @@ export class Zombies {
           this.spawn(type, x, z, { horde: true });
           this.hordePending--;
         }
+      }
+    }
+    if (this.hordeActive && this.hordePending <= 0) {
+      // самокорекція лічильника + таймаут захист від застряглих зомбі
+      const aliveHorde = this.list.filter((z) => z.horde && z.state !== 'dead').length;
+      if (aliveHorde !== this.hordeRemaining) this.hordeRemaining = aliveHorde;
+      // скидаємо таймер простою якщо гравець робить прогрес (вбивства)
+      if (this._hordePrevAlive === undefined || aliveHorde < this._hordePrevAlive) {
+        this._hordeIdleT = 0;
+      } else {
+        this._hordeIdleT += dt;
+      }
+      this._hordePrevAlive = aliveHorde;
+      if (this._hordeIdleT > 25 && this.hordeRemaining > 0) {
+        for (const z of this.list) if (z.horde && z.state !== 'dead') z.horde = false;
+        this.hordeRemaining = 0;
       }
     }
     if (this.hordeActive && this.hordePending <= 0 && this.hordeRemaining <= 0) {
@@ -599,7 +621,7 @@ export class Zombies {
           this._aggro(z);
           z.state = 'chase';
           level.audio.shriek(1, st.pitch * 1.4);
-          level.bus.emit('toast', '😱 СЮРПРИЗ! У будинку ховався зомбі!');
+          level.bus.emit('toast', t('😱 СЮРПРИЗ! У будинку ховався зомбі!'));
         } else {
           updateRig(rig, dt * 0.35); // спить — ледь погойдується
           continue;

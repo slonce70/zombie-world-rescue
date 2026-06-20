@@ -304,7 +304,9 @@ export class Lobby {
       if (url.pathname === '/lobby/ping' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         if (!this._pingAllowed(ip)) return this.json({ error: 'rate' }, 429);
-        const d = await request.json();
+        const _raw = await request.text();
+        if (_raw.length > MAX_BODY_BYTES) return this.json({ error: 'big' }, 413);
+        const d = JSON.parse(_raw);
         const cid = String(d.cid || '').slice(0, 40);
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);
         this.players.set(cid, { nick: cleanNickSrv(d.nick), ts: now });
@@ -374,6 +376,15 @@ export class SaveVault {
     )`);
     this._lastPut = new Map(); // cid -> ts (анти-спам, у пам'яті — ок)
     this._claims = new Map();  // ip -> {n, t0} (анти-перебір кодів)
+    this._putIp = new Map(); // ip -> {n,t0}
+  }
+
+  _putAllowed(ip) {
+    const now = Date.now();
+    let r = this._putIp.get(ip);
+    if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; this._putIp.set(ip, r); }
+    if (this._putIp.size > 2000) this._putIp.clear();
+    return ++r.n <= 30; // 30 збережень/хв/IP (норм клієнт пушить раз на 25с)
   }
 
   _claimAllowed(ip) {
@@ -405,6 +416,8 @@ export class SaveVault {
     try {
       // зберегти прогрес: {cid, data: "<рядок JSON сейва>"}
       if (url.pathname === '/save/put' && request.method === 'POST') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'x';
+        if (!this._putAllowed(ip)) return this.json({ error: 'rate' }, 429);
         const d = await request.json();
         const cid = this._cid(d.cid);
         const data = typeof d.data === 'string' ? d.data : '';
@@ -488,6 +501,15 @@ export class League {
       PRIMARY KEY (cid, mode, country)
     )`);
     this._lastSubmit = new Map(); // cid -> ts (анти-спам)
+    this._subIp = new Map(); // ip -> {n,t0}
+  }
+
+  _ipAllowed(ip) {
+    const now = Date.now();
+    let r = this._subIp.get(ip);
+    if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; this._subIp.set(ip, r); }
+    if (this._subIp.size > 2000) this._subIp.clear();
+    return ++r.n <= 20; // 20 сабмітів/хв/IP
   }
 
   json(obj, status = 200) {
@@ -504,7 +526,11 @@ export class League {
     }
     try {
       if (url.pathname === '/league/submit' && request.method === 'POST') {
-        return this.submit(await request.json());
+        const ip = request.headers.get('CF-Connecting-IP') || 'x';
+        if (!this._ipAllowed(ip)) return this.json({ error: 'rate' }, 429);
+        const _raw = await request.text();
+        if (_raw.length > MAX_BODY_BYTES) return this.json({ error: 'big' }, 413);
+        return this.submit(JSON.parse(_raw));
       }
       if (url.pathname === '/league/top') {
         return this.top(url.searchParams);
@@ -559,6 +585,16 @@ export class League {
     } else {
       // нік міг змінитись — оновлюємо м'яко
       this.sql.exec('UPDATE entries SET nick = ? WHERE cid = ? AND mode = ? AND country = ?', nick, cid, mode, country);
+    }
+    // показуємо лише топ-50 → тримаємо щонайбільше 500 на (mode,country), решту прибираємо
+    const ord = MODES[mode] === 'desc' ? 'DESC' : 'ASC';
+    const cnt = this.sql.exec('SELECT COUNT(*) AS n FROM entries WHERE mode = ? AND country = ?', mode, country).toArray();
+    if ((cnt[0].n | 0) > 500) {
+      this.sql.exec(
+        `DELETE FROM entries WHERE mode = ? AND country = ? AND cid IN (
+           SELECT cid FROM entries WHERE mode = ? AND country = ? ORDER BY score ${ord} LIMIT -1 OFFSET 500)`,
+        mode, country, mode, country
+      );
     }
     return this.rankResponse(mode, country, cid);
   }

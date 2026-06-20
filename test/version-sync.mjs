@@ -11,15 +11,18 @@ const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!
 const versionJson = JSON.parse(readFileSync(root + 'version.json', 'utf8'));
 const mainSrc = readFileSync(root + 'src/main.js', 'utf8');
 const protoSrc = readFileSync(root + 'src/net/protocol.js', 'utf8');
+const swSrc = readFileSync(root + 'sw.js', 'utf8');
 
 const appV = Number((mainSrc.match(/const APP_VERSION\s*=\s*(\d+)/) || [])[1]);
 const protoV = Number((protoSrc.match(/PROTO_VERSION\s*=\s*(\d+)/) || [])[1]);
+const cacheV = Number((swSrc.match(/const CACHE\s*=\s*'zr-cache-v(\d+)'/) || [])[1]);
 
-console.log(`version.json.v=${versionJson.v}  APP_VERSION=${appV}  PROTO_VERSION=${protoV}`);
+console.log(`version.json.v=${versionJson.v}  APP_VERSION=${appV}  PROTO_VERSION=${protoV}  SW_CACHE_V=${cacheV}`);
 check(Number.isInteger(versionJson.v), 'version.json має цілочисельне поле v');
 check(Number.isInteger(appV), 'APP_VERSION знайдено у src/main.js');
 check(versionJson.v === appV, `version.json.v (${versionJson.v}) === APP_VERSION (${appV}) — авто-оновлення працюватиме`);
 check(Number.isInteger(protoV), `PROTO_VERSION визначено (${protoV}) — звіряти при зміні формату повідомлень`);
+check(Number.isInteger(cacheV) && cacheV === appV, `SW CACHE версія (${cacheV}) === APP_VERSION (${appV}) — старі кеші чистяться при оновленні`);
 
 console.log(failed === 0 ? '\n🎉 ВЕРСІЇ СИНХРОНІЗОВАНІ' : `\n❌ РОЗСИНХРОН ВЕРСІЙ: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

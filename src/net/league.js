@@ -2,6 +2,7 @@
 // Усі фейли тихі — гра ніколи не залежить від доступності Ліги.
 import { apiBase } from './transport.js';
 import { loadNick } from './coop.js';
+import { t } from '../i18n.js';
 
 // високоентропійний резервний cid, якщо crypto.randomUUID недоступний (старі WebView):
 // 128 біт із getRandomValues — cid є «паролем» хмарного сейва, тож має бути невгадуваним
@@ -28,7 +29,7 @@ export function ensureCid(game) {
 }
 
 export function leagueNick(game) {
-  return loadNick() || (game.coop && game.coop.session.nick) || 'Гравець';
+  return loadNick() || (game.coop && game.coop.session.nick) || t('Гравець');
 }
 
 // надіслати результат; повертає {top, me} або null (офлайн/помилка)

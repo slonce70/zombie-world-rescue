@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeDog, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
 import { damp, dampAngle } from '../utils.js';
 import { PF, idxToWeapon } from './protocol.js';
+import { t } from '../i18n.js';
 
 const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
 
@@ -30,7 +31,7 @@ export class RemotePlayer {
   constructor(level, pid, info) {
     this.level = level;
     this.pid = pid;
-    this.nick = info.nick || `Гравець ${pid}`;
+    this.nick = info.nick || t('Гравець {n}', { n: pid });
     this.skin = info.skin || 'classic';
     this.tracer = info.tracer || 'classic';
 

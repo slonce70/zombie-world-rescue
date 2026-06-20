@@ -53,7 +53,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -198,6 +198,10 @@ class Game {
       this._hideOverlay('overlay-pause');
       this.endLevel();
     });
+    document.getElementById('btn-how-to-play').addEventListener('click', () => {
+      this._hideOverlay('overlay-pause');
+      this._showTouchCoach(true);
+    });
     document.getElementById('btn-victory-globe').addEventListener('click', () => {
       this._hideOverlay('overlay-victory');
       this.endLevel();
@@ -283,7 +287,7 @@ class Game {
         this.audio.click();
       });
     }
-    this._applyKidMode();
+    this._applyKidMode({ silent: true }); // boot init — тост не потрібен
 
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
@@ -322,7 +326,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
-      missionRuns: {}, kidMode: null,
+      missionRuns: {}, kidMode: null, cloudTs: 0,
     };
   }
 
@@ -371,7 +375,15 @@ class Game {
   }
 
   saveGame() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); } catch (e) { /* ignore */ }
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.save));
+    } catch (e) {
+      // Safari Private Mode / заблокований сторедж: попереджаємо РАЗ, щоб дитина встигла експортувати
+      if (!this._storageWarned) {
+        this._storageWarned = true;
+        if (this.hud) this.hud.toast(t('⚠️ Браузер не зберігає прогрес — увімкни звичайний режим або експортуй файл'));
+      }
+    }
     if (this.cloud) this.cloud.schedulePush();
   }
 
@@ -386,19 +398,33 @@ class Game {
   }
 
   // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (вмикає авто-вогонь і CSS)
-  _applyKidMode() {
+  // opts.silent — не показувати тост (при авто-init та вході в рівень)
+  _applyKidMode(opts = {}) {
     const on = !!this.save.kidMode;
     document.body.classList.toggle('kid-mode', on);
     const btn = document.getElementById('btn-kid');
     if (btn) btn.textContent = on ? t('🐣 Малюк: вкл') : t('🐣 Малюк: викл');
+    if (this.hud) this.hud.setKidChip(on);
+    if (!opts.silent) {
+      if (this.hud) this.hud.toast(on
+        ? t('🐣 Малюк увімкнено: авто-приціл і авто-вогонь')
+        : t('🐣 Малюк вимкнено: цілишся сам'));
+    }
   }
 
   // 👆 Перше знайомство з керуванням: показуємо раз, лише на телефоні
   _maybeShowTouchCoach() {
+    this._showTouchCoach(false);
+  }
+
+  // 👆 Показати коуч керування. force=true — ігнорує localStorage-гейт (для кнопки «Як грати»)
+  _showTouchCoach(force) {
     if (!this.touch) return; // тільки телефон: на десктопі this.touch === null
-    let coached = false;
-    try { coached = localStorage.getItem('zr-touch-coached') === '1'; } catch (e) { /* ignore */ }
-    if (coached) return;
+    if (!force) {
+      let coached = false;
+      try { coached = localStorage.getItem('zr-touch-coached') === '1'; } catch (e) { /* ignore */ }
+      if (coached) return;
+    }
     const el = document.getElementById('touch-coach');
     if (!el) return;
     // 🌍 локалізуємо підписи коуча зараз: ключ — оригінальний укр. рядок (data-i18n)
@@ -411,7 +437,9 @@ class Game {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       el.classList.remove('show');
       el.setAttribute('aria-hidden', 'true');
-      try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      if (!force) {
+        try { localStorage.setItem('zr-touch-coached', '1'); } catch (err) { /* ignore */ }
+      }
       // 🔊 тап по коучу = той самий жест, що й клік по «торкнись, щоб грати»: розблоковуємо звук
       if (this.input.onUserGesture) this.input.onUserGesture();
       el.removeEventListener('touchstart', dismiss);
@@ -729,6 +757,21 @@ class Game {
     this._showGlobeUI(false);
     // даємо браузеру намалювати екран завантаження
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    /**
+     * Спільний контекст забігу (per-run), передається в усі підсистеми як перший аргумент або через замикання.
+     * Поля, що існують ЗАВЖДИ (у всіх режимах):
+     *   game, countryId, country, scene, bus, rng, audio, stats, combo,
+     *   bossDefeated, net, mirror, netEv, players, runIndex,
+     *   world, effects, addCoins, player, zombies, missions,
+     *   vehicles, gadgets, pet.
+     *
+     * РЕЖИМО-УМОВНІ поля (присутні тільки в певних режимах):
+     *   storm    — тільки в режимі Шторм (isStorm); інакше — undefined.
+     *   bossRush — тільки в режимі Арени (isArena); інакше — undefined.
+     *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
+     *
+     * Правило: перед доступом до режимо-умовних полів завжди перевіряй наявність (level.storm?.foo).
+     */
     const level = {
       game: this,
       countryId,
@@ -897,7 +940,11 @@ class Game {
         if (d < r) {
           const rage = level.player.buffs.rage > 0 ? 2 : 1;
           const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * level.player.damageMult * rage);
-          level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          // вибух: не малюємо число, якщо щит або нагрудник повністю поглинає удар
+          const absorbed = zb.shieldHp > 0 || (zb.chestHp > 0); // вибух не є headshot → chestHp завжди поглинає
+          if (!absorbed) {
+            level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
+          }
           zb.lastHitBy = ownerPid; // чесний кіл-кредит за вибухове добивання
           zb.damage(dmg, null, false);
         }
@@ -996,7 +1043,7 @@ class Game {
 
     this.level = level;
     this.state = 'level';
-    this._applyKidMode(); // 🐣 клас kid-mode активний і в бою
+    this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;
     this.paused = false;

@@ -3,8 +3,8 @@
 // гравцю і відкривається кнопкою «Зайти» без кода; закриття прибирає її зі списку.
 // Транспорт: повідомлення летять пачками (~10 ws-send/с замість 25+).
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
+import { spawnRelay } from './_relay.mjs';
 
 const BASE = 'http://localhost:8741';
 const RELAY_PORT = 8752;
@@ -29,11 +29,7 @@ async function waitLobby(cond, timeout = 15000) {
   return null;
 }
 
-const relay = spawn('node', ['relay/dev-relay.mjs'], {
-  env: { ...process.env, PORT: String(RELAY_PORT) },
-  stdio: ['ignore', 'ignore', 'pipe'],
-});
-await sleep(600);
+const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = {
   args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox', '--disable-background-timer-throttling',

@@ -81,7 +81,7 @@ export function makeFBM(seed, octaves = 3) {
 
 // Найближча точка між променем (o, d — нормалізований) і відрізком p0-p1.
 // Повертає {dist, t (вздовж променя), u (0..1 вздовж відрізка)}
-export function closestRaySeg(o, d, p0, p1) {
+export function closestRaySeg(o, d, p0, p1, out) {
   const sx = p1.x - p0.x, sy = p1.y - p0.y, sz = p1.z - p0.z;
   const wx = o.x - p0.x, wy = o.y - p0.y, wz = o.z - p0.z;
   const b = d.x * sx + d.y * sy + d.z * sz;
@@ -97,7 +97,9 @@ export function closestRaySeg(o, d, p0, p1) {
   const px = o.x + d.x * t - (p0.x + sx * u);
   const py = o.y + d.y * t - (p0.y + sy * u);
   const pz = o.z + d.z * t - (p0.z + sz * u);
-  return { dist: Math.hypot(px, py, pz), t, u };
+  const dist = Math.hypot(px, py, pz);
+  if (out) { out.dist = dist; out.t = t; out.u = u; return out; }
+  return { dist, t, u };
 }
 
 // Промінь проти AABB (slab-метод). Повертає t входу або Infinity.
