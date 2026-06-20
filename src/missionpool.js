@@ -323,9 +323,33 @@ export class DynamicMissions {
   // точка здачі: кільце на землі біля ландмарки країни (або біля слота)
   _makeDeliverPoint(m, cfg) {
     const level = this.level;
-    const lp = (level.world.map.landmarkParams || {})[cfg.deliver];
-    const x = lp ? lp.x : m.site.x;
-    const z = lp ? (lp.z + 6) : (m.site.z + 6);
+    const world = level.world;
+    const lp = (world.map.landmarkParams || {})[cfg.deliver];
+    // центр ландмарки (від нього відсуваємось «назовні», по +z — як було раніше)
+    const cx = lp ? lp.x : m.site.x;
+    const cz = lp ? lp.z : m.site.z;
+    // шукаємо першу прохідну точку, відсуваючи кандидат усе далі від центру.
+    // collide() з радіусом гравця повертає точку, виштовхнуту з перешкод;
+    // якщо вона майже не зсунулась — там можна стояти. Балон/базар лишаються
+    // як були (їхній перший кандидат lp.z+6 уже вільний), а гробниця (всередині
+    // суцільної піраміди) зсувається до прохідної землі.
+    const PR = 0.45; // радіус гравця (як у player.js)
+    let x = cx;
+    let z = cz + 6;
+    for (const off of [6, 10, 14, 18, 22, 26, 30]) {
+      const candX = cx;
+      const candZ = cz + off;
+      const solved = world.collide(candX, candZ, PR);
+      const disp = Math.hypot(solved.x - candX, solved.z - candZ);
+      x = candX;
+      z = candZ;
+      if (disp < 0.2) break; // прохідно — беремо цю точку
+    }
+    // belt-and-suspenders: фінально розв'язуємо колізію, щоб центр кільця
+    // ніколи не опинився всередині суцільної споруди (для вже-вільної точки — без змін)
+    const solvedFinal = world.collide(x, z, PR);
+    x = solvedFinal.x;
+    z = solvedFinal.z;
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(3.2, 0.16, 8, 30),
       new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
@@ -337,7 +361,7 @@ export class DynamicMissions {
     icon.position.set(x, y + 3.2, z);
     level.scene.add(ring);
     level.scene.add(icon);
-    return { x, z, y, r: 4.2, ring, icon };
+    return { x, z, y, r: 5, ring, icon };
   }
 
   // ---------- допоміжні споруди місій ----------
