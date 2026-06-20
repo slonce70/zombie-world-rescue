@@ -797,4 +797,12 @@ export const EN = {
 "Вище зірка — міцніші вороги й більше монет. Перший прохід і кооп — завжди ★1.": "Higher star — tougher enemies and more coins. First clear and co-op are always ★1.",
 "⭐ Складність {n} — вороги міцніші, монет більше!": "⭐ Difficulty {n} — enemies are tougher, more coins!",
 "⭐ Бонус за складність: +{n} монет!": "⭐ Difficulty bonus: +{n} coins!",
+"Сюди!": "Over here!",
+"Допоможи!": "Help!",
+"Готовий!": "Ready!",
+"Дякую!": "Thanks!",
+"Захищаю!": "Covering you!",
+"Ти: {p}": "You: {p}",
+"Пінг команді": "Ping the team",
+"📣 ПІНГ КОМАНДІ": "📣 PING THE TEAM",
 };
