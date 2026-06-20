@@ -841,18 +841,19 @@ export class Effects {
       // перешкоди світу
       let hitT = this.world.shotBlockDist(rk.mesh.position, this._tmpDir, frameDist + 0.3);
       // зомбі на шляху
+      let hitZombie = false;
       if (this.zombieHitTest) {
         const zh = this.zombieHitTest(rk.mesh.position, this._tmpDir, frameDist + 0.6);
-        if (zh && zh.t < hitT) hitT = zh.t;
+        if (zh && zh.t < hitT) { hitT = zh.t; hitZombie = true; }
       }
       let boom = hitT <= frameDist + 0.3;
       rk.mesh.position.addScaledVector(rk.v, dt);
       rk.traveled += frameDist;
       const rp = rk.mesh.position;
       if (!boom && rp.y < this.world.groundH(rp.x, rp.z) + 0.15) boom = true;
-      // 🚀 зведення: перші ~3 м ракета НЕ детонує (пролітає крізь упритул-натовп),
-      // щоб дитина не підірвала себе пострілом у юрбу зблизька (F10).
-      if (boom && rk.traveled < 3) boom = false;
+      // 🚀 зведення: у перші ~3 м ракета НЕ детонує від землі/стіни/повітря (щоб дитина не
+      // підірвала себе зблизька, F10), АЛЕ пряме влучання у ворога детонує завжди (ревью).
+      if (boom && !hitZombie && rk.traveled < 3) boom = false;
       // димний слід
       rk.smokeT -= dt;
       if (rk.smokeT <= 0) {
