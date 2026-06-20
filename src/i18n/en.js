@@ -760,4 +760,13 @@ export const EN = {
 "Тікає від тебе — дожени і отримай джекпот!": "Runs away from you — catch it for the jackpot!",
 "🎖️ РАНГ РЯТІВНИКА {n}!": "🎖️ RESCUER RANK {n}!",
 "Так тримати, легендо!": "Keep it up, legend!",
+"Зробити ціллю": "Set as goal",
+"🎯 Ціль: {i} {n} — ще {r} ₴": "🎯 Goal: {i} {n} — {r} ₴ to go",
+"🎯 Ціль: {i} {n} — можна купити! 🎉": "🎯 Goal: {i} {n} — you can buy it! 🎉",
+"🎯 Обери ціль — тисни 🎯 на товарі": "🎯 Pick a goal — tap 🎯 on an item",
+"🎯 Ціль досягнута! Обери нову в магазині": "🎯 Goal reached! Pick a new one in the shop",
+"🎯 Моя ціль": "🎯 My goal",
+"Обери ціль у магазині — тисни 🎯 на товарі, на який збираєш монети.": "Pick a goal in the shop — tap 🎯 on the item you're saving coins for.",
+"Можна купити! 🎉": "You can buy it! 🎉",
+"Ще {r} монет": "{r} coins to go",
 };

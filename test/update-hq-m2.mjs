@@ -37,8 +37,11 @@ await page.evaluate(() => { window.__game.save.coins = 1000; window.__game.save.
 await page.evaluate(() => { window.__game.shop.activeTab = 'Спорядження'; window.__game.shop.render(); });
 let goalBtn = await page.$('#shop [data-goal="vest"]');
 check(!!goalBtn, 'у магазині є кнопка «🎯 ціль» для бронежилета');
+const coinsBefore = await page.evaluate(() => window.__game.save.coins);
 await page.evaluate(() => document.querySelector('#shop [data-goal="vest"]').click());
 check((await save()).goal === 'vest', 'клік 🎯 встановлює save.goal=vest');
+const coinsAfter = await page.evaluate(() => window.__game.save.coins);
+check(coinsAfter === coinsBefore, 'клік 🎯 не списує монет (stopPropagation, не купівля)');
 const header = await page.evaluate(() => document.getElementById('shop-goal') && document.getElementById('shop-goal').textContent);
 check(/Бронежилет|ціль|Ціль/i.test(header || ''), 'шапка магазину показує ціль');
 // auto-clear on buy
@@ -58,7 +61,7 @@ check(/hq-goal/.test(hq), 'Штаб має секцію «Моя ціль»');
 check(/Бронежилет|Vest|Бронежилет/.test(hq) && /\d/.test(hq), 'ціль показує назву і скільки ще монет');
 await page.evaluate(() => { window.__game.save.goal = null; window.__game.hq.render(); });
 const hq2 = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
-check(/hq-goal/.test(hq2), 'без цілі — запрошення обрати ціль');
+check(/hq-goal/.test(hq2) && /Обери ціль|Pick a goal|Выбери цель/.test(hq2), 'без цілі — запрошення обрати ціль');
 
 // ============ ПІДСУМОК ============
 console.log('');
