@@ -9,12 +9,43 @@ import { ensureCid } from './league.js';
 const PUSH_DELAY_MS = 25_000;
 const SAVE_KEY = 'zr-save-v1'; // тримати в синхроні з main.js
 
+// 🎨 Дефолтний герой і стартові монети — ЄДИНЕ ДЖЕРЕЛО для _newSave (main.js) і
+// для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
+// двох місцях, вони розійдуться при будь-якій зміні палітри. Тримаємо тут, бо саме
+// тут живе захист від перезапису прогресу.
+export const DEFAULT_HERO = { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 };
+export const NEW_SAVE_COINS = 50;
+
+// ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
+// імпорту/claim (adopt + confirm-діалоги в saveui), і newest-wins у bootSync.
+// F24+F27: раніше рахувались лише 4 поля (liberated/xp/missionRuns/stormBest), тож
+// дитина, яка зробила кастом-героя / поставила ціль / накопичила монети ДО першого
+// вбивства, мала saveHasProgress=false → claim/імпорт ТИХО перезаписував без
+// попередження, а bootSync міг adopt-нути хмару поверх живого локального.
 export function saveHasProgress(s) {
   if (!s || typeof s !== 'object') return false;
+  const heroChanged = s.hero && typeof s.hero === 'object'
+    && (s.hero.shirt !== DEFAULT_HERO.shirt
+      || s.hero.pants !== DEFAULT_HERO.pants
+      || s.hero.skin !== DEFAULT_HERO.skin);
   return Object.keys(s.liberated || {}).length > 0
     || (s.xp | 0) > 0
     || Object.keys(s.missionRuns || {}).length > 0
-    || Object.keys(s.stormBest || {}).length > 0;
+    || Object.keys(s.stormBest || {}).length > 0
+    || (s.coins | 0) > NEW_SAVE_COINS                       // більше за стартові монети
+    || Object.keys(s.upgrades || {}).length > 0             // куплені прокачування
+    || Object.keys(s.bestiary || {}).length > 0             // бачені вороги
+    || (s.chapter && (s.chapter.done || Object.keys(s.chapter.p || {}).length > 0))
+    || (s.medals || []).length > 0                          // медалі
+    || (s.stats && (s.stats.killed | 0) > 0)               // хоч одне вбивство в статистиці
+    || !!s.goal                                             // поставлена ціль
+    || heroChanged                                          // кастом-герой ≠ дефолт
+    || (s.skins || []).length > 2                           // більше за ['classic','custom']
+    || (s.dances || []).length > 1                          // більше за ['shuffle']
+    || (s.tracers || []).length > 1                         // більше за ['classic']
+    || (s.gadgetsOwned || []).length > 0                    // куплені гаджети
+    || (s.diffStar | 0) > 1                                 // піднята складність
+    || (s.weapons || []).length > 0;                        // здобута/розблокована зброя
 }
 
 export class CloudSave {
@@ -112,14 +143,22 @@ export class CloudSave {
     }
   }
 
-  // прийняти чужий сейв (з коду або файлу) і перезапустити гру
-  adopt(rawJson) {
+  // прийняти чужий сейв (з коду або файлу) і перезапустити гру.
+  // opts.justImported — F25: файл-імпорт ставить прапорець, який наступний bootSync
+  // спожиє ОДИН раз: пропустить adopt-хмари і форсне push, щоб імпортований файл став
+  // найновішим у хмарі (інакше новіший хмарний ts тихо перезаписав би щойно імпортоване).
+  adopt(rawJson, opts = {}) {
     try {
       const s = JSON.parse(rawJson);
       if (!s || typeof s !== 'object') return false;
       // захист від випадкового імпорту порожнього/обрізаного файлу поверх реального прогресу
       if (!saveHasProgress(s) && saveHasProgress(this.game.save)) return false;
-      localStorage.setItem(SAVE_KEY, rawJson);
+      if (opts.justImported) {
+        s._justImported = true;
+        localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+      } else {
+        localStorage.setItem(SAVE_KEY, rawJson);
+      }
       location.reload();
       return true;
     } catch (e) {
@@ -133,6 +172,13 @@ export class CloudSave {
   async bootSync() {
     if (!this.enabled) return;
     const local = this.game.save;
+    // F25: щойно імпортований файл має стати найновішим у хмарі — пропускаємо adopt раз і пушимо.
+    if (local._justImported) {
+      delete local._justImported;
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(local)); } catch (e) { /* ignore */ }
+      this.push();
+      return;
+    }
     const localHas = saveHasProgress(local);
     const cloud = await this.pull();
     let cloudObj = null;

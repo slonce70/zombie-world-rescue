@@ -44,9 +44,17 @@ const coinsAfter = await page.evaluate(() => window.__game.save.coins);
 check(coinsAfter === coinsBefore, 'клік 🎯 не списує монет (stopPropagation, не купівля)');
 const header = await page.evaluate(() => document.getElementById('shop-goal') && document.getElementById('shop-goal').textContent);
 check(/Бронежилет|ціль|Ціль/i.test(header || ''), 'шапка магазину показує ціль');
-// auto-clear on buy
-await page.evaluate(() => window.__game.shop.buy('vest'));
-check((await save()).goal === null, 'купівля цілі очищає save.goal');
+// F42: ціль на БАГАТОРІВНЕВИЙ товар (vest max:2) НЕ очищається після першої покупки —
+// лише коли вичерпано до max. Інакше дитина «досягла» цілі, ще не докупивши апгрейд.
+await page.evaluate(() => window.__game.shop.buy('vest')); // 0 → 1 (ще не max)
+check((await save()).goal === 'vest', 'F42: ціль на vest ЛИШАЄТЬСЯ після 1-ї покупки (1/2)');
+await page.evaluate(() => window.__game.shop.buy('vest')); // 1 → 2 (=max)
+check((await save()).goal === null, 'F42: ціль очищається коли товар вичерпано (2/2)');
+// одноразовий товар (max:1) очищає ціль одразу — поведінка незмінна
+await page.evaluate(() => {
+  window.__game.save.coins = 1000; window.__game.save.goal = 'sniper'; window.__game.shop.buy('sniper');
+});
+check((await save()).goal === null, 'F42: одноразовий товар (sniper) очищає ціль одразу');
 // persist
 await page.evaluate(() => { window.__game.save.goal = 'sniper'; window.__game.saveGame(); });
 await page.goto(`${BASE}/?test&country=UKR`);

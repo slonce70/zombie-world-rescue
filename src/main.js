@@ -25,7 +25,7 @@ import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
 import { Chapter } from './chapter.js';
 import { submitScore } from './net/league.js';
-import { CloudSave } from './net/cloudsave.js';
+import { CloudSave, DEFAULT_HERO, NEW_SAVE_COINS } from './net/cloudsave.js';
 
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
 translateHtml(document.body);
@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -348,10 +348,10 @@ class Game {
 
   _newSave() {
     return {
-      coins: 50, upgrades: {}, liberated: {}, weapons: [], records: {},
+      coins: NEW_SAVE_COINS, upgrades: {}, liberated: {}, weapons: [], records: {},
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
-      hero: { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 },
+      hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
@@ -367,7 +367,20 @@ class Game {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
       if (s && typeof s === 'object') {
+        // F26: знімок вкладених дефолтів ДО Object.assign — бо assign перезапише
+        // defaults.* посиланнями зі сейва, і дефолти стали б недоступні для merge нижче.
+        const nestedDefaults = { stats: defaults.stats, hero: defaults.hero, chapter: defaults.chapter };
         out = Object.assign(defaults, s);
+        // F26: глибокий merge дефолтів для вкладених об'єктів (stats/hero/chapter…).
+        // Поверхневий Object.assign замінює весь вкладений об'єкт цілком — тож якщо
+        // старий сейв має stats БЕЗ нового під-поля, воно лишилось би undefined → NaN.
+        // Беремо бракуючі під-поля з _newSave-дефолтів. Тип-валідація нижче лишається —
+        // вона ще й ловить чужі значення неправильного типу (рядок замість числа тощо).
+        for (const k of ['stats', 'hero', 'chapter']) {
+          if (out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])) {
+            out[k] = Object.assign({}, nestedDefaults[k], out[k]);
+          }
+        }
         // вкладені об'єкти і списки могли прийти зі старого сейва неповними
         if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
         // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
@@ -383,7 +396,7 @@ class Game {
         if (!out.skins.includes('custom')) out.skins.push('custom');
         if (!out.hero || typeof out.hero !== 'object') out.hero = {};
         for (const k of ['shirt', 'pants', 'skin']) {
-          if (typeof out.hero[k] !== 'number') out.hero[k] = ({ shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 })[k];
+          if (typeof out.hero[k] !== 'number') out.hero[k] = DEFAULT_HERO[k];
         }
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];

@@ -32,6 +32,7 @@ export class HostNet {
     this._nextId = 10000;      // мережеві id (>10000, щоб не зіткнутись із pre-net id)
     this._tmpV = new THREE.Vector3();
     this._hostShotCd = 0;
+    this._fountainAt = new Map(); // pid -> час останнього fountain (анти-флуд декору)
 
     // адаптер власного гравця для AI-циклів (level.players)
     const p = level.player;
@@ -75,6 +76,7 @@ export class HostNet {
       this._rebuildPlayers();
     }
     this.readyGuests.delete(pid);
+    this._fountainAt.delete(pid);
   }
 
   _rebuildPlayers() {
@@ -145,12 +147,19 @@ export class HostNet {
       case 'nade': {
         const o = d.o, v = d.v;
         if (!isVec3(o) || !isVec3(v)) return true;
+        // F20: дистанц-гейт як у shot/gadget — граната має вилітати з-під самого гостя.
+        // Без нього гість міг би кинути гранату в будь-яку точку карти.
+        const rpN = this.remotes.get(from);
+        if (rpN && Math.hypot(o[0] - rpN.pos.x, o[2] - rpN.pos.z) > 6) return true;
         this.spawnNetGrenade(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(v[0], v[1], v[2]), from);
         return true;
       }
       case 'rocket': {
         const o = d.o, dir = d.d;
         if (!isVec3(o) || !isVec3(dir)) return true;
+        // F20: ракета теж стартує з-під гостя — той самий дистанц-гейт.
+        const rpR = this.remotes.get(from);
+        if (rpR && Math.hypot(o[0] - rpR.pos.x, o[2] - rpR.pos.z) > 6) return true;
         this.spawnNetRocket(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(dir[0], dir[1], dir[2]), clampDmg(d.dmg), from);
         return true;
       }
@@ -171,6 +180,10 @@ export class HostNet {
         const target = d.target | 0;
         const reviverNick = (this.session.roster.get(from) || {}).nick || t('Друг');
         if (target === 1) {
+          // F21: реанімація хоста лише впритул (≤3 од.) — симетрія з реанімацією гостей нижче.
+          // Без цього гість міг би «підняти» хоста з будь-якої точки карти.
+          const reviver = this.remotes.get(from);
+          if (!reviver || Math.hypot(reviver.pos.x - level.player.pos.x, reviver.pos.z - level.player.pos.z) > 3) return true;
           this.game.applyRevive(reviverNick);
         } else {
           const trp = this.remotes.get(target);
@@ -184,9 +197,21 @@ export class HostNet {
         return true;
       }
       case 'fountain': {
+        // F23: декор-монети від гостя — кламп координат у межі карти + кулдаун ≥3с на pid.
+        // Без цього гість міг би спамити фонтанами (лаг/сміття в снапшоті) або
+        // розкидати монети в NaN/за межами карти.
+        if (!Number.isFinite(d.x) || !Number.isFinite(d.z)) return true;
+        const now = performance.now();
+        const last = this._fountainAt.get(from) || 0;
+        if (now - last < 3000) return true;
+        this._fountainAt.set(from, now);
+        const bound = (level.world.layout && level.world.layout.BOUND) || 200;
+        let fx = d.x, fz = d.z;
+        const dC = Math.hypot(fx, fz);
+        if (dC > bound) { fx *= bound / dC; fz *= bound / dC; } // у коло радіуса BOUND
         for (let i = 0; i < 14; i++) {
           const a = (i / 14) * Math.PI * 2;
-          level.effects.spawnCoin(d.x + Math.cos(a) * (1 + Math.random() * 2.2), d.z + Math.sin(a) * (1 + Math.random() * 2.2), 14);
+          level.effects.spawnCoin(fx + Math.cos(a) * (1 + Math.random() * 2.2), fz + Math.sin(a) * (1 + Math.random() * 2.2), 14);
         }
         return true;
       }

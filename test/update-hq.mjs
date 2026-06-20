@@ -166,6 +166,17 @@ const bHtml = await page.evaluate(() => document.getElementById('hq-content').in
 check(/hq-beast/.test(bHtml), 'Штаб показує картки бестіарію');
 check(/Бестіарій|Bestiary|Бестиарий/.test(bHtml), 'є заголовок «Бестіарій X/Y»');
 
+// F41: вбитий бос пишеться в bestiary['boss'] і ТЕПЕР показується карткою (👑), а не сміттям
+await page.evaluate(() => {
+  const g = window.__game; const p = g.level.player.pos;
+  g.test.spawnZombie('boss', p.x + 6, p.z).damage(999999, null, false);
+  g.hq.render();
+});
+const sv3 = await page.evaluate(() => window.__game.save);
+check((sv3.bestiary.boss || 0) >= 1, `F41: бестіарій рахує boss (${sv3.bestiary.boss})`);
+const bHtml2 = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/👑/.test(bHtml2) && /(Бос|Boss|Босс)/.test(bHtml2), 'F41: картка боса 👑 видима в бестіарії');
+
 // підсумок
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));
