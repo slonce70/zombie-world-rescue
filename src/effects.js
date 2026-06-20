@@ -53,6 +53,21 @@ export class Effects {
       scene.add(m);
       this.tracerPool.push({ mesh: m, life: 0 });
     }
+    // 🔫 промінь лазера (v46): один яскравий ціановий циліндр, оновлюється щокадру
+    this.laserMat = new THREE.MeshBasicMaterial({ color: 0x66ffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    this.laserGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 6, 1, true);
+    this.laserMesh = new THREE.Mesh(this.laserGeo, this.laserMat);
+    this.laserMesh.frustumCulled = false;
+    this.laserMesh.visible = false;
+    scene.add(this.laserMesh);
+    this.laserT = 0;
+    // 🔫 ядро променя (білий тонший циліндр всередині) — читабельніше світіння
+    this.laserCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    this.laserCore = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 6, 1, true), this.laserCoreMat);
+    this.laserCore.frustumCulled = false;
+    this.laserCore.visible = false;
+    scene.add(this.laserCore);
+
     this._up = new THREE.Vector3(0, 1, 0);
     this._tmpDir = new THREE.Vector3();
     this._sbOld = new THREE.Vector3(); // позиція снаряда ДО руху (swept-перевірка влучання)
@@ -116,10 +131,11 @@ export class Effects {
     sc.remove(this.pMesh, this.flashLight);
     for (const t of this.tracerPool) { sc.remove(t.mesh); if (t.mesh.material) t.mesh.material.dispose(); }
     for (const d of this.dmgPool) { sc.remove(d.spr); if (d.spr.material) d.spr.material.dispose(); if (d.tex) d.tex.dispose(); }
+    sc.remove(this.laserMesh, this.laserCore);
     this.pMesh.geometry.dispose();
     this.pMesh.material.dispose();
-    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo]) g.dispose();
-    for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat]) m.dispose();
+    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry]) g.dispose();
+    for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat, this.laserMat, this.laserCoreMat]) m.dispose();
     // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
   }
 
@@ -589,8 +605,61 @@ export class Effects {
 
   muzzleFlash(pos) {
     this.flashLight.position.copy(pos);
+    this.flashLight.color.setHex(0xffc966);
     this.flashLight.intensity = 14;
     this.flashT = 0.05;
+  }
+
+  // 🔫 ЛАЗЕР (v46): яскравий ціановий промінь від ствола до точки влучання.
+  // Малюємо один меш (без алокацій на кадр), таймер гасить його, коли вогонь відпущено.
+  laserBeam(from, to) {
+    const dir = this._tmpDir.copy(to).sub(from);
+    const len = dir.length();
+    if (len < 0.2) { return; }
+    dir.normalize();
+    const mid = this._sbOld.copy(from).add(to).multiplyScalar(0.5);
+    this._q.setFromUnitVectors(this._up, dir);
+    for (const m of [this.laserMesh, this.laserCore]) {
+      m.visible = true;
+      m.position.copy(mid);
+      m.quaternion.copy(this._q);
+      m.scale.set(1, len, 1);
+      m.material.opacity = m === this.laserMesh ? 0.85 : 0.8;
+    }
+    // легке світіння в точці влучання
+    this.flashLight.position.copy(to);
+    this.flashLight.color.setHex(0x66ffff);
+    this.flashLight.intensity = 8;
+    this.flashT = 0.06;
+    this.laserT = 0.06; // тримаємо промінь видимим до наступного кадру стрільби
+  }
+
+  // 🔥 ВОГНЕМЕТ (v46): потік вогняних частинок конусом уперед від ствола.
+  flameCone(from, dir, range) {
+    const n = 5; // помірно — щоб і на тачі тягнуло
+    let spawned = 0;
+    for (const pt of this.particles) {
+      if (pt.alive) continue;
+      pt.alive = true;
+      // старт біля ствола з невеликим розкидом
+      pt.p.set(
+        from.x + (Math.random() - 0.5) * 0.18,
+        from.y + (Math.random() - 0.5) * 0.18,
+        from.z + (Math.random() - 0.5) * 0.18
+      );
+      // швидкість уздовж напряму + конусний розкид
+      const spread = 0.55;
+      const vx = dir.x + (Math.random() - 0.5) * spread;
+      const vy = dir.y + (Math.random() - 0.5) * spread + 0.12;
+      const vz = dir.z + (Math.random() - 0.5) * spread;
+      const sp = range * (0.9 + Math.random() * 0.5);
+      pt.v.set(vx * sp, vy * sp, vz * sp);
+      pt.life = pt.maxLife = 0.22 + Math.random() * 0.12;
+      pt.size = 1.4 + Math.random() * 1.2;
+      // колір від яскраво-жовтого до помаранчево-червоного
+      pt.color.setHex([0xffe066, 0xffa040, 0xff6a2a, 0xff4422][Math.floor(Math.random() * 4)]);
+      if (++spawned >= n) break;
+    }
   }
 
   ring(pos, colorHex = 0xff8844, maxR = 6) {
@@ -760,6 +829,12 @@ export class Effects {
       t.life -= dt;
       t.mesh.material.opacity = Math.max(0, t.life / 0.07) * 0.85;
       if (t.life <= 0) t.mesh.visible = false;
+    }
+
+    // 🔫 промінь лазера: гасне за мить після відпускання вогню
+    if (this.laserMesh.visible) {
+      this.laserT -= dt;
+      if (this.laserT <= 0) { this.laserMesh.visible = false; this.laserCore.visible = false; }
     }
 
     // спалах

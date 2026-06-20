@@ -1868,6 +1868,62 @@ export function makeGunMesh(kind) {
     }
     g.add(body, barrel, brake, scope, lens, mount1, mount2, mag, stock, cheek, grip);
     muzzle.position.set(0, 0.02, -0.94);
+  } else if (kind === 'laser') {
+    // 🔫 Лазер: футуристична зброя з ціановою «лінзою» на дулі
+    const cyanM = toonMat(0x2bd6e0, 0x0f8a92, 0.5);
+    const glowM = toonMat(0x9ffcff, 0x4fe0ff, 0.85);
+    const body = box(0.08, 0.12, 0.42, midM);
+    body.position.z = -0.1;
+    const topFin = box(0.04, 0.05, 0.34, cyanM);
+    topFin.position.set(0, 0.09, -0.12);
+    const emitter = cylinder(0.05, 0.07, 0.22, darkM, 10);
+    emitter.rotation.x = Math.PI / 2;
+    emitter.position.set(0, 0.02, -0.4);
+    const lens = cylinder(0.055, 0.055, 0.04, glowM, 12);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0, 0.02, -0.52);
+    const coil1 = cylinder(0.062, 0.062, 0.03, cyanM, 10);
+    coil1.rotation.x = Math.PI / 2;
+    coil1.position.set(0, 0.02, -0.32);
+    const coil2 = cylinder(0.062, 0.062, 0.03, cyanM, 10);
+    coil2.rotation.x = Math.PI / 2;
+    coil2.position.set(0, 0.02, -0.22);
+    const grip = box(0.05, 0.13, 0.07, darkM);
+    grip.position.set(0, -0.1, 0.06);
+    grip.rotation.x = -0.28;
+    const cell = box(0.06, 0.1, 0.12, glowM); // енергоблок-«балон»
+    cell.position.set(0, -0.05, 0.16);
+    const stock = box(0.05, 0.1, 0.16, midM);
+    stock.position.set(0, -0.02, 0.24);
+    g.add(body, topFin, emitter, lens, coil1, coil2, grip, cell, stock);
+    muzzle.position.set(0, 0.02, -0.56);
+  } else if (kind === 'flamethrower') {
+    // 🔥 Вогнемет: широке сопло + балон-резервуар
+    const redM = toonMat(0xc0392b, 0x7a2018, 0.3);
+    const tank = cylinder(0.08, 0.08, 0.3, redM, 12); // балон
+    tank.rotation.z = Math.PI / 2;
+    tank.position.set(0, -0.04, 0.18);
+    const tankCap = cylinder(0.085, 0.085, 0.05, accentM, 12);
+    tankCap.rotation.z = Math.PI / 2;
+    tankCap.position.set(0.16, -0.04, 0.18);
+    const body = box(0.07, 0.1, 0.34, midM);
+    body.position.z = -0.06;
+    const pipe = cylinder(0.022, 0.022, 0.4, darkM, 8);
+    pipe.rotation.x = Math.PI / 2;
+    pipe.position.set(0, 0.02, -0.26);
+    const nozzle = cylinder(0.06, 0.035, 0.14, darkM, 12); // розтруб сопла
+    nozzle.rotation.x = Math.PI / 2;
+    nozzle.position.set(0, 0.02, -0.5);
+    const pilot = cone(0.025, 0.07, accentM, 8); // вогник-запальник
+    pilot.rotation.x = -Math.PI / 2;
+    pilot.position.set(0.05, 0.06, -0.5);
+    const grip = box(0.05, 0.13, 0.07, darkM);
+    grip.position.set(0, -0.1, 0.04);
+    grip.rotation.x = -0.25;
+    const grip2 = box(0.05, 0.1, 0.06, darkM);
+    grip2.position.set(0, -0.07, -0.2);
+    g.add(tank, tankCap, body, pipe, nozzle, pilot, grip, grip2);
+    muzzle.position.set(0, 0.02, -0.58);
   } else if (kind === 'bazooka') {
     const oliveM = toonMat(0x6b7a4a);
     const tube = cylinder(0.075, 0.075, 0.85, oliveM, 12);

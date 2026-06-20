@@ -151,7 +151,7 @@ export class Zombies {
     } else {
       z_.chestHp = 0;
     }
-    z_.damage = (amt, dir, headshot) => this._damage(z_, amt, dir, headshot);
+    z_.damage = (amt, dir, headshot, opts) => this._damage(z_, amt, dir, headshot, opts);
     if (opts.golden) this._makeGolden(z_);
     if (opts.elite) this._makeElite(z_);
     if (opts.sleeping) {
@@ -374,8 +374,12 @@ export class Zombies {
     return best;
   }
 
-  _damage(z, amt, dir, headshot) {
+  // opts.fire — урон вогнем (вогнемет, v46). У ЦЬОМУ релізі поведінка щита незмінна:
+  // вогонь руйнує звичайний щит, як будь-яка інша шкода. Прапорець — гак для v47
+  // (щити, стійкі до вогню): тоді перевірятимемо z.shieldFireproof && opts.fire тут.
+  _damage(z, amt, dir, headshot, opts) {
     if (z.state === 'dead') return;
+    const fire = !!(opts && opts.fire);
     // 🛡 щит: фронтальні влучання та вибухи приймає на себе щит
     if (z.shieldHp > 0) {
       const fx = -Math.sin(z.rig.group.rotation.y);
@@ -384,6 +388,9 @@ export class Zombies {
       // поріг -0.45 (раніше -0.15): вужчий фронтальний конус → дитині легше зайти збоку.
       const onShield = !dir || (dir.x * fx + dir.z * fz) < -0.45;
       if (onShield) {
+        // 🔥 v47-гак: тут перевірятимемо z.shieldFireproof && fire → щит ігнорує вогонь.
+        // У v46 поведінка незмінна — вогонь руйнує щит, як будь-яка шкода.
+        z.shieldFire = z.shieldFire || fire; // маркер: щит уже отримував вогняний урон
         z.shieldHp -= amt;
         this._aggro(z);
         for (const o of this.list) {

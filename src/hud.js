@@ -181,12 +181,24 @@ export class HUD {
       this._lastBuffHtml = buffHtml;
     }
 
-    // патрони
-    const a = p.curAmmo;
-    this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
-    this.el.ammoReserve.textContent = a.reserve === Infinity ? '∞' : a.reserve;
-    this.el.weaponName.textContent = `${p.weapon.icon} ${t(p.weapon.name)}`;
-    this.el.ammoMag.classList.toggle('low', a.mag <= 4 && p.reloading <= 0);
+    // патрони / 🔋 паливо (континуальні зброї — лазер/вогнемет)
+    const w = p.weapon;
+    this.el.weaponName.textContent = `${w.icon} ${t(w.name)}`;
+    if (w.continuous) {
+      // показуємо ПАЛИВО (секунди балона), а не mag/reserve
+      const fuel = p.fuel[p.cur] || 0;
+      const frac = fuel / w.fuelMax;
+      this.el.ammoMag.textContent = '🔋';
+      this.el.ammoReserve.textContent = fuel.toFixed(1) + t('с');
+      this.el.ammoMag.classList.toggle('low', frac < 0.2);
+      this.el.ammoReserve.classList.toggle('low', frac < 0.2);
+    } else {
+      const a = p.curAmmo;
+      this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
+      this.el.ammoReserve.textContent = a.reserve === Infinity ? '∞' : a.reserve;
+      this.el.ammoMag.classList.toggle('low', a.mag <= 4 && p.reloading <= 0);
+      this.el.ammoReserve.classList.remove('low');
+    }
 
     // гранати
     this.el.grenadesValue.textContent = p.grenades;

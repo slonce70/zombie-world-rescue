@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -988,6 +988,8 @@ class Game {
     // зброя, здобута в попередніх країнах
     for (const w of this.save.weapons) level.player.giveWeapon(w, false);
     if (this.save.weapons.includes('bazooka')) level.player.addRockets(2);
+    // 🔋 паливні зброї (v46): на старті рівня — повний балон у кожної наявної
+    for (const w of this.save.weapons) level.player.refillFuel(w);
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isArena) {
@@ -1343,6 +1345,7 @@ class Game {
       return;
     }
     this.level.player.giveWeapon(id);
+    this.level.player.refillFuel(id); // 🔋 нова паливна зброя — повний балон
     this.save.weapons.push(id);
     this.saveGame();
   }
