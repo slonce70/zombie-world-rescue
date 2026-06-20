@@ -333,7 +333,7 @@ class Game {
       xp: 0, skins: ['classic'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
-      missionRuns: {}, kidMode: null, cloudTs: 0,
+      missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
     };
@@ -368,6 +368,7 @@ class Game {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
         }
         if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
+        if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};

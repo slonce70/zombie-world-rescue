@@ -31,6 +31,17 @@ export const SHOP_ITEMS = [
   { id: 'damage', icon: '💥', name: t('Шкода'), desc: t('+15% до шкоди'), price: 150, max: 3, cat: t('Прокачування') },
 ];
 
+// Поточна «Моя ціль»: товар, на який гравець збирає монети (або null).
+export function goalInfo(game) {
+  const id = game.save && game.save.goal;
+  if (!id) return null;
+  const item = SHOP_ITEMS.find((i) => i.id === id);
+  if (!item) return null;
+  const need = item.price;
+  const have = game.save.coins || 0;
+  return { item, need, have, remaining: Math.max(0, need - have), done: have >= need };
+}
+
 export class Shop {
   constructor(game) {
     this.game = game;
@@ -107,8 +118,13 @@ export class Shop {
       const priceLabel = locked ? '🔒' : maxed ? (item.weapon || item.gadget ? t('Є!') : t('МАКС')) : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
+      // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
+      const goalOk = item.cat !== t('Припаси') && !maxed && !locked;
+      const isGoal = save.goal === item.id;
+      const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
-        <div class="shop-item ${maxed || locked ? 'maxed' : afford ? '' : 'poor'}" data-id="${item.id}">
+        <div class="shop-item ${maxed || locked ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
+          ${goalBtn}
           <div class="shop-icon">${item.icon}</div>
           <div class="shop-name">${item.name}${lvl}</div>
           <div class="shop-desc">${desc}</div>
@@ -119,6 +135,23 @@ export class Shop {
     this.elGrid.querySelectorAll('.shop-item').forEach((el) => {
       el.addEventListener('click', () => this.buy(el.dataset.id));
     });
+    this.elGrid.querySelectorAll('.shop-goal-btn').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const gid = el.dataset.goal;
+        this.game.save.goal = (this.game.save.goal === gid) ? null : gid;
+        this.game.audio.click();
+        this.game.saveGame();
+        this.render();
+      });
+    });
+    // шапка «Моя ціль»
+    const gi = goalInfo(this.game);
+    const goalEl = document.getElementById('shop-goal');
+    if (goalEl) goalEl.textContent = gi
+      ? (gi.done ? t('🎯 Ціль: {i} {n} — можна купити! 🎉', { i: gi.item.icon, n: gi.item.name })
+                 : t('🎯 Ціль: {i} {n} — ще {r} ₴', { i: gi.item.icon, n: gi.item.name, r: gi.remaining }))
+      : t('🎯 Обери ціль — тисни 🎯 на товарі');
   }
 
   buy(id) {
@@ -198,6 +231,11 @@ export class Shop {
     }
     game.audio.purchase();
     game.saveGame();
+    if (game.save.goal === id) {
+      game.save.goal = null;
+      game.hud.toast(t('🎯 Ціль досягнута! Обери нову в магазині'));
+      game.saveGame();
+    }
     this.render();
   }
 }

@@ -552,6 +552,7 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
   margin-top: 6px; border-bottom: 1px solid var(--ui-border); padding-bottom: 4px;
 }
 .shop-item {
+  position: relative;
   background: rgba(255,255,255,0.07); border: 2px solid var(--ui-border);
   border-radius: 16px; padding: 16px 12px; cursor: pointer; transition: all .14s;
 }
@@ -1042,3 +1043,13 @@ body.touch-mode #touch-coach.show { display: block; }
 .hq-beast-name { font-weight: 700; font-size: 14px; margin-top: 4px; }
 .hq-beast-desc { font-size: 11px; opacity: .8; margin-top: 2px; }
 .hq-beast-n { font-size: 11px; margin-top: 4px; opacity: .9; }
+
+/* 🎯 Моя ціль: рядок у шапці магазину + кнопка на картці товару */
+.shop-goal { text-align: center; font-weight: 700; margin: 6px 0; opacity: .95; }
+.shop-goal-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,.25); border: none; border-radius: 8px;
+  padding: 2px 6px; cursor: pointer; font-size: 14px; opacity: .6;
+}
+.shop-goal-btn.on { opacity: 1; background: #f5c542; }
+.shop-item.goal { outline: 2px solid #f5c542; }
