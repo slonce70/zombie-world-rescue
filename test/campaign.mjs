@@ -28,8 +28,8 @@ async function waitFor(fn, timeoutMs, label) {
 await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
 
-const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'TUR', 'EGY'];
-const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: 'flamethrower', TUR: 'magnum', EGY: 'bazooka' };
+const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'EGY'];
+const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: 'flamethrower', ITA: 'laser', TUR: 'magnum', EGY: 'bazooka' };
 
 for (const c of ORDER) {
   console.log(`▸ Граємо: ${c}`);
@@ -100,8 +100,8 @@ const final = await page.evaluate(() => {
     allDone: g.globe.allDone,
   };
 });
-check(final.liberated === 7, `усі 7 країн звільнено (${final.liberated})`);
-check(final.weapons.length >= 7, `арсенал: ${final.weapons.join(', ')}`);
+check(final.liberated === 8, `усі 8 країн звільнено (${final.liberated})`);
+check(final.weapons.length >= 8, `арсенал: ${final.weapons.join(', ')}`);
 check(final.passLevel >= 5, `зірковий рівень після кампанії: ${final.passLevel} (XP ${final.xp})`);
 check(final.allDone, 'глобус святкує: світ врятовано');
 check(final.coins > 300, `монет зароблено: ${final.coins}`);
