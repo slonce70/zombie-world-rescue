@@ -721,7 +721,7 @@ export class Zombies {
             if (playerAlive) {
               const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
               const target = new THREE.Vector3(tp.x, tp.y + 1.25, tp.z);
-              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg * this.coopMul(), z.ranged.size, z.ranged.color);
+              level.effects.spawnProjectile(from, target, z.ranged.projSpeed, z.ranged.dmg * this.diff.dmg, z.ranged.size, z.ranged.color);
               level.netEv('proj',
                 Math.round(from.x * 10) / 10, Math.round(from.y * 10) / 10, Math.round(from.z * 10) / 10,
                 Math.round(target.x * 10) / 10, Math.round(target.y * 10) / 10, Math.round(target.z * 10) / 10,
@@ -729,7 +729,7 @@ export class Zombies {
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
-            this._hurt(tgt, st.dmg * this.diff.dmg * this.coopMul(), z.x, z.z);
+            this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
             level.audio.zattack(1);
             if (z.type === 'boss') {
               level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), z.frost ? 0x66ccff : 0xff6644, 5);
@@ -784,7 +784,7 @@ export class Zombies {
           z.z += z.chargeDZ * cs * dt;
           if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
             z.didHit = true;
-            this._hurt(tgt, 34 * this.diff.dmg * this.coopMul(), z.x, z.z);
+            this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
             level.audio.slam();
           }
           if (z.charging <= 0) {

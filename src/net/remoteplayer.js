@@ -35,7 +35,7 @@ export class RemotePlayer {
     this.skin = info.skin || 'classic';
     this.tracer = info.tracer || 'classic';
 
-    this.rig = makeHero(this.skin);
+    this.rig = makeHero(this.skin, info.hero || null);
     level.scene.add(this.rig.group);
 
     // зброя в правій руці (як tpGuns у player.js)
