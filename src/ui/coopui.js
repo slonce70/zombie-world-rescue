@@ -43,6 +43,7 @@ export class CoopUI {
       modes: $('lobby-modes'),
       start: $('btn-lobby-start'),
       leave: $('btn-lobby-leave'),
+      invite: $('btn-coop-invite'),
       hint: $('lobby-hint'),
     };
 
@@ -90,6 +91,8 @@ export class CoopUI {
     };
     this.el.pub.addEventListener('change', () => onPub(this.el.pub.checked));
     this.el.lobbyPub.addEventListener('change', () => { game.audio.click(); onPub(this.el.lobbyPub.checked); });
+
+    this.el.invite.addEventListener('click', () => this._shareInvite());
 
     this.el.start.addEventListener('click', () => {
       if (this.session.role === 'host') {
@@ -150,8 +153,33 @@ export class CoopUI {
     if (params.has('coophost')) {
       this._autoHost(params.get('nick') || t('Хост'));
     } else if (params.get('coopjoin')) {
-      this._autoJoin(params.get('coopjoin'), params.get('nick') || t('Гість'));
+      this._autoJoin(params.get('coopjoin'), params.get('nick') || loadNick() || t('Гість'));
     }
+  }
+
+  // ---------- 📨 поклич друга ----------
+  // Лінк на цю ж гру з кодом кімнати — друг тисне й одразу заходить (?coopjoin=CODE).
+  _inviteUrl(code) {
+    return location.origin + location.pathname + '?coopjoin=' + encodeURIComponent(code);
+  }
+
+  async _shareInvite() {
+    const code = this.session && this.session.room;
+    if (!code) return; // нема кімнати → нічого не робимо
+    const url = this._inviteUrl(code);
+    const text = t('Гайда грати разом проти зомбі! 🧟 Тисни — і ти в моїй грі:');
+    this.game.audio.click();
+    try {
+      if (navigator.share) { await navigator.share({ title: t('Операція: Порятунок Світу'), text, url }); return; }
+    } catch (e) { /* користувач скасував share — ок */ return; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        this.game.hud.toast(t('🔗 Посилання скопійовано — надішли другу!'));
+        return;
+      }
+    } catch (e) { /* clipboard заблоковано — покажемо посилання */ }
+    this.game.hud.toast(t('🔗 Посилання: {u}', { u: url }));
   }
 
   // ---------- публічність ----------

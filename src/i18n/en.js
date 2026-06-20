@@ -782,4 +782,9 @@ export const EN = {
 "Ти отримав {m}!": "You earned {m}!",
 "📖 Глава 1: Я рятівник": "📖 Chapter 1: I'm a Rescuer",
 "🎖️ {m} — отримано!": "🎖️ {m} — received!",
+"📨 Поклич друга": "📨 Invite a friend",
+"Гайда грати разом проти зомбі! 🧟 Тисни — і ти в моїй грі:": "Come play against zombies together! 🧟 Tap — and you're in my game:",
+"Операція: Порятунок Світу": "Operation: World Rescue",
+"🔗 Посилання скопійовано — надішли другу!": "🔗 Link copied — send it to a friend!",
+"🔗 Посилання: {u}": "🔗 Link: {u}",
 };
