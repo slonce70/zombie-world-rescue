@@ -127,6 +127,16 @@ const hqHtml = await page.evaluate(() => document.getElementById('hq-content').i
 check(/Мої цифри|My Stats|Мои цифры/.test(hqHtml), 'Штаб рендерить секцію «Мої цифри»');
 check(/hq-stat-n/.test(hqHtml), 'Штаб показує картки-цифри');
 
+// ============ 🎖️ ПРЕСТИЖ: XP понад поріг 30 рівня → Ранг Рятівника ============
+console.log('▸ Престиж: XP понад максимум → Ранг Рятівника');
+// Престиж: XP понад поріг 30 рівня дає Зірки Рятівника
+await page.evaluate(() => window.__game.test.addXp(200000));
+const stars = await page.evaluate(() => window.__game.progress.prestigeStars);
+check(stars >= 1, `XP понад максимум → prestigeStars ≥ 1 (${stars})`);
+await page.evaluate(() => window.__game.hq.render());
+const pHtml = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
+check(/Ранг Рятівника|Rescuer Rank|Ранг Спасателя/.test(pHtml), 'Штаб показує Ранг Рятівника');
+
 // ============ 🗺️ ШТАБ: секція «Моя пригода» (печаті країн) ============
 console.log('▸ Штаб: Моя пригода (печаті країн)');
 // До звільнення: Україна відкрита, решта світу затемнена (???)

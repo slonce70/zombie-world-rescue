@@ -1028,6 +1028,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .hq-stat-i { font-size: 22px; }
 .hq-stat-l { flex: 1; font-size: 13px; opacity: .85; }
 .hq-stat-n { font-weight: 800; font-size: 18px; }
+.hq-prestige { margin-top: 10px; font-weight: 800; font-size: 16px; text-align: center; }
 .hq-countries { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .hq-country { text-align: center; font-size: 30px; background: rgba(255,255,255,.07); border-radius: 12px; padding: 10px 6px; }
 .hq-country.locked { opacity: .4; }

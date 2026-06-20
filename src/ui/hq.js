@@ -40,6 +40,8 @@ export class RescueHQ {
       h += `<div class="hq-stat"><span class="hq-stat-i">${i}</span><span class="hq-stat-l">${label}</span><span class="hq-stat-n">${n}</span></div>`;
     }
     h += '</div>';
+    const stars = this.game.progress ? this.game.progress.prestigeStars : 0;
+    h += `<div class="hq-prestige">${t('🎖️ Ранг Рятівника: {n} ⭐', { n: stars })}</div>`;
     return h;
   }
 
