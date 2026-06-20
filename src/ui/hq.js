@@ -2,6 +2,7 @@
 // Дзеркало renderWardrobe: будує innerHTML у #hq-content. Жодного 3D.
 import { t } from '../i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
+import { goalInfo } from '../shop.js';
 
 const BESTIARY = [
   { id: 'walker', icon: '🧟', name: t('Волоцюга'), desc: t('Повільний, зате їх багато!') },
@@ -22,7 +23,17 @@ export class RescueHQ {
   render() {
     const root = document.getElementById('hq-content');
     if (!root) return;
-    root.innerHTML = this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._bestiaryHtml(this.game.save);
+    root.innerHTML = this._goalHtml(this.game.save) + this._statsHtml(this.game.save) + this._adventureHtml(this.game.save) + this._bestiaryHtml(this.game.save);
+  }
+
+  _goalHtml(save) {
+    const gi = goalInfo(this.game);
+    if (!gi) return `<h3 class="hq-h">${t('🎯 Моя ціль')}</h3><div class="hq-goal empty">${t('Обери ціль у магазині — тисни 🎯 на товарі, на який збираєш монети.')}</div>`;
+    const line = gi.done
+      ? t('Можна купити! 🎉')
+      : t('Ще {r} монет', { r: gi.remaining });
+    const desc = typeof gi.item.desc === 'function' ? gi.item.desc() : gi.item.desc;
+    return `<h3 class="hq-h">${t('🎯 Моя ціль')}</h3><div class="hq-goal"><span class="hq-goal-i">${gi.item.icon}</span><div class="hq-goal-b"><div class="hq-goal-n">${gi.item.name}</div><div class="hq-goal-r">${line}</div><div class="hq-goal-d">${desc}</div></div></div>`;
   }
 
   _statsHtml(save) {
