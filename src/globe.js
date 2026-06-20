@@ -333,7 +333,7 @@ export class Globe {
     if (!this.ready) return;
     // не показуємо тултип країни, коли вже НЕ на глобусі (інакше при старті рівня
     // рух миші під час асинхронної побудови «протікає» тултип «звільнено…» у бій)
-    if (this.game.state !== 'globe') { document.getElementById('globe-tooltip').style.display = 'none'; return; }
+    if (this.game.state !== 'globe') { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; return; }
     const hit = this._raycast(e);
     const c = hit ? this.pickCountry(hit.uv) : null;
     const newHover = c ? c.id : null;
