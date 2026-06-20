@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -521,10 +521,11 @@ class Game {
   }
 
   // 🌍 Список країн під глобусом: чіпи з прапором/назвою/станом.
-  // Глобус лишається клікабельним — список дублює таргети для тих, кому
-  // важко влучити по країні пальцем. Тап доступної країни → startLevel().
-  renderCountryList() {
-    const box = document.getElementById('country-list');
+  // Список країн кампанії: показується у ГРАТИ → Кампанія (#solo-countries).
+  // Глобус лишається клікабельним — список дублює таргети для тих, кому важко
+  // влучити по країні пальцем. Тап доступної країни → startLevel() (+ закриває
+  // оверлей, якщо переданий). Заблокована → denied-тост.
+  renderCountryList(box, onPlay) {
     if (!box) return;
     const lib = this.save.liberated || {};
     box.innerHTML = '';
@@ -544,6 +545,7 @@ class Game {
         const nowLib = this.save.liberated || {};
         if (nowLib[id] || isCountryOpen(nowLib, id)) {
           this.audio.click();
+          if (onPlay) onPlay();
           this.startLevel(id);
         } else {
           this.audio.denied();
@@ -558,7 +560,6 @@ class Game {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
     if (show) {
-      this.renderCountryList();
       document.getElementById('liberated-count').textContent =
         Object.keys(this.save.liberated).length;
       // бейджі: рівень пасса і незавершені завдання дня
@@ -611,8 +612,14 @@ class Game {
         }
         this.audio.click();
         if (mode === 'campaign') {
-          this._hideOverlay('overlay-solo');
-          this.hud.toast(t('🔴 Натисни червону країну на глобусі — там зомбі!'));
+          // вибір країни ТУТ (після ГРАТИ), а не на головному екрані
+          root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
+          cRoot.style.display = '';
+          cRoot.innerHTML = t('<div class="solo-cty-title">Яку країну рятуємо?</div>');
+          const listBox = document.createElement('div');
+          listBox.id = 'country-list';
+          cRoot.appendChild(listBox);
+          this.renderCountryList(listBox, () => this._hideOverlay('overlay-solo'));
         } else if (mode === 'arena') {
           this._hideOverlay('overlay-solo');
           this.startArena();
