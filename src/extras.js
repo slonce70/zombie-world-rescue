@@ -609,8 +609,8 @@ export class Gadgets {
       level.bus.emit('toast', t('💫 Оглушливі кулі на 3с! Пістолет і магнум оглушують зомбі'));
       ok = true;
     } else if (id === 'teleport') {
-      // 🌀 ривок уперед на ~8м; collide не дає опинитися в стіні чи за межами
-      const dist = 8;
+      // 🌀 ривок уперед на ~20м; collide не дає опинитися в стіні чи за межами
+      const dist = 20;
       const tx = p.pos.x - Math.sin(p.yaw) * dist;
       const tz = p.pos.z - Math.cos(p.yaw) * dist;
       const solved = level.world.collide(tx, tz, 0.45, p.pos.y);
