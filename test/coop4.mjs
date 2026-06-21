@@ -42,8 +42,8 @@ try {
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
   await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
-  // у хоста є песик — ще ДО створення кімнати
-  await A.evaluate(() => { window.__game.save.upgrades.dog = 1; window.__game.saveGame(); });
+  // у хоста є песик — ще ДО створення кімнати (v63: улюбленці через save.pets/activePet)
+  await A.evaluate(() => { const g = window.__game; if (!g.save.pets.includes('dog')) g.save.pets.push('dog'); g.save.activePet = 'dog'; g.saveGame(); });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
   await sleep(400);
@@ -56,11 +56,11 @@ try {
   // ---- 1. 🐶 гість бачить песика хоста ----
   await B.waitForFunction(() => {
     const rp = window.__game.level.net.remotes.get(1);
-    return rp && rp.dog && rp.dog.group.visible;
+    return rp && rp.pet && rp.pet.group.visible;
   }, null, { timeout: 12000 }).catch(() => {});
   const dogB = await B.evaluate(() => {
     const rp = window.__game.level.net.remotes.get(1);
-    return rp && rp.dog ? rp.dog.group.visible : false;
+    return rp && rp.pet ? rp.pet.group.visible : false;
   });
   check('песик хоста видимий гостю', dogB === true);
 

@@ -223,18 +223,20 @@ try {
   check('гість вполював зомбі (кредит за кіл)', killsAfter > killsBefore, `кіли: ${killsBefore} → ${killsAfter}`);
 
   // 10. зʼєднання живе: kill-credit вище вже довів двосторонній канал.
-  // Вотчдог `waiting` латчиться після >4с без застосованого снапшота, а поріг 4с НЕ
-  // масштабований SLOW. На завантаженому CI rAF гостя тротлиться, тож рідкісний флаш
-  // не встигав: вотчдог релатчувався між перевірками. Фікс: ЩІЛЬНИЙ потік флашів —
-  // тримаємо lastSnapAt гостя свіжим (<4с) безперервно, аби будь-який кадр rAF зняв waiting.
+  // Вотчдог `waiting` перераховується ЛИШЕ в GuestNet.update() (rAF). На завантаженому CI
+  // rAF гостя тротлиться >4с, тож флаш сам по собі не знімав waiting. Фікс: після флаша
+  // ПРИМУСОВО тикаємо мережу гостя (g.level.net.update) — застосувати снапшот і перерахувати
+  // вотчдог, не чекаючи на rAF. Реальний «хост замовк» усе одно лишив би waiting=true (без флашів).
   {
     const deadline = Date.now() + 20000 * SLOW;
     let ok = false;
     while (Date.now() < deadline && !ok) {
-      for (let k = 0; k < 5; k++) { await flushHostSnapshot(); await sleep(100); }
-      await sleep(150); // дати гостю кадр застосувати останній снапшот і перерахувати вотчдог
+      await flushHostSnapshot();
+      await sleep(120);
       ok = await B.evaluate(() => {
-        const s = window.__game.test.coopState();
+        const g = window.__game;
+        if (g.level && g.level.net && g.level.net.update) g.level.net.update(0.05);
+        const s = g.test.coopState();
         return s.connected === true && s.waiting === false;
       });
     }
