@@ -35,7 +35,7 @@ const cfg = await page.evaluate(async () => {
   const C = mod.COUNTRIES.ESP;
   const order = mod.CAMPAIGN_ORDER;
   return {
-    exists: !!C, biome: C && C.biome, reward: C && C.weaponReward,
+    exists: !!C, biome: C && C.biome, reward: C && C.weaponReward, coin: C && C.coinReward,
     extra: C && C.extraZombie, bossStyle: C && C.boss.style, bossHp: C && C.boss.hp,
     diff: C && C.difficulty, hasBiome: !!mod.BIOMES[C && C.biome],
     order, idx: order.indexOf('ESP'),
@@ -44,7 +44,9 @@ const cfg = await page.evaluate(async () => {
 });
 check(cfg.exists, 'COUNTRIES.ESP існує');
 check(cfg.biome === 'spainSun' && cfg.hasBiome, 'біом spainSun зареєстровано', cfg.biome);
-check(cfg.reward === 'flamethrower', 'нагорода — ВОГНЕМЕТ (flamethrower)', cfg.reward);
+// v53: ESP більше НЕ дає зброю (вогнемет — за зірковий рівень 25), а дає МОНЕТИ
+check(!cfg.reward, 'ESP більше не має weaponReward (вогнемет — за зірковий рівень)', cfg.reward || '—');
+check(cfg.coin === 600, 'нагорода — 600 МОНЕТ (coinReward)', cfg.coin);
 check(cfg.extra === 'toro', 'extraZombie = toro', cfg.extra);
 check(cfg.bossStyle === 'matador' && cfg.bossHp === 7000, `бос matador, ${cfg.bossHp} HP`);
 check(cfg.idx === 4 && cfg.order[3] === 'FRA' && cfg.order.indexOf('TUR') > cfg.idx,
@@ -160,13 +162,15 @@ check(boss && boss.style === 'matador', `бос стиль matador (${boss && bo
 check(boss && boss.hp >= 7000, `бос 7000 HP (${boss && boss.hp})`);
 check(boss && boss.ranged, 'бос має дальню атаку (бандерильї)');
 
-// перемагаємо боса → звільнення → ВОГНЕМЕТ
+// перемагаємо боса → звільнення → +600 МОНЕТ (вогнемет тепер за зірковий рівень, не за ESP)
+const coinsBefore = await page.evaluate(() => window.__game.save.coins);
 await page.evaluate(() => window.__game.test.damageBoss(999999));
 const win = await waitFor(page, () => window.__game.victoryShown, 30000, 'перемога');
 check(win, 'ESP звільнено!');
 const st = await page.evaluate(() => window.__game.test.state());
 check(st.liberated.includes('ESP'), 'ESP записано в сейв');
-check(st.player.weapons.includes('flamethrower'), 'звільнення ESP дало ВОГНЕМЕТ');
+check(!st.player.weapons.includes('flamethrower'), 'звільнення ESP НЕ дає вогнемет (він за зірковий рівень 25)');
+check(st.coins >= coinsBefore + 600, `звільнення ESP дало +600 монет (${coinsBefore} → ${st.coins})`);
 
 console.log('');
 if (errors.length) {

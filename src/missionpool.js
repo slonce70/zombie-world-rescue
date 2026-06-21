@@ -917,15 +917,24 @@ export class DynamicMissions {
       m.crateOpenedT += dt;
       if (m.crateOpenedT > 0.9) {
         const w = level.country.weaponReward;
-        const hadIt = (level.game.save.weapons || []).includes(w);
-        level.game.unlockWeapon(w); // видає зброю (соло/хост); якщо вже є — unlockWeapon сам дає +300 монет і тост «вже є»
-        this._complete(m.id);
-        // тост-нагороду показуємо ЛИШЕ якщо зброя справді нова; weaponRewardToast — ФУНКЦІЯ,
-        // тож ВИКЛИКАЄМО її (раніше емітували саму функцію → у тост лазив код), і не дублюємо
-        // повідомлення «Ти отримав…», коли зброя вже була (тоді гравець бачить «вже є +300»)
-        if (!hadIt && level.country.weaponRewardToast) {
-          const tw = level.country.weaponRewardToast;
-          level.bus.emit('toast', typeof tw === 'function' ? tw() : tw);
+        if (w) {
+          const hadIt = (level.game.save.weapons || []).includes(w);
+          level.game.unlockWeapon(w); // видає зброю (соло/хост); якщо вже є — unlockWeapon сам дає +300 монет і тост «вже є»
+          this._complete(m.id);
+          // тост-нагороду показуємо ЛИШЕ якщо зброя справді нова; weaponRewardToast — ФУНКЦІЯ,
+          // тож ВИКЛИКАЄМО її (раніше емітували саму функцію → у тост лазив код), і не дублюємо
+          // повідомлення «Ти отримав…», коли зброя вже була (тоді гравець бачить «вже є +300»)
+          if (!hadIt && level.country.weaponRewardToast) {
+            const tw = level.country.weaponRewardToast;
+            level.bus.emit('toast', typeof tw === 'function' ? tw() : tw);
+          }
+        } else {
+          // 🇪🇸/🇮🇹 склад без зброї: ящик дає МОНЕТИ (вогнемет/лазер тепер за зірковий рівень)
+          const c = level.country.coinReward || 120;
+          level.game.save.coins += c;
+          level.game.saveGame();
+          this._complete(m.id);
+          level.bus.emit('toast', t('📦 Ящик зі скарбом! +{c} монет 💰', { c }));
         }
       }
     }

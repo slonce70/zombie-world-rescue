@@ -1190,6 +1190,16 @@ function buildZombie(type, rng) {
     rig.ztype = 'gladiator';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'imp') {
+    // 🧟 шкет: дрібний і дуже швидкий зомбі — впізнавано МАЛЕНЬКИЙ (≈0.66 зросту),
+    // велика голова й вирячені очі надають хижого «дитячого» вигляду
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 0.66, belly: 0.78, armsForward: 1.5, headR: 0.3, lean: -0.18,
+      eyeWhite: 0xfff0a0, eyeL: 0.1, eyeR: 0.1, pupilColor: 0xc62828, brow: 0.2,
+    }));
+    rig.ztype = 'imp';
+    addZombieWear(rig);
+    return rig;
   } else { // walker
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.0, belly: 1.05, armsForward: 1.35,

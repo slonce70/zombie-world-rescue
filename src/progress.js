@@ -103,7 +103,26 @@ export class Progress {
     if (prestigeAfter > prestigeBefore) {
       game.hud.banner(t('🎖️ РАНГ РЯТІВНИКА {n}!', { n: prestigeAfter }), t('Так тримати, легендо!'), 4.2);
     }
+    // 🔥 вогнемет@25 / 🔫 лазер@28 — нагороди за зірковий рівень (ОКРЕМО від PASS_REWARDS)
+    if (after > before) this._checkWeaponUnlocks();
     game.saveGame();
+  }
+
+  // 🎖️ Зброя за ЗІРКОВИЙ РІВЕНЬ: вогнемет@25, лазер@28. Окремо від PASS_REWARDS.
+  // Викликається з addXp (при підвищенні рівня) і на boot (catch-up для тих, хто вже ≥25/28).
+  _checkWeaponUnlocks() {
+    const g = this.game, lvl = this.level;
+    const grant = (need, id, name) => {
+      if (lvl >= need && !(g.save.weapons || []).includes(id)) {
+        if (!g.save.weapons) g.save.weapons = [];
+        g.save.weapons.push(id);
+        if (g.level && g.level.player) g.level.player.giveWeapon(id, false);
+        if (g.hud) g.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {n}!', { n: need }), t('Нова зброя: {w}! Перемкни її 🔁', { w: name }), 4.4);
+        g.saveGame();
+      }
+    };
+    grant(25, 'flamethrower', t('🔥 ВОГНЕМЕТ'));
+    grant(28, 'laser', t('🔫 ЛАЗЕР'));
   }
 
   _grantLevel(lvl) {

@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -550,6 +550,8 @@ class Game {
     }
     this._hideOverlay('overlay-loading');
     this.state = 'globe';
+    // 🎖️ catch-up: гравці, які ВЖЕ на зірковому рівні ≥25/≥28, одразу отримують вогнемет/лазер
+    this.progress._checkWeaponUnlocks();
     this._showGlobeUI(true);
     this._initVersionCheck();
     this.cloud.bootSync(); // тихо: пуш прогресу або підхоплення хмарного сейва
@@ -1338,6 +1340,7 @@ class Game {
   // нагорода-зброя за країну: видається і запам'ятовується назавжди.
   // Якщо зброя вже куплена в магазині — компенсація монетами.
   unlockWeapon(id) {
+    if (!id) return; // 🛡 ESP/ITA більше не мають weaponReward — гард від unlockWeapon(undefined)
     if (!this.level) return;
     if (this.save.weapons.includes(id)) {
       this.level.addCoins(300);
@@ -1665,6 +1668,10 @@ class Game {
       if (country.weaponRewardToast) {
         this.hud.toast(typeof country.weaponRewardToast === 'function' ? country.weaponRewardToast() : country.weaponRewardToast);
       }
+    } else if (!country.weaponReward && country.coinReward) {
+      // 🇪🇸/🇮🇹 більше не дають зброю — натомість монети (вогнемет/лазер тепер за зірковий рівень)
+      this.save.coins += country.coinReward;
+      this.hud.toast(t('🏆 {n} звільнено! +{c} монет 💰', { n: country.name, c: country.coinReward }));
     }
     // наступне проходження цієї країни отримає НОВИЙ набір місій
     this.save.missionRuns[country.id] = (this.save.missionRuns[country.id] || 0) + 1;

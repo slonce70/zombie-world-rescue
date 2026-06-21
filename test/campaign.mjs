@@ -29,7 +29,8 @@ await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
 
 const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'EGY'];
-const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: 'flamethrower', ITA: 'laser', TUR: 'magnum', EGY: 'bazooka' };
+// v53: ESP/ITA більше НЕ дають зброю (вогнемет@25 / лазер@28 — за зірковий рівень) — лише монети.
+const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: null, ITA: null, TUR: 'magnum', EGY: 'bazooka' };
 
 for (const c of ORDER) {
   console.log(`▸ Граємо: ${c}`);
@@ -48,8 +49,8 @@ for (const c of ORDER) {
     g.test.completeMission('warehouse');
   });
   // зброя-нагорода видається при відкритті ящика — у тесті місія завершена напряму,
-  // тож даємо її явно (як зробив би гравець, відкривши ящик)
-  await page.evaluate((w) => window.__game.unlockWeapon(w), REWARDS[c]);
+  // тож даємо її явно (як зробив би гравець, відкривши ящик). ESP/ITA зброї не дають — пропускаємо.
+  if (REWARDS[c]) await page.evaluate((w) => window.__game.unlockWeapon(w), REWARDS[c]);
   // відбиваємо орди, поки арена боса не відкриється (орда оголошується з затримкою)
   let bossOk = false;
   const tH = Date.now();
@@ -79,7 +80,15 @@ for (const c of ORDER) {
   check(win, `${c} звільнено!`);
   const st = await page.evaluate(() => window.__game.test.state());
   check(st.liberated.includes(c), 'країна записана в сейв');
-  check(st.player.weapons.includes(REWARDS[c]), `зброя-нагорода в арсеналі (${REWARDS[c]})`);
+  if (REWARDS[c]) check(st.player.weapons.includes(REWARDS[c]), `зброя-нагорода в арсеналі (${REWARDS[c]})`);
+  else {
+    // ESP/ITA дають МОНЕТИ. Зброю (вогнемет/лазер) дав би лише зірковий рівень ≥25/≥28 —
+    // у швидкому тесті він туди не доходить, тож гард-перевірка враховує й цей крайній випадок.
+    const lvl = await page.evaluate(() => window.__game.progress.level);
+    const noFlame = lvl >= 25 || !st.player.weapons.includes('flamethrower');
+    const noLaser = lvl >= 28 || !st.player.weapons.includes('laser');
+    check(noFlame && noLaser, `${c} не дає зброю — нагорода монетами (вогнемет/лазер за зірковий рівень, lvl=${lvl})`);
+  }
   // на глобус
   await page.evaluate(() => {
     document.getElementById('btn-victory-globe').click();
@@ -101,7 +110,13 @@ const final = await page.evaluate(() => {
   };
 });
 check(final.liberated === 8, `усі 8 країн звільнено (${final.liberated})`);
-check(final.weapons.length >= 8, `арсенал: ${final.weapons.join(', ')}`);
+// v53: ESP/ITA дають монети, тож кампанія дає 6 зброй (rifle/shotgun/smg/sniper/magnum/bazooka).
+// Вогнемет/лазер тепер за зірковий рівень 25/28, який у швидкій кампанії не досягається.
+const expectWeapons = ['rifle', 'shotgun', 'smg', 'sniper', 'magnum', 'bazooka'];
+check(expectWeapons.every((w) => final.weapons.includes(w)),
+  `арсенал має 6 зброй за країни: ${final.weapons.join(', ')}`);
+check(!final.weapons.includes('flamethrower') && !final.weapons.includes('laser'),
+  'вогнемет/лазер НЕ в арсеналі (за зірковий рівень 25/28, а не за ESP/ITA)');
 check(final.passLevel >= 5, `зірковий рівень після кампанії: ${final.passLevel} (XP ${final.xp})`);
 check(final.allDone, 'глобус святкує: світ врятовано');
 check(final.coins > 300, `монет зароблено: ${final.coins}`);
