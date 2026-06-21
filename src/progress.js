@@ -123,6 +123,13 @@ export class Progress {
     };
     grant(25, 'flamethrower', t('🔥 ВОГНЕМЕТ'));
     grant(28, 'laser', t('🔫 ЛАЗЕР'));
+    // 🛡️ скін «Лицар» — за зірковий рівень 30 (фінал шляху; royal-трасер на 30 лишається)
+    if (lvl >= 30 && !(g.save.skins || []).includes('knight')) {
+      if (!g.save.skins) g.save.skins = [];
+      g.save.skins.push('knight');
+      if (g.hud) g.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ 30!'), t('Скін «Лицар» 🛡️ — одягни в Гардеробі!'), 4.4);
+      g.saveGame();
+    }
   }
 
   _grantLevel(lvl) {

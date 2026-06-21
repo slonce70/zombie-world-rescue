@@ -429,10 +429,18 @@ export const GADGETS = {
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
 const WATCHTOWER_HP = 125;
 
-function makeWatchtowerMesh() {
+// 🗼 скіни башти: id → кольори (metal — ноги/щаблі, dark — платформа) + метадані для UI
+export const TOWER_SKINS = {
+  default: { name: t('Залізна башта'), icon: '🗼', metal: 0x6f7d8a, dark: 0x3c4650 },
+  stone: { name: t('Камʼяна башта'), icon: '🪨', metal: 0x9b9489, dark: 0x6b6359 },
+  gold: { name: t('Золота башта'), icon: '🏅', metal: 0xf4c430, dark: 0xb8860b },
+};
+
+function makeWatchtowerMesh(skinId) {
+  const s = TOWER_SKINS[skinId] || TOWER_SKINS.default;
   const g = new THREE.Group();
-  const metal = new THREE.MeshToonMaterial({ color: 0x6f7d8a });
-  const dark = new THREE.MeshToonMaterial({ color: 0x3c4650 });
+  const metal = new THREE.MeshToonMaterial({ color: s.metal });
+  const dark = new THREE.MeshToonMaterial({ color: s.dark });
   const legGeo = new THREE.CylinderGeometry(0.055, 0.075, 4.0, 6);
   for (const sx of [-0.85, 0.85]) {
     for (const sz of [-0.85, 0.85]) {
@@ -678,7 +686,7 @@ export class Gadgets {
     const oldIdx = this.towers.findIndex((t) => t.ownerPid === ownerPid);
     if (oldIdx >= 0) this._removeWatchtower(oldIdx, false);
     const y = level.world.groundH(x, z);
-    const mesh = makeWatchtowerMesh();
+    const mesh = makeWatchtowerMesh(level.game && level.game.save && level.game.save.activeTowerSkin);
     mesh.position.set(x, y, z);
     level.scene.add(mesh);
     const collider = { x, z, r: 0.8, top: y + 2.4 };
