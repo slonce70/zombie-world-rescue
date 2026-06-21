@@ -111,6 +111,6 @@ jobs:
         run: node test/save-migration.mjs
       - name: Extended battery
         run: |
-          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 update-bugfix weapons-fuel enemies-v47 update-spain update-italy crate-toast weapon-unlock xray-ghost gadget-watchtower stun-bullets gadget-teleport campaign maps flows replay terrain-geometry; do
+          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 update-bugfix weapons-fuel enemies-v47 update-spain update-italy crate-toast weapon-unlock xray-ghost gadget-watchtower stun-bullets gadget-teleport pets campaign maps flows replay terrain-geometry; do
             echo "=== $t ==="; SLOW=4 node test/$t.mjs || exit 1
           done

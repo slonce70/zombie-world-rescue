@@ -1,5 +1,6 @@
 // Магазин (клавіша B): вкладки категорій, зброя, гаджети, спорядження, прокачування
 import { GADGETS } from './extras.js';
+import { PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 
 export const SHOP_ITEMS = [
@@ -21,7 +22,8 @@ export const SHOP_ITEMS = [
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'dog', icon: '🐶', name: t('Песик Дружок'), desc: t('Збирає монети і гавкає на сюрпризи!'), price: 350, max: 1, cat: t('Гаджети й друзі') },
+  // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500
+  ...Object.entries(PETS).map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
   // --- зброя ---
   { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
   { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
@@ -91,6 +93,7 @@ export class Shop {
   getCount(item) {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
+    if (item.pet) return this.game.save.pets.includes(item.id) ? 1 : 0;
     return this.game.save.upgrades[item.id] || 0;
   }
 
@@ -186,7 +189,13 @@ export class Shop {
       return;
     }
     save.coins -= price;
-    if (item.max !== Infinity && !item.weapon && !item.gadget) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet) save.upgrades[id] = count + 1;
+    if (item.pet) {
+      if (!save.pets.includes(id)) save.pets.push(id);
+      save.activePet = id; // куплений улюбленець одразу стає активним і з'являється поряд
+      game.spawnPet();
+      game.hud.toast(t('{i} {n} — тепер з тобою! Обрати іншого — Гардероб 🎒', { i: item.icon, n: item.name }));
+    }
     switch (id) {
       case 'medkit': player.heal(50); break;
       case 'maxhp':
@@ -234,10 +243,6 @@ export class Shop {
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
         game.hud.toast(t('{i} {n} — твій назавжди! Клавіша F (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name }));
-        break;
-      case 'dog':
-        game.spawnPet();
-        game.hud.toast(t('🐶 Дружок тепер з тобою! Він збирає монети сам'));
         break;
     }
     game.audio.purchase();

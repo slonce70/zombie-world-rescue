@@ -74,6 +74,9 @@ try {
   await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 });
   check('обидва клієнти на глобусі', true);
 
+  // хост обирає улюбленця ДО створення кімнати — друг має побачити його поряд (повний синк)
+  await A.evaluate(() => { const g = window.__game; if (!g.save.pets.includes('cat')) g.save.pets.push('cat'); g.save.activePet = 'cat'; });
+
   // 2. хост створює кімнату
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   check('кімнату створено', typeof code === 'string' && code.length === 4, `код ${code}`);
@@ -109,6 +112,8 @@ try {
   const sB = await B.evaluate(() => window.__game.test.coopState());
   check('гість отримав зомбі від хоста', sB.aliveZombies > 10, `зомбі: ${sB.aliveZombies}`);
   check('гість отримав предмети від хоста', sB.items > 5, `предметів: ${sB.items}`);
+  // 🐾 повний синк: гість бачить улюбленця хоста (кошеня)
+  check('гість бачить улюбленця хоста (кошеня)', Object.values(sB.remotePets).includes('cat'), JSON.stringify(sB.remotePets));
 
   // 6. обидва бачать одне одного
   await A.waitForFunction(() => window.__game.test.coopState().remotes.length === 1, null, { timeout: 8000 }).catch(() => {});

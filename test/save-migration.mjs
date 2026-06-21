@@ -73,6 +73,23 @@ async function loadWith(raw) {
   check(save.chapter.done === false, 'F26: chapter.done доповнено дефолтом (false)');
 }
 
+// 6. Улюбленці: легасі-собака (upgrades.dog) → у список pets + активний
+{
+  const { save, errs } = await loadWith(JSON.stringify({
+    liberated: { UKR: true }, weapons: ['pistol'], upgrades: { dog: 1, maxhp: 2 },
+  }));
+  check(errs.length === 0, `легасі-собака: без винятків (${errs[0] || 'ok'})`);
+  check(Array.isArray(save.pets) && save.pets.includes('dog'), 'легасі-собака: dog перенесено у save.pets');
+  check(save.activePet === 'dog', 'легасі-собака: activePet = dog');
+}
+
+// 7. activePet, що вказує на неоплаченого улюбленця → скидається
+{
+  const { save, errs } = await loadWith(JSON.stringify({ pets: ['cat'], activePet: 'dragon' }));
+  check(errs.length === 0, `битий activePet: без винятків (${errs[0] || 'ok'})`);
+  check(save.activePet === 'cat', 'битий activePet → перший із наявних (cat)');
+}
+
 await browser.close();
 console.log(failed === 0 ? '\n🎉 МІГРАЦІЯ СЕЙВА НАДІЙНА' : `\n❌ МІГРАЦІЯ: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);

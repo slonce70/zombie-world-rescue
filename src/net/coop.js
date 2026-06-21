@@ -66,7 +66,7 @@ export class CoopSession {
       hero: (save.activeSkin === 'custom' && save.hero) ? save.hero : null,
       tracer: save.activeTracer || 'classic',
       dance: save.activeDance || 'shuffle',
-      dog: (save.upgrades.dog || 0) > 0 ? 1 : 0,
+      pet: save.activePet || null, // 🐾 id активного улюбленця — друзі бачать його поряд
     };
   }
 
@@ -261,7 +261,7 @@ export class CoopSession {
     // 🧼 безпека дітей: захист від клієнта, що оминає cleanNick (нік видно іншій дитині)
     if (nickIsBad(nick)) nick = t('Гравець');
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
-    this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, dog: d.dog || 0 });
+    this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId,
       roster: this._rosterList(),
@@ -288,7 +288,7 @@ export class CoopSession {
   _rosterList() {
     const out = [];
     for (const [pid, r] of this.roster) {
-      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, hero: r.hero || null, tracer: r.tracer, dog: r.dog || 0 });
+      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
     }
     return out;
   }

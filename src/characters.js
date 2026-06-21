@@ -2403,6 +2403,370 @@ export function makeDog() {
 }
 
 // ============================================================
+// 🐾 УЛЮБЛЕНЦІ (процедурні моделі в стилі makeDog)
+// Кожен білдер повертає { group, head, legs|wings, tail, phase } —
+// Pet.update анімує наявні частини за типом руху (quad/bird/hop).
+// ============================================================
+
+// спільні милі очі з відблиском
+function petEyes(headG, dx, dy, dz, r = 0.028, color = 0x141414) {
+  for (const side of [-1, 1]) {
+    const eye = sphere(r, toonMat(color), 8, 6);
+    eye.position.set(dx * side, dy, dz);
+    headG.add(eye);
+    const glint = sphere(r * 0.42, toonMat(0xffffff), 6, 5);
+    glint.position.set(dx * side - 0.008, dy + 0.012, dz - 0.012);
+    headG.add(glint);
+  }
+}
+
+// 🐱 кошеня: струнке, трикутні вушка, вуса, довгий хвіст
+export function makeCat() {
+  const root = new THREE.Group();
+  const furM = toonMat(0x9aa0a6), darkM = toonMat(0x6f757b), pinkM = toonMat(0xe79aa6);
+  const body = capsule(0.12, 0.28, furM); body.rotation.x = Math.PI / 2; body.position.y = 0.3; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.46, -0.22);
+  const head = sphere(0.13, furM, 14, 10); head.castShadow = true; headG.add(head);
+  const muzzle = sphere(0.07, toonMat(0xc7ccd1), 10, 8); muzzle.position.set(0, -0.03, -0.1); muzzle.scale.set(1, 0.7, 0.8); headG.add(muzzle);
+  const nose = sphere(0.02, pinkM, 8, 6); nose.position.set(0, -0.01, -0.15); headG.add(nose);
+  petEyes(headG, 0.06, 0.04, -0.11, 0.026, 0x6bbf59);
+  for (const side of [-1, 1]) {
+    const ear = cone(0.055, 0.12, furM, 4); ear.position.set(0.075 * side, 0.13, 0.01); ear.rotation.z = -0.18 * side; headG.add(ear);
+    const earIn = cone(0.028, 0.07, pinkM, 4); earIn.position.set(0.075 * side, 0.135, -0.005); earIn.rotation.z = -0.18 * side; headG.add(earIn);
+    for (const wy of [-0.025, 0.005]) { const wh = cylinder(0.003, 0.003, 0.14, darkM, 4); wh.rotation.z = Math.PI / 2; wh.position.set(0.11 * side, wy, -0.12); headG.add(wh); }
+  }
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.07, -0.13], [0.07, -0.13], [-0.07, 0.13], [0.07, 0.13]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.22, lz);
+    const lm = capsule(0.032, 0.14, furM, 3, 8); lm.position.y = -0.09; leg.add(lm);
+    const paw = sphere(0.038, darkM, 8, 6); paw.position.y = -0.18; leg.add(paw);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.38, 0.2);
+  const t1 = capsule(0.032, 0.2, furM, 3, 8); t1.position.y = 0.11; t1.rotation.x = -0.5; tail.add(t1);
+  const t2 = sphere(0.042, darkM, 8, 6); t2.position.set(0, 0.24, -0.06); tail.add(t2);
+  root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🦊 лисеня: руде, біла грудка, великі вуха, пухнастий хвіст із білим кінчиком
+export function makeFox() {
+  const root = new THREE.Group();
+  const furM = toonMat(0xe08234), whiteM = toonMat(0xf4ece0), darkM = toonMat(0x2b2622);
+  const body = capsule(0.12, 0.28, furM); body.rotation.x = Math.PI / 2; body.position.y = 0.3; body.castShadow = true; root.add(body);
+  const chest = sphere(0.11, whiteM, 10, 8); chest.position.set(0, 0.28, -0.16); chest.scale.set(0.9, 0.9, 0.7); root.add(chest);
+  const headG = new THREE.Group(); headG.position.set(0, 0.46, -0.24);
+  const head = sphere(0.13, furM, 14, 10); head.castShadow = true; headG.add(head);
+  const snout = cone(0.07, 0.16, furM, 8); snout.rotation.x = -Math.PI / 2; snout.position.set(0, -0.02, -0.15); headG.add(snout);
+  const snoutW = cone(0.05, 0.1, whiteM, 8); snoutW.rotation.x = -Math.PI / 2; snoutW.position.set(0, -0.04, -0.17); headG.add(snoutW);
+  const nose = sphere(0.025, darkM, 8, 6); nose.position.set(0, -0.02, -0.24); headG.add(nose);
+  petEyes(headG, 0.06, 0.05, -0.1, 0.026, 0x241c14);
+  for (const side of [-1, 1]) {
+    const ear = cone(0.06, 0.16, furM, 4); ear.position.set(0.08 * side, 0.16, 0.02); ear.rotation.z = -0.12 * side; headG.add(ear);
+    const earT = cone(0.03, 0.07, darkM, 4); earT.position.set(0.08 * side, 0.22, 0.02); earT.rotation.z = -0.12 * side; headG.add(earT);
+  }
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.07, -0.13], [0.07, -0.13], [-0.07, 0.13], [0.07, 0.13]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.22, lz);
+    const lm = capsule(0.034, 0.15, darkM, 3, 8); lm.position.y = -0.09; leg.add(lm);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.36, 0.22);
+  const t1 = capsule(0.07, 0.22, furM, 4, 10); t1.position.y = 0.12; t1.rotation.x = -0.6; tail.add(t1);
+  const t2 = sphere(0.07, whiteM, 10, 8); t2.position.set(0, 0.26, -0.08); tail.add(t2);
+  root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🐼 панда: округла, чорні лапи/вуха/плями навколо очей
+export function makePanda() {
+  const root = new THREE.Group();
+  const whiteM = toonMat(0xf2f2ee), blackM = toonMat(0x2a2a2e);
+  const body = capsule(0.18, 0.2, whiteM); body.rotation.x = Math.PI / 2; body.position.y = 0.34; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.56, -0.18);
+  const head = sphere(0.17, whiteM, 16, 12); head.castShadow = true; headG.add(head);
+  const snout = sphere(0.06, whiteM, 8, 6); snout.position.set(0, -0.04, -0.14); headG.add(snout);
+  const nose = sphere(0.025, blackM, 8, 6); nose.position.set(0, -0.02, -0.18); headG.add(nose);
+  for (const side of [-1, 1]) {
+    const patch = sphere(0.05, blackM, 8, 6); patch.position.set(0.07 * side, 0.03, -0.12); patch.scale.set(1, 1.3, 0.6); patch.rotation.z = 0.4 * side; headG.add(patch);
+    const ear = sphere(0.055, blackM, 8, 6); ear.position.set(0.12 * side, 0.15, 0.02); headG.add(ear);
+  }
+  petEyes(headG, 0.07, 0.04, -0.14, 0.022, 0x111111);
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.1, -0.12], [0.1, -0.12], [-0.1, 0.12], [0.1, 0.12]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.24, lz);
+    const lm = capsule(0.055, 0.12, blackM, 3, 8); lm.position.y = -0.09; leg.add(lm);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.34, 0.2);
+  const tm = sphere(0.05, whiteM, 8, 6); tm.position.y = 0.04; tail.add(tm); root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🐰 зайчик: довгі вуха, пухнастий хвостик, великі задні лапи (рух hop)
+export function makeBunny() {
+  const root = new THREE.Group();
+  const furM = toonMat(0xe9e2d6), pinkM = toonMat(0xeaa6b0), darkM = toonMat(0x4a4038);
+  const body = capsule(0.12, 0.16, furM); body.position.y = 0.26; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.46, -0.06);
+  const head = sphere(0.12, furM, 14, 10); head.castShadow = true; headG.add(head);
+  const nose = sphere(0.02, pinkM, 8, 6); nose.position.set(0, -0.01, -0.12); headG.add(nose);
+  petEyes(headG, 0.06, 0.02, -0.1, 0.028, 0x3a2a2a);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Group(); ear.position.set(0.05 * side, 0.12, 0.0); ear.rotation.z = -0.12 * side;
+    const eo = capsule(0.035, 0.22, furM, 3, 8); eo.position.y = 0.13; ear.add(eo);
+    const ei = capsule(0.02, 0.18, pinkM, 3, 6); ei.position.set(0, 0.13, -0.025); ear.add(ei);
+    headG.add(ear);
+  }
+  root.add(headG);
+  const legs = [];
+  // передні маленькі
+  for (const lx of [-0.07, 0.07]) { const leg = new THREE.Group(); leg.position.set(lx, 0.16, -0.08); const lm = capsule(0.03, 0.08, furM, 3, 6); lm.position.y = -0.06; leg.add(lm); root.add(leg); legs.push(leg); }
+  // задні великі
+  for (const lx of [-0.09, 0.09]) { const leg = new THREE.Group(); leg.position.set(lx, 0.14, 0.1); const foot = capsule(0.045, 0.1, furM, 3, 8); foot.rotation.x = Math.PI / 2; foot.position.set(0, -0.05, 0.02); leg.add(foot); root.add(leg); legs.push(leg); }
+  const tail = new THREE.Group(); tail.position.set(0, 0.3, 0.16);
+  const tm = sphere(0.05, toonMat(0xffffff), 8, 6); tail.add(tm); root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🐸 жабка: широкий рот, опуклі очі зверху, перетинчасті лапи (рух hop)
+export function makeFrog() {
+  const root = new THREE.Group();
+  const skinM = toonMat(0x6fbf4a), bellyM = toonMat(0xd6e8a8), darkM = toonMat(0x2c2c2c);
+  const body = sphere(0.18, skinM, 16, 12); body.position.y = 0.18; body.scale.set(1, 0.8, 1.05); body.castShadow = true; root.add(body);
+  const belly = sphere(0.13, bellyM, 12, 8); belly.position.set(0, 0.12, -0.08); belly.scale.set(1, 0.7, 0.7); root.add(belly);
+  const headG = new THREE.Group(); headG.position.set(0, 0.2, -0.12);
+  // широкий рот-усмішка
+  const mouth = box(0.18, 0.02, 0.02, darkM); mouth.position.set(0, 0.0, -0.06); headG.add(mouth);
+  for (const side of [-1, 1]) {
+    const bulge = sphere(0.06, skinM, 10, 8); bulge.position.set(0.08 * side, 0.12, -0.02); headG.add(bulge);
+    const eye = sphere(0.04, toonMat(0xf4d03f), 8, 6); eye.position.set(0.08 * side, 0.15, -0.04); headG.add(eye);
+    const pupil = sphere(0.018, darkM, 6, 5); pupil.position.set(0.08 * side, 0.15, -0.075); headG.add(pupil);
+  }
+  root.add(headG);
+  const legs = [];
+  for (const lx of [-0.12, 0.12]) { const leg = new THREE.Group(); leg.position.set(lx, 0.1, -0.08); const lm = capsule(0.025, 0.06, skinM, 3, 6); lm.position.y = -0.04; leg.add(lm); const foot = sphere(0.05, skinM, 8, 6); foot.scale.set(1.4, 0.4, 1); foot.position.set(0, -0.08, -0.04); leg.add(foot); root.add(leg); legs.push(leg); }
+  for (const lx of [-0.14, 0.14]) { const leg = new THREE.Group(); leg.position.set(lx, 0.1, 0.1); const lm = capsule(0.03, 0.1, skinM, 3, 6); lm.rotation.x = -0.6; lm.position.y = -0.04; leg.add(lm); const foot = sphere(0.06, skinM, 8, 6); foot.scale.set(1.5, 0.4, 1.1); foot.position.set(0, -0.1, 0.06); leg.add(foot); root.add(leg); legs.push(leg); }
+  return { group: root, head: headG, legs, tail: null, phase: Math.random() * 6 };
+}
+
+// 🐧 пінгвін: чорна спинка, біле черевце, дзьоб і ластами (waddle = quad)
+export function makePenguin() {
+  const root = new THREE.Group();
+  const blackM = toonMat(0x2b3138), whiteM = toonMat(0xf4f4f0), orangeM = toonMat(0xf2912e);
+  const body = capsule(0.15, 0.18, blackM); body.position.y = 0.32; body.castShadow = true; root.add(body);
+  const belly = capsule(0.12, 0.16, whiteM); belly.position.set(0, 0.3, -0.06); belly.scale.set(0.9, 1, 0.6); root.add(belly);
+  const headG = new THREE.Group(); headG.position.set(0, 0.58, -0.02);
+  const head = sphere(0.13, blackM, 14, 10); head.castShadow = true; headG.add(head);
+  const face = sphere(0.1, whiteM, 12, 8); face.position.set(0, -0.01, -0.07); face.scale.set(0.9, 1, 0.5); headG.add(face);
+  const beak = cone(0.05, 0.1, orangeM, 8); beak.rotation.x = -Math.PI / 2; beak.position.set(0, -0.02, -0.14); headG.add(beak);
+  petEyes(headG, 0.05, 0.03, -0.1, 0.024, 0x111111);
+  root.add(headG);
+  // ласти як «лапи» для анімації махів
+  const legs = [];
+  for (const side of [-1, 1]) { const w = new THREE.Group(); w.position.set(0.15 * side, 0.34, 0); const wm = capsule(0.03, 0.16, blackM, 3, 8); wm.position.y = -0.06; wm.rotation.z = 0.3 * side; w.add(wm); root.add(w); legs.push(w); }
+  // ноги
+  for (const lx of [-0.06, 0.06]) { const f = box(0.08, 0.03, 0.12, orangeM); f.position.set(lx, 0.16, -0.04); root.add(f); }
+  const tail = new THREE.Group(); tail.position.set(0, 0.2, 0.14); const tm = cone(0.06, 0.1, blackM, 6); tm.rotation.x = Math.PI / 2 + 0.4; tail.add(tm); root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🐢 черепашка: купол-панцир із візерунком, коротенькі лапки
+export function makeTurtle() {
+  const root = new THREE.Group();
+  const shellM = toonMat(0x4f7c3a), shellD = toonMat(0x3a5e2a), skinM = toonMat(0xb6c46a);
+  const shell = sphere(0.22, shellM, 14, 8); shell.position.y = 0.26; shell.scale.set(1, 0.6, 1.2); shell.castShadow = true; root.add(shell);
+  const rim = cylinder(0.24, 0.24, 0.06, shellD, 16); rim.position.y = 0.18; root.add(rim);
+  // шестикутні плитки на панцирі
+  for (const [hx, hz] of [[0, 0], [0.1, -0.12], [-0.1, -0.12], [0.1, 0.12], [-0.1, 0.12], [0, 0.18], [0, -0.2]]) {
+    const tile = cylinder(0.05, 0.05, 0.03, shellD, 6); tile.position.set(hx, 0.34, hz); root.add(tile);
+  }
+  const headG = new THREE.Group(); headG.position.set(0, 0.22, -0.26);
+  const head = sphere(0.09, skinM, 12, 8); head.castShadow = true; headG.add(head);
+  petEyes(headG, 0.04, 0.02, -0.06, 0.02, 0x111111);
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.16, -0.14], [0.16, -0.14], [-0.16, 0.14], [0.16, 0.14]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.14, lz);
+    const lm = capsule(0.05, 0.04, skinM, 3, 8); lm.rotation.z = Math.PI / 2; lm.position.y = -0.04; leg.add(lm);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.18, 0.24); const tm = cone(0.04, 0.1, skinM, 6); tm.rotation.x = Math.PI / 2; tail.add(tm); root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🦜 папуга: яскравий, гнутий дзьоб, чубчик, кольорові крила (рух bird)
+export function makeParrot() {
+  const root = new THREE.Group();
+  const redM = toonMat(0xe8403a), blueM = toonMat(0x2f7fe0), yellowM = toonMat(0xf4c430), darkM = toonMat(0x222222);
+  const body = capsule(0.1, 0.2, redM); body.position.y = 0.34; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.52, -0.04);
+  const head = sphere(0.1, redM, 12, 10); head.castShadow = true; headG.add(head);
+  // гнутий дзьоб
+  const beakU = cone(0.05, 0.1, darkM, 8); beakU.rotation.x = -Math.PI / 2 - 0.4; beakU.position.set(0, -0.01, -0.1); headG.add(beakU);
+  const beakL = cone(0.035, 0.05, toonMat(0x444444), 8); beakL.rotation.x = -Math.PI / 2 - 0.1; beakL.position.set(0, -0.05, -0.08); headG.add(beakL);
+  // чубчик
+  for (const cy of [-0.03, 0, 0.03]) { const cf = cone(0.02, 0.08, yellowM, 5); cf.position.set(cy, 0.11, 0.02); cf.rotation.x = 0.3; headG.add(cf); }
+  petEyes(headG, 0.06, 0.02, -0.05, 0.022, 0x111111);
+  root.add(headG);
+  // крила (для махів)
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(0.08 * side, 0.4, 0.02);
+    const wm = box(0.04, 0.04, 0.22, blueM); wm.position.set(0.06 * side, 0, 0); w.add(wm);
+    const tip = box(0.03, 0.03, 0.1, yellowM); tip.position.set(0.12 * side, 0, 0.02); w.add(tip);
+    root.add(w); wings.push(w);
+  }
+  // хвостове пір'я
+  const tail = new THREE.Group(); tail.position.set(0, 0.32, 0.16);
+  for (const [tx, tc] of [[-0.03, blueM], [0, yellowM], [0.03, blueM]]) { const tf = box(0.025, 0.02, 0.2, tc); tf.position.set(tx, 0, 0.08); tf.rotation.x = 0.3; tail.add(tf); }
+  root.add(tail);
+  return { group: root, head: headG, wings, tail, phase: Math.random() * 6 };
+}
+
+// 🦖 динозаврик: зелений Т-рекс, велика голова з зубами, шипи, довгий хвіст
+export function makeDino() {
+  const root = new THREE.Group();
+  const skinM = toonMat(0x5bbf6a), bellyM = toonMat(0xcfe89a), darkM = toonMat(0x214a2a);
+  const body = capsule(0.14, 0.22, skinM); body.rotation.x = Math.PI / 2 - 0.3; body.position.y = 0.34; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.56, -0.2);
+  const head = sphere(0.14, skinM, 14, 10); head.scale.set(1, 0.95, 1.2); head.castShadow = true; headG.add(head);
+  const jaw = box(0.16, 0.06, 0.16, skinM); jaw.position.set(0, -0.08, -0.06); headG.add(jaw);
+  // зуби
+  for (const tx of [-0.05, 0, 0.05]) { const tooth = cone(0.015, 0.05, toonMat(0xffffff), 4); tooth.rotation.x = Math.PI; tooth.position.set(tx, -0.04, -0.14); headG.add(tooth); }
+  petEyes(headG, 0.07, 0.06, -0.1, 0.026, 0xf2c20a);
+  root.add(headG);
+  // спинні шипи
+  for (let i = 0; i < 5; i++) { const sp = cone(0.03, 0.09, darkM, 4); sp.position.set(0, 0.5 - i * 0.02, -0.1 + i * 0.09); root.add(sp); }
+  // великі задні ноги
+  const legs = [];
+  for (const lx of [-0.1, 0.1]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.26, 0.04);
+    const thigh = capsule(0.06, 0.12, skinM, 3, 8); thigh.position.y = -0.08; leg.add(thigh);
+    const foot = box(0.08, 0.04, 0.14, darkM); foot.position.set(0, -0.18, -0.04); leg.add(foot);
+    root.add(leg); legs.push(leg);
+  }
+  // крихітні ручки
+  for (const side of [-1, 1]) { const arm = capsule(0.02, 0.06, skinM, 3, 6); arm.position.set(0.1 * side, 0.42, -0.12); arm.rotation.x = -0.6; root.add(arm); }
+  const tail = new THREE.Group(); tail.position.set(0, 0.36, 0.2);
+  const t1 = capsule(0.07, 0.18, skinM, 4, 8); t1.rotation.x = Math.PI / 2 - 0.2; t1.position.set(0, -0.02, 0.12); tail.add(t1);
+  const t2 = cone(0.05, 0.14, skinM, 8); t2.rotation.x = Math.PI / 2 - 0.2; t2.position.set(0, -0.05, 0.28); tail.add(t2);
+  root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🐉 дракончик: роги, крильця (легкий мах), шипи, лусочка
+export function makeDragon() {
+  const root = new THREE.Group();
+  const skinM = toonMat(0x8e44d6), bellyM = toonMat(0xe4c0ff), hornM = toonMat(0xf4e3b0), darkM = toonMat(0x5a2a8a);
+  const body = capsule(0.13, 0.22, skinM); body.rotation.x = Math.PI / 2; body.position.y = 0.34; body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.54, -0.22);
+  const head = sphere(0.13, skinM, 14, 10); head.castShadow = true; headG.add(head);
+  const snout = box(0.1, 0.07, 0.1, skinM); snout.position.set(0, -0.03, -0.14); headG.add(snout);
+  for (const nx of [-0.025, 0.025]) { const nostril = sphere(0.012, darkM, 6, 5); nostril.position.set(nx, -0.02, -0.19); headG.add(nostril); }
+  petEyes(headG, 0.06, 0.05, -0.1, 0.026, 0xf2c20a);
+  for (const side of [-1, 1]) { const horn = cone(0.025, 0.12, hornM, 6); horn.position.set(0.06 * side, 0.14, 0.04); horn.rotation.z = 0.3 * side; horn.rotation.x = -0.3; headG.add(horn); }
+  root.add(headG);
+  // крильця кажана: пласкі віяла, що махають (тонкі по Y, широкі по X/Z)
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const w = new THREE.Group(); w.position.set(0.09 * side, 0.46, 0.02);
+    const memb = box(0.22, 0.02, 0.18, bellyM); memb.position.set(0.14 * side, 0, -0.01); w.add(memb);
+    // кісткові «пальці» по передньому краю
+    const bone = capsule(0.012, 0.2, darkM, 3, 6); bone.rotation.z = Math.PI / 2; bone.position.set(0.14 * side, 0.012, -0.08); w.add(bone);
+    for (let f = 0; f < 3; f++) { const fr = capsule(0.008, 0.12, darkM, 3, 5); fr.position.set((0.04 + f * 0.08) * side, 0.012, 0.0); w.add(fr); }
+    root.add(w); wings.push(w);
+  }
+  for (let i = 0; i < 5; i++) { const sp = cone(0.025, 0.07, hornM, 4); sp.position.set(0, 0.48 - i * 0.02, -0.08 + i * 0.08); root.add(sp); }
+  const legs = [];
+  for (const [lx, lz] of [[-0.08, -0.12], [0.08, -0.12], [-0.08, 0.12], [0.08, 0.12]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.24, lz);
+    const lm = capsule(0.04, 0.12, skinM, 3, 8); lm.position.y = -0.09; leg.add(lm); root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.34, 0.22);
+  const t1 = capsule(0.05, 0.2, skinM, 4, 8); t1.rotation.x = Math.PI / 2 - 0.2; t1.position.set(0, -0.02, 0.12); tail.add(t1);
+  const t2 = cone(0.06, 0.1, hornM, 4); t2.rotation.x = Math.PI; t2.position.set(0, 0.0, 0.26); tail.add(t2);
+  root.add(tail);
+  return { group: root, head: headG, legs, wings, tail, phase: Math.random() * 6 };
+}
+
+// 🦄 єдиноріг: білий, золотий ріг, веселкова грива і хвіст
+export function makeUnicorn() {
+  const root = new THREE.Group();
+  const bodyM = toonMat(0xf6f0fb), hornM = toonMat(0xf4c430, 0xf4c430, 0.3), hoofM = toonMat(0xd9b3e0);
+  const RB = [0xff5e7a, 0xffa64d, 0xf4d03f, 0x6bd47a, 0x4db3ff, 0xb06bff];
+  const body = capsule(0.13, 0.3, bodyM); body.rotation.x = Math.PI / 2; body.position.y = 0.42; body.castShadow = true; root.add(body);
+  const neck = capsule(0.07, 0.12, bodyM); neck.position.set(0, 0.52, -0.22); neck.rotation.x = -0.5; root.add(neck);
+  const headG = new THREE.Group(); headG.position.set(0, 0.66, -0.3);
+  const head = sphere(0.1, bodyM, 14, 10); head.scale.set(1, 1, 1.25); head.castShadow = true; headG.add(head);
+  petEyes(headG, 0.06, 0.0, -0.08, 0.026, 0x3a2a4a);
+  for (const side of [-1, 1]) { const ear = cone(0.03, 0.08, bodyM, 5); ear.position.set(0.05 * side, 0.12, 0.04); headG.add(ear); }
+  // золотий спіральний ріг
+  const horn = cone(0.03, 0.18, hornM, 8); horn.position.set(0, 0.16, -0.06); horn.rotation.x = -0.3; headG.add(horn);
+  // веселкова грива
+  for (let i = 0; i < 6; i++) { const m = sphere(0.04, toonMat(RB[i]), 8, 6); m.position.set(0, 0.1 - i * 0.04, -0.02 + i * 0.03); headG.add(m); }
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.08, -0.15], [0.08, -0.15], [-0.08, 0.15], [0.08, 0.15]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.32, lz);
+    const lm = capsule(0.04, 0.2, bodyM, 3, 8); lm.position.y = -0.12; leg.add(lm);
+    const hoof = cylinder(0.045, 0.045, 0.05, hoofM, 8); hoof.position.y = -0.24; leg.add(hoof);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.46, 0.24);
+  for (let i = 0; i < 6; i++) { const tf = capsule(0.022, 0.12, toonMat(RB[i]), 3, 6); tf.position.set((i - 2.5) * 0.018, -0.02, 0.04); tf.rotation.x = -0.7; tail.add(tf); }
+  root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// 🤖 робо-пес: металевий, світні очі, антена, боксова форма
+export function makeRoboPet() {
+  const root = new THREE.Group();
+  const metalM = toonMat(0x9aa7b4), darkM = toonMat(0x4a5560), eyeM = toonMat(0x33e0ff, 0x33e0ff, 0.9);
+  const body = box(0.3, 0.2, 0.42, metalM); body.position.y = 0.36; body.castShadow = true; root.add(body);
+  const panel = box(0.18, 0.1, 0.02, darkM); panel.position.set(0, 0.36, -0.22); root.add(panel);
+  const headG = new THREE.Group(); headG.position.set(0, 0.52, -0.24);
+  const head = box(0.2, 0.18, 0.18, metalM); head.castShadow = true; headG.add(head);
+  const visor = box(0.18, 0.06, 0.02, darkM); visor.position.set(0, 0.02, -0.1); headG.add(visor);
+  for (const side of [-1, 1]) { const eye = sphere(0.025, eyeM, 8, 6); eye.position.set(0.05 * side, 0.02, -0.11); headG.add(eye); const ear = box(0.03, 0.08, 0.03, darkM); ear.position.set(0.1 * side, 0.12, 0); headG.add(ear); }
+  const antenna = cylinder(0.008, 0.008, 0.12, darkM, 6); antenna.position.set(0, 0.16, 0.04); headG.add(antenna);
+  const bulb = sphere(0.025, eyeM, 8, 6); bulb.position.set(0, 0.23, 0.04); headG.add(bulb);
+  root.add(headG);
+  const legs = [];
+  for (const [lx, lz] of [[-0.11, -0.16], [0.11, -0.16], [-0.11, 0.16], [0.11, 0.16]]) {
+    const leg = new THREE.Group(); leg.position.set(lx, 0.26, lz);
+    const lm = box(0.06, 0.18, 0.06, darkM); lm.position.y = -0.09; leg.add(lm);
+    const foot = box(0.08, 0.04, 0.1, metalM); foot.position.y = -0.18; leg.add(foot);
+    root.add(leg); legs.push(leg);
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.44, 0.22);
+  const tm = cylinder(0.02, 0.02, 0.16, darkM, 6); tm.position.y = 0.06; tm.rotation.x = -0.7; tail.add(tm);
+  const tb = sphere(0.03, eyeM, 8, 6); tb.position.set(0, 0.14, -0.06); tail.add(tb);
+  root.add(tail);
+  return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+// реєстр улюбленців (id → метадані + білдер + тип руху для Pet.update)
+export const PETS = {
+  dog: { name: t('Песик Дружок'), icon: '🐶', desc: t('Збирає монети і гавкає на сюрпризи!'), make: makeDog, move: 'quad' },
+  cat: { name: t('Кошеня Мурчик'), icon: '🐱', desc: t('Спритне кошеня — мчить по монетки.'), make: makeCat, move: 'quad' },
+  fox: { name: t('Лисеня Руде'), icon: '🦊', desc: t('Хитре лисеня з пухнастим хвостом.'), make: makeFox, move: 'quad' },
+  panda: { name: t('Панда Бамбук'), icon: '🐼', desc: t('Гладка панда — найкращий обнімашка.'), make: makePanda, move: 'quad' },
+  bunny: { name: t('Зайчик Стриб'), icon: '🐰', desc: t('Скаче поряд і збирає монетки.'), make: makeBunny, move: 'hop' },
+  frog: { name: t('Жабка Кваки'), icon: '🐸', desc: t('Стрибуча жабка з великими очима.'), make: makeFrog, move: 'hop' },
+  penguin: { name: t('Пінгвін Льодик'), icon: '🐧', desc: t('Перевальцем тупає за тобою.'), make: makePenguin, move: 'quad' },
+  turtle: { name: t('Черепашка Панцир'), icon: '🐢', desc: t('Повільна, зате з міцним панциром.'), make: makeTurtle, move: 'quad' },
+  parrot: { name: t('Папуга Барвій'), icon: '🦜', desc: t('Літає поряд і махає крилами.'), make: makeParrot, move: 'bird' },
+  dino: { name: t('Динозаврик Рекс'), icon: '🦖', desc: t('Маленький Т-рекс — грізний друг!'), make: makeDino, move: 'quad' },
+  dragon: { name: t('Дракончик Іскра'), icon: '🐉', desc: t('Махає крильцями — справжній дракон!'), make: makeDragon, move: 'quad' },
+  unicorn: { name: t('Єдиноріг Зоря'), icon: '🦄', desc: t('Чарівний ріг і веселкова грива.'), make: makeUnicorn, move: 'quad' },
+  robo: { name: t('Робо-пес Болт'), icon: '🤖', desc: t('Залізний друг зі світними очима.'), make: makeRoboPet, move: 'quad' },
+};
+
+// ============================================================
 // 🛴 Самокат
 // ============================================================
 export function makeScooter(color = 0x4fd8ff) {
