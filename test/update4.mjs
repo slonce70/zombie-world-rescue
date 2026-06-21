@@ -422,13 +422,13 @@ const shopRes = await page.evaluate(() => {
   g.test.shopBuy('dog');
   return {
     owned: [...g.save.gadgetsOwned],
-    dog: g.save.upgrades.dog,
+    dog: g.save.pets.includes('dog'), // v63: улюбленці тепер у save.pets, не upgrades.dog
     pet: !!g.level.pet,
   };
 });
 check(shopRes.owned.includes('tramp'), `батут купується назавжди (${shopRes.owned})`);
 check(shopRes.owned.includes('wall'), `барикада купується назавжди (${shopRes.owned})`);
-check(shopRes.dog === 1 && shopRes.pet, 'пес купується і одразу з\'являється');
+check(shopRes.dog === true && shopRes.pet, 'пес купується і одразу з\'являється');
 
 // ============ ПІДСУМОК ============
 console.log('');
