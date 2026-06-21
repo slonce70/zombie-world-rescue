@@ -44,6 +44,9 @@ const TYPE_STATS = {
   // МІЦНИЙ ближній боєць (високий hp, боляче рубає мечем), середня швидкість.
   // Здаля РОЗГАНЯЄТЬСЯ у випад мечем (charger): телеграф → ривок → удар.
   gladiator: { hp: 175, speed: 1.4, chaseSpeed: 3.6, aggro: 28, dmg: 19, attackR: 2.2, coins: 22, pitch: 0.62, charger: true },
+  // 🧟 шкет (imp): дрібний, слабкий (50hp), зате ДУЖЕ швидкий (швидше за runner) — наздожене будь-кого.
+  // Доступний з усіх країн, у т.ч. UKR: лише швидкий, новачку не страшно.
+  imp: { hp: 50, speed: 2.8, chaseSpeed: 6.2, aggro: 32, dmg: 6, attackR: 1.5, coins: 6, pitch: 1.8, small: true },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -252,6 +255,8 @@ export class Zombies {
         } else if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
         // 🔫 стрілець — лише у складнішому контексті (НЕ перша Україна на ★1)
         else if (this._allowGunner && this.rng.chance(0.1)) type = 'gunner';
+        // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
+        else if (this.rng.chance(0.13)) type = 'imp';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });

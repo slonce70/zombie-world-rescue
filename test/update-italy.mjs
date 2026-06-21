@@ -36,7 +36,7 @@ const cfg = await page.evaluate(async () => {
   const C = mod.COUNTRIES.ITA;
   const order = mod.CAMPAIGN_ORDER;
   return {
-    exists: !!C, biome: C && C.biome, reward: C && C.weaponReward,
+    exists: !!C, biome: C && C.biome, reward: C && C.weaponReward, coin: C && C.coinReward,
     extra: C && C.extraZombie, bossStyle: C && C.boss.style, bossHp: C && C.boss.hp,
     diff: C && C.difficulty, hasBiome: !!mod.BIOMES[C && C.biome],
     order, idx: order.indexOf('ITA'),
@@ -45,7 +45,9 @@ const cfg = await page.evaluate(async () => {
 });
 check(cfg.exists, 'COUNTRIES.ITA існує');
 check(cfg.biome === 'italyMed' && cfg.hasBiome, 'біом italyMed зареєстровано', cfg.biome);
-check(cfg.reward === 'laser', 'нагорода — ЛАЗЕР (laser)', cfg.reward);
+// v53: ITA більше НЕ дає зброю (лазер — за зірковий рівень 28), а дає МОНЕТИ
+check(!cfg.reward, 'ITA більше не має weaponReward (лазер — за зірковий рівень)', cfg.reward || '—');
+check(cfg.coin === 600, 'нагорода — 600 МОНЕТ (coinReward)', cfg.coin);
 check(cfg.extra === 'gladiator', 'extraZombie = gladiator', cfg.extra);
 check(cfg.bossStyle === 'gladiator' && cfg.bossHp === 7500, `бос gladiator, ${cfg.bossHp} HP`);
 check(cfg.idx === 5 && cfg.order[4] === 'ESP' && cfg.order[6] === 'TUR',
@@ -183,13 +185,15 @@ const reachable = await page.evaluate(async () => {
 check(reachable.collInCore === 0 && reachable.onGround && reachable.moved > 1.0,
   `бос на чистому інтер'єрі Колізею (колайдерів у центрі ${reachable.collInCore}, на землі=${reachable.onGround}, зрушив ${reachable.moved.toFixed(1)}м)`);
 
-// перемагаємо боса → звільнення → ЛАЗЕР
+// перемагаємо боса → звільнення → +600 МОНЕТ (лазер тепер за зірковий рівень, не за ITA)
+const coinsBefore = await page.evaluate(() => window.__game.save.coins);
 await page.evaluate(() => window.__game.test.damageBoss(999999));
 const win = await waitFor(page, () => window.__game.victoryShown, 30000, 'перемога');
 check(win, 'ITA звільнено!');
 const st = await page.evaluate(() => window.__game.test.state());
 check(st.liberated.includes('ITA'), 'ITA записано в сейв');
-check(st.player.weapons.includes('laser'), 'звільнення ITA дало ЛАЗЕР');
+check(!st.player.weapons.includes('laser'), 'звільнення ITA НЕ дає лазер (він за зірковий рівень 28)');
+check(st.coins >= coinsBefore + 600, `звільнення ITA дало +600 монет (${coinsBefore} → ${st.coins})`);
 
 console.log('');
 if (errors.length) {
