@@ -675,6 +675,8 @@ export class Effects {
 
   // пес або інший помічник збирає предмет негайно
   collectCoinNow(c) {
+    const L = this.levelRef;
+    if (L && L.mirror) return;
     const i = this.coins.indexOf(c);
     if (i < 0) return;
     if (this.onPickup) this.onPickup(c.type, c.value);

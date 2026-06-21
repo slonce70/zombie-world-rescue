@@ -2,7 +2,7 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 4; // v32: пінги (безпечні фрази як тости)
+export const PROTO_VERSION = 5; // v52: co-op індекси паливних зброї
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {
@@ -38,6 +38,6 @@ export function packZombieState(z, moving) {
 }
 
 // індекси зброї для компактної передачі
-export const WEAPON_IDX = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
+export const WEAPON_IDX = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
 export const weaponToIdx = (w) => Math.max(0, WEAPON_IDX.indexOf(w));
 export const idxToWeapon = (i) => WEAPON_IDX[i] || 'pistol';

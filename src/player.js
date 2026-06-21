@@ -833,9 +833,13 @@ export class Player {
 
     // дросселюємо звук/число-маркер, щоб не сипати щокадру
     this._contSfxT = (this._contSfxT || 0) - dt;
+    const netReport = level.mirror && level.net ? { endPoint: null, hits: [] } : null;
     let anyHit = false;
-    if (w.beam) anyHit = this._laserBeam(origin, dir, w, dmgThisFrame, level);
-    else if (w.flame) anyHit = this._flameCone(origin, dir, w, dmgThisFrame, level);
+    if (w.beam) anyHit = this._laserBeam(origin, dir, w, dmgThisFrame, level, netReport);
+    else if (w.flame) anyHit = this._flameCone(origin, dir, w, dmgThisFrame, level, netReport);
+    if (netReport && (netReport.endPoint || netReport.hits.length)) {
+      level.net.shotReport(this.cur, netReport.endPoint, netReport.hits);
+    }
 
     if (this._contSfxT <= 0) {
       this._contSfxT = 0.11;
@@ -847,7 +851,7 @@ export class Player {
   }
 
   // 🔫 ЛАЗЕР: миттєвий промінь-хітскан уперед, пробиває кількох зомбі на лінії.
-  _laserBeam(origin, dir, w, dmg, level) {
+  _laserBeam(origin, dir, w, dmg, level, netReport = null) {
     const MAX_D = w.range;
     let anyHit = false;
     let endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
@@ -865,8 +869,9 @@ export class Player {
           first = false;
           break;
         }
-        // соло/хост б'є локально; гість (mirror) лише малює промінь — шкоду рахує хост
-        if (!level.mirror) { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, false); }
+        // соло/хост б'є локально; гість (mirror) репортить влучання, шкоду рахує хост
+        if (level.mirror) netReport?.hits.push([hit.zombie.nid, Math.round(dmg), 0]);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, false); }
         anyHit = true;
         endPoint = hit.point;
         // легке свічення/іскри в точці влучання (без важких ефектів)
@@ -883,12 +888,13 @@ export class Player {
       }
     }
     // яскравий ціановий промінь від ствола до точки влучання (перевикористовуємо trace-пул)
+    if (netReport) netReport.endPoint = { x: endPoint.x, y: endPoint.y, z: endPoint.z };
     level.effects.laserBeam(this._muzzlePos, endPoint);
     return anyHit;
   }
 
   // 🔥 ВОГНЕМЕТ: короткий конус полум'я. Шкода спадає з дистанцією; тип шкоди «вогонь».
-  _flameCone(origin, dir, w, dmg, level) {
+  _flameCone(origin, dir, w, dmg, level, netReport = null) {
     let anyHit = false;
     if (level.zombies) {
       for (const z of level.zombies.list) {
@@ -907,8 +913,9 @@ export class Player {
         // лінійний спад шкоди з дистанцією (повна у впор → ~0 на краю)
         const falloff = 1 - (d / w.range) * 0.85;
         // 🔥 ТИП ШКОДИ «вогонь» (v47-гак): передаємо опції з прапорцем fire.
-        // соло/хост б'є локально; гість (mirror) лише малює полум'я
-        if (!level.mirror) { z.lastHitBy = 1; z.damage(dmg * falloff, this._flameDir.clone(), false, { fire: true }); }
+        // соло/хост б'є локально; гість (mirror) репортить влучання, шкоду рахує хост
+        if (level.mirror) netReport?.hits.push([z.nid, Math.round(dmg * falloff), 0]);
+        else { z.lastHitBy = 1; z.damage(dmg * falloff, this._flameDir.clone(), false, { fire: true }); }
         anyHit = true;
       }
     }

@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 49;
+const APP_VERSION = 52;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1744,10 +1744,11 @@ class Game {
       }
       return;
     }
-    this._step(Math.min(this.clock.getDelta(), 0.05), skipRender);
+    const real = this.clock.getDelta();
+    this._step(Math.min(real, 0.05), skipRender, real);
   }
 
-  _step(dt, skipRender) {
+  _step(dt, skipRender, timerDt = dt) {
     this._fpsAcc += dt;
     this._fpsN++;
     if (this._fpsAcc >= 1) {
@@ -1829,7 +1830,7 @@ class Game {
         this._updateMusic(dt);
         // відлік смерті
         if (this.deathT >= 0) {
-          this.deathT -= dt;
+          this.deathT -= timerDt;
           const n = Math.max(1, Math.ceil(this.deathT));
           document.getElementById('death-countdown').textContent = n;
           if (this.deathT <= 0) {
@@ -2021,11 +2022,13 @@ class Game {
       completeMission: (id) => g.level.missions._complete(id),
       finishHorde: () => {
         const zm = g.level.zombies;
+        if (g.level.missions) g.level.missions.pendingHorde = null;
         zm.hordePending = 0;
         for (const zb of [...zm.list]) {
           if (zb.horde && zb.state !== 'dead') zb.damage(99999, null, false);
         }
         zm.hordeRemaining = 0;
+        zm.hordeActive = false;
       },
       damageBoss: (amt) => {
         if (g.level.zombies.boss) g.level.zombies.boss.damage(amt, null, false);

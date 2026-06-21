@@ -6,6 +6,7 @@ import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 import { PING_PHRASES } from './coop.js';
 import { t } from '../i18n.js';
+import { WEAPONS } from '../player.js';
 
 const SNAP_HZ = 12;
 const GUEST_STALE_MS = 120000;
@@ -228,15 +229,16 @@ export class HostNet {
   _onShot(from, d) {
     const level = this.level;
     const rp = this.remotes.get(from);
-    const w = idxToWeapon(d.w);
-    // D2: дальність зброї + 30 u лаг-маржа (hitscan max 140; shotgun pellets 45)
-    const reach = ((w && w.pellets) ? 45 : 140) + 30;
+    const weaponId = idxToWeapon(d.w);
+    const w = WEAPONS[weaponId] || WEAPONS.pistol;
+    // D2: дальність зброї + 30 u лаг-маржа (hitscan max 140; shotgun pellets 45; fuel weapons use cfg.range)
+    const reach = ((w.pellets ? 45 : (w.range || 140))) + 30;
     // звук + трасер для всіх (і для хоста)
     if (rp) {
       const muzzle = rp.muzzleWorld(this._tmpV).clone();
       if (d.e) level.effects.tracer(muzzle, new THREE.Vector3(d.e[0], d.e[1], d.e[2]));
       const dd = Math.hypot(rp.pos.x - level.player.pos.x, rp.pos.z - level.player.pos.z);
-      if (dd < 70) level.audio.shot(w);
+      if (dd < 70) level.audio.shot(weaponId);
     }
     this.ev('sh', from, d.w, d.e || 0);
     // влучання: довіряємо гостю (сімейний кооп), але форму перевіряємо і шкоду санітизуємо
@@ -250,7 +252,7 @@ export class HostNet {
         const dir = this._tmpV.set(zb.x - (rp ? rp.pos.x : 0), 0, zb.z - (rp ? rp.pos.z : 0));
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
-        zb.damage(clampDmg(h[1]), dir, !!h[2]);
+        zb.damage(clampDmg(h[1]), dir, !!h[2], w.flame ? { fire: true } : undefined);
       }
     }
     if (Array.isArray(d.bar)) for (const e of d.bar) {

@@ -587,6 +587,15 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 /* список кнопок усередині висувного ☰-меню */
 #menu-list { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 #menu-list .globe-act { font-size: 15px; padding: 11px 16px; text-align: left; width: 100%; }
+#overlay-menu .overlay-card {
+  display: flex; flex-direction: column;
+  max-height: calc(100dvh - 24px); overflow: hidden;
+}
+#overlay-menu #menu-list {
+  overflow-y: auto; padding-right: 4px;
+  max-height: min(540px, calc(100dvh - 180px));
+  -webkit-overflow-scrolling: touch;
+}
 
 /* 🌍 список країн — компактна горизонтальна стрічка чіпів (не над глобусом) */
 #country-list {
@@ -1069,6 +1078,14 @@ body.touch-mode #touch-coach.show { display: block; }
   .globe-play { font-size: 14px; padding: 9px 18px; }
   .country-item { padding: 5px 9px; }
   .country-item .ci-name { font-size: 12px; }
+  #overlay-menu .overlay-card { padding: 12px 14px; }
+  #overlay-menu #menu-list { gap: 5px; max-height: calc(100dvh - 118px); }
+  #overlay-menu #menu-list .globe-act { font-size: 13px; padding: 8px 10px; }
+  body.touch-mode #banner {
+    top: 52%;
+    width: min(560px, 58vw);
+    padding: 0;
+  }
 }
 
 /* 💾 панель «Мій прогрес» і аварійний екран */

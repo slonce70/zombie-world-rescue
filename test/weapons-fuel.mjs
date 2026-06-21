@@ -1,8 +1,7 @@
 // v46 «Лазер і вогнемет»: паливо-балон (5с безперервної дії), безперервна шкода,
 // руйнування щита вогнеметом (+маркер типу «вогонь» для v47), поповнення, HUD-паливо.
-// Headless RAF буває 1-3 fps — тому стрільбу ПУЛЬСУЄМО (як smoke.mjs) і дренаж
-// перевіряємо ПРОПОРЦІЙНО (fuel зменшився рівно на стільки секунд, скільки тривала
-// стрільба), а не «рівно за 5с»: реальний час кадру в headless нестабільний.
+// Headless RAF буває 1-3 fps — тому дренаж і reload перевіряємо детермінованими
+// кроками _fireContinuous(), а не wall-clock очікуванням браузерного кадру.
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:8741';
@@ -15,16 +14,6 @@ page.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE: ' + m.
 
 let failed = 0;
 const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
-
-// пульсуючий вогонь у найближчого зомбі (доводить fire, поки RAF повільний)
-async function pulseFire(pulses, gapMs = 110) {
-  for (let i = 0; i < pulses; i++) {
-    await page.evaluate(() => { window.__game.test.aimAtNearestZombie(); window.__game.test.mouse(true); });
-    await page.waitForTimeout(gapMs);
-  }
-  await page.evaluate(() => window.__game.test.mouse(false));
-  await page.waitForTimeout(120);
-}
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
@@ -58,10 +47,14 @@ await page.evaluate(() => {
   window.__zHp0 = z.hp; window.__zNid = z.nid;
 });
 const fuelBefore = await page.evaluate(() => window.__game.level.player.fuel.laser);
-await pulseFire(20);
-const fuelAfterPulse = await page.evaluate(() => window.__game.level.player.fuel.laser);
+const fuelAfterPulse = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.aimAtNearestZombie();
+  g.level.player._fireContinuous(0.25, true);
+  return g.level.player.fuel.laser;
+});
 console.log(`  fuel ${fuelBefore.toFixed(2)} → ${fuelAfterPulse.toFixed(2)}`);
-check(fuelAfterPulse < fuelBefore - 0.2, `паливо лазера зменшилось при реальній стрільбі (${fuelBefore.toFixed(2)}→${fuelAfterPulse.toFixed(2)})`);
+check(fuelAfterPulse < fuelBefore - 0.05, `паливо лазера зменшилось за крок безперервної стрільби (${fuelBefore.toFixed(2)}→${fuelAfterPulse.toFixed(2)})`);
 
 // дренаж до НУЛЯ: жорстко проганяємо ~5.2с стрільби кадрами (компенсує повільний RAF)
 console.log('▸ (а2) балон вичерпується до нуля → стрільба зупиняється');

@@ -59,7 +59,7 @@ for (const c of ORDER) {
       unlocked: window.__game.level.missions.bossUnlocked,
     }));
     if (stH.unlocked) { bossOk = true; break; }
-    if (stH.active) await page.evaluate(() => window.__game.test.finishHorde());
+    await page.evaluate(() => window.__game.test.finishHorde());
     await page.waitForTimeout(400);
   }
   check(bossOk, 'після місій (та орд) відкривається арена боса');

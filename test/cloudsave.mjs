@@ -162,13 +162,20 @@ await Promise.all([
   B.waitForNavigation({ timeout: 10000 }).catch(() => null), // adopt → location.reload()
   B.click('#btn-cloud-claim'),
 ]);
-// adopt робить ще один location.reload() — чекаємо стабільний контекст і читаємо дані ОДНИМ
-// waitForFunction (він авто-ретраїться крізь навігацію, тож «execution context destroyed» не валить тест)
-const restored = await B.waitForFunction(() => {
+// adopt робить ще один location.reload() — чекаємо саме цільовий стан як boolean,
+// щоб не тримати JSHandle з контексту, який може зникнути під час фінального reload.
+await B.waitForFunction(({ codeCid }) => {
   const g = window.__game;
-  if (!g || g.state !== 'globe' || !g.save) return null;
-  return { coins: g.save.coins, ukr: !!g.save.liberated.UKR, cid: g.save.cid };
-}, null, { timeout: 25000, polling: 300 }).then((h) => h.jsonValue());
+  return !!(g && g.state === 'globe' && g.save
+    && g.save.coins === 7777
+    && g.save.liberated.UKR
+    && g.save.cid === codeCid);
+}, { codeCid: cidA }, { timeout: 25000, polling: 300 });
+const restored = await B.evaluate(() => ({
+  coins: window.__game.save.coins,
+  ukr: !!window.__game.save.liberated.UKR,
+  cid: window.__game.save.cid,
+}));
 check('Б відновив монети і країну', restored.coins === 7777 && restored.ukr);
 check('Б успадкував cid (далі синхрон той самий)', restored.cid === cidA);
 

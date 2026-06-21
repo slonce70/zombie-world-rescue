@@ -6,7 +6,7 @@ import { damp, dampAngle } from '../utils.js';
 import { PF, idxToWeapon } from './protocol.js';
 import { t } from '../i18n.js';
 
-const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka'];
+const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
 
 function makeNameSprite(nick) {
   const cv = document.createElement('canvas');

@@ -149,18 +149,22 @@ check(coinsAfter >= coinsBefore + 10, `джекпот: +${coinsAfter - coinsBefo
 
 // батут
 console.log('▸ Батут');
-const jumpY = await page.evaluate(() => {
+await page.evaluate(() => {
   const g = window.__game;
   const jp = g.level.world.jumpPads[0];
+  const p = g.level.player;
   g.test.teleport(jp.x, jp.z);
+  p.pos.y = g.level.world.groundH(p.pos.x, p.pos.z);
+  p.vel.set(0, 0, 0);
+  p.onGround = true;
+  p.update(0.016, { rmbDown: false, touchScope: false, touchMove: null, touchSprint: false, consumeMouse: () => ({ dx: 0, dy: 0 }), down: () => false, pressed: () => false }, false);
   return jp.x;
 });
-await page.waitForTimeout(1200);
 const velY = await page.evaluate(() => {
   const p = window.__game.level.player;
-  return { y: p.pos.y, gh: window.__game.level.world.groundH(p.pos.x, p.pos.z) };
+  return { vy: p.vel.y };
 });
-check(velY.y > velY.gh + 1.5, `батут підкинув (висота +${(velY.y - velY.gh).toFixed(1)} м)`);
+check(velY.vy > 10, `батут підкинув (vel.y=${velY.vy.toFixed(1)})`);
 
 // м'яч
 console.log('▸ Футбольний м\'яч');
@@ -234,19 +238,21 @@ check(polInfo.ice, 'зона льоду існує');
 check(polInfo.floors >= 4, `кам'яниці з інтер'єрами: ${polInfo.floors}`);
 
 // фізика ковзання: інерція на льоду довша, ніж на снігу
-const slide = await page.evaluate(async () => {
+const slide = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
   const ice = g.level.world.iceZone;
-  const measure = async (x, z) => {
+  const input = { rmbDown: false, touchScope: false, touchMove: null, touchSprint: false, consumeMouse: () => ({ dx: 0, dy: 0 }), down: () => false, pressed: () => false };
+  const measure = (x, z) => {
     g.test.teleport(x, z);
-    await new Promise((r) => setTimeout(r, 300));
+    p.pos.y = g.level.world.groundH(p.pos.x, p.pos.z);
+    p.onGround = true;
     p.vel.x = 6; p.vel.z = 0;
-    await new Promise((r) => setTimeout(r, 900));
+    for (let i = 0; i < 18; i++) p.update(0.05, input, false);
     return Math.abs(p.vel.x);
   };
-  const onIce = await measure(ice.x, ice.z);
-  const onSnow = await measure(0, 100);
+  const onIce = measure(ice.x, ice.z);
+  const onSnow = measure(0, 100);
   return { onIce, onSnow };
 });
 check(slide.onIce > slide.onSnow + 0.5, `лід ковзає: інерція ${slide.onIce.toFixed(1)} проти ${slide.onSnow.toFixed(1)} на снігу`);
