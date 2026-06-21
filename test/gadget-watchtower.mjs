@@ -77,7 +77,7 @@ const placed = await page.evaluate(async () => {
   };
 });
 check(placed.used && placed.count === 1, 'башта ставиться', JSON.stringify(placed));
-check(placed.hp === 125, 'прочність башти 125', JSON.stringify(placed));
+check(placed.hp === 200, 'прочність башти 200', JSON.stringify(placed));
 check(placed.cd === 125, 'перезарядка 125с', JSON.stringify(placed));
 check(placed.up.onTower && placed.up.y > placed.groundY + 3, 'Y піднімає на башту', JSON.stringify(placed));
 check(!placed.down.onTower && Math.abs(placed.down.y - placed.groundY) < 1.5, 'Y спускає з башти', JSON.stringify(placed));
