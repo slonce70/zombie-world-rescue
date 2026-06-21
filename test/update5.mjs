@@ -107,43 +107,37 @@ check(!scopePistol, 'з пістолетом оптика не вмикаєть�
 console.log('▸ Фізика самоката');
 await loadCountry('UKR');
 await page.evaluate(() => window.__game.test.god());
-const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1); // на CI rAF рідший — даємо більше часу
-const rideRes = await page.evaluate(async (SLOW) => {
-  const g = window.__game;
+const rideRes = await page.evaluate(() => {
+  const g = window.__game, p = g.level.player;
   g.test.mountScooter(0);
-  const p = g.level.player;
   const yaw0 = p.yaw;
+  // RAF у headless майже стоїть — драйвимо фізику самоката НАПРЯМУ (детермінізм без реальних секунд)
+  const drive = (n) => { for (let i = 0; i < n; i++) p.update(0.05, g.input, true); };
   // газ
-  g.test.key('KeyW', true);
-  const t0 = performance.now();
-  while (performance.now() - t0 < 15000 && p.rideSpeed < 6) await new Promise((r) => setTimeout(r, 200));
-  g.test.key('KeyW', false);
+  g.test.key('KeyW', true); drive(60); g.test.key('KeyW', false);
   const speedAfterGas = p.rideSpeed;
   const animMode = p.rig.anim.mode;
   // кермо праворуч на ходу
-  g.test.key('KeyD', true);
-  await new Promise((r) => setTimeout(r, 900));
-  g.test.key('KeyD', false);
+  g.test.key('KeyD', true); drive(20); g.test.key('KeyD', false);
   const yawAfterSteer = p.yaw;
   // вбік не їде: швидкість завжди вздовж погляду
   const velAngle = Math.atan2(-p.vel.x, -p.vel.z);
   const spd = Math.hypot(p.vel.x, p.vel.z);
   const aligned = spd < 0.5 || Math.abs(((velAngle - p.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.1;
-  // гальмо
+  // гальмо — до зупинки
   g.test.key('KeyS', true);
-  const t1 = performance.now();
-  while (performance.now() - t1 < 5000 * SLOW && p.rideSpeed > 0.5) await new Promise((r) => setTimeout(r, 200));
+  for (let i = 0; i < 120 && p.rideSpeed > 0.5; i++) p.update(0.05, g.input, true);
   g.test.key('KeyS', false);
   const speedAfterBrake = p.rideSpeed;
   // таран ВІДСУТНІЙ: зомбі впритул не отримує шкоди від їзди
   const z = g.test.spawnZombie('walker', p.pos.x, p.pos.z);
   z.sleeping = true;
   const hpBefore = z.hp;
-  await new Promise((r) => setTimeout(r, 1200));
+  drive(20);
   const noRam = z.hp === hpBefore;
   g.test.dismountScooter();
   return { speedAfterGas, animMode, yaw0, yawAfterSteer, aligned, speedAfterBrake, noRam };
-}, SLOW);
+});
 check(rideRes.speedAfterGas > 5, `W розганяє самокат (${rideRes.speedAfterGas.toFixed(1)} м/с)`);
 check(rideRes.animMode === 'ride', `поза «на самокаті», а не біг (${rideRes.animMode})`);
 check(Math.abs(rideRes.yawAfterSteer - rideRes.yaw0) > 0.15, 'A/D повертають кермо');
@@ -237,7 +231,7 @@ check(wallShoot.pickedUp, 'E повертає барикаду');
 console.log('▸ Стрілець і броньовик');
 await loadCountry('UKR');
 await page.evaluate(() => window.__game.test.god());
-const gunnerRes = await page.evaluate(async () => {
+const gunnerRes = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
   p.respawnProtect = 0;
@@ -245,10 +239,13 @@ const gunnerRes = await page.evaluate(async () => {
   z.aggroed = true;
   z.state = 'chase';
   z.rangedCd = 0;
+  z.sleeping = false;
   const hpBefore = p.health;
-  const t0 = performance.now();
-  while (performance.now() - t0 < 15000 && p.health >= hpBefore) {
-    await new Promise((r) => setTimeout(r, 300));
+  // драйвимо AI стрільця + політ кулі НАПРЯМУ (RAF у headless стоїть)
+  for (let i = 0; i < 120 && p.health >= hpBefore; i++) {
+    g.level.zombies.update(0.05);
+    g.level.effects.update(0.05);
+    p.update(0.05, g.input, true);
   }
   const dmg = hpBefore - p.health;
   g.test.god();

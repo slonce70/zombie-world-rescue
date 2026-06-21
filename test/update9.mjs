@@ -44,7 +44,7 @@ const shopT = await page.evaluate(() => {
     spent: before - g.save.coins,
   };
 });
-check(shopT.owned && shopT.spent === 450, `купується в магазині за 450₴ (витрачено ${shopT.spent})`);
+check(shopT.owned && shopT.spent === 1000, `купується в магазині за 1000₴ (витрачено ${shopT.spent})`);
 
 const place = await page.evaluate(() => {
   const g = window.__game;

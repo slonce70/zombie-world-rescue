@@ -49,8 +49,12 @@ try {
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
   await page.click('.solo-mode[data-mode="campaign"]');
-  const soloHidden = await page.evaluate(() => !document.getElementById('overlay-solo').classList.contains('show'));
-  check('Кампанія → меню закрилось (грай через глобус)', soloHidden);
+  // новий флоу: країну обирають ІНЛАЙН у меню (не закриваючи його, не йдучи на глобус)
+  await page.waitForSelector('#country-list .country-item', { timeout: 10000 });
+  const campCountries = await page.evaluate(() =>
+    document.querySelectorAll('#country-list .country-item').length);
+  check('Кампанія → інлайн-список країн у меню', campCountries >= 8, `${campCountries}`);
+  await page.evaluate(() => window.__game._hideOverlay('overlay-solo')); // закрити для наступних кроків
 
   // ---------- розблокування: після України відкритий ВЕСЬ світ ----------
   const openLogic = await page.evaluate(async () => {

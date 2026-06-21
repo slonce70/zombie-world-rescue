@@ -132,20 +132,27 @@ const bazookaShot = await page.evaluate(() => {
   return { hpBefore: z.hp, cur: p.cur };
 });
 check(bazookaShot.cur === 'bazooka', 'базука в руках (клавіша 7)');
-await page.evaluate(() => window.__game.test.mouse(true));
-await page.waitForTimeout(150);
-await page.evaluate(() => window.__game.test.mouse(false));
-const rocketFlew = await waitFor(async () =>
-  (await page.evaluate(() => window.__game.level.effects.rockets.length)) > 0, 8000, 'ракета полетіла');
-check(rocketFlew, 'ракета вилетіла');
-await waitFor(async () => (await page.evaluate(() => window.__game.level.effects.rockets.length)) === 0, 15000, 'ракета вибухнула');
+// RAF у headless майже стоїть — драйвимо симуляцію НАПРЯМУ (пастка таймінг-тестів), а не реальні секунди
 const bazookaResult = await page.evaluate(() => {
-  const g = window.__game;
+  const g = window.__game, p = g.level.player;
+  g.test.mouse(true);
+  let flew = false;
+  for (let i = 0; i < 40 && !flew; i++) {
+    p.update(0.05, g.input, true);
+    g.level.effects.update(0.05);
+    if (g.level.effects.rockets.length) flew = true;
+  }
+  g.test.mouse(false);
+  for (let i = 0; i < 120 && g.level.effects.rockets.length; i++) {
+    g.level.effects.update(0.05);
+    g.level.zombies.update(0.05);
+  }
   const z = g.level.zombies.list.find((zz) => zz.type === 'walker' && Math.hypot(zz.x - 60, zz.z - 108) < 8);
-  return z ? { hp: z.hp, maxHp: z.maxHp } : null;
+  return { flew, hp: z ? z.hp : null, maxHp: z ? z.maxHp : null, gone: !z };
 });
-check(bazookaResult && bazookaResult.hp < bazookaResult.maxHp - 30,
-  `вибух ракети зносить ціль (${bazookaResult ? bazookaResult.maxHp + '→' + Math.round(bazookaResult.hp) : 'ціль зникла'})`);
+check(bazookaResult.flew, 'ракета вилетіла');
+check(bazookaResult.gone || (bazookaResult.maxHp != null && bazookaResult.hp < bazookaResult.maxHp - 30),
+  `вибух ракети зносить ціль (${bazookaResult.gone ? 'ціль знищено' : bazookaResult.maxHp + '→' + Math.round(bazookaResult.hp)})`);
 await page.screenshot({ path: 'shots/u3-bazooka.png' });
 
 // ============ 🛒 МАГАЗИН 2.0 ============
@@ -321,17 +328,23 @@ check(fra.eiffelFloors >= 2, `Ейфелева вежа: яруси-платфо
 check(fra.balloon, '🎈 повітряна куля літає');
 check(fra.pads >= 4, `батути на карті (${fra.pads})`);
 
-// плювака плює
-await page.evaluate(() => {
+// плювака плює — драйвимо AI зомбі напряму (RAF у headless стоїть)
+const spitFlew = await page.evaluate(() => {
   const g = window.__game;
   const sp = g.level.zombies.list.find((z) => z.type === 'spitter');
+  if (!sp) return false;
   g.test.teleport(sp.x + 11, sp.z);
   sp.aggroed = true;
   sp.state = 'chase';
   sp.rangedCd = 0.1;
+  sp.sleeping = false;
+  for (let i = 0; i < 80; i++) {
+    g.level.zombies.update(0.05);
+    g.level.effects.update(0.05);
+    if (g.level.effects.projectiles.some((p) => p.color === 0x9be84e)) return true;
+  }
+  return false;
 });
-const spitFlew = await waitFor(async () =>
-  (await page.evaluate(() => window.__game.level.effects.projectiles.some((p) => p.color === 0x9be84e))), 15000, 'отрута летить');
 check(spitFlew, 'плювака плюється отрутою');
 await page.screenshot({ path: 'shots/u3-france.png' });
 
