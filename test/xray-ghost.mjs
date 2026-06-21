@@ -54,6 +54,24 @@ await page.evaluate(() => window.__game.startLevel('TUR'));
 await waitFor(page, () => window.__game.state === 'level' && window.__game.level
   && !document.getElementById('overlay-level-loading').classList.contains('show'), 30000, 'рівень TUR');
 
+const shopBuyXray = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.giveCoins(3000);
+  const before = g.save.coins;
+  g.test.shopBuy('xray');
+  const afterFirst = g.save.coins;
+  g.test.shopBuy('xray');
+  const afterSecond = g.save.coins;
+  return {
+    owned: g.save.gadgetsOwned.includes('xray'),
+    active: g.save.activeGadget,
+    firstCost: before - afterFirst,
+    secondCost: afterFirst - afterSecond,
+  };
+});
+check(shopBuyXray.owned && shopBuyXray.active === 'xray', 'куплений xray стає owned/active', JSON.stringify(shopBuyXray));
+check(shopBuyXray.firstCost === 1000 && shopBuyXray.secondCost === 0, 'xray не можна купити вдруге', JSON.stringify(shopBuyXray));
+
 // привид спавниться невидимим
 const spawned = await page.evaluate(() => {
   const Z = window.__game.level.zombies;

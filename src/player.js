@@ -57,6 +57,7 @@ export class Player {
     // тимчасові бафи (секунди, що лишились)
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
     this.gadgetShield = 0; // 🛡️ гаджет-щит: поглинає шкоду повністю, поки не розіб'ється
+    this.infiniteAmmoT = 0;
 
     // 💃 емоції-танці та 🛴 їзда на самокаті
     this.emoting = null;
@@ -320,6 +321,7 @@ export class Player {
     for (const k in this.buffs) {
       if (this.buffs[k] > 0) this.buffs[k] -= dt;
     }
+    if (this.infiniteAmmoT > 0) this.infiniteAmmoT = Math.max(0, this.infiniteAmmoT - dt);
 
     const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
     const sprint = !this.riding && moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
@@ -480,7 +482,7 @@ export class Player {
         const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
         if (trigger && this.shootCd <= 0) {
           this._clickBuffer = 0;
-          if (this.curAmmo.mag > 0) this._shoot();
+          if (this.curAmmo.mag > 0 || (this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg'))) this._shoot();
           else {
             this.level.audio.empty();
             this.shootCd = 0.35;
@@ -652,8 +654,9 @@ export class Player {
     const w = this.weapon;
     const a = this.curAmmo;
     const level = this.level;
-    a.mag--;
-    this.shootCd = 60 / w.rpm;
+    const infAmmo = this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg');
+    if (!infAmmo) a.mag--;
+    this.shootCd = (60 / w.rpm) * (infAmmo ? 0.45 : 1);
     this.gunKick = 1;
     level.audio.shot(this.cur);
     level.stats.shotsFired++;

@@ -214,6 +214,8 @@ const petRes = await page.evaluate(async () => {
   const coinsBefore = g.save.coins;
   const t0 = performance.now();
   while (performance.now() - t0 < 6000) {
+    g.level.pet.update(0.3);
+    g.level.effects.update(0.3);
     await new Promise((r) => setTimeout(r, 300));
     if (g.save.coins > coinsBefore) break;
   }
@@ -296,6 +298,7 @@ const wallRes = await page.evaluate(async () => {
   // 1) міцність реально тане під тиском
   let t0 = performance.now();
   while (performance.now() - t0 < 12000 && w.hp > hpBefore - 8) {
+    g.level.gadgets.update(0.5, g.input, false);
     await new Promise((r) => setTimeout(r, 300));
   }
   const damaged = w.hp < hpBefore - 8;
@@ -303,6 +306,7 @@ const wallRes = await page.evaluate(async () => {
   w.hp = 3;
   t0 = performance.now();
   while (performance.now() - t0 < 8000 && g.level.gadgets.walls.length) {
+    g.level.gadgets.update(0.5, g.input, false);
     await new Promise((r) => setTimeout(r, 300));
   }
   return { blocked, damaged, broken: g.level.gadgets.walls.length === 0 };
@@ -412,7 +416,7 @@ console.log('▸ Магазин: гаджети і пес');
 await loadCountry('UKR');
 const shopRes = await page.evaluate(() => {
   const g = window.__game;
-  g.test.giveCoins(2000);
+  g.test.giveCoins(2500);
   g.test.shopBuy('tramp');
   g.test.shopBuy('wall');
   g.test.shopBuy('dog');

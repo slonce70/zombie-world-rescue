@@ -278,6 +278,20 @@ export const COUNTRIES = {
     banner: t('Великий базар, повітряні кулі і ПАША КЕБАБ. Стережись шампурів! 🍢'),
     food: t('лукум'),
   },
+  SWE: {
+    id: 'SWE', name: t('Швеція'), flag: '🇸🇪', seed: 6565,
+    lat: 60.1, lon: 18.6,
+    victoryTitle: t('🇸🇪 ШВЕЦІЮ ЗВІЛЬНЕНО!'),
+    biome: 'winterDusk',
+    map: polandMap,
+    difficulty: { hp: 2.1, dmg: 1.42, counts: 1.52 },
+    coinReward: 700,
+    extraZombie: 'snowman',
+    shieldGuards: 4,
+    boss: { name: t('👑 СНІГОВИЙ ЯРЛ'), hp: 6000, frost: true, style: 'frost' },
+    banner: t('Північний холод, сніговики-зомбі і СНІГОВИЙ ЯРЛ. Тримайся тепліше! ❄️'),
+    food: t('булочка з корицею'),
+  },
   EGY: {
     id: 'EGY', name: t('Єгипет'), flag: '🇪🇬', seed: 7070,
     lat: 26.6, lon: 30.2,
@@ -295,7 +309,7 @@ export const COUNTRIES = {
   },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'EGY'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;

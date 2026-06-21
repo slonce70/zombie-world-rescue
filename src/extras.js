@@ -394,12 +394,41 @@ export const GADGETS = {
   wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 1000, get desc() { return t('Стіна на 100 міцності ({k})', { k: keyHint('кнопка ✋ — забрати', 'E — забрати') }); } },
   // 🤖 преміум: автоматична вогнева підтримка
   turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 1000, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
+  watchtower: { name: t('Башня спостереження'), icon: '🗼', cd: 125, price: 1000, desc: t('Залізна башта: натисни Y, щоб залізти або спуститися') },
   // 🩻 Ікс-рей: підсвічує всіх невидимих зомбі (Привидів) на 4с, перезарядка 25с
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
+  infammo: { name: t('Бескінечні патрони'), icon: '♾️', cd: 45, price: 1000, desc: t('3 секунди автомат і швидкостріл не витрачають патрони') },
 };
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
+const WATCHTOWER_HP = 125;
+
+function makeWatchtowerMesh() {
+  const g = new THREE.Group();
+  const metal = new THREE.MeshToonMaterial({ color: 0x6f7d8a });
+  const dark = new THREE.MeshToonMaterial({ color: 0x3c4650 });
+  const legGeo = new THREE.CylinderGeometry(0.055, 0.075, 4.0, 6);
+  for (const sx of [-0.85, 0.85]) {
+    for (const sz of [-0.85, 0.85]) {
+      const leg = new THREE.Mesh(legGeo, metal);
+      leg.position.set(sx, 2, sz);
+      leg.castShadow = true;
+      g.add(leg);
+    }
+  }
+  const platform = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.18, 2.2), dark);
+  platform.position.y = 4.05;
+  platform.castShadow = platform.receiveShadow = true;
+  g.add(platform);
+  for (const x of [-0.45, 0, 0.45]) {
+    const rung = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.07, 0.07), metal);
+    rung.position.set(x, 1.2 + (x + 0.45) * 2.2, -0.95);
+    rung.castShadow = true;
+    g.add(rung);
+  }
+  return g;
+}
 
 export class Gadgets {
   constructor(level) {
@@ -408,6 +437,7 @@ export class Gadgets {
     this.tramps = [];
     this.walls = [];
     this.turrets = [];
+    this.towers = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
     // 🛡 бульбашка гаджет-щита довкола героя
@@ -428,6 +458,11 @@ export class Gadgets {
     const level = this.level;
     const p = level.player;
     if (this.cd > 0) this.cd -= dt;
+    this._syncWatchtowerPlayer();
+    if (allowControl && input.pressed('KeyY')) {
+      this._toggleWatchtower();
+      input.justPressed.delete('KeyY');
+    }
     if (allowControl && p.health > 0 && input.pressed('KeyF')) this.use();
 
     // бульбашка щита слідує за героєм і тане з міцністю
@@ -479,6 +514,7 @@ export class Gadgets {
     }
     // 🤖 турелі: стрільба/тиск/життя (рахує лише хост/соло)
     this._updateTurrets(dt);
+    this._updateTowers(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -542,12 +578,24 @@ export class Gadgets {
     } else if (id === 'turret') {
       if (level.mirror) ok = this._requestPlace('turret', 2.2);
       else ok = this._placeTurret();
+    } else if (id === 'watchtower') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Башта доступна тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._placeWatchtower();
     } else if (id === 'xray') {
       // 🩻 локальний ефект (не синхронізуємо): підсвічує невидимих привидів на 4с
       level.zombies.xrayT = 4;
       level.audio.powerup();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9be8ff, 14, { speed: 3, up: 3, life: 0.7 });
       level.bus.emit('toast', t('🩻 Ікс-рей! Невидимі зомбі підсвічені на 4с'));
+      ok = true;
+    } else if (id === 'infammo') {
+      p.infiniteAmmoT = 3;
+      level.audio.powerup();
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffd23f, 16, { speed: 3, up: 3, life: 0.7 });
+      level.bus.emit('toast', t('♾️ Бескінечні патрони на 3с! Автомат і швидкостріл шаленіють'));
       ok = true;
     }
     if (ok) {
@@ -564,6 +612,106 @@ export class Gadgets {
     const solved = this.level.world.collide(x, z, 0.7);
     if (Math.hypot(solved.x - x, solved.z - z) > 0.4) return null;
     return { x, z, y: this.level.world.groundH(x, z) };
+  }
+
+  // ================= 🗼 БАШТА СПОСТЕРЕЖЕННЯ =================
+  _placeWatchtower() {
+    const pos = this._placePos(2.6);
+    if (!pos) {
+      this.level.bus.emit('toast', t('Тут не можна поставити башту 🙈'));
+      return false;
+    }
+    this.placeWatchtowerAt(pos.x, pos.z, 1);
+    return true;
+  }
+
+  placeWatchtowerAt(x, z, ownerPid) {
+    const level = this.level;
+    const oldIdx = this.towers.findIndex((t) => t.ownerPid === ownerPid);
+    if (oldIdx >= 0) this._removeWatchtower(oldIdx, false);
+    const y = level.world.groundH(x, z);
+    const mesh = makeWatchtowerMesh();
+    mesh.position.set(x, y, z);
+    level.scene.add(mesh);
+    const collider = { x, z, r: 0.8, top: y + 2.4 };
+    level.world.colliders.push(collider);
+    level.world._buildGrid();
+    this.towers.push({ x, z, y, topY: y + 4.25, hp: WATCHTOWER_HP, ownerPid, mesh, collider });
+    level.audio.powerup();
+    level.effects.ring(new THREE.Vector3(x, y, z), 0x9aa8b5, 2.4);
+    return true;
+  }
+
+  _toggleWatchtower() {
+    const p = this.level.player;
+    const current = p.watchtower;
+    if (current && this.towers.includes(current)) {
+      p.watchtower = null;
+      p.pos.set(current.x + 1.9, this.level.world.groundH(current.x + 1.9, current.z), current.z);
+      p.vel.set(0, 0, 0);
+      p.onGround = true;
+      return true;
+    }
+    let best = null, bd = 2.6;
+    for (const t of this.towers) {
+      const d = Math.hypot(p.pos.x - t.x, p.pos.z - t.z);
+      if (d < bd) { bd = d; best = t; }
+    }
+    if (!best) return false;
+    p.watchtower = best;
+    p.pos.set(best.x, best.topY, best.z);
+    p.vel.set(0, 0, 0);
+    p.onGround = true;
+    return true;
+  }
+
+  _syncWatchtowerPlayer() {
+    const p = this.level.player;
+    const t = p.watchtower;
+    if (!t) return;
+    if (!this.towers.includes(t) || Math.hypot(p.pos.x - t.x, p.pos.z - t.z) > 1.2) {
+      p.watchtower = null;
+      return;
+    }
+    p.pos.y = t.topY;
+    p.vel.y = 0;
+    p.onGround = true;
+  }
+
+  _updateTowers(dt) {
+    const level = this.level;
+    for (let i = this.towers.length - 1; i >= 0; i--) {
+      const t = this.towers[i];
+      let pressure = 0;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || !z.aggroed) continue;
+        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.6) pressure += z.stats.dmg;
+      }
+      if (pressure > 0) {
+        t.hp -= pressure * dt * 0.85;
+        if (t.hp <= 0) this._removeWatchtower(i, true);
+      }
+    }
+  }
+
+  _removeWatchtower(i, broken) {
+    const level = this.level;
+    const tower = this.towers[i];
+    if (!tower) return;
+    this.towers.splice(i, 1);
+    if (level.player.watchtower === tower) {
+      level.player.watchtower = null;
+      level.player.pos.set(tower.x + 1.9, level.world.groundH(tower.x + 1.9, tower.z), tower.z);
+      level.player.vel.set(0, 0, 0);
+    }
+    level.scene.remove(tower.mesh);
+    level.world.colliders = level.world.colliders.filter((c) => c !== tower.collider);
+    level.world._buildGrid();
+    if (broken) {
+      level.effects.burst(new THREE.Vector3(tower.x, tower.y + 2, tower.z), 0x7d8aa0, 18, { speed: 4, up: 4, life: 0.8, size: 1.0 });
+      level.audio.shieldBreak();
+      level.bus.emit('toast', t('🗼 Башту зламали!'));
+    }
   }
 
   // гість: просимо хоста поставити гаджет у нашій точці

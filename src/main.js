@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 54;
+const APP_VERSION = 57;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2049,6 +2049,17 @@ class Game {
       unlockGadget: (id) => {
         if (!g.save.gadgetsOwned.includes(id)) g.save.gadgetsOwned.push(id);
         g.save.activeGadget = id;
+        g.saveGame();
+      },
+      giveGadgets: (tramps = 1, walls = 1) => {
+        // ponytail: legacy screenshot helper; gadgets are now unlocks, not consumable counts.
+        const ids = [];
+        if (tramps > 0) ids.push('tramp');
+        if (walls > 0) ids.push('wall');
+        for (const id of ids) {
+          if (!g.save.gadgetsOwned.includes(id)) g.save.gadgetsOwned.push(id);
+        }
+        if (!g.save.activeGadget && ids.length) g.save.activeGadget = ids[0];
         g.saveGame();
       },
       useGadget: () => g.level.gadgets.use(),

@@ -80,39 +80,42 @@ export class World {
   _buildLandmarks() {
     const lm = this.map.landmarks || [];
     const P = this.map.landmarkParams || {};
-    if (lm.includes('sunflowerField')) this._lmSunflowers(P.sunflowerField);
-    if (lm.includes('pond')) this._lmPond(P.pond);
-    if (lm.includes('windmill')) this._lmWindmill(P.windmill);
-    if (lm.includes('townSquare')) this._lmTownSquare(P.townSquare);
-    if (lm.includes('frozenLake')) this._lmFrozenLake(P.frozenLake);
-    if (lm.includes('castleRuin')) this._lmCastleRuin(P.castleRuin);
-    if (lm.includes('railDepot')) this._lmRailDepot(P.railDepot);
-    if (lm.includes('garlandTrees')) this._lmGarlands(P.garlandTrees);
-    if (lm.includes('cityGate')) this._lmCityGate(P.cityGate);
-    if (lm.includes('autobahn')) this._lmAutobahn(P.autobahn);
-    if (lm.includes('beerGarden')) this._lmBeerGarden(P.beerGarden);
-    if (lm.includes('eiffelTower')) this._lmEiffelTower(P.eiffelTower);
-    if (lm.includes('cafe')) this._lmCafe(P.cafe);
-    if (lm.includes('lavenderField')) this._lmLavender(P.lavenderField);
-    if (lm.includes('vineyard')) this._lmVineyard(P.vineyard);
-    if (lm.includes('balloon')) this._lmBalloon(P.balloon);
-    if (lm.includes('chimneySmoke')) this._lmChimneySmoke();
-    if (lm.includes('grandBazaar')) this._lmGrandBazaar(P.grandBazaar);
-    if (lm.includes('galataTower')) this._lmGalataTower(P.galataTower);
-    if (lm.includes('teaGarden')) this._lmTeaGarden(P.teaGarden);
-    if (lm.includes('cappadociaBalloons')) this._lmCappadociaBalloons(P.cappadociaBalloons);
-    if (lm.includes('pyramids')) this._lmPyramids(P.pyramids);
-    if (lm.includes('sphinx')) this._lmSphinx(P.sphinx);
-    if (lm.includes('oasis')) this._lmOasis(P.oasis);
+    const build = {
+      sunflowerField: () => this._lmSunflowers(P.sunflowerField),
+      pond: () => this._lmPond(P.pond),
+      windmill: () => this._lmWindmill(P.windmill),
+      townSquare: () => this._lmTownSquare(P.townSquare),
+      frozenLake: () => this._lmFrozenLake(P.frozenLake),
+      castleRuin: () => this._lmCastleRuin(P.castleRuin),
+      railDepot: () => this._lmRailDepot(P.railDepot),
+      garlandTrees: () => this._lmGarlands(P.garlandTrees),
+      cityGate: () => this._lmCityGate(P.cityGate),
+      autobahn: () => this._lmAutobahn(P.autobahn),
+      beerGarden: () => this._lmBeerGarden(P.beerGarden),
+      eiffelTower: () => this._lmEiffelTower(P.eiffelTower),
+      cafe: () => this._lmCafe(P.cafe),
+      lavenderField: () => this._lmLavender(P.lavenderField),
+      vineyard: () => this._lmVineyard(P.vineyard),
+      balloon: () => this._lmBalloon(P.balloon),
+      chimneySmoke: () => this._lmChimneySmoke(),
+      grandBazaar: () => this._lmGrandBazaar(P.grandBazaar),
+      galataTower: () => this._lmGalataTower(P.galataTower),
+      teaGarden: () => this._lmTeaGarden(P.teaGarden),
+      cappadociaBalloons: () => this._lmCappadociaBalloons(P.cappadociaBalloons),
+      pyramids: () => this._lmPyramids(P.pyramids),
+      sphinx: () => this._lmSphinx(P.sphinx),
+      oasis: () => this._lmOasis(P.oasis),
+      bullring: () => this._lmBullring(P.bullring),
+      plazaFountain: () => this._lmPlazaFountain(P.plazaFountain),
+      oliveGrove: () => this._lmOliveGrove(P.oliveGrove),
+      cathedral: () => this._lmCathedral(P.cathedral),
+      colosseum: () => this._lmColosseum(P.colosseum),
+      leaningTower: () => this._lmLeaningTower(P.leaningTower),
+      romanRuins: () => this._lmRomanRuins(P.romanRuins),
+      birds: () => this._lmBirds(),
+    };
+    for (const id of lm) if (build[id]) build[id]();
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
-    if (lm.includes('bullring')) this._lmBullring(P.bullring);
-    if (lm.includes('plazaFountain')) this._lmPlazaFountain(P.plazaFountain);
-    if (lm.includes('oliveGrove')) this._lmOliveGrove(P.oliveGrove);
-    if (lm.includes('cathedral')) this._lmCathedral(P.cathedral);
-    if (lm.includes('colosseum')) this._lmColosseum(P.colosseum);
-    if (lm.includes('leaningTower')) this._lmLeaningTower(P.leaningTower);
-    if (lm.includes('romanRuins')) this._lmRomanRuins(P.romanRuins);
-    if (lm.includes('birds')) this._lmBirds();
   }
 
   _drapeXZGeometry(geo, cx, cz, offset = 0) {

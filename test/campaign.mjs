@@ -1,4 +1,4 @@
-// Повне проходження кампанії від початку до кінця: 7 країн поспіль
+// Повне проходження кампанії від початку до кінця: усі країни поспіль
 // на одному сейві — місії, орди, боси, нагороди, прогресія.
 import { chromium } from 'playwright';
 
@@ -28,9 +28,9 @@ async function waitFor(fn, timeoutMs, label) {
 await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
 
-const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'EGY'];
-// v53: ESP/ITA більше НЕ дають зброю (вогнемет@25 / лазер@28 — за зірковий рівень) — лише монети.
-const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: null, ITA: null, TUR: 'magnum', EGY: 'bazooka' };
+const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY'];
+// v53+: частина країн дає монети; вогнемет@25 / лазер@28 — за зірковий рівень.
+const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: null, ITA: null, TUR: 'magnum', SWE: null, EGY: 'bazooka' };
 
 for (const c of ORDER) {
   console.log(`▸ Граємо: ${c}`);
@@ -82,7 +82,7 @@ for (const c of ORDER) {
   check(st.liberated.includes(c), 'країна записана в сейв');
   if (REWARDS[c]) check(st.player.weapons.includes(REWARDS[c]), `зброя-нагорода в арсеналі (${REWARDS[c]})`);
   else {
-    // ESP/ITA дають МОНЕТИ. Зброю (вогнемет/лазер) дав би лише зірковий рівень ≥25/≥28 —
+    // Монетні країни не дають зброю. Вогнемет/лазер дав би лише зірковий рівень ≥25/≥28 —
     // у швидкому тесті він туди не доходить, тож гард-перевірка враховує й цей крайній випадок.
     const lvl = await page.evaluate(() => window.__game.progress.level);
     const noFlame = lvl >= 25 || !st.player.weapons.includes('flamethrower');
@@ -109,7 +109,7 @@ const final = await page.evaluate(() => {
     allDone: g.globe.allDone,
   };
 });
-check(final.liberated === 8, `усі 8 країн звільнено (${final.liberated})`);
+check(final.liberated === 9, `усі 9 країн звільнено (${final.liberated})`);
 // v53: ESP/ITA дають монети, тож кампанія дає 6 зброй (rifle/shotgun/smg/sniper/magnum/bazooka).
 // Вогнемет/лазер тепер за зірковий рівень 25/28, який у швидкій кампанії не досягається.
 const expectWeapons = ['rifle', 'shotgun', 'smg', 'sniper', 'magnum', 'bazooka'];

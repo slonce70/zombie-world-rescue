@@ -2,24 +2,16 @@
   "name": "claude",
   "version": "1.0.0",
   "description": "3D browser zombie rescue game with campaign, co-op, Storm mode, leaderboard, cloud save, and PWA support",
-  "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
     "serve": "python3 -m http.server 8741",
     "relay": "node relay/dev-relay.mjs",
     "test": "node test/smoke.mjs",
     "test:coop": "node test/coop.mjs"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "playwright": "^1.60.0"
-  },
   "devDependencies": {
+    "playwright": "^1.60.0",
     "ws": "^8.21.0"
   }
 }

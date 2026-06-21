@@ -710,20 +710,7 @@ export class DynamicMissions {
     const px = player.pos.x, pz = player.pos.z;
     this.prompt = null;
 
-    for (const m of this.missions) {
-      if (!m.beam) continue;
-      m.beam.update(dt);
-      // 🧭 маяк веде до НАСТУПНОЇ цілі місії, а не стоїть на місці
-      const target = this._beamTarget(m);
-      if (target) {
-        const g = m.beam.group;
-        const ty = this.level.world.groundH(target.x, target.z);
-        g.position.x += (target.x - g.position.x) * Math.min(1, dt * 6);
-        g.position.z += (target.z - g.position.z) * Math.min(1, dt * 6);
-        g.position.y = ty;
-      }
-    }
-    if (this.bossBeam) this.bossBeam.update(dt);
+    this._updateBeams(dt);
 
     // відкладена орда
     if (this.pendingHorde) {
@@ -776,6 +763,22 @@ export class DynamicMissions {
     }
 
     this._updateCivilians(dt);
+  }
+
+  _updateBeams(dt) {
+    for (const m of this.missions) {
+      if (!m.beam) continue;
+      m.beam.update(dt);
+      // 🧭 маяк веде до НАСТУПНОЇ цілі місії, а не стоїть на місці
+      const target = this._beamTarget(m);
+      if (!target) continue;
+      const g = m.beam.group;
+      const ty = this.level.world.groundH(target.x, target.z);
+      g.position.x += (target.x - g.position.x) * Math.min(1, dt * 6);
+      g.position.z += (target.z - g.position.z) * Math.min(1, dt * 6);
+      g.position.y = ty;
+    }
+    if (this.bossBeam) this.bossBeam.update(dt);
   }
 
   // куди має стояти маяк місії просто зараз
@@ -1568,20 +1571,7 @@ export class DynamicMissions {
     this.prompt = null;
     if (net) net.holdE = false;
 
-    for (const m of this.missions) {
-      if (m.beam) {
-        m.beam.update(dt);
-        const target = this._beamTarget(m);
-        if (target) {
-          const g = m.beam.group;
-          const ty = level.world.groundH(target.x, target.z);
-          g.position.x += (target.x - g.position.x) * Math.min(1, dt * 6);
-          g.position.z += (target.z - g.position.z) * Math.min(1, dt * 6);
-          g.position.y = ty;
-        }
-      }
-    }
-    if (this.bossBeam) this.bossBeam.update(dt);
+    this._updateBeams(dt);
 
     const near = (x, z, r) => Math.hypot(player.pos.x - x, player.pos.z - z) < r;
     let pressE = allowControl && input.pressed('KeyE');
