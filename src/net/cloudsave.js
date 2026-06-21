@@ -13,7 +13,7 @@ const SAVE_KEY = 'zr-save-v1'; // тримати в синхроні з main.js
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
 // двох місцях, вони розійдуться при будь-якій зміні палітри. Тримаємо тут, бо саме
 // тут живе захист від перезапису прогресу.
-export const DEFAULT_HERO = { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3 };
+export const DEFAULT_HERO = { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3, shoes: 0x303642, hatColor: 0x2f80c3, hat: 'cap', face: 'smile' };
 export const NEW_SAVE_COINS = 50;
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист

@@ -1638,10 +1638,60 @@ export function attachHeroGear(rig, kind) {
 
 // ---------- Палітра кастом-героя (фіксована, нуль вільного тексту) ----------
 export const HERO_PALETTE = {
+  skin: [0xffc9a3, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd9b3, 0xd9f0a3, 0xbfa6ff],
   shirt: [0x2f80c3, 0xe14b4b, 0x46b340, 0xf5a623, 0x8e44ad, 0x16a085, 0xec407a, 0x34495e],
-  pants: [0x474f63, 0x2d3436, 0x6b4f3a, 0x2c3e50, 0x7f8c8d, 0x512e5f],
-  skin: [0xffc9a3, 0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffd9b3],
+  pants: [0x474f63, 0x2d3436, 0x6b4f3a, 0x2c3e50, 0x7f8c8d, 0x512e5f, 0x1e6f5c, 0x9b2d2d],
+  shoes: [0x303642, 0xffffff, 0xe14b4b, 0x2f80c3, 0xf5a623, 0x2d3436],
+  hatColor: [0x2f80c3, 0xe14b4b, 0x46b340, 0xf5a623, 0x8e44ad, 0xf4c430, 0xffffff, 0x34495e],
 };
+
+// частини редактора героя (id → метадані для UI; геометрію будує buildHeroHat / faceSpec)
+export const HERO_HATS = {
+  none: { name: t('Без шапки'), icon: '🚫' },
+  cap: { name: t('Кепка'), icon: '🧢' },
+  beanie: { name: t('Шапочка'), icon: '🧶' },
+  cowboy: { name: t('Капелюх'), icon: '🤠' },
+  crown: { name: t('Корона'), icon: '👑' },
+  ears: { name: t('Вушка'), icon: '🐻' },
+  party: { name: t('Ковпак'), icon: '🥳' },
+};
+export const HERO_FACES = {
+  smile: { name: t('Усмішка'), icon: '🙂' },
+  grin: { name: t('Сміх'), icon: '😄' },
+  cool: { name: t('Крутий'), icon: '😎' },
+};
+
+// будує обрану шапку на голові героя (headG = rig.parts.head), колір hatColor
+export function buildHeroHat(headG, hatId, hatColor) {
+  const m = toonMat(hatColor != null ? hatColor : 0x2f80c3);
+  if (hatId === 'cap') {
+    const top = sphere(0.275, m, 16, 10); top.position.y = 0.2; top.scale.set(1, 0.62, 1); headG.add(top);
+    const brim = box(0.26, 0.04, 0.2, m); brim.position.set(0, 0.16, -0.22); headG.add(brim);
+  } else if (hatId === 'beanie') {
+    const top = sphere(0.285, m, 16, 10); top.position.y = 0.16; top.scale.set(1, 0.7, 1); headG.add(top);
+    const band = cylinder(0.29, 0.29, 0.07, toonMat(0xffffff), 16); band.position.y = 0.05; headG.add(band);
+    const pom = sphere(0.06, toonMat(0xffffff), 10, 8); pom.position.y = 0.34; headG.add(pom);
+  } else if (hatId === 'cowboy') {
+    const brim = cylinder(0.4, 0.4, 0.035, m, 18); brim.position.y = 0.12; headG.add(brim);
+    const crown = cylinder(0.2, 0.23, 0.18, m, 14); crown.position.y = 0.22; headG.add(crown);
+  } else if (hatId === 'crown') {
+    const gold = toonMat(0xf4c430, 0xf4c430, 0.25);
+    const band = cylinder(0.26, 0.26, 0.1, gold, 14); band.position.y = 0.22; headG.add(band);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const sp = cone(0.04, 0.1, gold, 5); sp.position.set(Math.cos(a) * 0.24, 0.3, Math.sin(a) * 0.24); headG.add(sp); }
+  } else if (hatId === 'ears') {
+    for (const side of [-1, 1]) { const ear = sphere(0.08, m, 10, 8); ear.position.set(0.14 * side, 0.26, 0); headG.add(ear); const inr = sphere(0.045, toonMat(0xeaa6b0), 8, 6); inr.position.set(0.14 * side, 0.27, -0.04); headG.add(inr); }
+  } else if (hatId === 'party') {
+    const cone1 = cone(0.16, 0.34, m, 14); cone1.position.y = 0.34; headG.add(cone1);
+    const pom = sphere(0.05, toonMat(0xffffff), 8, 6); pom.position.y = 0.52; headG.add(pom);
+  }
+}
+
+// параметри обличчя для makeHumanoid (+ чи додавати окуляри для 'cool')
+function faceSpec(faceId) {
+  if (faceId === 'grin') return { mouth: 'open', teeth: true, glasses: false };
+  if (faceId === 'cool') return { mouth: 'smile', teeth: false, glasses: true };
+  return { mouth: 'smile', teeth: false, glasses: false };
+}
 
 // ---------- Скіни героя ----------
 export const HERO_SKINS = {
@@ -1966,15 +2016,21 @@ export function makeHero(skinId = 'classic', heroColors = null) {
     },
     custom() {
       const hc = heroColors || {};
+      const f = faceSpec(hc.face || 'smile');
       const rig = makeHumanoid({
         scale: 1.0,
         skin: hc.skin || 0xffc9a3, shirt: hc.shirt || 0x2f80c3, pants: hc.pants || 0x474f63,
-        shoes: 0x303642, eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x8a4b3a, brow: -0.08, cast: 'all',
+        shoes: hc.shoes != null ? hc.shoes : 0x303642,
+        eyeL: 0.058, eyeR: 0.058, mouth: f.mouth, teeth: f.teeth, mouthColor: 0x8a4b3a, brow: -0.08, cast: 'all',
       });
-      // проста кепка кольору сорочки — щоб кастом не виглядав «голим»
-      const capM = toonMat(hc.shirt || 0x2f80c3);
-      const capTop = sphere(0.275, capM, 16, 10); capTop.position.y = 0.2; capTop.scale.set(1, 0.62, 1);
-      rig.parts.head.add(capTop);
+      // 🎩 обрана шапка (колір hatColor); за замовчуванням кепка кольору сорочки
+      const hatId = hc.hat || 'cap';
+      const hatCol = hc.hatColor != null ? hc.hatColor : (hc.shirt || 0x2f80c3);
+      buildHeroHat(rig.parts.head, hatId, hatCol);
+      // 😎 окуляри для «крутого» обличчя
+      if (f.glasses) {
+        const gl = box(0.34, 0.07, 0.04, toonMat(0x1a1a1a)); gl.position.set(0, 0.07, -0.235); rig.parts.head.add(gl);
+      }
       return rig;
     },
   };
