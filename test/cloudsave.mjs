@@ -14,6 +14,9 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// CI під навантаженням (SLOW=4): relay-раунд-тріпи й перезавантаження повільніші — масштабуємо чекання
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const T = (ms) => Math.round(ms * SLOW);
 
 const relay = await spawnRelay(RELAY_PORT);
 
@@ -81,7 +84,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   const ctxU = await browser.newContext({ viewport: { width: 1024, height: 768 } });
   const U = await ctxU.newPage();
   await U.goto(`${BASE}/?test&fresh`);
-  await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+  await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
   const res = await U.evaluate(async () => {
     const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS } = await import('/src/net/cloudsave.js');
     const fresh = window.__game._newSave();
@@ -121,7 +124,7 @@ const A = await ctxA.newPage();
 const errorsA = [];
 A.on('pageerror', (e) => errorsA.push(e.message));
 await A.goto(`${BASE}/${URL_PARAMS}`);
-await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 const codeA = await A.evaluate(async () => {
   const g = window.__game;
   g.save.coins = 7777;
@@ -136,13 +139,13 @@ const cidA = await A.evaluate(() => window.__game.save.cid);
 
 // панель: відкривається кнопкою (v34: кнопки тепер у ☰-меню — спершу відкриваємо його)
 await A.click('#btn-menu');
-await sleep(300);
+await sleep(T(300));
 await A.click('#btn-progress');
-await sleep(700);
+await sleep(T(700));
 const panelVisible = await A.evaluate(() => document.getElementById('overlay-progress').classList.contains('show'));
 check('панель «Мій прогрес» відкривається', panelVisible);
 await A.click('#btn-cloud-code');
-await A.waitForFunction(() => /-/.test(document.getElementById('cloud-code').textContent), null, { timeout: 5000 });
+await A.waitForFunction(() => /-/.test(document.getElementById('cloud-code').textContent), null, { timeout: T(5000) });
 const shownCode = await A.evaluate(() => document.getElementById('cloud-code').textContent);
 check('код показано у форматі XXXX-XXXX', shownCode.replace('-', '') === codeA, shownCode);
 
@@ -152,14 +155,14 @@ const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } }
 const B = await ctxB.newPage();
 // ?fresh не даємо: інакше adopt-нутий сейв знову зітреться після перезавантаження
 await B.goto(`${BASE}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
-await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 B.on('dialog', (d) => d.accept());
 await B.click('#btn-menu');
-await sleep(300);
+await sleep(T(300));
 await B.click('#btn-progress');
 await B.fill('#cloud-code-input', codeA);
 await Promise.all([
-  B.waitForNavigation({ timeout: 10000 }).catch(() => null), // adopt → location.reload()
+  B.waitForNavigation({ timeout: T(10000) }).catch(() => null), // adopt → location.reload()
   B.click('#btn-cloud-claim'),
 ]);
 // adopt робить ще один location.reload() — чекаємо саме цільовий стан як boolean,
@@ -170,7 +173,7 @@ await B.waitForFunction(({ codeCid }) => {
     && g.save.coins === 7777
     && g.save.liberated.UKR
     && g.save.cid === codeCid);
-}, { codeCid: cidA }, { timeout: 25000, polling: 300 });
+}, { codeCid: cidA }, { timeout: T(25000), polling: 300 });
 const restored = await B.evaluate(() => ({
   coins: window.__game.save.coins,
   ukr: !!window.__game.save.liberated.UKR,
@@ -184,21 +187,21 @@ console.log('▸ bootSync: «почистив браузер» (cid зберіг
 const ctxC = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const C = await ctxC.newPage();
 await C.goto(`${BASE}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
-await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await C.evaluate((cid) => {
   localStorage.setItem('zr-save-v1', JSON.stringify({ cid })); // свіжий сейв, але cid відомий
 }, cidA);
 await C.reload();
 await C.waitForFunction(
   () => window.__game && window.__game.save && window.__game.save.coins === 7777,
-  null, { timeout: 25000 }
+  null, { timeout: T(25000) }
 ).catch(() => null);
 const cCoins = await C.evaluate(() => window.__game.save.coins);
 check('bootSync сам підтягнув хмарний прогрес', cCoins === 7777, `coins=${cCoins}`);
 
 // ---------- файл-копія (панель А досі відкрита) ----------
 console.log('▸ Файл-копія');
-const dlPromise = A.waitForEvent('download', { timeout: 8000 }).catch(() => null);
+const dlPromise = A.waitForEvent('download', { timeout: T(8000) }).catch(() => null);
 await A.click('#btn-save-export');
 const dl = await dlPromise;
 check('експорт качає zr-progres.json', !!dl && dl.suggestedFilename() === 'zr-progres.json');
@@ -208,11 +211,11 @@ console.log('▸ Аварійний екран');
 const ctxE = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const E = await ctxE.newPage();
 await E.goto(`${BASE}/?test&fresh`);
-await E.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+await E.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await E.evaluate(() => setTimeout(() => { throw new Error('тестовий вибух'); }, 0));
 await E.waitForFunction(
   () => document.getElementById('overlay-crash').classList.contains('show'),
-  null, { timeout: 5000 }
+  null, { timeout: T(5000) }
 ).catch(() => null);
 const crash = await E.evaluate(() => ({
   shown: document.getElementById('overlay-crash').classList.contains('show'),

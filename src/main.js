@@ -23,6 +23,7 @@ import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
+import { LivingHQ } from './hqbase.js';
 import { Chapter } from './chapter.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, DEFAULT_HERO, NEW_SAVE_COINS } from './net/cloudsave.js';
@@ -55,7 +56,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -143,6 +144,7 @@ class Game {
     this.league = new LeagueUI(this);
     this.saveui = new SaveUI(this);
     this.hq = new RescueHQ(this);
+    this.hqbase = new LivingHQ(this);
     this.chapter = new Chapter(this);
     this.touch = isTouchDevice() ? new TouchControls(this) : null;
     if (this.touch) {
@@ -181,6 +183,7 @@ class Game {
       // у полі вводу літери B/M — це просто літери, а не магазин/звук
       const tgt = e.target;
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
+      if (e.code === 'Escape' && this.state === 'hqbase') { this.exitHQBase(); return; }
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }
@@ -257,6 +260,7 @@ class Game {
       this.hq.render();
       this._showOverlay('overlay-hq');
     });
+    document.getElementById('btn-hqbase').addEventListener('click', () => this.enterHQBase());
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
       this.renderSoloMenu();
@@ -325,6 +329,7 @@ class Game {
         this.level.player.camera.aspect = innerWidth / innerHeight;
         this.level.player.camera.updateProjectionMatrix();
       }
+      if (this.hqbase && this.state === 'hqbase') this.hqbase.onResize();
     });
 
     this.clock = new THREE.Clock();
@@ -626,6 +631,25 @@ class Game {
       if (this._newVersion) this._onNewVersion(this._newVersion);
     }
     if (this.coop) this.coop.updateRoomChip();
+  }
+
+  // ---------- 🏠 Живий Штаб ----------
+  enterHQBase() {
+    this.audio.click();
+    this._hideOverlay('overlay-hq');
+    this._hideOverlay('overlay-menu');
+    this._showGlobeUI(false);
+    document.body.classList.remove('in-level'); // це не рівень — ховаємо бойовий HUD (амуніція/мінікарта/тач)
+    this.state = 'hqbase';
+    this.hqbase.enter();
+    this.clock.getDelta(); // не накопичуємо dt за час на меню
+  }
+
+  exitHQBase() {
+    this.audio.click();
+    this.hqbase.exit();
+    this.state = 'globe';
+    this._showGlobeUI(true);
   }
 
   // ---------- 🎮 меню «Грати» (соло-режими) ----------
@@ -1918,6 +1942,9 @@ class Game {
     if (this.state === 'globe') {
       this.globe.update(dt);
       if (!skipRender) this.renderer.render(this.globe.scene, this.globe.camera);
+    } else if (this.state === 'hqbase') {
+      this.hqbase.update(dt);
+      if (!skipRender) this.renderer.render(this.hqbase.scene, this.hqbase.camera);
     } else if (this.state === 'level' && this.level) {
       const isCoop = !!this.level.net;
       // кооп: пауза/магазин ховають керування, але світ ЖИВЕ (інші ж грають!)

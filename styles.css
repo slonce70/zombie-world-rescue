@@ -1150,3 +1150,22 @@ body.touch-mode #touch-coach.show { display: block; }
 }
 .shop-goal-btn.on { opacity: 1; background: #f5c542; }
 .shop-item.goal { outline: 2px solid #f5c542; }
+
+/* 🏠 Живий Штаб */
+.hqbase-row { display: flex; justify-content: center; margin: 8px 0 14px; }
+.hqbase-enter { width: min(100%, 360px); }
+#hqbase-ui {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 20;
+}
+.hqbase-counter {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .45);
+  color: #fff;
+  font-weight: 800;
+  text-align: center;
+}

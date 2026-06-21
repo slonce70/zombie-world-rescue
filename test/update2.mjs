@@ -264,13 +264,15 @@ await page.evaluate(() => {
   const el = document.getElementById('tb-fire');
   el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [], changedTouches: [] }));
 });
-await page.waitForTimeout(400);
+// ТРИМАЄМО кнопку і чекаємо на постріл: на завантаженому CI кадри рідші, ніж фіксовані 400мс
+const firedOk = await waitFor(async () =>
+  (await page.evaluate(() => window.__game.level.stats.shotsFired)) > firedBefore, 8000, 'постріл з кнопки вогню');
 await page.evaluate(() => {
   const el = document.getElementById('tb-fire');
   el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [] }));
 });
 const firedAfter = await page.evaluate(() => window.__game.level.stats.shotsFired);
-check(firedAfter > firedBefore, `кнопка вогню стріляє (${firedBefore}→${firedAfter})`);
+check(firedOk && firedAfter > firedBefore, `кнопка вогню стріляє (${firedBefore}→${firedAfter})`);
 await page.screenshot({ path: 'shots/u2-touch.png' });
 
 console.log('');
