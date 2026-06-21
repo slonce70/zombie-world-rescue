@@ -398,6 +398,8 @@ export const GADGETS = {
   // 🩻 Ікс-рей: підсвічує всіх невидимих зомбі (Привидів) на 4с, перезарядка 25с
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
   infammo: { name: t('Бескінечні патрони'), icon: '♾️', cd: 45, price: 1000, desc: t('3 секунди автомат і швидкостріл не витрачають патрони') },
+  // 💫 Оглушливі кулі: 3с кулі пістолета/магнума оглушують зомбі на 0.5с
+  stunammo: { name: t('Оглушливі кулі'), icon: '💫', cd: 45, price: 1000, desc: t('3 секунди кулі пістолета й магнума оглушують зомбі на 0.5с') },
 };
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
@@ -596,6 +598,12 @@ export class Gadgets {
       level.audio.powerup();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffd23f, 16, { speed: 3, up: 3, life: 0.7 });
       level.bus.emit('toast', t('♾️ Бескінечні патрони на 3с! Автомат і швидкостріл шаленіють'));
+      ok = true;
+    } else if (id === 'stunammo') {
+      p.stunAmmoT = 3;
+      level.audio.powerup();
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0xc9a8ff, 16, { speed: 3, up: 3, life: 0.7 });
+      level.bus.emit('toast', t('💫 Оглушливі кулі на 3с! Пістолет і магнум оглушують зомбі'));
       ok = true;
     }
     if (ok) {

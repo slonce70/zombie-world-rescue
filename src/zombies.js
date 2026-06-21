@@ -144,6 +144,7 @@ export class Zombies {
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,
       attackT: -1, didHit: false,
+      stunT: 0,
       deadT: -1,
       groanT: this.rng.range(2, 9),
       groupId: opts.groupId ?? -1,
@@ -702,6 +703,15 @@ export class Zombies {
         continue;
       }
 
+      // 💫 оглушений: завмирає на місці (ні руху, ні атак), ледь хитається «в зірках»
+      if (z.stunT > 0) {
+        z.stunT -= dt;
+        setAnim(rig, 'idle');
+        rig.group.rotation.y += Math.sin(z.stunT * 40) * 0.04;
+        updateRig(rig, dt);
+        continue;
+      }
+
       let tgt = null;
       let distP = Infinity;
       for (const pl of players) {
@@ -1150,6 +1160,9 @@ export class Zombies {
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
   _hurt(tgt, dmg, fx, fz) {
     if (!tgt) return;
+    // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
+    // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
+    if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return;
     if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz);
     else this.level.player.takeDamage(dmg, fx, fz);
   }

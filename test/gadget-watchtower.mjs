@@ -82,6 +82,29 @@ check(placed.cd === 125, 'перезарядка 125с', JSON.stringify(placed))
 check(placed.up.onTower && placed.up.y > placed.groundY + 3, 'Y піднімає на башту', JSON.stringify(placed));
 check(!placed.down.onTower && Math.abs(placed.down.y - placed.groundY) < 1.5, 'Y спускає з башти', JSON.stringify(placed));
 
+// 🛡 баг-фікс: мелі-зомбі не дістають гравця, поки той на башті
+const melee = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  const z = g.level.zombies;
+  const tower = g.level.gadgets.towers[0];
+  const clearProt = () => { p.respawnProtect = 0; p.buffs.bubble = 0; p.gadgetShield = 0; p.armor = 0; p.health = 100; };
+  // на башті
+  g.test.teleport(tower.x + 1.2, tower.z);
+  g.test.key('KeyY', true); g.level.gadgets.update(0.1, g.input, true); g.test.key('KeyY', false);
+  const onTower = !!p.watchtower;
+  clearProt();
+  z._hurt(p, 30, tower.x, tower.z);
+  const hpOnTower = p.health;
+  // на землі (контроль): спускаємось, мелі має проходити
+  g.test.key('KeyY', true); g.level.gadgets.update(0.1, g.input, true); g.test.key('KeyY', false);
+  clearProt();
+  z._hurt(p, 30, p.pos.x + 1, p.pos.z);
+  return { onTower, hpOnTower, hpGround: p.health };
+});
+check(melee.onTower && melee.hpOnTower === 100, 'на башті мелі-зомбі не б’ють', JSON.stringify(melee));
+check(melee.hpGround < 100, 'на землі мелі-зомбі б’ють (контроль)', JSON.stringify(melee));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
