@@ -49,16 +49,32 @@ check(hpScaled === 91, `складність: HP волоцюги 70→${hpScale
 console.log('▸ Сніговик: дальня атака');
 await page.evaluate(() => {
   const g = window.__game;
+  const w = g.level.world;
+  const V = g.level.player.pos.constructor; // THREE.Vector3
   const sm = g.level.zombies.list.find((z) => z.type === 'snowman');
-  // стаємо за 12 м від сніговика на відкритому місці
-  g.test.teleport(sm.x + 12, sm.z);
-  sm.aggroed = true;
-  sm.state = 'chase';
-  sm.rangedCd = 0.1;
+  // ДЕТЕРМІНІЗМ: ставимо гравця рівно за 12 м від сніговика в напрямку з ЧИСТОЮ лінією.
+  // (раніше брали фіксований +x → інколи будівля на точці блукання глушила кидок = флак на CI)
+  const dirs = [[12, 0], [-12, 0], [0, 12], [0, -12], [8.5, 8.5], [-8.5, -8.5]];
+  let px = sm.x + 12, pz = sm.z;
+  for (const [dx, dz] of dirs) {
+    const x = sm.x + dx, z = sm.z + dz, y = w.groundH(x, z);
+    const from = new V(sm.x, sm.y + 1.3, sm.z);
+    const dir = new V(x - sm.x, (y + 1.2) - (sm.y + 1.3), z - sm.z);
+    const dist = dir.length(); dir.normalize();
+    if (w.shotBlockDist(from, dir, dist) > dist - 1.5) { px = x; pz = z; break; }
+  }
+  g.test.teleport(px, pz);
+  sm.aggroed = true; sm.state = 'chase'; sm.rangedCd = 0.1;
+  sm.telegraph = 0; sm.charging = 0; sm.stunT = 0;
 });
 const hpBefore = (await state()).player.health;
-const gotProjectile = await waitFor(async () =>
-  (await page.evaluate(() => window.__game.level.effects.projectiles.length)) > 0, 15000, 'сніжка летить');
+const gotProjectile = await waitFor(async () => page.evaluate(() => {
+  const g = window.__game;
+  // підтримуємо «готовність кидати», не перериваючи вже розпочату атаку
+  const sm = g.level.zombies.list.find((z) => z.type === 'snowman' && z.state !== 'dead');
+  if (sm && sm.state === 'chase' && sm.rangedCd > 1.0) { sm.aggroed = true; sm.rangedCd = 0.1; }
+  return g.level.effects.projectiles.length > 0;
+}), 30000, 'сніжка летить');
 check(gotProjectile, 'сніговик кинув сніжку');
 await waitFor(async () => (await state()).player.health < hpBefore, 12000, 'влучання сніжки');
 s = await state();
