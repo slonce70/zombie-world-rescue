@@ -1,5 +1,5 @@
 // Магазин (клавіша B): вкладки категорій, зброя, гаджети, спорядження, прокачування
-import { GADGETS } from './extras.js';
+import { GADGETS, TOWER_SKINS } from './extras.js';
 import { PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 
@@ -24,6 +24,8 @@ export const SHOP_ITEMS = [
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500
   ...Object.entries(PETS).map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
+  // 🏅 золотий скін для гаджета-башти (камʼяний дається за Францію — не в магазині)
+  { id: 'tower_gold', icon: TOWER_SKINS.gold.icon, name: TOWER_SKINS.gold.name, desc: t('Золотий скін для гаджета-башти'), price: 2344, max: 1, cat: t('Гаджети й друзі'), towerSkin: 'gold' },
   // --- зброя ---
   { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
   { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
@@ -94,6 +96,7 @@ export class Shop {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
     if (item.pet) return this.game.save.pets.includes(item.id) ? 1 : 0;
+    if (item.towerSkin) return (this.game.save.towerSkins || []).includes(item.towerSkin) ? 1 : 0;
     return this.game.save.upgrades[item.id] || 0;
   }
 
@@ -189,12 +192,18 @@ export class Shop {
       return;
     }
     save.coins -= price;
-    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin) save.upgrades[id] = count + 1;
     if (item.pet) {
       if (!save.pets.includes(id)) save.pets.push(id);
       save.activePet = id; // куплений улюбленець одразу стає активним і з'являється поряд
       game.spawnPet();
       game.hud.toast(t('{i} {n} — тепер з тобою! Обрати іншого — Гардероб 🎒', { i: item.icon, n: item.name }));
+    }
+    if (item.towerSkin) {
+      if (!save.towerSkins) save.towerSkins = ['default'];
+      if (!save.towerSkins.includes(item.towerSkin)) save.towerSkins.push(item.towerSkin);
+      save.activeTowerSkin = item.towerSkin; // одразу активуємо куплений скін башти
+      game.hud.toast(t('{i} {n} — обрано! Постав башту (гаджет) 🗼', { i: item.icon, n: item.name }));
     }
     switch (id) {
       case 'medkit': player.heal(50); break;

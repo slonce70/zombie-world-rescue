@@ -1705,6 +1705,7 @@ export const HERO_SKINS = {
   hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
   thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
+  knight: { name: t('Лицар'), icon: '🛡️', desc: t('Зоряний шлях, рівень 30') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2012,6 +2013,24 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       const capeKnot = box(0.46, 0.06, 0.06, toonMat(0xb03a3a));
       capeKnot.position.set(0, 0.58, 0.05);
       rig.parts.torso.add(capeKnot);
+      return rig;
+    },
+    // 🛡️ Лицар: сталеві лати, шолом із плюмажем, золотий хрест — за зірковий шлях 30
+    knight() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xe8c4a0, shirt: 0xc4ccd6, pants: 0x8a929c, shoes: 0x5a626c,
+        eyeL: 0.056, eyeR: 0.056, mouth: 'smile', mouthColor: 0x8a4b3a, brow: -0.1, cast: 'all', sleeves: 'shirt',
+      });
+      const steel = toonMat(0xc4ccd6), dark = toonMat(0x6b7280), gold = toonMat(0xf4c430, 0xf4c430, 0.25);
+      // шолом із прорізом-візором
+      const helm = sphere(0.285, steel, 16, 12); helm.position.y = 0.13; helm.scale.set(1.02, 1.06, 1.02); rig.parts.head.add(helm);
+      const visor = box(0.3, 0.07, 0.06, dark); visor.position.set(0, 0.18, -0.255); rig.parts.head.add(visor);
+      const plume = cone(0.05, 0.24, gold, 8); plume.position.set(0, 0.42, 0.04); rig.parts.head.add(plume);
+      // золотий хрест на нагруднику (перед = -Z)
+      const cv = box(0.07, 0.22, 0.04, gold); cv.position.set(0, 0.14, -0.26); rig.parts.torso.add(cv);
+      const ch = box(0.18, 0.07, 0.04, gold); ch.position.set(0, 0.18, -0.26); rig.parts.torso.add(ch);
+      // наплічники
+      for (const side of [-1, 1]) { const p = sphere(0.12, steel, 10, 8); p.position.set(0.27 * side, 0.34, 0); p.scale.set(1, 0.7, 1); rig.parts.torso.add(p); }
       return rig;
     },
     custom() {

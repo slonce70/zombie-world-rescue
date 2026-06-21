@@ -15,7 +15,7 @@ import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
-import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
+import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES, PETS, makeHero } from './characters.js';
@@ -56,7 +56,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -363,6 +363,7 @@ class Game {
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       pets: [], activePet: null,
+      towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
@@ -407,6 +408,10 @@ class Game {
         if ((out.upgrades && out.upgrades.dog > 0) && !out.pets.includes('dog')) out.pets.push('dog');
         if (out.activePet && !out.pets.includes(out.activePet)) out.activePet = null;
         if (!out.activePet && out.pets.length) out.activePet = out.pets[0];
+        // 🗼 скіни башти: default завжди є; gold — куплений (у towerSkins); stone — за Францію (динамічно)
+        if (!Array.isArray(out.towerSkins)) out.towerSkins = ['default'];
+        if (!out.towerSkins.includes('default')) out.towerSkins.unshift('default');
+        if (!TOWER_SKINS[out.activeTowerSkin]) out.activeTowerSkin = 'default';
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
         if (!out.skins.includes('custom')) out.skins.push('custom');
         if (!out.hero || typeof out.hero !== 'object') out.hero = {};
@@ -818,6 +823,12 @@ class Game {
       const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
       html += card(id, meta2, save.pets.includes(id), save.activePet === id, 'pet');
     }
+    html += t('</div><div class="ward-section">🗼 Скін башти (гаджет)</div><div class="ward-grid">');
+    const towerOwned = (id) => id === 'default' || (id === 'stone' && !!(save.liberated && save.liberated.FRA)) || save.towerSkins.includes(id);
+    for (const [id, meta] of Object.entries(TOWER_SKINS)) {
+      const meta2 = { icon: meta.icon, name: meta.name, desc: id === 'stone' ? t('Звільни Францію 🇫🇷') : id === 'gold' ? t('Купи в магазині') : t('Базова') };
+      html += card(id, meta2, towerOwned(id), save.activeTowerSkin === id, 'tower');
+    }
     html += t('</div><div class="ward-section">Сліди куль</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TRACERS)) {
       html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
@@ -833,6 +844,7 @@ class Game {
         else if (kind === 'dance') save.activeDance = id;
         else if (kind === 'gadget') save.activeGadget = id;
         else if (kind === 'pet') { save.activePet = id; this.spawnPet(); }
+        else if (kind === 'tower') save.activeTowerSkin = id;
         else if (kind === 'tracer') {
           save.activeTracer = id;
           if (this.level) this.level.effects.tracerStyle = id === 'classic' ? null : id;
