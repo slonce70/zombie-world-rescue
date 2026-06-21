@@ -427,7 +427,7 @@ export const GADGETS = {
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
-const WATCHTOWER_HP = 125;
+const WATCHTOWER_HP = 200;
 
 // 🗼 скіни башти: id → кольори (metal — ноги/щаблі, dark — платформа) + метадані для UI
 export const TOWER_SKINS = {
