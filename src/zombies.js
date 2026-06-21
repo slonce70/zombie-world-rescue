@@ -47,6 +47,9 @@ const TYPE_STATS = {
   // 🧟 шкет (imp): дрібний, слабкий (50hp), зате ДУЖЕ швидкий (швидше за runner) — наздожене будь-кого.
   // Доступний з усіх країн, у т.ч. UKR: лише швидкий, новачку не страшно.
   imp: { hp: 50, speed: 2.8, chaseSpeed: 6.2, aggro: 32, dmg: 6, attackR: 1.5, coins: 6, pitch: 1.8, small: true },
+  // 👻 привид: НЕВИДИМИЙ зомбі. Без гаджета «Ікс-рей» його не видно — лише він підсвічує всіх привидів на 4с.
+  // Середній і доволі прудкий, тому коштує уваги; багато монет як нагорода за виклик.
+  ghost: { hp: 60, speed: 2.0, chaseSpeed: 4.2, aggro: 30, dmg: 12, attackR: 1.8, coins: 20, pitch: 1.4, invisible: true },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -87,6 +90,9 @@ export class Zombies {
     // Той самий гейт, що й стрілець (dmg>1 або підняті зірки).
     this._allowWizard = this.diff.dmg > 1 || this.diffStar > 1;
     this._wizardCount = 0; // не більше 1-2 на рівень
+    // 👻 невидимі привиди — той самий гейт (НЕ навчальна Україна ★1)
+    this._allowGhost = this.diff.dmg > 1 || this.diffStar > 1;
+    this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
     this.byNidMap = new Map();
@@ -119,6 +125,7 @@ export class Zombies {
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
+    if (stats && stats.invisible) rig.group.visible = false; // 👻 невидимий до Ікс-рею
     // 🤝 кооп: зомбі сильніші пропорційно команді (2 гравці → ×2 HP, 3 → ×3).
     // noCoopScale — для хвиль Шторму: їх КІЛЬКІСТЬ уже росте з гравцями (+60%/друга),
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
@@ -145,6 +152,7 @@ export class Zombies {
       chargeCd: this.rng.range(2.5, 5), charging: 0, chargeDX: 0, chargeDZ: 0, telegraph: 0,
       charger: !!stats.charger,
       summonedAt: { 75: false, 50: false, 25: false },
+      invisible: !!(stats && stats.invisible),
       frost: bossStyle === 'frost',
       bossStyle: type === 'boss' ? bossStyle : null,
       noLeash: !!opts.noLeash, // міні-боси шторму гуляють вільно
@@ -255,6 +263,8 @@ export class Zombies {
         } else if (this.extraZombie && this.rng.chance(0.25)) type = this.extraZombie;
         // 🔫 стрілець — лише у складнішому контексті (НЕ перша Україна на ★1)
         else if (this._allowGunner && this.rng.chance(0.1)) type = 'gunner';
+        // 👻 привид — невидимий спец-ворог (бачиш лише з Ікс-реєм), той самий гейт, що й стрілець
+        else if (this._allowGhost && this.rng.chance(0.07)) type = 'ghost';
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
@@ -594,6 +604,10 @@ export class Zombies {
   }
 
   update(dt) {
+    // 👻 невидимі привиди видимі ЛИШЕ поки активний Ікс-рей (працює і для хоста, і для гостя)
+    if (this.xrayT > 0) this.xrayT = Math.max(0, this.xrayT - dt);
+    const reveal = this.xrayT > 0;
+    for (const z of this.list) if (z.invisible) z.rig.group.visible = reveal;
     if (this.mirror) { this._updateMirror(dt); return; }
     const level = this.level;
     const player = level.player;
