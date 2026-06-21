@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { WEAPONS } from './player.js';
+import { GADGETS } from './extras.js';
 import { clamp } from './utils.js';
 
 export class HUD {
@@ -247,7 +248,7 @@ export class HUD {
     const activeG = this.game.save.activeGadget;
     let gHtml = '';
     if (activeG && gadgets) {
-      const icon = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱', turret: '🤖' }[activeG];
+      const icon = GADGETS[activeG] ? GADGETS[activeG].icon : '';
       gHtml = gadgets.cd > 0
         ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}${t('с')}</span>`
         : `${icon} ${t('ГОТОВО (F)')}`;
@@ -257,7 +258,7 @@ export class HUD {
       this._lastGadgetHtml = gHtml;
       const btn = document.getElementById('tb-gadget');
       if (btn && activeG) {
-        btn.childNodes[0].textContent = { shield: '🛡️', heal: '💚', tramp: '🦘', wall: '🧱', turret: '🤖' }[activeG];
+        btn.childNodes[0].textContent = GADGETS[activeG] ? GADGETS[activeG].icon : '';
       }
       const badge = document.getElementById('tb-gadget-n');
       if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
