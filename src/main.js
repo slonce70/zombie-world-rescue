@@ -18,7 +18,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, PETS, makeHero } from './characters.js';
+import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES, PETS, makeHero } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -405,9 +405,11 @@ class Game {
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
         if (!out.skins.includes('custom')) out.skins.push('custom');
         if (!out.hero || typeof out.hero !== 'object') out.hero = {};
-        for (const k of ['shirt', 'pants', 'skin']) {
+        for (const k of ['shirt', 'pants', 'skin', 'shoes', 'hatColor']) {
           if (typeof out.hero[k] !== 'number') out.hero[k] = DEFAULT_HERO[k];
         }
+        if (!HERO_HATS[out.hero.hat]) out.hero.hat = DEFAULT_HERO.hat;
+        if (!HERO_FACES[out.hero.face]) out.hero.face = DEFAULT_HERO.face;
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
@@ -754,17 +756,29 @@ class Game {
     }
     html += '</div>';
     if (save.activeSkin === 'custom') {
-      const slotLabel = { shirt: t('Сорочка'), pants: t('Штани'), skin: t('Шкіра') };
-      html += t('<div class="ward-section">🎨 Мої кольори</div>');
-      for (const slot of ['shirt', 'pants', 'skin']) {
+      const h = save.hero;
+      const slotLabel = { skin: t('Шкіра'), shirt: t('Футболка'), pants: t('Штани'), shoes: t('Взуття'), hatColor: t('Колір шапки') };
+      const hex6 = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+      html += t('<div class="ward-section">🎨 Створи свого героя</div>');
+      html += '<div class="hero-editor"><canvas id="hero-preview" class="hero-preview" width="260" height="300"></canvas><div class="hero-controls">';
+      for (const slot of ['skin', 'shirt', 'pants', 'shoes', 'hatColor']) {
         html += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
-        for (const hex of HERO_PALETTE[slot]) {
-          const on = save.hero[slot] === hex ? ' on' : '';
-          const css = '#' + hex.toString(16).padStart(6, '0');
-          html += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hex}" style="background:${css}"></button>`;
+        for (const hexv of HERO_PALETTE[slot]) {
+          const on = h[slot] === hexv ? ' on' : '';
+          html += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hexv}" style="background:${hex6(hexv)}"></button>`;
         }
+        html += `<label class="hero-pick" title="${t('Будь-який колір')}" style="background:${hex6(h[slot])}">🎨<input type="color" data-slot="${slot}" value="${hex6(h[slot])}"></label>`;
         html += '</div>';
       }
+      html += t('<div class="hero-sub">🎩 Шапка</div><div class="ward-grid hero-parts">');
+      for (const [id, m] of Object.entries(HERO_HATS)) {
+        html += `<div class="ward-card hero-part-card ${h.hat === id ? 'equipped' : ''}" data-part="hat" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
+      }
+      html += t('</div><div class="hero-sub">😀 Обличчя</div><div class="ward-grid hero-parts">');
+      for (const [id, m] of Object.entries(HERO_FACES)) {
+        html += `<div class="ward-card hero-part-card ${h.face === id ? 'equipped' : ''}" data-part="face" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
+      }
+      html += '</div></div></div>';
     }
     html += t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
@@ -786,8 +800,9 @@ class Game {
     }
     html += '</div>';
     const root = document.getElementById('wardrobe-content');
+    this._stopHeroPreview(); // прибрати старий рендер перед перемальовкою
     root.innerHTML = html;
-    root.querySelectorAll('.ward-card:not(.locked)').forEach((el) => {
+    root.querySelectorAll('.ward-card:not(.locked):not(.hero-part-card)').forEach((el) => {
       el.addEventListener('click', () => {
         const { kind, id } = el.dataset;
         if (kind === 'skin') save.activeSkin = id;
@@ -803,16 +818,96 @@ class Game {
         this.renderWardrobe();
       });
     });
+    // --- редактор кастом-героя: без повної перемальовки, живий 3D-прев'ю ---
+    const onHeroChange = () => { this.saveGame(); this._rebuildHeroPreview(); };
     root.querySelectorAll('.hero-swatch').forEach((el) => {
       el.addEventListener('click', () => {
-        const { slot, hex } = el.dataset;
-        save.hero[slot] = parseInt(hex, 10);
-        this.saveGame();
+        const slot = el.dataset.slot;
+        save.hero[slot] = parseInt(el.dataset.hex, 10);
+        for (const sib of el.parentElement.querySelectorAll('.hero-swatch')) sib.classList.toggle('on', sib === el);
+        const pick = el.parentElement.querySelector('.hero-pick');
+        if (pick) { const css = '#' + ((save.hero[slot] >>> 0) & 0xffffff).toString(16).padStart(6, '0'); pick.style.background = css; pick.querySelector('input').value = css; }
         this.audio.purchase();
-        // Кольори застосуються на герої з наступним рівнем (на глобусі live-героя немає).
-        this.renderWardrobe();
+        onHeroChange();
       });
     });
+    root.querySelectorAll('.hero-pick input[type=color]').forEach((el) => {
+      el.addEventListener('input', () => {
+        const slot = el.dataset.slot;
+        save.hero[slot] = parseInt(el.value.slice(1), 16);
+        el.parentElement.style.background = el.value;
+        for (const sib of el.parentElement.querySelectorAll('.hero-swatch')) sib.classList.remove('on');
+        onHeroChange();
+      });
+    });
+    root.querySelectorAll('.hero-part-card').forEach((el) => {
+      el.addEventListener('click', () => {
+        const { part, id } = el.dataset;
+        save.hero[part] = id;
+        for (const sib of root.querySelectorAll(`.hero-part-card[data-part="${part}"]`)) sib.classList.toggle('equipped', sib === el);
+        this.audio.purchase();
+        onHeroChange();
+      });
+    });
+    if (save.activeSkin === 'custom') this._startHeroPreview();
+  }
+
+  // ---------- живий 3D-перегляд кастом-героя в гардеробі ----------
+  _startHeroPreview() {
+    const cv = document.getElementById('hero-preview');
+    if (!cv) return;
+    this._stopHeroPreview();
+    const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    renderer.setSize(cv.width, cv.height, false);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(2, 4, 2); scene.add(dir);
+    const cam = new THREE.PerspectiveCamera(32, cv.width / cv.height, 0.1, 50);
+    cam.position.set(0, 1.15, -4.7); cam.lookAt(0, 1.05, 0); // -Z = перед героя (дивиться у -Z)
+    const rig = makeHero('custom', this.save.hero);
+    scene.add(rig.group);
+    let raf = 0; const t0 = performance.now();
+    const loop = () => {
+      rig.group.rotation.y = (performance.now() - t0) / 1400;
+      renderer.render(scene, cam);
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    this._heroPrev = { renderer, scene, cam, rig, raf };
+  }
+
+  // звільняємо унікальну per-instance гео/матеріали рига (запечене тіло — НЕ shared),
+  // спільні кеші (userData.shared) лишаємо. Інакше кожна правка в редакторі тече по GPU.
+  _freeRig(group) {
+    if (!group) return;
+    group.traverse((o) => {
+      if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+        if (!m || (m.userData && m.userData.shared)) return;
+        if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
+        m.dispose();
+      });
+    });
+  }
+
+  _rebuildHeroPreview() {
+    const hp = this._heroPrev;
+    if (!hp) return;
+    hp.scene.remove(hp.rig.group);
+    this._freeRig(hp.rig.group); // не лишаємо запечену гео старого рига в пам'яті GPU
+    hp.rig = makeHero('custom', this.save.hero);
+    hp.scene.add(hp.rig.group);
+  }
+
+  _stopHeroPreview() {
+    const hp = this._heroPrev;
+    if (!hp) return;
+    cancelAnimationFrame(hp.raf);
+    this._freeRig(hp.rig.group);
+    // r160 dispose() НЕ звільняє WebGL-контекст — форсимо, інакше ~16 контекстів і канвас гасне
+    if (hp.renderer.forceContextLoss) hp.renderer.forceContextLoss();
+    hp.renderer.dispose();
+    this._heroPrev = null;
   }
 
   // ---------- шторм ----------
@@ -890,7 +985,11 @@ class Game {
   }
 
   _showOverlay(id) { document.getElementById(id).classList.add('show'); }
-  _hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
+  _hideOverlay(id) {
+    document.getElementById(id).classList.remove('show');
+    // закрили гардероб — гасимо 3D-прев'ю (вигляд героя застосується при вході в рівень)
+    if (id === 'overlay-wardrobe') this._stopHeroPreview();
+  }
 
   // ---------- рівень ----------
   async startLevel(countryId, opts = {}) {

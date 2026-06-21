@@ -1,7 +1,7 @@
 // Віддалений гравець: ріг героя зі скіном, нік над головою, смужка HP,
 // зброя в руці, плавна інтерполяція позиції зі снапшотів.
 import * as THREE from 'three';
-import { makeHero, makeGunMesh, PETS, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
+import { makeHero, makeGunMesh, PETS, HERO_HATS, HERO_FACES, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
 import { damp, dampAngle } from '../utils.js';
 import { PF, idxToWeapon, WEAPON_IDX } from './protocol.js';
 import { t } from '../i18n.js';
@@ -35,9 +35,14 @@ export class RemotePlayer {
     this.skin = info.skin || 'classic';
     this.tracer = info.tracer || 'classic';
 
-    // кольори кастом-героя приходять від іншого клієнта (untrusted) — клампимо в коректні 24-біт кольори
+    // кастом-герой приходить від іншого клієнта (untrusted): кольори клампимо в 24-біт,
+    // частини (шапка/обличчя) — лише з білого списку, інакше дефолт
     const h = info.hero;
-    const hero = h ? { shirt: (h.shirt | 0) & 0xffffff, pants: (h.pants | 0) & 0xffffff, skin: (h.skin | 0) & 0xffffff } : null;
+    const hero = h ? {
+      shirt: (h.shirt | 0) & 0xffffff, pants: (h.pants | 0) & 0xffffff, skin: (h.skin | 0) & 0xffffff,
+      shoes: (h.shoes | 0) & 0xffffff, hatColor: (h.hatColor | 0) & 0xffffff,
+      hat: HERO_HATS[h.hat] ? h.hat : 'cap', face: HERO_FACES[h.face] ? h.face : 'smile',
+    } : null;
     this.rig = makeHero(this.skin, hero);
     level.scene.add(this.rig.group);
 
