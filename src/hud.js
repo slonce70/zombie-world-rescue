@@ -496,6 +496,8 @@ export class HUD {
     // зомбі поблизу
     for (const z of level.zombies.list) {
       if (z.state === 'dead') continue;
+      // 👻 невидимі привиди не світяться на мінікарті — лише поки активний Ікс-рей
+      if (z.invisible && !(level.zombies.xrayT > 0)) continue;
       if (z.golden) {
         // золотий видно завжди — полювання за скарбом!
         let [gx, gy] = toMap(z.x, z.z);

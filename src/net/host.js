@@ -253,6 +253,8 @@ export class HostNet {
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
         zb.damage(clampDmg(h[1]), dir, !!h[2], w.flame ? { fire: true } : undefined);
+        // 💫 гаджет «Оглушливі кулі» гостя: оглушуємо лише з пістолета/магнума
+        if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead') zb.stunT = 0.5;
       }
     }
     if (Array.isArray(d.bar)) for (const e of d.bar) {

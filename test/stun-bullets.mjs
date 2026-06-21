@@ -97,6 +97,52 @@ const gate = await page.evaluate(() => {
 check(gate.hpStunned === 100 && gate.stunLeft < 0.5 && gate.stunLeft > 0, 'оглушений зомбі не б’є і таймер тане', JSON.stringify(gate));
 check(gate.hpControl < 100, 'без оглушення зомбі б’є (контроль)', JSON.stringify(gate));
 
+// кооп: хост застосовує оглушення з пострілу гостя (4-й елемент hits), лише пістолет/магнум
+console.log('▸ Кооп: хост приймає прапорець оглушення від гостя');
+const host = await page.evaluate(async () => {
+  const { HostNet } = await import('/src/net/host.js');
+  const { weaponToIdx } = await import('/src/net/protocol.js');
+  const { Vector3 } = await import('/vendor/three.module.js');
+  const mk = () => ({ nid: 88, x: 3, z: 0, state: 'chase', stunT: 0, damage() {} });
+  const h = Object.create(HostNet.prototype);
+  let zombie = mk();
+  h.level = {
+    player: { pos: new Vector3(0, 0, 0) },
+    zombies: { byNid: (n) => (n === 88 ? zombie : null) },
+    effects: { tracer() {} }, audio: { shot() {} },
+  };
+  h.remotes = new Map([[2, { pos: new Vector3(0, 0, 0), muzzleWorld: (v) => v.set(0, 1, 0) }]]);
+  h._tmpV = new Vector3();
+  h.ev = () => {};
+  h._onShot(2, { w: weaponToIdx('pistol'), hits: [[88, 30, 0, 1]] });
+  const pistol = zombie.stunT;
+  zombie = mk();
+  h._onShot(2, { w: weaponToIdx('rifle'), hits: [[88, 30, 0, 1]] }); // контроль: автомат не оглушує
+  const rifle = zombie.stunT;
+  zombie = mk();
+  h._onShot(2, { w: weaponToIdx('pistol'), hits: [[88, 30, 0, 0]] }); // контроль: без прапорця
+  const noFlag = zombie.stunT;
+  return { pistol, rifle, noFlag };
+});
+check(host.pistol === 0.5, 'хост оглушує з пістолета гостя', JSON.stringify(host));
+check(host.rifle === 0, 'хост НЕ оглушує з автомата гостя (контроль)', JSON.stringify(host));
+check(host.noFlag === 0, 'хост НЕ оглушує без прапорця (контроль)', JSON.stringify(host));
+
+// фікс: вогнетривкий щит гасить вогонь, але зомбі все одно агриться
+console.log('▸ Фікс: вогнетривкий щит — зомбі помічає вогнемет');
+const fireShield = await page.evaluate(() => {
+  const g = window.__game;
+  const z = g.test.spawnZombie('shield', 0, -6);
+  z.shieldFireproof = true; z.aggroed = false; z.state = 'wander';
+  const hpBefore = z.shieldHp;
+  z.damage(20, null, false, { fire: true }); // вогонь у фронт щита
+  const r = { aggroed: z.aggroed, shieldHp: z.shieldHp, hpBefore };
+  z.state = 'dead';
+  return r;
+});
+check(fireShield.aggroed === true, 'вогнетривкий щит агриться від вогнемета', JSON.stringify(fireShield));
+check(fireShield.shieldHp === fireShield.hpBefore, 'вогонь не шкодить вогнетривкому щиту (як і було)', JSON.stringify(fireShield));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
