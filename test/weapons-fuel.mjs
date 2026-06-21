@@ -170,6 +170,38 @@ const hudGun = await page.evaluate(() => {
 });
 check(!/🔋/.test(hudGun.mag) && (/^\d+$/.test(hudGun.mag) || hudGun.mag === '⟳'), `звичайна зброя показує патрони, не паливо (${hudGun.mag}/${hudGun.reserve})`);
 
+// ============ (е) ПЕРЕЗАРЯДКА балона (магазин на 5с, не фінітне паливо) ============
+console.log('▸ (е) балон перезаряджається: вичерпав → reload → знову повний (5с)');
+const reloadCycle = await page.evaluate(() => {
+  const g = window.__game; const pl = g.level.player;
+  pl.switchWeapon('laser');
+  // АВТО: вичерпуємо балон → авто-перезарядка → доводимо update-ами → повний
+  pl.fuel.laser = 0; pl.reloading = 0; pl._contWasEmpty = false;
+  pl._fireContinuous(0.05, true);                                   // порожній → startReload
+  const autoStart = pl.reloading;
+  for (let i = 0; i < 30; i++) pl.update(0.1, g.input, true);       // > reloadT (2.0)
+  const autoDone = pl.fuel.laser;
+  // РУЧНА: частковий балон + перезарядка → повний
+  pl.fuel.laser = 2.0; pl.reloading = 0;
+  pl.startReload();
+  const manStart = pl.reloading;
+  for (let i = 0; i < 30; i++) pl.update(0.1, g.input, true);
+  const manDone = pl.fuel.laser;
+  // ПОВНИЙ балон → перезарядка НЕ стартує (марно)
+  pl.fuel.laser = 5.0; pl.reloading = 0; pl.startReload();
+  const fullNoReload = pl.reloading;
+  // HUD під час перезарядки показує ⟳
+  pl.fuel.laser = 1.0; pl.reloading = 1.5; g.hud.update(0.016);
+  const hudMag = document.getElementById('ammo-mag').textContent;
+  return { autoStart, autoDone, manStart, manDone, fullNoReload, reloadT: pl.weapon.reloadT, hudMag };
+});
+console.log('  RELOAD:', JSON.stringify(reloadCycle));
+check(reloadCycle.autoStart > 0, `вичерпаний балон → авто-перезарядка стартує (${reloadCycle.autoStart}с)`);
+check(reloadCycle.autoDone === 5.0, `після перезарядки балон знову повний (${reloadCycle.autoDone})`);
+check(reloadCycle.manStart > 0 && reloadCycle.manDone === 5.0, 'ручна перезарядка з часткового балона → повний');
+check(reloadCycle.fullNoReload === 0, 'повний балон не перезаряджається даремно');
+check(reloadCycle.hudMag === '⟳', `HUD під час перезарядки показує ⟳ (${reloadCycle.hudMag})`);
+
 // ============ ПІДСУМОК ============
 console.log('');
 check(errs.length === 0, `без JS-помилок (${errs.length})`);

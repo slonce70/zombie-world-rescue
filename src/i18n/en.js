@@ -157,6 +157,7 @@ export const EN = {
 "🧟 Бос кличе підмогу!": "🧟 The boss calls for backup!",
 "🛡 Щит розбито! Тепер щитоносець беззахисний — добивай!": "🛡 Shield broken! The shieldbearer is defenseless — finish him!",
 "с": "s",
+"заряд…": "charging…",
 "ГОТОВО (F)": "READY (F)",
 "БІЖИ В КОЛО!": "RUN TO THE CIRCLE!",
 "м": "m",

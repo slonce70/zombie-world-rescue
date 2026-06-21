@@ -13,14 +13,15 @@ export const WEAPONS = {
   sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
-  // ПАЛИВО (балон = 5с безперервної дії), а не патрони-штуки. fuelMax — місткість балона.
+  // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.
+  // Коли балон вичерпано (або тиснеш R) — ПЕРЕЗАРЯДКА (reloadT), після неї знову повні 5с. Нескінченно.
   // dps — шкода ЗА СЕКУНДУ (застосовується щокадру: dmg = dps * dt).
   // 🔫 Лазер: безперервний промінь-хітскан, пробиває кількох (як снайперка, але потоком).
   //   dps 90 → walker (70hp) ~0.8с, але балон лише 5с і ще треба тримати лінію. Потужно, не імба.
-  laser: { name: 'Лазер', icon: '🔫', dmg: 0, dps: 90, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 0, recoil: 0, infinite: false, continuous: true, beam: true, pierce: 6, range: 90, fuelMax: 5.0 },
+  laser: { name: 'Лазер', icon: '🔫', dmg: 0, dps: 90, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 2.0, recoil: 0, infinite: false, continuous: true, beam: true, pierce: 6, range: 90, fuelMax: 5.0 },
   // 🔥 Вогнемет: короткий конус полум'я, висока шкода зблизька, спадає з дистанцією.
   //   dps 120 у впор, падає до ~0 на краю (range 8). Тип шкоди «вогонь» — гак для v47.
-  flamethrower: { name: 'Вогнемет', icon: '🔥', dmg: 0, dps: 120, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 0, recoil: 0, infinite: false, continuous: true, flame: true, range: 8, coneCos: 0.82, fuelMax: 5.0 },
+  flamethrower: { name: 'Вогнемет', icon: '🔥', dmg: 0, dps: 120, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 2.5, recoil: 0, infinite: false, continuous: true, flame: true, range: 8, coneCos: 0.82, fuelMax: 5.0 },
 };
 export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
 const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower' };
@@ -260,8 +261,15 @@ export class Player {
   }
 
   startReload() {
-    const a = this.curAmmo;
     const w = this.weapon;
+    if (w.continuous) {
+      // континуальна зброя (лазер/вогнемет): перезаряджаємо балон, якщо він не повний
+      if (this.reloading > 0 || (this.fuel[this.cur] || 0) >= w.fuelMax) return;
+      this.reloading = w.reloadT;
+      this.level.audio.reload(this.cur);
+      return;
+    }
+    const a = this.curAmmo;
     if (this.reloading > 0 || a.mag >= w.mag || (!w.infinite && a.reserve <= 0)) return;
     this.reloading = w.reloadT;
     this.level.audio.reload(this.cur);
@@ -441,14 +449,18 @@ export class Player {
     if (this.reloading > 0) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
-        const a = this.curAmmo;
         const w = this.weapon;
-        const need = w.mag - a.mag;
-        if (w.infinite) a.mag = w.mag;
-        else {
-          const take = Math.min(need, a.reserve);
-          a.mag += take;
-          a.reserve -= take;
+        if (w.continuous) {
+          this.fuel[this.cur] = w.fuelMax; // балон знову повний (5с стрільби)
+        } else {
+          const a = this.curAmmo;
+          const need = w.mag - a.mag;
+          if (w.infinite) a.mag = w.mag;
+          else {
+            const take = Math.min(need, a.reserve);
+            a.mag += take;
+            a.reserve -= take;
+          }
         }
         this.reloading = 0;
       }
@@ -798,8 +810,9 @@ export class Player {
     const fuel = this.fuel[this.cur] || 0;
     if (!held) { this._contWasEmpty = false; return; }
     if (fuel <= 0) {
-      // балон порожній: разовий «клац» і нічого
+      // балон вичерпано → автоматична перезарядка (разовий «клац», далі reload)
       if (!this._contWasEmpty) { this._contWasEmpty = true; this.level.audio.empty(); }
+      this.startReload();
       return;
     }
     this._contWasEmpty = false;

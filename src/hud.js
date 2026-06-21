@@ -185,13 +185,20 @@ export class HUD {
     const w = p.weapon;
     this.el.weaponName.textContent = `${w.icon} ${t(w.name)}`;
     if (w.continuous) {
-      // показуємо ПАЛИВО (секунди балона), а не mag/reserve
+      // показуємо ПАЛИВО (секунди балона), а не mag/reserve; під час перезарядки — ⟳
       const fuel = p.fuel[p.cur] || 0;
       const frac = fuel / w.fuelMax;
-      this.el.ammoMag.textContent = '🔋';
-      this.el.ammoReserve.textContent = fuel.toFixed(1) + t('с');
-      this.el.ammoMag.classList.toggle('low', frac < 0.2);
-      this.el.ammoReserve.classList.toggle('low', frac < 0.2);
+      if (p.reloading > 0) {
+        this.el.ammoMag.textContent = '⟳';
+        this.el.ammoReserve.textContent = t('заряд…');
+        this.el.ammoMag.classList.add('low');
+        this.el.ammoReserve.classList.add('low');
+      } else {
+        this.el.ammoMag.textContent = '🔋';
+        this.el.ammoReserve.textContent = fuel.toFixed(1) + t('с');
+        this.el.ammoMag.classList.toggle('low', frac < 0.2);
+        this.el.ammoReserve.classList.toggle('low', frac < 0.2);
+      }
     } else {
       const a = p.curAmmo;
       this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
