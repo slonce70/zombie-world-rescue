@@ -217,10 +217,22 @@ try {
   const killsAfter = await B.evaluate(() => window.__game.test.state().stats.kills);
   check('гість вполював зомбі (кредит за кіл)', killsAfter > killsBefore, `кіли: ${killsBefore} → ${killsAfter}`);
 
-  // 10. зʼєднання живе: kill-credit вище вже довів двосторонній канал,
-  // тут лише фіксуємо фінальний стан без довгого polling на повільному CI.
-  await flushHostSnapshot();
-  await sleep(500 * SLOW);
+  // 10. зʼєднання живе: kill-credit вище вже довів двосторонній канал.
+  // Полінг на реальний сигнал: вотчдог `waiting` латчиться після >4с тиші, тож щоразу
+  // шлемо свіжий снапшот (скидає lastSnapAt) і чекаємо саме на connected && !waiting —
+  // фіксований sleep гонився з вотчдогом і флакав на завантаженому CI.
+  {
+    const deadline = Date.now() + 15000 * SLOW;
+    while (Date.now() < deadline) {
+      await flushHostSnapshot();
+      const ok = await B.evaluate(() => {
+        const s = window.__game.test.coopState();
+        return s.connected === true && s.waiting === false;
+      });
+      if (ok) break;
+      await sleep(250);
+    }
+  }
   const wA = await A.evaluate(() => window.__game.test.coopState());
   const wB = await B.evaluate(() => window.__game.test.coopState());
   check('хост онлайн', wA.connected === true);
