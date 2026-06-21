@@ -631,7 +631,8 @@ export class Player {
     const fwd = this.forwardVec(this._fwd); // вже нормований
     let best = null, bestDot = 0.91, bestD = 0; // конус ~24° (cos 24° ≈ 0.913)
     for (const z of level.zombies.list) {
-      if (z.state === 'dead') continue;
+      // не наводимося на невидимих привидів, поки їх не підсвітив Ікс-рей
+      if (z.state === 'dead' || (z.invisible && !z.rig.group.visible)) continue;
       const dx = z.x - this.pos.x;
       const dz = z.z - this.pos.z;
       const torsoY = z.y + z.rig.height * 0.55;
@@ -753,9 +754,9 @@ export class Player {
       } else if (hit) {
         endPoint = hit.point;
         let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
-        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0]);
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, stunShot ? 1 : 0]);
         else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot); }
-        // ponytail: оглушення хост-авторитетне — на гостеві (mirror) маріонетками керує хост
+        // оглушення хост-авторитетне: соло/хост ставлять одразу, гість шле прапорець хосту (4-й елемент)
         if (stunShot && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = 0.5;
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;

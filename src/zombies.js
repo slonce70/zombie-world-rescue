@@ -461,6 +461,7 @@ export class Zombies {
             this._fireShieldHintShown = true;
             this.level.bus.emit('toast', t('🔵 Цей щит не горить! Вогнемет не бере — обійди збоку!'));
           }
+          this._aggro(z); // вогонь не шкодить, та зомбі все одно помічає гравця (як і всі інші гілки)
           return; // урон вогнем по анти-вогонь щиту — поглинається без шкоди щиту
         }
         z.shieldFire = z.shieldFire || fire; // маркер: щит уже отримував вогняний урон

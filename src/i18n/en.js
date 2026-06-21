@@ -807,6 +807,8 @@ export const EN = {
 "Зомбі-бик — розганяється і б’є рогами!": "A zombie bull — it charges and gores with its horns!",
 "Шкет": "Imp",
 "Дрібний і дуже швидкий — наздожене будь-кого!": "Tiny and very fast — it'll catch anyone!",
+"Чаклун": "Sorcerer",
+"Кайтить, ставить собі щит і шпурляє магію — добивай швидко!": "Kites, shields himself and hurls magic — finish him fast!",
 "Привид": "Ghost",
 "Невидимий! Увімкни гаджет Ікс-рей, щоб його побачити.": "Invisible! Use the X-ray gadget to see it.",
 "Золотий зомбі": "Golden Zombie",
