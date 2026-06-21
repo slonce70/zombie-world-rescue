@@ -400,6 +400,9 @@ export const GADGETS = {
   infammo: { name: t('Бескінечні патрони'), icon: '♾️', cd: 45, price: 1000, desc: t('3 секунди автомат і швидкостріл не витрачають патрони') },
   // 💫 Оглушливі кулі: 3с кулі пістолета/магнума оглушують зомбі на 0.5с
   stunammo: { name: t('Оглушливі кулі'), icon: '💫', cd: 45, price: 1000, desc: t('3 секунди кулі пістолета й магнума оглушують зомбі на 0.5с') },
+  // 🪄 Телепортація: миттєвий ривок уперед на ~8м (вирватись із натовпу), перезарядка 45с
+  // (іконка 🪄, а не 🌀 — 🌀 уже зайнятий швидкострілом)
+  teleport: { name: t('Телепортація'), icon: '🪄', cd: 45, price: 1000, desc: t('Миттєвий стрибок уперед — вирвись із натовпу') },
 };
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
@@ -604,6 +607,23 @@ export class Gadgets {
       level.audio.powerup();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0xc9a8ff, 16, { speed: 3, up: 3, life: 0.7 });
       level.bus.emit('toast', t('💫 Оглушливі кулі на 3с! Пістолет і магнум оглушують зомбі'));
+      ok = true;
+    } else if (id === 'teleport') {
+      // 🌀 ривок уперед на ~8м; collide не дає опинитися в стіні чи за межами
+      const dist = 8;
+      const tx = p.pos.x - Math.sin(p.yaw) * dist;
+      const tz = p.pos.z - Math.cos(p.yaw) * dist;
+      const solved = level.world.collide(tx, tz, 0.45, p.pos.y);
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0x9b6bff, 18, { speed: 4, up: 3, life: 0.6 });
+      p.watchtower = null; // якщо стояв на башті — телепорт знімає
+      p.pos.x = solved.x;
+      p.pos.z = solved.z;
+      p.pos.y = Math.max(level.world.groundH(solved.x, solved.z), level.world.floorAt(solved.x, solved.z, p.pos.y));
+      p.vel.set(0, 0, 0);
+      p.onGround = true;
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0x9b6bff, 18, { speed: 4, up: 3, life: 0.6 });
+      level.audio.powerup();
+      level.bus.emit('toast', t('🪄 Телепорт!'));
       ok = true;
     }
     if (ok) {
