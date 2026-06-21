@@ -378,7 +378,9 @@ const campaign = await page.evaluate(async () => {
   const mod = await import('/src/countries.js');
   return { order: mod.CAMPAIGN_ORDER, names: mod.CAMPAIGN_ORDER.map((id) => mod.COUNTRIES[id].name) };
 });
-check(campaign.order.length === 8, `у кампанії 8 країн: ${campaign.names.join(' → ')}`);
+// стійко до додавання нових країн: ≥8, старт з України, без дублів (а не жорстке число)
+check(campaign.order.length >= 8 && campaign.order[0] === 'UKR' && new Set(campaign.order).size === campaign.order.length,
+  `кампанія: ${campaign.order.length} країн, з України: ${campaign.names.join(' → ')}`);
 
 console.log('');
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 3 ПРОЙДЕНО' : `❌ ПРОВАЛЕНО: ${failed}`);
