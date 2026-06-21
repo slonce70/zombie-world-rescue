@@ -235,26 +235,24 @@ await loadCountry('UKR');
 await page.evaluate(() => window.__game.test.god());
 st = await state();
 check(st.scooters.length >= 2, `на карті ${st.scooters.length} самокати`);
-const rideRes = await page.evaluate(async () => {
+const rideRes = await page.evaluate(() => {
   const g = window.__game;
+  const p = g.level.player;
   g.test.mountScooter(0);
-  await new Promise((r) => setTimeout(r, 200));
-  const riding = !!g.level.player.riding;
-  const tp = !g.level.player.firstPerson;
-  // з оновлення 5 самокат їде по-справжньому: газ W, без тарана
+  const riding = !!p.riding;
+  const tp = !p.firstPerson;
+  const drive = (n) => { for (let i = 0; i < n; i++) p.update(0.05, g.input, true); };
   g.test.key('KeyW', true);
-  const t0 = performance.now();
-  while (performance.now() - t0 < 12000 && g.level.player.rideSpeed < 4) {
-    await new Promise((r) => setTimeout(r, 150));
-  }
+  drive(60);
   g.test.key('KeyW', false);
-  const accelerated = g.level.player.rideSpeed >= 4;
+  const speed = p.rideSpeed;
+  const accelerated = speed >= 4;
   g.test.dismountScooter();
-  return { riding, tp, accelerated, dismounted: !g.level.player.riding };
+  return { riding, tp, accelerated, dismounted: !p.riding, speed };
 });
 check(rideRes.riding, 'герой сідає на самокат (E)');
 check(rideRes.tp, 'на самокаті — вид від 3-ї особи');
-check(rideRes.accelerated, 'самокат розганяється газом (W)');
+check(rideRes.accelerated, `самокат розганяється газом (W, ${rideRes.speed.toFixed(1)} м/с)`);
 check(rideRes.dismounted, 'E — зійти із самоката');
 
 // ============ 🦘🧱 ГАДЖЕТИ ============

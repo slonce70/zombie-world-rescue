@@ -115,8 +115,11 @@ const barrelResult = await page.evaluate(() => {
   e.damageBarrel(e.barrels[e.barrels.length - 2], 999);
   return { kills };
 });
-await waitFor(async () => (await page.evaluate(() =>
-  window.__game.level.effects.barrels.filter((b) => b.exploded).length)) >= 2, 10000, 'ланцюговий вибух');
+await waitFor(async () => (await page.evaluate(() => {
+  const e = window.__game.level.effects;
+  for (let i = 0; i < 6; i++) e.update(0.05);
+  return e.barrels.filter((b) => b.exploded).length;
+})) >= 2, 10000, 'ланцюговий вибух');
 const chainCount = await page.evaluate(() => window.__game.level.effects.barrels.filter((b) => b.exploded).length);
 check(chainCount >= 2, `ланцюгова реакція: вибухнуло ${chainCount} бочки`);
 const killsAfterBarrel = await page.evaluate(() => window.__game.level.stats.kills);
@@ -132,11 +135,16 @@ const golden = await page.evaluate(() => {
   return { x: gz.x, z: gz.z };
 });
 check(golden !== null, 'золотий зомбі існує');
-await page.waitForTimeout(2500);
-const fled = await page.evaluate(() => {
-  const gz = window.__game.level.zombies.list.find((z) => z.golden);
-  return gz ? gz.state : 'dead';
-});
+let fled = 'dead';
+await waitFor(async () => {
+  fled = await page.evaluate(() => {
+    const g = window.__game;
+    for (let i = 0; i < 6; i++) g.level.zombies.update(0.05);
+    const gz = g.level.zombies.list.find((z) => z.golden);
+    return gz ? gz.state : 'dead';
+  });
+  return fled === 'flee';
+}, 10000, 'золотий тікає');
 check(fled === 'flee', `золотий тікає (стан: ${fled})`);
 const coinsBefore = await page.evaluate(() => window.__game.level.effects.coins.length);
 await page.evaluate(() => {
@@ -175,18 +183,27 @@ const ballMoved = await page.evaluate(() => {
   g.test.teleport(ball.mesh.position.x - 0.7, ball.mesh.position.z);
   return before;
 });
-await page.waitForTimeout(1500);
-const ballAfter = await page.evaluate(() => {
-  const b = window.__game.level.effects.ball.mesh.position;
-  return { x: b.x, z: b.z };
-});
-const ballDist = Math.hypot(ballAfter.x - ballMoved.x, ballAfter.z - ballMoved.z);
+let ballDist = 0;
+await waitFor(async () => {
+  const ballAfter = await page.evaluate(() => {
+    const e = window.__game.level.effects;
+    for (let i = 0; i < 6; i++) e.update(0.05);
+    const b = window.__game.level.effects.ball.mesh.position;
+    return { x: b.x, z: b.z };
+  });
+  ballDist = Math.hypot(ballAfter.x - ballMoved.x, ballAfter.z - ballMoved.z);
+  return ballDist > 1.5;
+}, 10000, 'мʼяч покотився');
 check(ballDist > 1.5, `м'яч покотився від удару (${ballDist.toFixed(1)} м)`);
 
 // аеродроп
 console.log('▸ Аеродроп');
 await page.evaluate(() => { window.__game.level.effects.airdropT = 0.1; });
-await waitFor(async () => (await page.evaluate(() => !!window.__game.level.effects.airdrop)), 10000, 'аеродроп з\'явився');
+await waitFor(async () => (await page.evaluate(() => {
+  const e = window.__game.level.effects;
+  for (let i = 0; i < 6; i++) e.update(0.05);
+  return !!e.airdrop;
+})), 10000, 'аеродроп з\'явився');
 check(await page.evaluate(() => !!window.__game.level.effects.airdrop), 'аеродроп летить');
 const dropCoins = await page.evaluate(() => {
   const e = window.__game.level.effects;
@@ -196,6 +213,7 @@ const dropCoins = await page.evaluate(() => {
 });
 await waitFor(async () => (await page.evaluate(() => {
   const e = window.__game.level.effects;
+  for (let i = 0; i < 6; i++) e.update(0.05);
   return e.airdrop && e.airdrop.landed;
 })), 10000, 'приземлення');
 const dropAfter = await page.evaluate(() => window.__game.level.effects.coins.length);
@@ -209,13 +227,18 @@ const henDist = await page.evaluate(() => {
   g.test.teleport(an.x + 1.5, an.z);
   return { x: an.x, z: an.z };
 });
-await page.waitForTimeout(2000);
-const henAfter = await page.evaluate(() => {
-  const g = window.__game;
-  const an = g.level.effects.animals[0];
-  const p = g.level.player.pos;
-  return Math.hypot(an.x - p.x, an.z - p.z);
-});
+let henAfter = 0;
+await waitFor(async () => {
+  henAfter = await page.evaluate(() => {
+    const g = window.__game;
+    const e = g.level.effects;
+    for (let i = 0; i < 6; i++) e.update(0.05);
+    const an = e.animals[0];
+    const p = g.level.player.pos;
+    return Math.hypot(an.x - p.x, an.z - p.z);
+  });
+  return henAfter > 2.5;
+}, 10000, 'курка втекла');
 check(henAfter > 2.5, `курка втекла від гравця (${henAfter.toFixed(1)} м)`);
 
 // ===== ПОЛЬЩА: лід, нова карта =====

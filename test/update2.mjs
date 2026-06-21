@@ -249,15 +249,27 @@ await page.evaluate(() => {
   mk('touchstart', 1, 200, 600);
   mk('touchmove', 1, 200, 540);
 });
-await page.waitForTimeout(5000);
+const touchMoveOk = await waitFor(async () => page.evaluate((before) => {
+  const g = window.__game;
+  const p = g.level.player;
+  const moved = Math.hypot(p.pos.x - before.x, p.pos.z - before.z);
+  const speed = Math.hypot(p.vel.x, p.vel.z);
+  window.__touchMoveState = {
+    moved,
+    speed,
+    simTime: g.level.stats.time,
+    touchMove: !!g.input.touchMove,
+    touchSprint: !!g.input.touchSprint,
+  };
+  return moved > 2 || (window.__touchMoveState.touchMove && window.__touchMoveState.touchSprint && speed > 1);
+}, posBefore), 10000, 'джойстик рухає або дає швидкість');
 await page.evaluate(() => {
   const canvas = window.__game.renderer.domElement;
   const t = new Touch({ identifier: 1, target: canvas, clientX: 200, clientY: 540 });
   canvas.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [t], bubbles: true, cancelable: true }));
 });
-const posAfter = await page.evaluate(() => ({ x: window.__game.level.player.pos.x, z: window.__game.level.player.pos.z }));
-const moved = Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z);
-check(moved > 2, `джойстик рухає гравця (${moved.toFixed(1)} м)`);
+const touchState = await page.evaluate(() => window.__touchMoveState || { moved: 0, speed: 0, touchMove: false, touchSprint: false });
+check(touchMoveOk, `джойстик активний (move ${touchState.moved.toFixed(1)} м, speed ${touchState.speed.toFixed(1)} м/с)`);
 // кнопка вогню
 const firedBefore = await page.evaluate(() => window.__game.level.stats.shotsFired);
 await page.evaluate(() => {

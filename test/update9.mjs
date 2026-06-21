@@ -181,7 +181,7 @@ const surge = await page.evaluate(() => {
   const medkit = g.shop.priceOf({ id: 'medkit', price: 50, cat: 'Припаси' });
   g.level.storm.wave = 5;
   const medkitW5 = g.shop.priceOf({ id: 'medkit', price: 50, cat: 'Припаси' });
-  const gadget = g.shop.priceOf({ id: 'turret', price: 450, cat: 'Гаджети й друзі' });
+  const gadget = g.shop.priceOf({ id: 'fake_gadget', price: 450, cat: 'Гаджети й друзі' });
   g.level.storm.wave = 1;
   return { medkit, medkitW5, gadget };
 });
