@@ -52,7 +52,7 @@ const tp = await page.evaluate(() => {
   };
 });
 check(tp.used && tp.cd === 45, 'телепорт спрацьовує і ставить cd 45с', JSON.stringify(tp));
-check(tp.moved > 2 && tp.moved <= 8.5, 'гравець стрибнув уперед (≈8м, не далі)', JSON.stringify(tp));
+check(tp.moved > 12 && tp.moved <= 21, 'гравець стрибнув уперед (≈20м, не далі)', JSON.stringify(tp));
 check(tp.forward > 2, 'стрибок у напрямку погляду (-z)', JSON.stringify(tp));
 check(tp.onGround && tp.offGround < 0.5, 'приземлився на землю', JSON.stringify(tp));
 check(tp.vel === 0, 'швидкість обнулена після телепорту', JSON.stringify(tp));
