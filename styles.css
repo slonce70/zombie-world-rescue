@@ -869,6 +869,9 @@ body.touch-mode #touch-coach.show { display: block; }
   display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 16px;
   color: #d9ecdf; margin-bottom: 8px;
 }
+.coop-today-head {
+  font-weight: 800; font-size: 14px; color: #c6d2e6; margin: -2px 0 10px 18px;
+}
 .online-dot {
   width: 10px; height: 10px; border-radius: 50%; background: #4dd6a8;
   box-shadow: 0 0 8px #4dd6a8; animation: online-pulse 1.6s ease-in-out infinite;

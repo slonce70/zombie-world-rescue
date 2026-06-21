@@ -247,6 +247,17 @@ export class Lobby {
     this.players = new Map(); // cid -> {nick, ts}
     this.rooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
     this._ping = new Map();   // ip -> {n, t0} (анти-флуд пінгів, як _claimAllowed у SaveVault)
+    // 📅 скільки УНІКАЛЬНИХ гравців зайшло грати разом сьогодні (UTC).
+    // ponytail: у памʼяті — скидається при гібернації DO (довгий простій); для лічильника-флагмана
+    // цього досить. Точність через storage (seen:<day>:<cid>) — якщо колись знадобиться.
+    this.day = '';
+    this.todaySet = new Set();
+  }
+
+  _recordToday(now, cid) {
+    const day = new Date(now).toISOString().slice(0, 10);
+    if (day !== this.day) { this.day = day; this.todaySet = new Set(); }
+    if (cid && this.todaySet.size < 100000) this.todaySet.add(cid);
   }
 
   // нормальний клієнт пінгує раз на ~8с; 30/10с з однієї IP — щедрий запас, але стеля проти флуду
@@ -283,7 +294,7 @@ export class Lobby {
         code, host: r.host, mode: r.mode, country: r.country,
         n: r.n, state: r.state, build: r.build,
       }));
-    return { online: this.players.size, players, rooms };
+    return { online: this.players.size, today: this.todaySet.size, players, rooms };
   }
 
   json(obj, status = 200) {
@@ -310,6 +321,7 @@ export class Lobby {
         const cid = String(d.cid || '').slice(0, 40);
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);
         this.players.set(cid, { nick: cleanNickSrv(d.nick), ts: now });
+        this._recordToday(now, cid); // 📅 рахуємо унікального гравця за сьогодні
         if (this.players.size > 500) this._prune(now);
         // хост закрив кімнату — прибираємо одразу, не чекаючи TTL
         if (d.close) {

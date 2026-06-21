@@ -33,6 +33,7 @@ export class CoopUI {
       err: $('coop-error'),
       pub: $('coop-public'),
       onlineN: $('coop-online-n'),
+      todayN: $('coop-today-n'),
       rooms: $('coop-rooms'),
       players: $('coop-players'),
       lobby: $('overlay-lobby'),
@@ -300,11 +301,13 @@ export class CoopUI {
     const esc = (x) => this._esc(x);
     if (!d) {
       this.el.onlineN.textContent = '—';
+      if (this.el.todayN) this.el.todayN.textContent = '—';
       this.el.rooms.innerHTML = t('<div class="coop-side-empty">📡 Сервер недоступний — перевір інтернет</div>');
       this.el.players.innerHTML = '';
       return;
     }
     this.el.onlineN.textContent = d.online;
+    if (this.el.todayN) this.el.todayN.textContent = d.today != null ? d.today : '—';
 
     // кімнати: лише сумісні з нашою версією і не наша власна
     const build = window.__APP_VERSION;
