@@ -218,19 +218,20 @@ try {
   check('гість вполював зомбі (кредит за кіл)', killsAfter > killsBefore, `кіли: ${killsBefore} → ${killsAfter}`);
 
   // 10. зʼєднання живе: kill-credit вище вже довів двосторонній канал.
-  // Полінг на реальний сигнал: вотчдог `waiting` латчиться після >4с тиші, тож щоразу
-  // шлемо свіжий снапшот (скидає lastSnapAt) і чекаємо саме на connected && !waiting —
-  // фіксований sleep гонився з вотчдогом і флакав на завантаженому CI.
+  // Вотчдог `waiting` латчиться після >4с без застосованого снапшота, а поріг 4с НЕ
+  // масштабований SLOW. На завантаженому CI rAF гостя тротлиться, тож рідкісний флаш
+  // не встигав: вотчдог релатчувався між перевірками. Фікс: ЩІЛЬНИЙ потік флашів —
+  // тримаємо lastSnapAt гостя свіжим (<4с) безперервно, аби будь-який кадр rAF зняв waiting.
   {
-    const deadline = Date.now() + 15000 * SLOW;
-    while (Date.now() < deadline) {
-      await flushHostSnapshot();
-      const ok = await B.evaluate(() => {
+    const deadline = Date.now() + 20000 * SLOW;
+    let ok = false;
+    while (Date.now() < deadline && !ok) {
+      for (let k = 0; k < 5; k++) { await flushHostSnapshot(); await sleep(100); }
+      await sleep(150); // дати гостю кадр застосувати останній снапшот і перерахувати вотчдог
+      ok = await B.evaluate(() => {
         const s = window.__game.test.coopState();
         return s.connected === true && s.waiting === false;
       });
-      if (ok) break;
-      await sleep(250);
     }
   }
   const wA = await A.evaluate(() => window.__game.test.coopState());
