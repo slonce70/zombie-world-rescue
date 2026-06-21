@@ -729,6 +729,7 @@ export const EN = {
 "— або введи код друга —": "— or enter a friend's code —",
 "КОД": "CODE",
 "Онлайн:": "Online:",
+"📅 Сьогодні грали:": "📅 Played today:",
 "🚪 Відкриті кімнати": "🚪 Open rooms",
 "😀 Хто в мережі": "😀 Who's online",
 "🛋️ КІМНАТА": "🛋️ ROOM",

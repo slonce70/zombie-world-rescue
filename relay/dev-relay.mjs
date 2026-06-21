@@ -28,12 +28,20 @@ const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789';
 const LOBBY_TTL = 40_000;
 const lobbyPlayers = new Map(); // cid -> {nick, ts}
 const lobbyRooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
+let lobbyDay = '';              // 📅 унікальні гравці за сьогодні (дзеркало Lobby DO)
+let lobbyToday = new Set();
+function recordToday(now, cid) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (day !== lobbyDay) { lobbyDay = day; lobbyToday = new Set(); }
+  if (cid && lobbyToday.size < 100000) lobbyToday.add(cid);
+}
 
 function lobbyView(now) {
   for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
   for (const [code, r] of lobbyRooms) if (now - r.ts > LOBBY_TTL) lobbyRooms.delete(code);
   return {
     online: lobbyPlayers.size,
+    today: lobbyToday.size,
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
       .map(([code, r]) => ({ code, host: r.host, mode: r.mode, country: r.country, n: r.n, state: r.state, build: r.build })),
@@ -46,6 +54,7 @@ function lobbyPing(d) {
   if (cid.length < 8) return null;
   const nick = cleanNickSrv(d.nick);
   lobbyPlayers.set(cid, { nick, ts: now });
+  recordToday(now, cid);
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);
     const r = lobbyRooms.get(code);
