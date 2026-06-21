@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { t, keyHint, interactKey } from './i18n.js';
 import {
-  makeMegaboxMesh, makeDog, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
+  makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh, PETS,
 } from './characters.js';
 
 // ============================================================
@@ -116,9 +116,11 @@ export class Megabox {
 // 🐶 Пес Дружок: біжить поруч, збирає монети, гавкає на сюрпризи
 // ============================================================
 export class Pet {
-  constructor(level) {
+  constructor(level, id = 'dog') {
     this.level = level;
-    this.dog = makeDog();
+    this.id = PETS[id] ? id : 'dog';
+    this.move = PETS[this.id].move;
+    this.model = PETS[this.id].make();
     const p = level.player.pos;
     this.x = p.x + 1.5;
     this.z = p.z + 1.5;
@@ -127,7 +129,11 @@ export class Pet {
     this.barkCd = 2;
     this.grabCd = 0;
     this.grabbing = null;
-    level.scene.add(this.dog.group);
+    level.scene.add(this.model.group);
+  }
+
+  dispose() {
+    if (this.model && this.model.group) this.level.scene.remove(this.model.group);
   }
 
   update(dt) {
@@ -157,7 +163,7 @@ export class Pet {
           level.effects.collectCoinNow(this.grabbing);
           this.grabbing = null;
           this.grabCd = 0.4;
-          this.dog.tail.rotation.z = 1;
+          if (this.model.tail) this.model.tail.rotation.z = 1;
         }
       }
     }
@@ -177,18 +183,32 @@ export class Pet {
     this.z = solved.z;
     this.y = Math.max(level.world.groundH(this.x, this.z), level.world.floorAt(this.x, this.z, this.y));
 
-    // анімація: лапки, хвостик, радість під час танцю героя
-    const g = this.dog;
+    // анімація залежно від типу руху улюбленця
+    const g = this.model;
     g.phase += dt * (moving ? 14 : 3);
-    g.legs.forEach((leg, i) => {
-      leg.rotation.x = moving ? Math.sin(g.phase + (i % 2) * Math.PI) * 0.7 : 0;
-    });
-    g.tail.rotation.z = Math.sin(g.phase * 1.6) * 0.5;
-    g.head.rotation.x = moving ? 0 : Math.sin(g.phase * 0.5) * 0.12;
     let hopY = 0;
+    if (this.move === 'bird') {
+      // папуга: махи крил + легке ширяння над землею
+      const flap = Math.sin(g.phase * (moving ? 1.0 : 0.7));
+      if (g.wings) { g.wings[0].rotation.z = -(0.4 + flap * 0.8); g.wings[1].rotation.z = 0.4 + flap * 0.8; }
+      if (g.tail) g.tail.rotation.x = Math.sin(g.phase * 0.6) * 0.2;
+      hopY = 0.45 + Math.sin(g.phase * 0.8) * 0.1;
+    } else if (this.move === 'hop') {
+      // зайчик/жабка: підстрибують у русі
+      const hop = Math.abs(Math.sin(g.phase * 0.5));
+      if (g.legs) g.legs.forEach((leg) => { leg.rotation.x = moving ? -hop * 0.8 : 0; });
+      hopY = moving ? hop * 0.4 : 0;
+      if (g.tail) g.tail.rotation.z = Math.sin(g.phase) * 0.15;
+    } else {
+      // quad: крокують лапи, хвіст, голова; крила (дракон) трохи махають
+      if (g.legs) g.legs.forEach((leg, i) => { leg.rotation.x = moving ? Math.sin(g.phase + (i % 2) * Math.PI) * 0.7 : 0; });
+      if (g.tail) g.tail.rotation.z = Math.sin(g.phase * 1.6) * 0.5;
+      if (g.head) g.head.rotation.x = moving ? 0 : Math.sin(g.phase * 0.5) * 0.12;
+      if (g.wings) { const fl = Math.sin(g.phase * 0.8); g.wings[0].rotation.z = -(0.2 + fl * 0.3); g.wings[1].rotation.z = 0.2 + fl * 0.3; }
+    }
     if (p.emoting) {
-      hopY = Math.abs(Math.sin(g.phase * 0.8)) * 0.35; // пес теж танцює!
-      g.tail.rotation.z = Math.sin(g.phase * 3) * 0.8;
+      hopY = Math.abs(Math.sin(g.phase * 0.8)) * 0.35; // улюбленець теж танцює!
+      if (g.tail) g.tail.rotation.z = Math.sin(g.phase * 3) * 0.8;
     }
     g.group.position.set(this.x, this.y + hopY, this.z);
     g.group.rotation.y += (this.yaw - g.group.rotation.y) * Math.min(1, dt * 9);
@@ -209,7 +229,7 @@ export class Pet {
           );
           if (!this._barkHint) {
             this._barkHint = true;
-            level.bus.emit('toast', t('🐶 Гав-гав! Дружок щось відчуває поблизу…'));
+            level.bus.emit('toast', t('🐾 Твій улюбленець щось відчуває поблизу…'));
           }
           break;
         }

@@ -18,7 +18,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, makeHero } from './characters.js';
+import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, PETS, makeHero } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -357,6 +357,7 @@ class Game {
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
+      pets: [], activePet: null,
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
       bestiary: {},
@@ -396,6 +397,11 @@ class Game {
         if (out.activeGadget && !out.gadgetsOwned.includes(out.activeGadget)) out.activeGadget = null;
         out.missionRuns = out.missionRuns || {};
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
+        // улюбленці: легасі-собака (upgrades.dog) → у список pets; узгодити activePet
+        if (!Array.isArray(out.pets)) out.pets = [];
+        if ((out.upgrades && out.upgrades.dog > 0) && !out.pets.includes('dog')) out.pets.push('dog');
+        if (out.activePet && !out.pets.includes(out.activePet)) out.activePet = null;
+        if (!out.activePet && out.pets.length) out.activePet = out.pets[0];
         if (!Array.isArray(out.skins) || !out.skins.length) out.skins = ['classic'];
         if (!out.skins.includes('custom')) out.skins.push('custom');
         if (!out.hero || typeof out.hero !== 'object') out.hero = {};
@@ -769,6 +775,11 @@ class Game {
       const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
       html += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
     }
+    html += t('</div><div class="ward-section">🐾 Улюбленець — біжить поряд</div><div class="ward-grid">');
+    for (const [id, meta] of Object.entries(PETS)) {
+      const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
+      html += card(id, meta2, save.pets.includes(id), save.activePet === id, 'pet');
+    }
     html += t('</div><div class="ward-section">Сліди куль</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TRACERS)) {
       html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
@@ -782,6 +793,7 @@ class Game {
         if (kind === 'skin') save.activeSkin = id;
         else if (kind === 'dance') save.activeDance = id;
         else if (kind === 'gadget') save.activeGadget = id;
+        else if (kind === 'pet') { save.activePet = id; this.spawnPet(); }
         else if (kind === 'tracer') {
           save.activeTracer = id;
           if (this.level) this.level.effects.tracerStyle = id === 'classic' ? null : id;
@@ -1010,7 +1022,7 @@ class Game {
     level.megabox = (isGuest || isArena) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
-    level.pet = (this.save.upgrades.dog || 0) > 0 ? new Pet(level) : null;
+    level.pet = this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
@@ -1275,9 +1287,11 @@ class Game {
     this._showVictory();
   }
 
-  // 🐶 купили песика — з'являється просто в поточному рівні
+  // 🐾 (пере)створюємо улюбленця в поточному рівні за save.activePet (купівля або зміна в гардеробі)
   spawnPet() {
-    if (this.level && !this.level.pet) this.level.pet = new Pet(this.level);
+    if (!this.level) return;
+    if (this.level.pet) this.level.pet.dispose();
+    this.level.pet = this.save.activePet ? new Pet(this.level, this.save.activePet) : null;
   }
 
   // 🦙 нагорода Мегабокса: pity гарантує круте після 2 невдач
@@ -1963,6 +1977,8 @@ class Game {
         quests: g.quests.list.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
         megabox: g.level && g.level.megabox ? { x: g.level.megabox.x, z: g.level.megabox.z, opened: g.level.megabox.opened } : null,
         pet: g.level ? !!g.level.pet : false,
+        activePet: g.save.activePet || null,
+        pets: [...(g.save.pets || [])],
         riding: g.level ? !!g.level.player.riding : false,
         emoting: g.level ? g.level.player.emoting : null,
         scooters: g.level ? g.level.vehicles.list.map((r) => ({ x: r.x, z: r.z })) : [],
@@ -2089,11 +2105,19 @@ class Game {
         g.save.activeDance = id;
         g.saveGame();
       },
-      givePet: () => {
-        g.save.upgrades.dog = 1;
+      givePet: (id = 'dog') => {
+        if (!g.save.pets.includes(id)) g.save.pets.push(id);
+        g.save.activePet = id;
+        g.spawnPet();
+      },
+      setActivePet: (id) => {
+        if (!g.save.pets.includes(id)) g.save.pets.push(id);
+        g.save.activePet = id;
+        g.saveGame();
         g.spawnPet();
       },
       petPos: () => g.level.pet ? { x: g.level.pet.x, z: g.level.pet.z } : null,
+      petKind: () => g.level.pet ? g.level.pet.id : null,
       rollMissions: (c, seed, run) => rollMissionSet(c, seed, run),
       missionTypes: () => Object.keys(MISSION_TYPES),
       setMissionRun: (c, n) => {
@@ -2124,6 +2148,7 @@ class Game {
           remotes: net ? [...net.remotes.keys()] : [],
           remotePos: net ? Object.fromEntries([...net.remotes.entries()].map(([pid, rp]) => [pid,
             { x: Math.round(rp.pos.x * 10) / 10, y: Math.round(rp.pos.y * 10) / 10, z: Math.round(rp.pos.z * 10) / 10, hp: rp.health }])) : {},
+          remotePets: net ? Object.fromEntries([...net.remotes.entries()].map(([pid, rp]) => [pid, rp.petId || null])) : {},
           aliveZombies: g.level ? g.level.zombies.list.filter((z) => z.state !== 'dead').length : 0,
           items: g.level ? g.level.effects.coins.length : 0,
           waiting: (net && net.waiting) || false,

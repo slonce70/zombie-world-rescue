@@ -1,7 +1,7 @@
 // Віддалений гравець: ріг героя зі скіном, нік над головою, смужка HP,
 // зброя в руці, плавна інтерполяція позиції зі снапшотів.
 import * as THREE from 'three';
-import { makeHero, makeGunMesh, makeDog, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
+import { makeHero, makeGunMesh, PETS, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
 import { damp, dampAngle } from '../utils.js';
 import { PF, idxToWeapon, WEAPON_IDX } from './protocol.js';
 import { t } from '../i18n.js';
@@ -99,13 +99,16 @@ export class RemotePlayer {
     this._speed = 0;
     this._danceSpin = 0;
 
-    // 🐶 песик власника видно всім (косметика, біжить за хазяїном локально)
-    this.dog = null;
-    if (info.dog) {
-      this.dog = makeDog();
-      this.dog.x = 0; this.dog.z = 0; this.dog.yaw = 0;
-      this.dog.group.visible = false;
-      level.scene.add(this.dog.group);
+    // 🐾 улюбленець власника видно всім (косметика, біжить за хазяїном локально)
+    this.pet = null; this.petMove = 'quad'; this.petId = null;
+    const petId = info.pet || (info.dog ? 'dog' : null); // info.dog — сумісність зі старим полем
+    if (petId && PETS[petId]) {
+      this.petId = petId;
+      this.petMove = PETS[petId].move;
+      this.pet = PETS[petId].make();
+      this.pet.x = 0; this.pet.z = 0; this.pet.yaw = 0;
+      this.pet.group.visible = false;
+      level.scene.add(this.pet.group);
     }
   }
 
@@ -166,9 +169,9 @@ export class RemotePlayer {
     }
     updateRig(this.rig, dt);
 
-    // 🐶 песик дріботить за хазяїном
-    if (this.dog) {
-      const g = this.dog;
+    // 🐾 улюбленець дріботить за хазяїном
+    if (this.pet) {
+      const g = this.pet;
       if (!g.group.visible && this._hasFirst) {
         g.x = this.pos.x + 1.5; g.z = this.pos.z + 1.5;
         g.group.visible = true;
@@ -188,11 +191,21 @@ export class RemotePlayer {
       }
       const gy = this.level.world.groundH(g.x, g.z);
       g.phase = (g.phase || 0) + dt * (moving ? 14 : 3);
-      g.legs.forEach((leg, i) => {
-        leg.rotation.x = moving ? Math.sin(g.phase + (i % 2) * Math.PI) * 0.7 : 0;
-      });
-      g.tail.rotation.z = Math.sin(g.phase * 1.6) * 0.5;
-      g.group.position.set(g.x, gy, g.z);
+      let hopY = 0;
+      if (this.petMove === 'bird') {
+        const flap = Math.sin(g.phase * (moving ? 1.0 : 0.7));
+        if (g.wings) { g.wings[0].rotation.z = -(0.4 + flap * 0.8); g.wings[1].rotation.z = 0.4 + flap * 0.8; }
+        hopY = 0.45 + Math.sin(g.phase * 0.8) * 0.1;
+      } else if (this.petMove === 'hop') {
+        const hop = Math.abs(Math.sin(g.phase * 0.5));
+        if (g.legs) g.legs.forEach((leg) => { leg.rotation.x = moving ? -hop * 0.8 : 0; });
+        hopY = moving ? hop * 0.4 : 0;
+      } else {
+        if (g.legs) g.legs.forEach((leg, i) => { leg.rotation.x = moving ? Math.sin(g.phase + (i % 2) * Math.PI) * 0.7 : 0; });
+        if (g.tail) g.tail.rotation.z = Math.sin(g.phase * 1.6) * 0.5;
+        if (g.wings) { const fl = Math.sin(g.phase * 0.8); g.wings[0].rotation.z = -(0.2 + fl * 0.3); g.wings[1].rotation.z = 0.2 + fl * 0.3; }
+      }
+      g.group.position.set(g.x, gy + hopY, g.z);
       g.group.rotation.y += (g.yaw - g.group.rotation.y) * Math.min(1, dt * 9);
     }
 
@@ -228,12 +241,12 @@ export class RemotePlayer {
 
   dispose() {
     this.level.scene.remove(this.rig.group);
-    if (this.dog) this.level.scene.remove(this.dog.group);
+    if (this.pet) this.level.scene.remove(this.pet.group);
     // звільняємо унікальні per-instance GPU-ресурси (запечена гео тіла/зброї, нік+HP канвас-текстури,
     // сфера щита). Спільні кеші (toonMat/bakedMat/cachedGeo, позначені userData.shared) НЕ чіпаємо —
     // вони живуть на весь сеанс. Без цього кожен дисконект/реконнект лишав би їх у пам'яті GPU.
     this._free(this.rig.group);
-    if (this.dog) this._free(this.dog.group);
+    if (this.pet) this._free(this.pet.group);
   }
 
   _free(root) {
