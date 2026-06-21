@@ -681,6 +681,7 @@ export class Zombies {
     if (this.hordeActive && this.hordePending <= 0 && this.hordeRemaining <= 0) {
       this.hordeActive = false;
       level.bus.emit('hordeEnd');
+      level.netEv('he'); // кооп: кінець орди гостю
     }
 
     let removeAny = false;
