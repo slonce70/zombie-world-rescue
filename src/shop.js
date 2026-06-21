@@ -20,6 +20,7 @@ export const SHOP_ITEMS = [
   { id: 'xray', icon: GADGETS.xray.icon, name: GADGETS.xray.name, desc: () => GADGETS.xray.desc + t(' · перезарядка {n}с', { n: GADGETS.xray.cd }), price: GADGETS.xray.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'dog', icon: '🐶', name: t('Песик Дружок'), desc: t('Збирає монети і гавкає на сюрпризи!'), price: 350, max: 1, cat: t('Гаджети й друзі') },
   // --- зброя ---
   { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
@@ -229,6 +230,7 @@ export class Shop {
       case 'xray':
       case 'infammo':
       case 'stunammo':
+      case 'teleport':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
         game.hud.toast(t('{i} {n} — твій назавжди! Клавіша F (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name }));
