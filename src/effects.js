@@ -914,13 +914,15 @@ export class Effects {
       rk.life -= dt;
       const speed = rk.v.length();
       const frameDist = speed * dt;
-      this._tmpDir.copy(rk.v).divideScalar(speed);
-      // перешкоди світу
-      let hitT = this.world.shotBlockDist(rk.mesh.position, this._tmpDir, frameDist + 0.3);
-      // зомбі на шляху
+      // зупинена ракета (гість у netWait занулив швидкість) — без ділення на 0 → без NaN-променя
+      let hitT = Infinity;
       let hitZombie = false;
-      if (this.zombieHitTest) {
-        const zh = this.zombieHitTest(rk.mesh.position, this._tmpDir, frameDist + 0.6);
+      if (speed > 1e-6) {
+        this._tmpDir.copy(rk.v).divideScalar(speed);
+        // перешкоди світу
+        hitT = this.world.shotBlockDist(rk.mesh.position, this._tmpDir, frameDist + 0.3);
+        // зомбі на шляху
+        const zh = this.zombieHitTest ? this.zombieHitTest(rk.mesh.position, this._tmpDir, frameDist + 0.6) : null;
         if (zh && zh.t < hitT) { hitT = zh.t; hitZombie = true; }
       }
       let boom = hitT <= frameDist + 0.3;

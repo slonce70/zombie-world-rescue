@@ -55,7 +55,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1413,7 +1413,7 @@ class Game {
       if (this.level.net) {
         this.deathT = 9999;
         const card = document.querySelector('#overlay-death p');
-        if (card) card.textContent = t('👑 Команда ще б\'ється! Чекай, поки друг підніме (E).');
+        if (card) card.textContent = t('👑 Команда ще б\'ється! Чекай, поки друг підніме ({k}).', { k: interactKey() });
         this.audio.defeat();
         this._showOverlay('overlay-death');
         return;
@@ -1427,7 +1427,7 @@ class Game {
         // Забіг завершується, лише коли впала ВСЯ команда (детектить хост).
         this.deathT = 9999;
         const card = document.querySelector('#overlay-death p');
-        if (card) card.textContent = t('⛈️ Команда ще тримається! Чекай, поки друг підбіжить і підніме (E).');
+        if (card) card.textContent = t('⛈️ Команда ще тримається! Чекай, поки друг підбіжить і підніме ({k}).', { k: interactKey() });
         this.audio.defeat();
         this._showOverlay('overlay-death');
         return;
@@ -1441,7 +1441,7 @@ class Game {
     const card = document.querySelector('#overlay-death p');
     if (card) {
       card.textContent = coop
-        ? t('💚 Друг може підбігти і підняти тебе (E)! Або відродишся біля бази.')
+        ? t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() })
         : t('Не хвилюйся — прогрес місій зберігся.');
     }
     this.audio.defeat();

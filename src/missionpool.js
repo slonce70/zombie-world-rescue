@@ -584,6 +584,7 @@ export class DynamicMissions {
     if (this.pendingHorde) this.pendingHorde.count += count;
     else this.pendingHorde = { t: 5, count };
     level.bus.emit('hordeWarning', 5);
+    level.netEv('hw'); // кооп: попередження про орду і гостю
   }
 
   // цивільні з хліва (порятунок) — як і раніше
@@ -719,6 +720,7 @@ export class DynamicMissions {
         level.zombies.startHorde(this.pendingHorde.count);
         level.audio.horde();
         level.bus.emit('hordeStart', this.pendingHorde.count);
+        level.netEv('hs', this.pendingHorde.count); // кооп: рев і банер старту орди гостю
         this.pendingHorde = null;
       }
     }
@@ -1332,7 +1334,7 @@ export class DynamicMissions {
     m.started = true;
     this._spawnTraveler(m);
     this.pendingWaves.push({ t: 3, n: 4, onlyWalkers: true, site: m.site });
-    this.level.netEv('esc', 1);
+    // ескорт синхронізується снапшотом (m.started → гість спавнить мандрівника); окрема подія не потрібна
   }
 
   // --- хост: стан місій для снапшота ---

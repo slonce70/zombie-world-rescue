@@ -3,10 +3,10 @@
 import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeDog, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
 import { damp, dampAngle } from '../utils.js';
-import { PF, idxToWeapon } from './protocol.js';
+import { PF, idxToWeapon, WEAPON_IDX } from './protocol.js';
 import { t } from '../i18n.js';
 
-const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
+// ponytail: порядок зброї — єдине джерело правди у protocol.js (WEAPON_IDX), не дублюємо
 
 function makeNameSprite(nick) {
   const cv = document.createElement('canvas');
@@ -43,7 +43,7 @@ export class RemotePlayer {
 
     // зброя в правій руці (як tpGuns у player.js)
     this.guns = {};
-    for (const w of WEAPON_SLOTS) {
+    for (const w of WEAPON_IDX) {
       const gun = makeGunMesh(w);
       bakeGroupMeshes(gun.group, { outline: 0.012 });
       gun.group.rotation.x = -Math.PI / 2;
