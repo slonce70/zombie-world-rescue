@@ -1081,6 +1081,7 @@ class Game {
       console.error(t('Помилка побудови рівня'), e);
       this._applyDefaultExposure();
       this._restoreAdaptiveResolution();
+      this._hitstopT = 0;
       this.level = null;
       this.state = 'globe';
       this._showGlobeUI(true);
@@ -1326,7 +1327,9 @@ class Game {
       if (crit) this._hitstopT = Math.max(this._hitstopT, 0.055);
     });
     level.bus.on('zombieKilled', (z) => {
-      if (!level.mirror) this._hitstopT = Math.max(this._hitstopT, z.type === 'boss' ? 0.07 : 0.045);
+      if (level.mirror) return;
+      if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
+      this._hitstopT = Math.max(this._hitstopT, z.type === 'boss' ? 0.07 : 0.045);
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('bossDied', () => this._onBossDied());
@@ -1427,6 +1430,7 @@ class Game {
     this._nightAnnounced = false;
     this.paused = false;
     this.deathT = -1;
+    this._hitstopT = 0;
     this.hud.showBoss(false);
 
     if (this.testMode) {
@@ -1582,6 +1586,7 @@ class Game {
     this._timeAcc = 0; // кооп-акумулятор не переносить борг між рівнями (інакше — ривок фаст-форварду на старті)
     this._applyDefaultExposure();
     this._restoreAdaptiveResolution();
+    this._hitstopT = 0;
     this.level = null;
     this.state = 'globe';
     this.victoryShown = false;
