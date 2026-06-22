@@ -124,6 +124,14 @@ class Game {
 
     const canvas = document.getElementById('game-canvas');
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: devicePixelRatio < 1.5 });
+    this._onContextLost = (e) => {
+      e.preventDefault();
+      this._contextLost = true;
+      if (this.hud) this.hud.toast(t('⚠️ Графіка перезапускається — зачекай...'));
+    };
+    this._onContextRestored = () => location.reload();
+    canvas.addEventListener('webglcontextlost', this._onContextLost, false);
+    canvas.addEventListener('webglcontextrestored', this._onContextRestored, false);
     this.renderer.setSize(innerWidth, innerHeight);
     this.pixelRatio = Math.min(devicePixelRatio, 1.5);
     this.renderer.setPixelRatio(this.pixelRatio);
