@@ -1962,10 +1962,11 @@ class Game {
       return;
     }
     const real = this.clock.getDelta();
-    this._step(Math.min(real, 0.05), skipRender, real);
+    this._step(Math.min(real, 0.05), skipRender);
   }
 
   _step(dt, skipRender, timerDt = dt) {
+    timerDt = Math.min(timerDt, dt);
     this._fpsAcc += dt;
     this._fpsN++;
     if (this._fpsAcc >= 1) {

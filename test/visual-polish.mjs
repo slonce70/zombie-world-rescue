@@ -92,6 +92,11 @@ const res = await page.evaluate(async () => {
   out.timerDelta = g.level.stats.time - time0;
   out.comboDelta = combo0 - g.level.combo.t;
   out.hitstopScalesSimButNotTimer = out.timerDelta >= 0.049 && out.timerDelta <= 0.052 && out.comboDelta > 0 && out.comboDelta < 0.02;
+  g._hitstopT = 0;
+  const longFrameTime0 = g.level.stats.time;
+  g._step(0.05, true, 2.0);
+  out.longFrameTimerDelta = g.level.stats.time - longFrameTime0;
+  out.longFrameTimerCapped = out.longFrameTimerDelta >= 0.049 && out.longFrameTimerDelta <= 0.052;
 
   const fx = g.level.effects;
   const from = new THREE.Vector3(0, 2, 0);
@@ -122,6 +127,7 @@ check(res.toonDither, 'toon materials enable dithering');
 check(res.terrainDither, 'terrain-like vertex-color materials enable dithering');
 check(res.highAdaptive, 'High quality can still adapt pixel ratio downward', JSON.stringify({ start: res.highStartRatio, dropped: res.highDroppedRatio }));
 check(res.hitstopStarted && res.hitstopScalesSimButNotTimer, 'hitstop slows sim without slowing run timer', JSON.stringify({ timerDelta: res.timerDelta, comboDelta: res.comboDelta }));
+check(res.longFrameTimerCapped, 'long frames do not jump run timer', JSON.stringify({ timerDelta: res.longFrameTimerDelta }));
 check(res.laserGlow, 'laser impact uses shared fake-glow sprite');
 check(res.ringPoolOk, 'explosion rings use fixed shared pool', JSON.stringify({ pool: res.ringPoolSize, active: res.activeRings }));
 check(res.exposureReset, 'leaving level resets renderer exposure to default');
