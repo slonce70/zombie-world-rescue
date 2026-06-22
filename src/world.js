@@ -1998,7 +1998,7 @@ export class World {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const mat = new THREE.MeshToonMaterial({ vertexColors: true });
+    const mat = new THREE.MeshToonMaterial({ vertexColors: true, dithering: true });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -2036,6 +2036,7 @@ export class World {
       const mat = new THREE.MeshToonMaterial({
         color: this.biome.water || 0x4dc3e8, transparent: true, opacity: 0.78,
         side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4,
+        dithering: true,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.renderOrder = 1;
@@ -2961,6 +2962,7 @@ export class World {
     const ice = new THREE.Mesh(geo, new THREE.MeshToonMaterial({
       color: 0x9ccbe8, gradientMap: toonMat(0).gradientMap,
       emissive: 0x3a7fc4, emissiveIntensity: 0.22,
+      dithering: true,
     }));
     ice.position.set(x, 0, z);
     this.scene.add(ice);

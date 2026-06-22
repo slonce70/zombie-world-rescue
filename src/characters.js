@@ -5,8 +5,13 @@ import { t } from './i18n.js';
 let gradMap = null;
 function getGradMap() {
   if (!gradMap) {
-    const data = new Uint8Array([110, 160, 215, 255]);
-    gradMap = new THREE.DataTexture(data, 4, 1, THREE.RedFormat);
+    const data = new Uint8Array([
+      130, 150, 190, 255,
+      168, 184, 220, 255,
+      214, 224, 246, 255,
+      255, 236, 204, 255,
+    ]);
+    gradMap = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
     gradMap.minFilter = THREE.NearestFilter;
     gradMap.magFilter = THREE.NearestFilter;
     gradMap.needsUpdate = true;
@@ -20,7 +25,7 @@ export function toonMat(color, emissive = 0x000000, emissiveIntensity = 0) {
   const key = `${color}|${emissive}|${emissiveIntensity}`;
   if (!matCache.has(key)) {
     const m = new THREE.MeshToonMaterial({
-      color, gradientMap: getGradMap(), emissive, emissiveIntensity,
+      color, gradientMap: getGradMap(), emissive, emissiveIntensity, dithering: true,
     });
     m.userData.shared = true; // кешований на весь сеанс і переюзаний усіма рівнями
     matCache.set(key, m);
@@ -60,7 +65,7 @@ function cylinder(rT, rB, h, mat, seg = 12) {
 let bakedMat = null;
 function getBakedMat() {
   if (!bakedMat) {
-    bakedMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradMap() });
+    bakedMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradMap(), dithering: true });
     bakedMat.userData.shared = true; // спільний матеріал запечених мешів — не диспозити в endLevel
   }
   return bakedMat;
