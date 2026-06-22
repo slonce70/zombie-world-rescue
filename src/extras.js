@@ -430,7 +430,12 @@ export const GADGETS = {
   teleport: { name: t('Телепортація'), icon: '🪄', cd: 45, price: 1000, desc: t('Миттєвий стрибок уперед — вирвись із натовпу') },
   // 🍎 Золоте яблуко: +20 тимчасового HP на 5с (бонус-макс, згасає сам), перезарядка 45с
   goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
+  // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
+  meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу на найближчого зомбі — 135 шкоди') },
 };
+
+// ☄️ напрямок удару метеорита — згори вниз: обходить фронтальний щит (кут) і нагрудник (headshot)
+const METEOR_DOWN = new THREE.Vector3(0, -1, 0);
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
@@ -673,12 +678,61 @@ export class Gadgets {
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0xffd23f, 16, { speed: 2.5, up: 3, life: 0.9 });
       level.bus.emit('toast', t('🍎 Золоте яблуко: +20 здоров\'я на 5с!'));
       ok = true;
+    } else if (id === 'meteor') {
+      // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму
+      ok = level.mirror ? this._requestMeteor() : this._callMeteor();
     }
     if (ok) {
       this.cd = GADGETS[id].cd;
       level.bus.emit('gadgetUsed', id);
     }
     return ok;
+  }
+
+  // ☄️ найближчий ЖИВИЙ зомбі до точки (соло/хост мають авторитетний список)
+  _nearestZombie(x, z) {
+    let best = null, bd = Infinity;
+    for (const zb of this.level.zombies.list) {
+      if (zb.state === 'dead' || zb.gone) continue;
+      const d = Math.hypot(zb.x - x, zb.z - z);
+      if (d < bd) { bd = d; best = zb; }
+    }
+    return best;
+  }
+
+  // 135 шкоди згори по конкретному nid (re-fetch: ціль могла впасти за час падіння)
+  _meteorHit(nid) {
+    const z = this.level.zombies.byNid(nid);
+    if (z && z.state !== 'dead') z.damage(135, METEOR_DOWN, true);
+  }
+
+  // соло/хост: метеорит на найближчого до гравця; візуал розсилаємо гостям ('met')
+  _callMeteor() {
+    const level = this.level;
+    const zb = this._nearestZombie(level.player.pos.x, level.player.pos.z);
+    if (!zb) { level.bus.emit('toast', t('☄️ Немає цілі поблизу!')); level.game.audio.denied(); return false; }
+    const nid = zb.nid;
+    level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid));
+    level.audio.powerup();
+    level.bus.emit('toast', t('☄️ Метеорит летить!'));
+    if (level.net && level.net.authority) level.netEv('met', Math.round(zb.x * 10) / 10, Math.round(zb.z * 10) / 10);
+    return true;
+  }
+
+  // гість: просимо хоста викликати метеорит (шле нашу позицію — хост шукає ціль)
+  _requestMeteor() {
+    const p = this.level.player;
+    this.level.net.sendGadget('meteor', p.pos.x, p.pos.z, p.yaw);
+    return true;
+  }
+
+  // хост: метеорит на найближчого до позиції гравця-замовника + розсилка візуалу
+  hostMeteor(x, z) {
+    const zb = this._nearestZombie(x, z);
+    if (!zb) return;
+    const nid = zb.nid;
+    this.level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid));
+    this.level.netEv('met', Math.round(zb.x * 10) / 10, Math.round(zb.z * 10) / 10);
   }
 
   _placePos(dist) {

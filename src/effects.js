@@ -109,6 +109,7 @@ export class Effects {
     this.flashLight = new THREE.PointLight(0xffc966, 0, 9);
     scene.add(this.flashLight);
     this.flashT = 0;
+    this._meteors = []; // ☄️ метеорити в польоті (гаджет): {rock, tx, tz, ty, t, dur, onLand}
 
     // монети та підбирання
     this.coins = [];
@@ -299,6 +300,46 @@ export class Effects {
       for (const ob of this.barrels) {
         if (ob.exploded || ob.fuse >= 0) continue;
         if (Math.hypot(ob.x - pos.x, ob.z - pos.z) < radius + 1) ob.fuse = 0.18;
+      }
+    }
+  }
+
+  // ☄️ метеорит із космосу падає на точку (tx,tz); onLand() — у момент удару (соло/хост: шкода)
+  callMeteor(tx, tz, onLand = null) {
+    const ty = this.world.groundH(tx, tz);
+    const rock = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.95, 0),
+      new THREE.MeshToonMaterial({ color: 0x3a2e26, emissive: 0xff5a1e, emissiveIntensity: 1.1, gradientMap: toonMat(0).gradientMap })
+    );
+    rock.position.set(tx, ty + 48, tz);
+    this.scene.add(rock);
+    this._meteors.push({ rock, tx, tz, ty, t: 0, dur: 0.85, onLand });
+    if (this.audio && this.audio.throwWhoosh) this.audio.throwWhoosh(1);
+  }
+
+  _updateMeteors(dt) {
+    for (let i = this._meteors.length - 1; i >= 0; i--) {
+      const m = this._meteors[i];
+      m.t += dt;
+      const k = Math.min(1, m.t / m.dur);
+      m.rock.position.y = m.ty + 0.95 + 48 * (1 - k * k); // прискорене падіння
+      m.rock.rotation.x += dt * 6;
+      m.rock.rotation.z += dt * 5;
+      this.burst(m.rock.position, 0xff7a2a, 1, { speed: 1, up: 0, life: 0.3, size: 0.9 }); // вогняний слід
+      if (k >= 1) {
+        const pos = new THREE.Vector3(m.tx, m.ty + 0.3, m.tz);
+        this.burst(pos, 0xffa040, 18, { speed: 6, up: 5, life: 0.7, size: 1.6 });
+        this.burst(pos, 0x553a22, 12, { speed: 4, up: 4, life: 0.6, size: 1.2 });
+        this.ring(pos, 0xff6a2a, 4);
+        this.flashLight.position.copy(pos);
+        this.flashLight.intensity = 30;
+        this.flashT = 0.12;
+        this.audio.explosion();
+        if (m.onLand) m.onLand();
+        this.scene.remove(m.rock);
+        m.rock.geometry.dispose();
+        m.rock.material.dispose();
+        this._meteors.splice(i, 1);
       }
     }
   }
@@ -881,6 +922,8 @@ export class Effects {
     for (let i = idx; i < this.MAX_P; i++) this.pMesh.setMatrixAt(i, this._m4);
     this.pMesh.instanceMatrix.needsUpdate = true;
     if (this.pMesh.instanceColor) this.pMesh.instanceColor.needsUpdate = true;
+
+    if (this._meteors.length) this._updateMeteors(dt);
 
     // трасери
     for (const t of this.tracerPool) {

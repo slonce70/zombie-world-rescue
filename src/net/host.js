@@ -346,6 +346,7 @@ export class HostNet {
     if (d.kind === 'wall') level.gadgets.placeWallAt(d.x, d.z, d.yaw, from);
     else if (d.kind === 'tramp') level.gadgets.placeTrampAt(d.x, d.z, from);
     else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from);
+    else if (d.kind === 'meteor') level.gadgets.hostMeteor(d.x, d.z); // ☄️ метеорит на найближчого до гостя
   }
 
   // ---------- зомбі / гравці: гачки для ігрових систем ----------

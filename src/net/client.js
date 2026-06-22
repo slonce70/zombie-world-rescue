@@ -234,6 +234,7 @@ export class GuestNet {
       case 'gn': level.effects.spawnNetGrenade(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
       case 'rk': level.effects.spawnNetRocket(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
       case 'bm': level.effects.netExplosion(a[0], a[1], a[2], a[3], a[4], a[5] || []); break;
+      case 'met': level.effects.callMeteor(a[0], a[1]); break; // ☄️ візуал метеорита (шкода — у хоста)
       case 'ad': level.effects.netAirdrop(a[0], a[1]); break;
       case 'sh': {
         if (a[0] === me) break;

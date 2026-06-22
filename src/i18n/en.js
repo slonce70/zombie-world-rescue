@@ -960,4 +960,8 @@ export const EN = {
 "ОСТРІВ ДИНОЗАВРІВ": "DINOSAUR ISLAND",
 "🦖 ТАЄМНИЙ ОСТРІВ!": "🦖 SECRET ISLAND!",
 "останній бій — натисни!": "final battle — tap!",
+"Метеорит": "Meteor",
+"Метеорит з космосу на найближчого зомбі — 135 шкоди": "A meteor from space onto the nearest zombie — 135 damage",
+"☄️ Метеорит летить!": "☄️ Meteor incoming!",
+"☄️ Немає цілі поблизу!": "☄️ No target nearby!",
 };
