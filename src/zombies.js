@@ -54,6 +54,8 @@ const TYPE_STATS = {
   // 👻 привид: НЕВИДИМИЙ зомбі. Без гаджета «Ікс-рей» його не видно — лише він підсвічує всіх привидів на 4с.
   // Середній і доволі прудкий, тому коштує уваги; багато монет як нагорода за виклик.
   ghost: { hp: 60, speed: 2.0, chaseSpeed: 4.2, aggro: 30, dmg: 12, attackR: 1.8, coins: 20, pitch: 1.4, invisible: true },
+  // 🪬 зомбі-шаман: звичайний мелі, але ВОСКРЕСАЄ один раз (добий двічі); може лишити тотем безсмертя
+  shaman: { hp: 125, speed: 1.5, chaseSpeed: 3.0, aggro: 28, dmg: 14, attackR: 1.9, coins: 30, pitch: 0.9 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -96,6 +98,8 @@ export class Zombies {
     this._wizardCount = 0; // не більше 1-2 на рівень
     // 👻 невидимі привиди — той самий гейт (НЕ навчальна Україна ★1)
     this._allowGhost = this.diff.dmg > 1 || this.diffStar > 1;
+    // 🪬 шаман — рідкісний спец-ворог пізніших країн (той самий гейт, що й привид)
+    this._allowShaman = this.diff.dmg > 1 || this.diffStar > 1;
     this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
@@ -158,6 +162,8 @@ export class Zombies {
       charger: !!stats.charger,
       summonedAt: { 75: false, 50: false, 25: false },
       invisible: !!(stats && stats.invisible),
+      revivedOnce: false, // 🪬 шаман воскресає один раз
+
       frost: bossStyle === 'frost',
       bossStyle: type === 'boss' ? bossStyle : null,
       noLeash: !!opts.noLeash, // міні-боси шторму гуляють вільно
@@ -270,6 +276,8 @@ export class Zombies {
         else if (this._allowGunner && this.rng.chance(0.1)) type = 'gunner';
         // 👻 привид — невидимий спец-ворог (бачиш лише з Ікс-реєм), той самий гейт, що й стрілець
         else if (this._allowGhost && this.rng.chance(0.07)) type = 'ghost';
+        // 🪬 зомбі-шаман — рідкісний; воскресає раз і може лишити тотем безсмертя
+        else if (this._allowShaman && this.rng.chance(0.06)) type = 'shaman';
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
@@ -546,7 +554,11 @@ export class Zombies {
       if (o.groupId === z.groupId && o.groupId >= 0 && o.state !== 'dead'
         && Math.hypot(o.x - z.x, o.z - z.z) < 13) this._aggro(o);
     }
-    if (z.hp <= 0) this._kill(z, dir);
+    if (z.hp <= 0) {
+      // 🪬 шаман воскресає один раз — перша «смерть» його не вбиває
+      if (z.type === 'shaman' && !z.revivedOnce) { this._reviveShaman(z); return; }
+      this._kill(z, dir);
+    }
   }
 
   _aggro(z) {
@@ -558,6 +570,20 @@ export class Zombies {
     const p = this.level.player;
     const d = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
     if (d < 42) this.level.audio.shriek(1 - clamp(d / 42, 0, 0.85), z.stats.pitch);
+  }
+
+  // 🪬 шаман воскресає (перша смерть): повне hp + зелено-золотий спалах; добий ще раз
+  _reviveShaman(z) {
+    z.revivedOnce = true;
+    z.hp = z.maxHp;
+    const level = this.level;
+    level.effects.totemBurst(new THREE.Vector3(z.x, z.y + 1.2, z.z));
+    level.audio.powerup();
+    level.netEv('zrev', z.nid); // кооп: спалах воскресіння у гостя
+    if (!this._shamanHintShown) {
+      this._shamanHintShown = true;
+      level.bus.emit('toast', t('🪬 Шаман воскрес! Добий ще раз!'));
+    }
   }
 
   _kill(z, dir) {
@@ -587,6 +613,8 @@ export class Zombies {
         // рідкісний сюрприз: тимчасове підсилення
         level.effects.spawnPickup(z.x + 1, z.z, this.rng.pick(['speed', 'rage', 'bubble', 'magnet']));
       }
+      // 🪬 шаман на остаточній смерті: 15% лишає тотем безсмертя
+      if (z.type === 'shaman' && this.rng.chance(0.15)) level.effects.spawnPickup(z.x, z.z, 'totem');
     }
     if (z.horde) this.hordeRemaining--;
     if (z.golden) {

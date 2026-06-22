@@ -806,6 +806,14 @@ export class Effects {
     this.rings.push(slot);
   }
 
+  // 🪬 спалах воскресіння (тотем безсмертя) — зелено-золотий, для шамана й гравця
+  totemBurst(pos) {
+    this.burst(pos, 0x2fe08a, 20, { speed: 6, up: 6, life: 0.8, size: 1.7 }); // смарагд
+    this.burst(pos, 0xffd23f, 14, { speed: 5, up: 5, life: 0.7, size: 1.5 }); // золото
+    this.ring(pos, 0x39ff88, 4.5);
+    this.ring(pos, 0xffd23f, 3.0);
+  }
+
   // пес або інший помічник збирає предмет негайно
   collectCoinNow(c) {
     const L = this.levelRef;
@@ -900,6 +908,28 @@ export class Effects {
       g.position.set(x, y0 + 0.55, z);
       this.scene.add(g);
       this._finishItem({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.5, life }, x, z, yOverride, nid);
+      return;
+    }
+    if (type === 'totem') {
+      // 🪬 тотем безсмертя — золотий стовпчик зі смарагдовим обличчям (як Minecraft)
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.5, 6), toonMat(0xffcf3a, 0xc8860a, 0.45));
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.16), toonMat(0xffd966, 0xc8860a, 0.4));
+      head.position.y = 0.32;
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), toonMat(0x2fe08a, 0x0e9c55, 0.9));
+      gem.position.set(0, 0.32, 0.09);
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), toonMat(0xffcf3a, 0xc8860a, 0.45));
+      armL.position.set(-0.19, 0.12, 0);
+      const armR = armL.clone();
+      armR.position.x = 0.19;
+      g.add(body, head, gem, armL, armR);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getGlowTexture(), color: 0x8fffb0, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+      glow.scale.setScalar(1.3);
+      glow.position.y = 0.2;
+      g.add(glow);
+      g.position.set(x, y0 + 0.45, z);
+      this.scene.add(g);
+      this._finishItem({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.4, life }, x, z, yOverride, nid);
       return;
     }
     if (type === 'food') {

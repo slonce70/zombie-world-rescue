@@ -1284,6 +1284,54 @@ function buildZombie(type, rng) {
     rig.ztype = 'terracotta';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'shaman') {
+    // 🪬 зомбі-шаман: темна роба з капюшоном, у руці тримає ТОТЕМ безсмертя —
+    // золотий стовпчик зі смарагдовим обличчям-гемом; вбитий раз — воскресає.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.08, belly: 0.85, armsForward: 0.8, lean: -0.06,
+      skin: 0x6e7f55, shirt: 0x2a3322, pants: 0x1f261a, shoes: 0x161b12,
+      eyeWhite: 0xd8ffcf, eyeL: 0.08, eyeR: 0.08, pupilColor: 0x2fae57, brow: 0.55,
+    }));
+    const robeM = toonMat(0x2a3322, 0x141a10, 0.18);   // темна роба
+    const goldM = toonMat(0xe8c14a, 0xb8902a, 0.4);     // золото тотема
+    const goldD = toonMat(0xb8902a);
+    const emerM = toonMat(0x2fae57, 0x2fae57, 0.85);    // смарагд (світиться)
+    // мантія — спідниця-конус від пояса донизу
+    const robe = cone(0.42, 0.96, robeM, 12);
+    robe.position.set(0, -0.4, 0);
+    rig.parts.torso.add(robe);
+    // капюшон — гострий конус на голові + кільце-комір
+    const hood = cone(0.31, 0.46, robeM, 10);
+    hood.position.set(0, 0.34, 0.02);
+    const hoodTip = sphere(0.05, robeM, 6, 5);
+    hoodTip.position.set(0, 0.58, 0.04);
+    rig.parts.head.add(hood, hoodTip);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 6, 14), robeM);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 0.02, 0);
+    rig.parts.head.add(collar);
+    // смарагдові обереги на мантії
+    for (let i = 0; i < 3; i++) {
+      const gem = box(0.06, 0.06, 0.02, emerM);
+      gem.position.set(rng.range(-0.18, 0.18), rng.range(0.1, 0.4), -0.27);
+      gem.rotation.z = 0.78;
+      rig.parts.torso.add(gem);
+    }
+    // 🪬 ТОТЕМ БЕЗСМЕРТЯ у правій руці: золотий стовпчик зі смарагдовим обличчям-гемом
+    const totemBody = box(0.16, 0.5, 0.13, goldM);
+    totemBody.position.set(0.05, -0.5, -0.18);
+    const totemHead = box(0.22, 0.2, 0.16, goldM);
+    totemHead.position.set(0.05, -0.18, -0.18);
+    const totemArms = box(0.34, 0.07, 0.1, goldD);
+    totemArms.position.set(0.05, -0.34, -0.18);
+    const totemFace = box(0.13, 0.13, 0.02, emerM);
+    totemFace.position.set(0.05, -0.18, -0.27);
+    const totemGem = sphere(0.07, emerM, 10, 8);
+    totemGem.position.set(0.05, 0.0, -0.18);
+    rig.parts.armR.add(totemBody, totemArms, totemHead, totemFace, totemGem);
+    rig.ztype = 'shaman';
+    addZombieWear(rig);
+    return rig;
   } else if (type === 'imp') {
     // 🧟 шкет: дрібний і дуже швидкий зомбі — впізнавано МАЛЕНЬКИЙ (≈0.66 зросту),
     // велика голова й вирячені очі надають хижого «дитячого» вигляду

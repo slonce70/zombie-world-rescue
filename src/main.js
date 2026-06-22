@@ -56,7 +56,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 79;
+const APP_VERSION = 80;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1289,6 +1289,11 @@ class Game {
         level.player.addRockets(3);
         this.audio.powerup();
         this.hud.banner(t('🚀 БАЗУКА!'), t('{k} — рознеси їх усіх! (+3 ракети)', { k: keyHint('кнопка 🔁', 'Клавіша 7') }));
+      } else if (type === 'totem') {
+        // 🪬 тотем безсмертя: +1 заряд воскресіння (рятує від смерті раз)
+        level.player.reviveCharges = (level.player.reviveCharges || 0) + 1;
+        this.audio.powerup();
+        this.hud.toast(t('🪬 Тотем безсмертя!'));
       } else if (BUFF_INFO[type]) {
         level.player.buffs[type] = BUFF_INFO[type].dur;
         this.audio.powerup();

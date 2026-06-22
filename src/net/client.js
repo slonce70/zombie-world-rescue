@@ -221,6 +221,11 @@ export class GuestNet {
       case 'zg': level.zombies.puppetGone(a[0]); break;
       case 'zsb': level.zombies.puppetShieldBreak(a[0]); break;
       case 'zcb': level.zombies.puppetChestBreak(a[0]); break;
+      case 'zrev': { // 🪬 шаман воскрес — спалах у гостя
+        const zr = level.zombies.byNid(a[0]);
+        if (zr) level.effects.totemBurst(new THREE.Vector3(zr.x, zr.y + 1.2, zr.z));
+        break;
+      }
       case 'it': level.effects.spawnNetItem(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
       case 'lt': {
         const item = level.effects.removeItemByNid(a[0]);

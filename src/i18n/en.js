@@ -976,4 +976,9 @@ export const EN = {
 "ВЕЛИКА СТІНА": "GREAT WALL",
 "Теракотовий воїн": "Terracotta Warrior",
 "Глиняна броня і спис — розганяється у важкий випад!": "Clay armor and a spear — charges into a heavy lunge!",
+"Зомбі-шаман": "Zombie Shaman",
+"Воскресає один раз — добий двічі! Може лишити тотем безсмертя.": "Revives once — kill it twice! May drop a Totem of Undying.",
+"🪬 Тотем безсмертя!": "🪬 Totem of Undying!",
+"🪬 Тотем урятував тебе!": "🪬 The Totem saved you!",
+"🪬 Шаман воскрес! Добий ще раз!": "🪬 The Shaman revived! Kill it again!",
 };

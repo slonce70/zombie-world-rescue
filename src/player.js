@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, bakeGroupMeshes } from './characters.js';
 
 import { clamp, damp, lerp, dampAngle } from './utils.js';
+import { t } from './i18n.js';
 
 export const WEAPONS = {
   pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, infinite: true },
@@ -81,6 +82,7 @@ export class Player {
     }
     this.grenades = 2;
     this.grenadeCd = 0;
+    this.reviveCharges = 0; // 🪬 заряди тотема безсмертя — кожен рятує від смерті 1 раз
     this.stepT = 0;
     this._clickBuffer = 0;
     this.shootCd = 0;
@@ -989,6 +991,16 @@ export class Player {
     this.level.audio.hurt();
     this.level.bus.emit('playerHurt');
     if (this.health <= 0) {
+      // 🪬 тотем безсмертя: рятує від смерті 1 раз — воскресає замість гинути
+      if (this.reviveCharges > 0) {
+        this.reviveCharges--;
+        this.health = Math.ceil(this.maxHealth * 0.5);
+        this.respawnProtect = 2; // коротка невразливість після воскресіння
+        if (this.level.effects) this.level.effects.totemBurst(this.pos.clone().setY(this.pos.y + 1.0));
+        this.level.audio.powerup();
+        this.level.bus.emit('toast', t('🪬 Тотем урятував тебе!'));
+        return;
+      }
       this.health = 0;
       this.level.bus.emit('playerDied');
     }
