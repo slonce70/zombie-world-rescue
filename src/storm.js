@@ -153,6 +153,8 @@ export class StormMode {
       }
       level.audio.mission();
       this._spawnWaveSoon = 6;
+      // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3 (лише соло-Шторм)
+      if (!level.net && level.runBuild && level.game.draft) level.game.draft.open();
     }
     if (this._spawnWaveSoon !== undefined) {
       this._spawnWaveSoon -= dt;

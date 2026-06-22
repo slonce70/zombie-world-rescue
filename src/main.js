@@ -1764,10 +1764,15 @@ class Game {
     }
     const rec = isRecord && prev ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const best = this.save.stormBest[level.countryId];
+    const rb = level.runBuild;
+    const buildRow = rb && rb.picks.length
+      ? `<div class="stat"><span class="stat-icon">🎲</span><span class="stat-name">${t('Твоя збірка')}</span><span class="stat-val">${rb.summary()}</span></div>`
+      : '';
     document.getElementById('storm-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">${t('Хвиль відбито')}${rec}</span><span class="stat-val">${res.wave - 1}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Протримався')}</span><span class="stat-val">${Math.floor(res.time / 60)}:${String(res.time % 60).padStart(2, '0')}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
+      ${buildRow}
       <div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')} (${this.level.country.name})</span><span class="stat-val">${t('хвиля')} ${best.wave}</span></div>`;
     this._showOverlay('overlay-storm-end');
   }
