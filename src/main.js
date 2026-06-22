@@ -133,6 +133,7 @@ class Game {
     this._shadowFrame = 0;
     this._lowFpsSec = 0;
     this._highFpsSec = 0;
+    this._hitstopT = 0;
     // у режимі «Авто» це рідний (бажаний) масштаб: адаптивка може тимчасово
     // опуститись нижче, але мусить піднятись назад, коли FPS знову стабільно високий
     this._autoTargetRatio = this.pixelRatio;
@@ -1321,6 +1322,12 @@ class Game {
     };
 
     this.hud.wire(level.bus);
+    level.bus.on('hitmarker', (crit) => {
+      if (crit) this._hitstopT = Math.max(this._hitstopT, 0.055);
+    });
+    level.bus.on('zombieKilled', (z) => {
+      if (!level.mirror) this._hitstopT = Math.max(this._hitstopT, z.type === 'boss' ? 0.07 : 0.045);
+    });
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('bossDied', () => this._onBossDied());
     level.bus.on('hordeEnd', () => {
@@ -1996,32 +2003,35 @@ class Game {
       const isCoop = !!this.level.net;
       // кооп: пауза/магазин ховають керування, але світ ЖИВЕ (інші ж грають!)
       const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.victoryShown);
+      const hitstopScale = this._hitstopT > 0 ? 0.15 : 1;
+      if (this._hitstopT > 0) this._hitstopT = Math.max(0, this._hitstopT - timerDt);
+      const simDt = dt * hitstopScale;
       if (!blocked) {
         const alive = this.level.player.health > 0;
         const allowControl = (this.input.locked || this.testMode || this.input.touchMode)
           && this.deathT < 0 && alive
           && !(isCoop && (this.paused || this.shop.isOpen));
-        this.level.player.update(dt, this.input, allowControl);
-        this.level.zombies.update(dt);
-        this.level.missions.update(dt, this.input, allowControl);
+        this.level.player.update(simDt, this.input, allowControl);
+        this.level.zombies.update(simDt);
+        this.level.missions.update(simDt, this.input, allowControl);
         // іграшки: самокати, мегабокс, гаджети, песик
-        this.level.vehicles.update(dt, this.input, allowControl);
+        this.level.vehicles.update(simDt, this.input, allowControl);
         if (this.level.megabox && !this.level.megabox.done) {
-          this.level.megabox.update(dt, this.input, allowControl);
+          this.level.megabox.update(simDt, this.input, allowControl);
         }
-        this.level.gadgets.update(dt, this.input, allowControl);
-        if (this.level.net) this._updateRevive(dt, allowControl);
-        if (this.level.pet) this.level.pet.update(dt);
-        this.level.world.update(dt, this.level.player.pos);
+        this.level.gadgets.update(simDt, this.input, allowControl);
+        if (this.level.net) this._updateRevive(simDt, allowControl);
+        if (this.level.pet) this.level.pet.update(simDt);
+        this.level.world.update(simDt, this.level.player.pos);
+        this.level.effects.update(simDt);
+        this.level.stats.time += timerDt;
         this._updateDayNight();
-        this.level.effects.update(dt);
-        this.level.stats.time += dt;
-        // комбо згасає без вбивств
+        // комбо згасає разом із симуляцією: freeze-frame не краде серію
         if (this.level.combo.t > 0) {
-          this.level.combo.t -= dt;
+          this.level.combo.t -= simDt;
           if (this.level.combo.t <= 0) this.level.combo.n = 0;
         }
-        this._updateMusic(dt);
+        this._updateMusic(simDt);
         // відлік смерті
         if (this.deathT >= 0) {
           this.deathT -= timerDt;
