@@ -496,6 +496,16 @@ class Game {
     this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
   }
 
+  _restoreAdaptiveResolution() {
+    if (this._adaptiveResolutionEnabled() && this.pixelRatio < this._autoTargetRatio) {
+      this.pixelRatio = this._autoTargetRatio;
+      this.renderer.setPixelRatio(this.pixelRatio);
+      this.renderer.setSize(innerWidth, innerHeight);
+    }
+    this._lowFpsSec = 0;
+    this._highFpsSec = 0;
+  }
+
   _applyQuality() {
     const q = this.save.quality || 'auto';
     document.getElementById('btn-quality').textContent = t('⚙️ Якість: {q}', { q: QUALITY_LABELS[q] });
@@ -1064,16 +1074,12 @@ class Game {
       this._timeAcc = 0;
       // адаптивка: кожен рівень стартує з рідного масштабу — коротка просадка на
       // минулому рівні більше не лишає гру «мильною» весь сеанс (Авто/Гарна)
-      if (this._adaptiveResolutionEnabled() && this.pixelRatio < this._autoTargetRatio) {
-        this.pixelRatio = this._autoTargetRatio;
-        this.renderer.setPixelRatio(this.pixelRatio);
-        this.renderer.setSize(innerWidth, innerHeight);
-      }
-      this._lowFpsSec = 0;
-      this._highFpsSec = 0;
+      this._restoreAdaptiveResolution();
     } catch (e) {
       // не блокуємо гру назавжди — повертаємось на глобус
       console.error(t('Помилка побудови рівня'), e);
+      this._applyDefaultExposure();
+      this._restoreAdaptiveResolution();
       this.level = null;
       this.state = 'globe';
       this._showGlobeUI(true);
@@ -1568,6 +1574,7 @@ class Game {
     if (this._burstIv) { clearInterval(this._burstIv); this._burstIv = null; } // салют боса не тикає по знесеному рівню
     this._timeAcc = 0; // кооп-акумулятор не переносить борг між рівнями (інакше — ривок фаст-форварду на старті)
     this._applyDefaultExposure();
+    this._restoreAdaptiveResolution();
     this.level = null;
     this.state = 'globe';
     this.victoryShown = false;
