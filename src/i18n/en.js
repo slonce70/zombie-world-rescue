@@ -967,4 +967,13 @@ export const EN = {
 "750 монет": "750 coins",
 "800 монет": "800 coins",
 "Гаджет «Метеорит»": "«Meteor» gadget",
+"Китай": "China",
+"🇨🇳 КИТАЙ ЗВІЛЬНЕНО!": "🇨🇳 CHINA LIBERATED!",
+"👑 ТЕРАКОТОВИЙ ІМПЕРАТОР": "👑 TERRACOTTA EMPEROR",
+"Велика стіна в тумані, червоні ліхтарі й ТЕРАКОТОВИЙ ІМПЕРАТОР! Стережись армії воїнів! 🏯": "The Great Wall in the mist, red lanterns and the TERRACOTTA EMPEROR! Beware the army of warriors! 🏯",
+"дамплінг": "dumpling",
+"ГІРСЬКЕ СЕЛО": "MOUNTAIN VILLAGE",
+"ВЕЛИКА СТІНА": "GREAT WALL",
+"Теракотовий воїн": "Terracotta Warrior",
+"Глиняна броня і спис — розганяється у важкий випад!": "Clay armor and a spear — charges into a heavy lunge!",
 };

@@ -19,6 +19,7 @@ const cfg = await page.evaluate(async () => {
   const { makeBoss } = await import('/src/characters.js');
   out.inLevel = window.__game.level && window.__game.level.countryId;
   out.inOrder = CAMPAIGN_ORDER.includes('JPN');
+  out.jpnIdx = CAMPAIGN_ORDER.indexOf('JPN');
   out.lastInOrder = CAMPAIGN_ORDER[CAMPAIGN_ORDER.length - 1];
   out.count = CAMPAIGN_ORDER.length;
   const J = COUNTRIES.JPN;
@@ -41,7 +42,7 @@ const cfg = await page.evaluate(async () => {
 });
 
 check(cfg.inLevel === 'JPN', 'рівень Японії завантажився', JSON.stringify({ inLevel: cfg.inLevel, zombies: cfg.zombies }));
-check(cfg.inOrder && cfg.lastInOrder === 'JPN' && cfg.count === 10, 'JPN — 10-та і остання в CAMPAIGN_ORDER', JSON.stringify({ last: cfg.lastInOrder, count: cfg.count }));
+check(cfg.inOrder && cfg.jpnIdx === 9 && cfg.lastInOrder === 'CHN' && cfg.count === 11, 'JPN — 10-та в CAMPAIGN_ORDER, остання тепер CHN (всього 11)', JSON.stringify({ jpnIdx: cfg.jpnIdx, last: cfg.lastInOrder, count: cfg.count }));
 check(cfg.hasBiome && cfg.biome === 'sakura', 'біом sakura існує', cfg.biome);
 check(cfg.extra === 'samurai', 'унікальний моб Японії — samurai', cfg.extra);
 check((cfg.types.samurai || 0) > 0, 'samurai присутній у спавні Японії', JSON.stringify(cfg.types));

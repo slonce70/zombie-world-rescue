@@ -9,6 +9,7 @@ import italyMap from './maps/italy.js';
 import turkeyMap from './maps/turkey.js';
 import egyptMap from './maps/egypt.js';
 import japanMap from './maps/japan.js';
+import chinaMap from './maps/china.js';
 import lostIslandMap from './maps/lostisland.js';
 
 export const BIOMES = {
@@ -215,6 +216,27 @@ export const BIOMES = {
     lampGlow: 1.1,
     signText: t('ОСТРІВ ДИНОЗАВРІВ'),
   },
+  // 🇨🇳 Велика стіна Китаю — туманні нефритові гори, бамбук, червоні ліхтарі, серпанкове синьо-сіре небо
+  greatwall: {
+    skyTop: 0x6e8ba8, skyHorizon: 0xcdd8de, skyBottom: 0xb4c2c8,
+    fogColor: 0xc4d2d8, fogNear: 105, fogFar: 380,
+    hemiSky: 0xd4dfe4, hemiGround: 0x5a7a52, hemiIntensity: 0.95,
+    sunColor: 0xfff0dc, sunIntensity: 1.55, sunPos: [85, 92, 56],
+    sunDisc: 0xffe6c2, sunDiscPos: [360, 320, 250],
+    grass1: 0x5fa84a, grass2: 0x4a8d3a, grass3: 0x78c25c, // нефритова гірська зелень
+    rock: 0x8a8478, peak: 0xc4ccd0, water: 0x49b8e8, riverbed: 0x9a8e7a, // туманні сірі піки
+    dirt: 0x9a8866, plaza: 0xb8a484, arenaGround: 0x988c76,
+    roadMain: 0xa89476, roadEdge: 0x7a6850,
+    treeGreens: [0x4f9a3e, 0x5fae4a, 0x46903a, 0x6fbd52, 0x57a042], // бамбук — насичена зелень
+    pineGreens: [0x2e6e44, 0x357a4e, 0x265e3a],
+    pineRatio: 0.42, snow: false, snowfall: false,
+    bamboo: true,
+    housePalette: [0xe8ddc8, 0xd6c4a8, 0xf0e4d0, 0xddc9b0, 0xe2d4ba], // глина/дерево гірського села
+    roofPalette: [0xc0392b, 0xa8302a, 0x99332f, 0x8a4a3e], // червона черепиця
+    flowers: true, hay: false,
+    lampGlow: 1.25, // помітні червоні ліхтарі
+    signText: t('ГІРСЬКЕ СЕЛО'),
+  },
 };
 
 export const COUNTRIES = {
@@ -364,8 +386,23 @@ export const COUNTRIES = {
     banner: t('Сакура, ворота торії й СУМО-ЗОМБІ! Стережись велетенського борця! 🌸'),
     food: t('онігірі'),
   },
-  // 🦖 ФІНАЛ: бонус-острів поза CAMPAIGN_ORDER. Відкривається лише після звільнення
-  // всіх 10 країн (isCountryOpen). Нагорода — ЛАЗЕР (інакше лише за зірковий рівень 28).
+  // 🇨🇳 ФІНАЛЬНА країна кампанії (11-та): Велика стіна, туман, Теракотовий Імператор
+  CHN: {
+    id: 'CHN', name: t('Китай'), flag: '🇨🇳', seed: 9292,
+    lat: 35.8, lon: 104.2,
+    victoryTitle: t('🇨🇳 КИТАЙ ЗВІЛЬНЕНО!'),
+    biome: 'greatwall',
+    map: chinaMap,
+    difficulty: { hp: 2.55, dmg: 1.52, counts: 1.62 },
+    coinReward: 900,
+    extraZombie: 'terracotta',
+    shieldGuards: 4,
+    boss: { name: t('👑 ТЕРАКОТОВИЙ ІМПЕРАТОР'), hp: 7600, frost: false, style: 'emperor' },
+    banner: t('Велика стіна в тумані, червоні ліхтарі й ТЕРАКОТОВИЙ ІМПЕРАТОР! Стережись армії воїнів! 🏯'),
+    food: t('дамплінг'),
+  },
+  // 🦖 ФІНАЛ-БОНУС: острів поза CAMPAIGN_ORDER. Відкривається лише після звільнення
+  // всіх 11 країн (isCountryOpen). Нагорода — ЛАЗЕР (інакше лише за зірковий рівень 28).
   LOST: {
     id: 'LOST', name: t('Острів Динозаврів'), flag: '🦖', seed: 9090,
     lat: -16.5, lon: -148.2,
@@ -383,7 +420,7 @@ export const COUNTRIES = {
   },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;
@@ -402,7 +439,7 @@ export function nextTarget(liberated) {
 // після її звільнення відкривається ВЕСЬ світ (грай у будь-якому порядку)
 export function isCountryOpen(liberated, id) {
   if (!COUNTRIES[id]) return false;
-  // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 10 країн кампанії)
+  // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 11 країн кампанії)
   if (id === 'LOST') return CAMPAIGN_ORDER.every((c) => !!(liberated && liberated[c]));
   return id === 'UKR' || !!(liberated && liberated.UKR);
 }

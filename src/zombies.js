@@ -46,6 +46,8 @@ const TYPE_STATS = {
   gladiator: { hp: 175, speed: 1.4, chaseSpeed: 3.6, aggro: 28, dmg: 19, attackR: 2.2, coins: 22, pitch: 0.62, charger: true },
   // ponytail: самурай переюзує готовий charger; окрему катана-механику додамо, коли вона реально потрібна.
   samurai: { hp: 150, speed: 1.65, chaseSpeed: 4.0, aggro: 30, dmg: 17, attackR: 2.1, coins: 20, pitch: 0.78, charger: true },
+  // 🏺 теракотовий воїн (Китай): броньований charger — трохи живучіший за самурая, важчий ривок
+  terracotta: { hp: 165, speed: 1.55, chaseSpeed: 4.1, aggro: 30, dmg: 18, attackR: 2.1, coins: 21, pitch: 0.72, charger: true },
   // 🧟 шкет (imp): дрібний, слабкий (50hp), зате ДУЖЕ швидкий (швидше за runner) — наздожене будь-кого.
   // Доступний з усіх країн, у т.ч. UKR: лише швидкий, новачку не страшно.
   imp: { hp: 50, speed: 2.8, chaseSpeed: 6.2, aggro: 32, dmg: 6, attackR: 1.5, coins: 6, pitch: 1.8, small: true },
@@ -920,7 +922,8 @@ export class Zombies {
                           : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
                             : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
                               : st === 'rex' ? (i % 2 ? 'toro' : 'imp')
-                                : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                                : st === 'emperor' ? (i % 2 ? 'terracotta' : 'runner')
+                                  : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
                 { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;

@@ -1245,6 +1245,45 @@ function buildZombie(type, rng) {
     rig.ztype = 'samurai';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'terracotta') {
+    // 🇨🇳 теракотовий воїн-зомбі: обпалена глиняна шкіра, ламельна броня, шолом і спис.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.14, belly: 1.04, armsForward: 0.95, headR: 0.24, lean: -0.06,
+      skin: 0xc08a5a, shirt: 0x9a6a3c, pants: 0x7a5230, shoes: 0x4a3320,
+      eyeWhite: 0xffe9b8, pupilColor: 0x3a2a1a, brow: 0.5,
+      mouth: 'open', teeth: true, nose: false,
+    }));
+    const clayM = toonMat(0xb87f4e, 0x8a5a32, 0.12);
+    const helmM = toonMat(0x8a5a32, 0x5a3a22, 0.14);
+    const bladeM = toonMat(0xc9d0d8, 0xffffff, 0.2);
+    // ламельний нагрудник
+    const cuirass = box(0.52, 0.5, 0.15, clayM);
+    cuirass.position.set(0, 0.32, -0.26);
+    rig.parts.torso.add(cuirass);
+    for (let r = 0; r < 2; r++) {
+      for (let c = -1; c <= 1; c++) {
+        const lamel = box(0.15, 0.11, 0.05, clayM);
+        lamel.position.set(c * 0.17, 0.46 - r * 0.17, -0.34);
+        rig.parts.torso.add(lamel);
+      }
+    }
+    // глиняний шолом із гребенем
+    const helm = sphere(0.27, helmM, 10, 8);
+    helm.scale.set(1, 0.85, 1);
+    helm.position.set(0, 0.16, 0);
+    rig.parts.head.add(helm);
+    const crest = cone(0.05, 0.16, helmM, 4);
+    crest.position.set(0, 0.42, 0.02);
+    rig.parts.head.add(crest);
+    // спис у правій руці (древко + наконечник)
+    const shaft = box(0.05, 0.95, 0.05, toonMat(0x5a3a22));
+    shaft.position.set(0, -0.78, 0);
+    const tip = cone(0.06, 0.22, bladeM, 6);
+    tip.position.set(0, -1.32, 0);
+    rig.parts.armR.add(shaft, tip);
+    rig.ztype = 'terracotta';
+    addZombieWear(rig);
+    return rig;
   } else if (type === 'imp') {
     // 🧟 шкет: дрібний і дуже швидкий зомбі — впізнавано МАЛЕНЬКИЙ (≈0.66 зросту),
     // велика голова й вирячені очі надають хижого «дитячого» вигляду
@@ -1327,6 +1366,11 @@ const BOSS_SPECS = {
   rex: {
     skin: 0x4e7a3a, shirt: 0x3a5a2c, pants: 0x2e4622, shoes: 0x23381c,
     eyeWhite: 0xffe24a, pupilColor: 0xc62828, browColor: 0x24381c,
+  },
+  // 🇨🇳 Теракотовий Імператор (фінал кампанії): глиняна шкіра, нефритово-золота імператорська броня
+  emperor: {
+    skin: 0xc08a5a, shirt: 0x2f6b4a, pants: 0x8a2f2f, shoes: 0x5a3a22,
+    eyeWhite: 0xffe9b8, pupilColor: 0x3a2a1a, browColor: 0x4a2e1c,
   },
 };
 
@@ -1645,6 +1689,60 @@ export function makeBoss(style = 'king') {
     // крихітні лапки тиранозавра
     rig.parts.armL.scale.set(0.55, 0.55, 0.55);
     rig.parts.armR.scale.set(0.55, 0.55, 0.55);
+  } else if (style === 'emperor') {
+    // 🇨🇳 ТЕРАКОТОВИЙ ІМПЕРАТОР: глиняний воїн-владар. Ламельна броня з обпаленої глини,
+    // імператорська корона мяньгуань (дошка зі звисами-перлами), нефритовий цзянь-меч.
+    const clayM = toonMat(0xc08a5a, 0x8a5a32, 0.12);
+    const jadeM = toonMat(0x2f8a5a, 0x14502e, 0.18);
+    const goldM = toonMat(0xffc933, 0xffa000, 0.25);
+    const bladeM = toonMat(0x7fd9a0, 0xc9f5d8, 0.22);
+    // ламельний нагрудник із глиняних пластин
+    const cuirass = box(0.6, 0.56, 0.16, clayM);
+    cuirass.position.set(0, 0.34, -0.26);
+    rig.parts.torso.add(cuirass);
+    for (let r = 0; r < 3; r++) {
+      for (let c = -1; c <= 1; c++) {
+        const lamel = box(0.16, 0.12, 0.05, clayM);
+        lamel.position.set(c * 0.18, 0.5 - r * 0.18, -0.35);
+        rig.parts.torso.add(lamel);
+      }
+    }
+    // нефритовий нагрудний диск
+    const disc = cylinder(0.11, 0.11, 0.04, jadeM, 12);
+    disc.rotation.x = Math.PI / 2;
+    disc.position.set(0, 0.34, -0.36);
+    rig.parts.torso.add(disc);
+    // корона мяньгуань: пласка дошка + золотий обідок
+    const band = cylinder(0.16, 0.17, 0.1, goldM, 10);
+    band.position.set(0, 0.42, 0);
+    rig.parts.head.add(band);
+    const board = box(0.5, 0.05, 0.34, toonMat(0x1f2530, 0x0e1218, 0.1));
+    board.position.set(0, 0.52, -0.04);
+    rig.parts.head.add(board);
+    // звиси-перли (лю) спереду й позаду дошки
+    for (const dz of [-0.16, 0.16]) {
+      for (let i = -2; i <= 2; i++) {
+        const bead = sphere(0.022, goldM, 6, 5);
+        bead.position.set(i * 0.1, 0.43, dz + (dz < 0 ? -0.02 : 0.02));
+        rig.parts.head.add(bead);
+      }
+    }
+    // нефритовий цзянь-меч у правій руці
+    const blade = box(0.07, 0.78, 0.03, bladeM);
+    blade.position.set(0, -0.84, -0.02);
+    const guard = box(0.18, 0.05, 0.07, goldM);
+    guard.position.set(0, -0.44, 0);
+    const grip = box(0.07, 0.16, 0.07, toonMat(0x5a3a22));
+    grip.position.set(0, -0.34, 0);
+    const pommel = sphere(0.05, jadeM, 8, 6);
+    pommel.position.set(0, -0.25, 0);
+    rig.parts.armR.add(blade, guard, grip, pommel);
+    // глиняні наплічники-ламелі
+    for (const side of [-1, 1]) {
+      const pad = box(0.22, 0.16, 0.26, clayM);
+      pad.position.set(0.4 * side, 1.56, 0);
+      rig.body.add(pad);
+    }
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

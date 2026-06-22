@@ -116,6 +116,7 @@ export class World {
       pagoda: () => this._lmPagoda(P.pagoda),
       birds: () => this._lmBirds(),
       volcano: () => this._lmVolcano(P.volcano),
+      greatwall: () => this._lmGreatWall(P.greatwall),
     };
     for (const id of lm) if (build[id]) build[id]();
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
@@ -169,6 +170,49 @@ export class World {
     this.staticGroup.add(spire);
     this._addCollider(x, z, 5.0, gy + 13, 4.6); // суцільна вежа — крізь неї не пройти
     this._makeSign(x + 7, z + 7, t('СВЯТА ПАГОДА'), 0.5);
+  }
+
+  // 🧱 Сегмент Великої стіни: масивний мур із зубчастим парапетом + сторожова башта.
+  // Суцільний орієнтир — крізь стіну не пройти. НЕ мутуємо спільні матеріали.
+  _lmGreatWall({ x, z }) {
+    const gy = this.groundH(x, z);
+    const stoneM = toonMat(0x9a8e78);
+    const trimM = toonMat(0x847862);
+    const roofM = toonMat(0xc0392b);
+    const LEN = 22, H = 7, T = 4; // довжина / висота / товщина муру
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(LEN, H, T), stoneM);
+    wall.position.set(x, gy + H / 2, z);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    this.staticGroup.add(wall);
+    // зубчастий парапет (мерлони з обох боків)
+    for (let i = -4; i <= 4; i++) {
+      for (const mz of [-T / 2 + 0.35, T / 2 - 0.35]) {
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 0.55), trimM);
+        merlon.position.set(x + i * 2.2, gy + H + 0.55, z + mz);
+        this.staticGroup.add(merlon);
+      }
+    }
+    // сторожова башта на одному кінці
+    const tx = x + LEN / 2 - 1.5;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(6, H + 5, 6), stoneM);
+    tower.position.set(tx, gy + (H + 5) / 2, z);
+    tower.castShadow = true;
+    tower.receiveShadow = true;
+    const tRoof = new THREE.Mesh(this._prismGeo(7.6, 1.6, 7.6), roofM);
+    tRoof.position.set(tx, gy + H + 5 + 0.8, z);
+    tRoof.castShadow = true;
+    this.staticGroup.add(tower, tRoof);
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.2), trimM);
+        c.position.set(tx + sx * 2.0, gy + H + 5 + 0.5, z + sz * 2.0);
+        this.staticGroup.add(c);
+      }
+    }
+    this._addCollider(x, z, LEN / 2 + 0.3, gy + H, T / 2 + 0.3); // суцільний мур
+    this._addCollider(tx, z, 3.2, gy + H + 5, 3.0);               // башта
+    this._makeSign(x - LEN / 2 + 2, z + T / 2 + 2, t('ВЕЛИКА СТІНА'), 0.4);
   }
 
   // 🌋 Вулкан: темний зрізаний конус + розпечений кратер і патьоки лави (emissive),

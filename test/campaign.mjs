@@ -28,9 +28,9 @@ async function waitFor(fn, timeoutMs, label) {
 await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
 
-const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN'];
+const ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
 // v53+: частина країн дає монети; вогнемет@25 / лазер@28 — за зірковий рівень.
-const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: null, ITA: null, TUR: 'magnum', SWE: null, EGY: 'bazooka', JPN: null };
+const REWARDS = { UKR: 'rifle', POL: 'shotgun', DEU: 'smg', FRA: 'sniper', ESP: null, ITA: null, TUR: 'magnum', SWE: null, EGY: 'bazooka', JPN: null, CHN: null };
 
 for (const c of ORDER) {
   console.log(`▸ Граємо: ${c}`);
@@ -109,7 +109,7 @@ const final = await page.evaluate(() => {
     allDone: g.globe.allDone,
   };
 });
-check(final.liberated === 10, `усі 10 країн звільнено (${final.liberated})`);
+check(final.liberated === 11, `усі 11 країн звільнено (${final.liberated})`);
 // v53: ESP/ITA дають монети, тож кампанія дає 6 зброй (rifle/shotgun/smg/sniper/magnum/bazooka).
 // Вогнемет/лазер тепер за зірковий рівень 25/28, який у швидкій кампанії не досягається.
 const expectWeapons = ['rifle', 'shotgun', 'smg', 'sniper', 'magnum', 'bazooka'];
@@ -126,7 +126,7 @@ await page.evaluate(() => window.__game.test.startStorm());
 const stormOk = await waitFor(() => window.__game.level && window.__game.level.storm && window.__game.level.storm.wave >= 1, 40000, 'шторм');
 check(stormOk, 'шторм запускається після кампанії');
 const stormCountry = await page.evaluate(() => window.__game.level.countryId);
-check(stormCountry === 'JPN', `шторм на найскладнішій звільненій країні (${stormCountry})`);
+check(stormCountry === 'CHN', `шторм на найскладнішій звільненій країні (${stormCountry})`);
 
 console.log('');
 if (errors.length) {
