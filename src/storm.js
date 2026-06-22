@@ -153,8 +153,10 @@ export class StormMode {
       }
       level.audio.mission();
       this._spawnWaveSoon = 6;
-      // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3 (лише соло-Шторм)
-      if (!level.net && level.runBuild && level.game.draft) level.game.draft.open();
+      // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3 (лише соло-Шторм).
+      // !this.over — гонка кадра смерті: якщо гравець помер цим же апдейтом (шкода поза колом
+      // вище), _endStormRun уже показав екран кінця → не відкриваємо драфт поверх нього.
+      if (!level.net && level.runBuild && level.game.draft && !this.over) level.game.draft.open();
     }
     if (this._spawnWaveSoon !== undefined) {
       this._spawnWaveSoon -= dt;
