@@ -61,6 +61,18 @@ window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: t('Авто'), high: t('Гарна'), fast: t('Швидка') };
+const DEFAULT_EXPOSURE = 1.06;
+const BIOME_EXPOSURE = {
+  summer: 1.08,
+  winterDusk: 1.02,
+  autumnGold: 1.08,
+  provence: 1.06,
+  spainSun: 0.98,
+  italyMed: 1.0,
+  bosphorus: 1.03,
+  desert: 0.96,
+  sakura: 1.05,
+};
 // Підказки будуються при показі (а не при завантаженні): keyHint потребує
 // живого input.touchMode, щоб на телефоні згадувати екранні кнопки, а не клавіші.
 function buildTips() {
@@ -126,7 +138,7 @@ class Game {
     this._autoTargetRatio = this.pixelRatio;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.06;
+    this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
 
     this.input = new Input(canvas);
     this.audio = new AudioMan();
@@ -470,13 +482,27 @@ class Game {
     if (this.cloud) this.cloud.schedulePush();
   }
 
+  _adaptiveResolutionEnabled() {
+    const q = this.save.quality || 'auto';
+    return q === 'auto' || q === 'high';
+  }
+
+  _applyLevelExposure(countryId) {
+    const biome = (COUNTRIES[countryId] || COUNTRIES.UKR).biome;
+    this.renderer.toneMappingExposure = BIOME_EXPOSURE[biome] || DEFAULT_EXPOSURE;
+  }
+
+  _applyDefaultExposure() {
+    this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
+  }
+
   _applyQuality() {
     const q = this.save.quality || 'auto';
     document.getElementById('btn-quality').textContent = t('⚙️ Якість: {q}', { q: QUALITY_LABELS[q] });
     if (q === 'fast') this.pixelRatio = 1.0;
     else if (q === 'high') this.pixelRatio = Math.min(devicePixelRatio, 1.75);
     else this.pixelRatio = Math.min(devicePixelRatio, 1.5);
-    // рідний масштаб для авто-відновлення + скидаємо лічильники гістерезису
+    // рідний масштаб для Авто/Гарна адаптивки + скидаємо лічильники гістерезису
     this._autoTargetRatio = this.pixelRatio;
     this._lowFpsSec = 0;
     this._highFpsSec = 0;
@@ -1037,8 +1063,8 @@ class Game {
       this.clock.getDelta();
       this._timeAcc = 0;
       // адаптивка: кожен рівень стартує з рідного масштабу — коротка просадка на
-      // минулому рівні більше не лишає гру «мильною» весь сеанс (лише в режимі Авто)
-      if ((this.save.quality || 'auto') === 'auto' && this.pixelRatio < this._autoTargetRatio) {
+      // минулому рівні більше не лишає гру «мильною» весь сеанс (Авто/Гарна)
+      if (this._adaptiveResolutionEnabled() && this.pixelRatio < this._autoTargetRatio) {
         this.pixelRatio = this._autoTargetRatio;
         this.renderer.setPixelRatio(this.pixelRatio);
         this.renderer.setSize(innerWidth, innerHeight);
@@ -1115,6 +1141,7 @@ class Game {
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
     const soloReplay = !isStorm && !isArena && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
     level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
+    this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
@@ -1540,6 +1567,7 @@ class Game {
     }
     if (this._burstIv) { clearInterval(this._burstIv); this._burstIv = null; } // салют боса не тикає по знесеному рівню
     this._timeAcc = 0; // кооп-акумулятор не переносить борг між рівнями (інакше — ривок фаст-форварду на старті)
+    this._applyDefaultExposure();
     this.level = null;
     this.state = 'globe';
     this.victoryShown = false;
@@ -1916,9 +1944,9 @@ class Game {
         fpsEl.style.display = 'block';
         fpsEl.textContent = this.fps + ' FPS';
       }
-      // адаптивна роздільність (лише в режимі Авто, лише в бою): гістерезис, щоб не «пульсувало» —
+      // адаптивна роздільність (Авто/Гарна, лише в бою): гістерезис, щоб не «пульсувало» —
       // довго < 48 fps → знижуємо рендер-масштаб; довго > 57 fps → піднімаємо назад до рідного.
-      if ((this.save.quality || 'auto') === 'auto' && this.state === 'level') {
+      if (this._adaptiveResolutionEnabled() && this.state === 'level') {
         if (this.fps < 48) {
           this._highFpsSec = 0;
           if (++this._lowFpsSec >= 3 && this.pixelRatio > 1.0) {
