@@ -129,7 +129,9 @@ class Game {
       this._contextLost = true;
       if (this.hud) this.hud.toast(t('⚠️ Графіка перезапускається — зачекай...'));
     };
-    this._onContextRestored = () => location.reload();
+    this._onContextRestored = () => {
+      if (this._contextLost) location.reload();
+    };
     canvas.addEventListener('webglcontextlost', this._onContextLost, false);
     canvas.addEventListener('webglcontextrestored', this._onContextRestored, false);
     this.renderer.setSize(innerWidth, innerHeight);
@@ -1938,6 +1940,10 @@ class Game {
 
   // ---------- цикл ----------
   _frame(skipRender = false) {
+    if (this._contextLost) {
+      if (this.clock) this.clock.getDelta();
+      return;
+    }
     // 🤝 кооп: накопичуємо РЕАЛЬНИЙ час і за потреби робимо кілька кроків —
     // після сну вкладки (фонові пачки повідомлень тікера) світ наздоганяє
     // годинник, а не падає у slow-motion

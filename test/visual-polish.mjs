@@ -42,6 +42,10 @@ const res = await page.evaluate(async () => {
   const canvas = document.getElementById('game-canvas');
   const ev = new Event('webglcontextlost', { cancelable: true });
   out.contextPrevented = canvas.dispatchEvent(ev) === false;
+  const contextTime0 = g.level.stats.time;
+  g._frame(true);
+  out.contextPausesFrame = Math.abs(g.level.stats.time - contextTime0) < 0.0001;
+  g._contextLost = false;
 
   out.exposure = g.renderer.toneMappingExposure;
   out.exposureOk = Math.abs(out.exposure - 1.08) < 0.001;
@@ -110,6 +114,7 @@ const res = await page.evaluate(async () => {
 
 check(res.contextHooks, 'WebGL context lost/restored hooks registered', JSON.stringify(res));
 check(res.contextPrevented, 'synthetic webglcontextlost is prevented', JSON.stringify(res));
+check(res.contextPausesFrame, 'context loss pauses simulation frames', JSON.stringify(res));
 check(res.exposureOk, 'summer biome applies exposure 1.08', JSON.stringify({ exposure: res.exposure }));
 check(res.rampLifted, 'toon ramp is colored RGBA and darkest band lifted', JSON.stringify({ len: res.rampLen }));
 check(res.colorRampShader, 'toon shader samples gradient ramp color');
