@@ -304,16 +304,42 @@ export class Effects {
     }
   }
 
-  // ☄️ метеорит із космосу падає на точку (tx,tz); onLand() — у момент удару (соло/хост: шкода)
-  callMeteor(tx, tz, onLand = null) {
+  // ☄️ метеорит із космосу падає на точку (tx,tz); onLand() — у момент удару (соло/хост: шкода).
+  // Видимий: повільний (1.3с) лінійний ДІАГОНАЛЬНИЙ захід згори-збоку (прокреслює небо),
+  // великий світний камінь із вогняним ореолом + слід, і мітка-кільце на землі куди впаде.
+  callMeteor(tx, tz, onLand = null, ox = null, oz = null) {
     const ty = this.world.groundH(tx, tz);
-    const rock = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.95, 0),
-      new THREE.MeshToonMaterial({ color: 0x3a2e26, emissive: 0xff5a1e, emissiveIntensity: 1.1, gradientMap: toonMat(0).gradientMap })
+    // напрямок заходу: з-за цілі В БІК гравця (летить назустріч камері й у поле зору).
+    // Фолбек (мережевий візуал без позиції замовника) — фіксована діагональ.
+    let dx = 0.6, dz = 0.45;
+    if (ox != null && oz != null) { const vx = tx - ox, vz = tz - oz, L = Math.hypot(vx, vz) || 1; dx = vx / L; dz = vz / L; }
+    const sx = tx + dx * 14, sy = ty + 24, sz = tz + dz * 14;
+    // 🟠 вертикальний промінь-попередження над ціллю — видно з БУДЬ-ЯКОГО ракурсу
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.9, 1.9, 32, 14, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xff6a2a, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
     );
-    rock.position.set(tx, ty + 48, tz);
+    beam.position.set(tx, ty + 16, tz);
+    this.scene.add(beam);
+    // 🎯 кільце на землі — точка удару
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(1.8, 2.9, 28),
+      new THREE.MeshBasicMaterial({ color: 0xffaa3a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.set(tx, ty + 0.15, tz);
+    this.scene.add(marker);
+    // ☄️ камінь — великий, світний, із вогняним ореолом
+    const rock = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1.4, 0),
+      new THREE.MeshToonMaterial({ color: 0x2e2620, emissive: 0xff6a1e, emissiveIntensity: 1.4, gradientMap: toonMat(0).gradientMap })
+    );
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getGlowTexture(), color: 0xff8a2a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(8, 8, 1);
+    rock.add(glow);
+    rock.position.set(sx, sy, sz);
     this.scene.add(rock);
-    this._meteors.push({ rock, tx, tz, ty, t: 0, dur: 0.85, onLand });
+    this._meteors.push({ rock, glow, marker, beam, sx, sy, sz, tx, tz, ty, t: 0, dur: 1.3, onLand });
     if (this.audio && this.audio.throwWhoosh) this.audio.throwWhoosh(1);
   }
 
@@ -322,23 +348,32 @@ export class Effects {
       const m = this._meteors[i];
       m.t += dt;
       const k = Math.min(1, m.t / m.dur);
-      m.rock.position.y = m.ty + 0.95 + 48 * (1 - k * k); // прискорене падіння
-      m.rock.rotation.x += dt * 6;
-      m.rock.rotation.z += dt * 5;
-      this.burst(m.rock.position, 0xff7a2a, 1, { speed: 1, up: 0, life: 0.3, size: 0.9 }); // вогняний слід
+      // лінійний рух старт→ціль: видно весь політ (не whip-down наприкінці)
+      m.rock.position.set(m.sx + (m.tx - m.sx) * k, m.sy + (m.ty + 1.0 - m.sy) * k, m.sz + (m.tz - m.sz) * k);
+      m.rock.rotation.x += dt * 5;
+      m.rock.rotation.z += dt * 4;
+      this.burst(m.rock.position, 0xff8a2a, 2, { speed: 1.5, up: 0.5, life: 0.4, size: 1.2 }); // вогняний слід
+      const ps = 1 + Math.sin(m.t * 14) * 0.14; // пульс мітки
+      m.marker.scale.set(ps, ps, ps);
+      m.beam.material.opacity = 0.22 + 0.18 * Math.abs(Math.sin(m.t * 8)) + 0.2 * k; // мерехтливий стовп
       if (k >= 1) {
         const pos = new THREE.Vector3(m.tx, m.ty + 0.3, m.tz);
-        this.burst(pos, 0xffa040, 18, { speed: 6, up: 5, life: 0.7, size: 1.6 });
-        this.burst(pos, 0x553a22, 12, { speed: 4, up: 4, life: 0.6, size: 1.2 });
-        this.ring(pos, 0xff6a2a, 4);
+        this.burst(pos, 0xffa040, 24, { speed: 7, up: 6, life: 0.85, size: 1.9 });
+        this.burst(pos, 0x553a22, 14, { speed: 4, up: 4, life: 0.6, size: 1.3 });
+        this.ring(pos, 0xff6a2a, 5.5);
         this.flashLight.position.copy(pos);
-        this.flashLight.intensity = 30;
-        this.flashT = 0.12;
+        this.flashLight.intensity = 36;
+        this.flashT = 0.15;
         this.audio.explosion();
         if (m.onLand) m.onLand();
-        this.scene.remove(m.rock);
+        this.scene.remove(m.rock, m.marker, m.beam);
         m.rock.geometry.dispose();
         m.rock.material.dispose();
+        m.glow.material.dispose();
+        m.marker.geometry.dispose();
+        m.marker.material.dispose();
+        m.beam.geometry.dispose();
+        m.beam.material.dispose();
         this._meteors.splice(i, 1);
       }
     }

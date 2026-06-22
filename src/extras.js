@@ -712,7 +712,7 @@ export class Gadgets {
     const zb = this._nearestZombie(level.player.pos.x, level.player.pos.z);
     if (!zb) { level.bus.emit('toast', t('☄️ Немає цілі поблизу!')); level.game.audio.denied(); return false; }
     const nid = zb.nid;
-    level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid));
+    level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid), level.player.pos.x, level.player.pos.z);
     level.audio.powerup();
     level.bus.emit('toast', t('☄️ Метеорит летить!'));
     if (level.net && level.net.authority) level.netEv('met', Math.round(zb.x * 10) / 10, Math.round(zb.z * 10) / 10);
@@ -731,7 +731,7 @@ export class Gadgets {
     const zb = this._nearestZombie(x, z);
     if (!zb) return;
     const nid = zb.nid;
-    this.level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid));
+    this.level.effects.callMeteor(zb.x, zb.z, () => this._meteorHit(nid), x, z);
     this.level.netEv('met', Math.round(zb.x * 10) / 10, Math.round(zb.z * 10) / 10);
   }
 

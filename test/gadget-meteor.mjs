@@ -54,7 +54,7 @@ const hit = await page.evaluate(() => {
   const nid = near.nid, hp0 = near.hp, isTank = near === tank;
   g.test.useGadget();
   const flying = g.level.effects._meteors.length;
-  for (let i = 0; i < 9; i++) g.level.effects.update(0.15); // >0.85с — приземлення
+  for (let i = 0; i < 12; i++) g.level.effects.update(0.15); // >1.3с — приземлення
   const after = g.level.zombies.byNid(nid);
   return { flying, isTank, dmg: hp0 - (after ? after.hp : hp0), landed: g.level.effects._meteors.length };
 });
@@ -70,7 +70,7 @@ const shield = await page.evaluate(() => {
   const sh = g.level.zombies.spawn('shield', p.pos.x + 1, p.pos.z, {});
   const shieldHp0 = sh.shieldHp, bodyHp0 = sh.hp, nid = sh.nid;
   g.test.useGadget();
-  for (let i = 0; i < 9; i++) g.level.effects.update(0.15);
+  for (let i = 0; i < 12; i++) g.level.effects.update(0.15);
   const after = g.level.zombies.byNid(nid);
   return { shieldHp0, bodyHp0, shieldHpAfter: sh.shieldHp, bodyDmg: bodyHp0 - (after ? after.hp : bodyHp0), dead: !after || after.state === 'dead' };
 });
