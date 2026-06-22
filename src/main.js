@@ -10,6 +10,8 @@ import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop } from './shop.js';
+import { Draft } from './draft.js';
+import { RunBuild } from './runbuild.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen } from './countries.js';
@@ -162,6 +164,7 @@ class Game {
 
     this.hud = new HUD(this);
     this.shop = new Shop(this);
+    this.draft = new Draft(this);
     this.globe = new Globe(this);
     this.coop = new CoopUI(this);
     this.league = new LeagueUI(this);
@@ -1194,6 +1197,8 @@ class Game {
       // ⛈️ шторм: без місій, тільки хвилі і коло
       level.storm = new StormMode(level);
       level.missions = level.storm;
+      // 🎲 «Прокачка» — внутрі-забігова прокачка лише в СОЛО-Штормі (кооп — окремий beat)
+      if (!level.net) level.runBuild = new RunBuild();
     } else {
       if (!isGuest) level.zombies.populate();
       level.missions = new DynamicMissions(level);
@@ -2027,7 +2032,7 @@ class Game {
     } else if (this.state === 'level' && this.level) {
       const isCoop = !!this.level.net;
       // кооп: пауза/магазин ховають керування, але світ ЖИВЕ (інші ж грають!)
-      const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.victoryShown);
+      const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.draft.isOpen || this.victoryShown);
       const hitstopScale = this._hitstopT > 0 ? 0.15 : 1;
       if (this._hitstopT > 0) this._hitstopT = Math.max(0, this._hitstopT - timerDt);
       const simDt = dt * hitstopScale;

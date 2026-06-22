@@ -1172,3 +1172,18 @@ body.touch-mode #touch-coach.show { display: block; }
   font-weight: 800;
   text-align: center;
 }
+
+/* 🎲 Драфт «Прокачка» — великі тап-картки, кольори за тегом */
+.draft-grid { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.draft-card {
+  width: 150px; min-height: 150px; padding: 16px 12px; border-radius: 18px;
+  border: 3px solid rgba(255,255,255,.25); background: rgba(20,16,40,.85);
+  color: #fff; font: inherit; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; transition: transform .08s;
+}
+.draft-card:active { transform: scale(.94); }
+.draft-card .draft-icon { font-size: 48px; line-height: 1; }
+.draft-card .draft-name { font-size: 16px; font-weight: 700; text-align: center; }
+.draft-card.tag-power { border-color: #ff5a4d; box-shadow: 0 0 18px rgba(255,90,77,.4); }
+.draft-card.tag-speed { border-color: #ffd23d; box-shadow: 0 0 18px rgba(255,210,61,.4); }
+.draft-card.tag-tank  { border-color: #4db8ff; box-shadow: 0 0 18px rgba(77,184,255,.4); }
