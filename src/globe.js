@@ -79,6 +79,8 @@ export class Globe {
     // маяк над поточною ціллю кампанії
     this.targetId = nextTarget(this.game.save.liberated || {}) || 'UKR';
     this.allDone = nextTarget(this.game.save.liberated || {}) === null;
+    // 🦖 світ звільнено, але таємний острів ще ні — маяк веде туди
+    if (this.allDone && !(this.game.save.liberated || {}).LOST) this.targetId = 'LOST';
     this.beacon = this._makeBeacon();
     this.group.add(this.beacon);
     this._aimBeaconAt(this.targetId);
@@ -152,6 +154,15 @@ export class Globe {
   }
 
   _aimBeaconAt(id) {
+    // 🦖 фінал відкрито: світ вільний, але острів динозаврів чекає — червоний маяк-заклик
+    if (this.allDone && !(this.game.save.liberated || {}).LOST && COUNTRIES.LOST) {
+      const isl = COUNTRIES.LOST;
+      this._placeBeacon(latLonToVec3(isl.lat, isl.lon, this.R));
+      this.beamMesh.material.color.setHex(0xff5a2a);
+      this.ringMesh.material.color.setHex(0xff5a2a);
+      this._drawBeaconLabel(t('🦖 ТАЄМНИЙ ОСТРІВ!'), t('останній бій — натисни!'), '#ff5a2a');
+      return;
+    }
     if (this.allDone) {
       // вся кампанія пройдена — золотий маяк над останньою країною
       const last = COUNTRIES[id] || COUNTRIES.UKR;
@@ -387,7 +398,8 @@ export class Globe {
     const lastTarget = this.targetId;
     const nt = nextTarget(this.game.save.liberated || {});
     this.allDone = nt === null;
-    this.targetId = nt || lastTarget;
+    // 🦖 після звільнення світу ведемо на таємний острів, поки й його не пройдено
+    this.targetId = nt || ((this.game.save.liberated || {}).LOST ? lastTarget : 'LOST');
     this.repaint();
     this._aimBeaconAt(this.targetId);
     this._rotateToCountry(this.targetId);

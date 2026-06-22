@@ -115,6 +115,7 @@ export class World {
       torii: () => this._lmTorii(P.torii),
       pagoda: () => this._lmPagoda(P.pagoda),
       birds: () => this._lmBirds(),
+      volcano: () => this._lmVolcano(P.volcano),
     };
     for (const id of lm) if (build[id]) build[id]();
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
@@ -168,6 +169,38 @@ export class World {
     this.staticGroup.add(spire);
     this._addCollider(x, z, 5.0, gy + 13, 4.6); // суцільна вежа — крізь неї не пройти
     this._makeSign(x + 7, z + 7, t('СВЯТА ПАГОДА'), 0.5);
+  }
+
+  // 🌋 Вулкан: темний зрізаний конус + розпечений кратер і патьоки лави (emissive),
+  // димові кулі над кратером. Світіння статичне — НЕ мутуємо спільний матеріал.
+  _lmVolcano({ x, z }) {
+    const gy = this.groundH(x, z);
+    const rockM = toonMat(0x463c36);
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(8, 30, 40, 18, 1), rockM);
+    cone.position.set(x, gy + 20, z);
+    cone.castShadow = true;
+    cone.receiveShadow = true;
+    this.staticGroup.add(cone);
+    // emissive елементи НЕ в staticGroup: запікання з'їло б світіння (як ліхтарі)
+    const lavaM = toonMat(0xff5a2a, 0xc42a00, 1.5);
+    const lava = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 7, 3, 18), lavaM);
+    lava.position.set(x, gy + 40, z);
+    this.scene.add(lava);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.5;
+      const streak = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.6, 26, 6), lavaM);
+      streak.position.set(x + Math.cos(a) * 11, gy + 20, z + Math.sin(a) * 11);
+      streak.rotation.z = Math.cos(a) * 0.32;
+      streak.rotation.x = -Math.sin(a) * 0.32;
+      this.scene.add(streak);
+    }
+    const smokeM = new THREE.MeshBasicMaterial({ color: 0x5a5048, transparent: true, opacity: 0.42, depthWrite: false });
+    for (let i = 0; i < 4; i++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(3.5 + i * 1.2, 8, 6), smokeM);
+      puff.position.set(x + (i % 2 ? 2.5 : -2), gy + 46 + i * 5, z + (i % 2 ? -1.5 : 2));
+      this.scene.add(puff);
+    }
+    this._addCollider(x, z, 22, gy + 36, 20); // велика гора — крізь неї не пройти
   }
 
   _drapeXZGeometry(geo, cx, cz, offset = 0) {

@@ -951,4 +951,13 @@ export const EN = {
 "СЕЛО САКУРОВЕ": "CHERRY VILLAGE",
 "ВОРОТА ТОРІЇ": "TORII GATE",
 "СВЯТА ПАГОДА": "SACRED PAGODA",
+"Острів Динозаврів": "Dinosaur Island",
+"🦖 ОСТРІВ ДИНОЗАВРІВ ЗВІЛЬНЕНО!": "🦖 DINOSAUR ISLAND LIBERATED!",
+"Ти отримав ЛАЗЕР! {k} — промінь крізь юрбу 🔴": "You got the LASER! {k} — a beam through the crowd 🔴",
+"👑 ЗОМБІ-ТИРАНОЗАВР": "👑 ZOMBIE T-REX",
+"Джунглі, димучий ВУЛКАН і ЗОМБІ-ТИРАНОЗАВР! Останній бій за світ! 🦖🌋": "Jungle, a smoking VOLCANO and the ZOMBIE T-REX! The final battle for the world! 🦖🌋",
+"кокос": "coconut",
+"ОСТРІВ ДИНОЗАВРІВ": "DINOSAUR ISLAND",
+"🦖 ТАЄМНИЙ ОСТРІВ!": "🦖 SECRET ISLAND!",
+"останній бій — натисни!": "final battle — tap!",
 };

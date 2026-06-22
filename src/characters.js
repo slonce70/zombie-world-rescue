@@ -1323,6 +1323,11 @@ const BOSS_SPECS = {
     skin: 0xd9a48f, shirt: 0x6b2233, pants: 0x2e2838, shoes: 0x2a2220,
     eyeWhite: 0xfff0e0, pupilColor: 0x3a2a20, browColor: 0x2e2620,
   },
+  // 🦖 Зомбі-тиранозавр (фінал): луската зелень, кістяні пластини, гнила паща
+  rex: {
+    skin: 0x4e7a3a, shirt: 0x3a5a2c, pants: 0x2e4622, shoes: 0x23381c,
+    eyeWhite: 0xffe24a, pupilColor: 0xc62828, browColor: 0x24381c,
+  },
 };
 
 export function makeBoss(style = 'king') {
@@ -1604,6 +1609,42 @@ export function makeBoss(style = 'king') {
       cord.position.set(i * 0.13, -0.42, -0.32);
       rig.parts.torso.add(cord);
     }
+  } else if (style === 'rex') {
+    // 🦖 ЗОМБІ-ТИРАНОЗАВР: гуманоїд-база з рептильною мордою, спинними пластинами,
+    // хвостом і крихітними лапками. Скелет/анімації переюзані (бос-charger б'є й розганяється).
+    const scaleM = toonMat(0x4e7a3a);
+    const boneM = toonMat(0xe8dcc4);
+    // видовжена паща із зубами (-Z — перед)
+    const snout = box(0.34, 0.2, 0.34, scaleM);
+    snout.position.set(0, -0.05, -0.26);
+    rig.parts.head.add(snout);
+    for (let i = -1; i <= 1; i++) {
+      const tooth = cone(0.03, 0.1, boneM, 5);
+      tooth.position.set(i * 0.09, -0.14, -0.4);
+      tooth.rotation.x = Math.PI;
+      rig.parts.head.add(tooth);
+    }
+    // гребінь на голові + кісткові пластини вздовж спини (+Z — спина)
+    const crest = cone(0.06, 0.14, boneM, 4);
+    crest.position.set(0, 0.4, 0.16);
+    rig.parts.head.add(crest);
+    for (let i = 0; i < 4; i++) {
+      const plate = cone(0.09 - i * 0.012, 0.2, boneM, 4);
+      plate.position.set(0, 0.52 - i * 0.3, 0.34);
+      plate.rotation.x = -0.5;
+      rig.parts.torso.add(plate);
+    }
+    // хвіст: звужувані сегменти позаду й донизу
+    let ty = -0.2, tz = 0.42;
+    for (let i = 0; i < 5; i++) {
+      const seg = box(0.22 - i * 0.035, 0.2 - i * 0.03, 0.26, scaleM);
+      seg.position.set(0, ty, tz);
+      rig.parts.torso.add(seg);
+      tz += 0.22; ty -= 0.05;
+    }
+    // крихітні лапки тиранозавра
+    rig.parts.armL.scale.set(0.55, 0.55, 0.55);
+    rig.parts.armR.scale.set(0.55, 0.55, 0.55);
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

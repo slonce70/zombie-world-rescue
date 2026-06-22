@@ -9,6 +9,7 @@ import italyMap from './maps/italy.js';
 import turkeyMap from './maps/turkey.js';
 import egyptMap from './maps/egypt.js';
 import japanMap from './maps/japan.js';
+import lostIslandMap from './maps/lostisland.js';
 
 export const BIOMES = {
   summer: {
@@ -193,6 +194,27 @@ export const BIOMES = {
     lampGlow: 0.85,
     signText: t('СЕЛО САКУРОВЕ'),
   },
+  // 🦖 доісторичний вулканічний острів — густі джунглі, попіл у повітрі, червоне небо лави
+  prehistoric: {
+    skyTop: 0x3a2e3a, skyHorizon: 0xff7a3c, skyBottom: 0x8a5a44,
+    fogColor: 0xd99a72, fogNear: 95, fogFar: 360,
+    hemiSky: 0xffb892, hemiGround: 0x4a5a32, hemiIntensity: 0.92,
+    sunColor: 0xffd9b0, sunIntensity: 1.55, sunPos: [70, 80, 60],
+    sunDisc: 0xff9a4a, sunDiscPos: [340, 250, 260],
+    grass1: 0x4f7a32, grass2: 0x3e6628, grass3: 0x639440, // соковита джунглева зелень
+    rock: 0x4a3f3a, peak: 0x2e2622, water: 0x39b0c8, riverbed: 0x6a5a48, // темний базальт
+    dirt: 0x6e5a44, plaza: 0x8a7258, arenaGround: 0x554237,
+    roadMain: 0x77624a, roadEdge: 0x4a3a2c,
+    treeGreens: [0x2f6e2a, 0x3a7e34, 0x276224, 0x47903c, 0x356e2e], // темні тропічні крони
+    pineGreens: [0x265a26, 0x2e6a2e, 0x1f4e20],
+    pineRatio: 0.2, snow: false, snowfall: false, dustfall: true, // попіл
+    palms: true, sparseTrees: false,
+    housePalette: [0x8a6e52, 0x9a7a58, 0x7a5e44, 0xa88a64, 0x6e5840], // дерево/бамбук хатин
+    roofPalette: [0x5a4632, 0x4a3a28, 0x6a5238, 0x3e3022],
+    flowers: true, hay: false,
+    lampGlow: 1.1,
+    signText: t('ОСТРІВ ДИНОЗАВРІВ'),
+  },
 };
 
 export const COUNTRIES = {
@@ -342,6 +364,23 @@ export const COUNTRIES = {
     banner: t('Сакура, ворота торії й СУМО-ЗОМБІ! Стережись велетенського борця! 🌸'),
     food: t('онігірі'),
   },
+  // 🦖 ФІНАЛ: бонус-острів поза CAMPAIGN_ORDER. Відкривається лише після звільнення
+  // всіх 10 країн (isCountryOpen). Нагорода — ЛАЗЕР (інакше лише за зірковий рівень 28).
+  LOST: {
+    id: 'LOST', name: t('Острів Динозаврів'), flag: '🦖', seed: 9090,
+    lat: -16.5, lon: -148.2,
+    victoryTitle: t('🦖 ОСТРІВ ДИНОЗАВРІВ ЗВІЛЬНЕНО!'),
+    biome: 'prehistoric',
+    map: lostIslandMap,
+    difficulty: { hp: 2.6, dmg: 1.55, counts: 1.7 },
+    weaponReward: 'laser',
+    weaponRewardToast: () => t('Ти отримав ЛАЗЕР! {k} — промінь крізь юрбу 🔴', { k: keyHint('кнопка 🔁', 'Клавіша 8') }),
+    extraZombie: 'toro',
+    shieldGuards: 4,
+    boss: { name: t('👑 ЗОМБІ-ТИРАНОЗАВР'), hp: 8500, frost: false, style: 'rex' },
+    banner: t('Джунглі, димучий ВУЛКАН і ЗОМБІ-ТИРАНОЗАВР! Останній бій за світ! 🦖🌋'),
+    food: t('кокос'),
+  },
 };
 
 export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN'];
@@ -363,5 +402,7 @@ export function nextTarget(liberated) {
 // після її звільнення відкривається ВЕСЬ світ (грай у будь-якому порядку)
 export function isCountryOpen(liberated, id) {
   if (!COUNTRIES[id]) return false;
+  // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 10 країн кампанії)
+  if (id === 'LOST') return CAMPAIGN_ORDER.every((c) => !!(liberated && liberated[c]));
   return id === 'UKR' || !!(liberated && liberated.UKR);
 }

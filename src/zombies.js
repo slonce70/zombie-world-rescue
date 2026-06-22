@@ -919,7 +919,8 @@ export class Zombies {
                         : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
                           : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
                             : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
-                              : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                              : st === 'rex' ? (i % 2 ? 'toro' : 'imp')
+                                : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
                 { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;
