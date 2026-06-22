@@ -964,4 +964,7 @@ export const EN = {
 "Метеорит з космосу на найближчого зомбі — 135 шкоди": "A meteor from space onto the nearest zombie — 135 damage",
 "☄️ Метеорит летить!": "☄️ Meteor incoming!",
 "☄️ Немає цілі поблизу!": "☄️ No target nearby!",
+"750 монет": "750 coins",
+"800 монет": "800 coins",
+"Гаджет «Метеорит»": "«Meteor» gadget",
 };

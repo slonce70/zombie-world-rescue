@@ -36,8 +36,12 @@ export const PASS_REWARDS = {
   28: { type: 'coins', n: 650, icon: '💰', name: t('650 монет') },
   29: { type: 'coins', n: 700, icon: '💰', name: t('700 монет') },
   30: { type: 'tracer', id: 'royal', icon: '👑', name: t('Королівські кулі + слава') },
+  // шлях продовжено до 33 — ФІНАЛ = гаджет «Метеорит» (інакше його не дістати)
+  31: { type: 'coins', n: 750, icon: '💰', name: t('750 монет') },
+  32: { type: 'coins', n: 800, icon: '💰', name: t('800 монет') },
+  33: { type: 'gadget', id: 'meteor', icon: '☄️', name: t('Гаджет «Метеорит»') },
 };
-export const PASS_MAX_LEVEL = 30;
+export const PASS_MAX_LEVEL = 33;
 
 // скільки XP треба, щоб перейти з рівня n на n+1
 export function xpForLevel(n) { return 80 + 40 * (n - 1); }

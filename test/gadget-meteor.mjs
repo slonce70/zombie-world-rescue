@@ -13,27 +13,34 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
 
-console.log('▸ Гаджет «Метеорит»');
+console.log('▸ Гаджет «Метеорит» (нагорода Зоряного шляху 33)');
 const meta = await page.evaluate(async () => {
   const { GADGETS } = await import('/src/extras.js');
   const { SHOP_ITEMS } = await import('/src/shop.js');
-  const G = GADGETS.meteor;
+  const { PASS_REWARDS, PASS_MAX_LEVEL } = await import('/src/progress.js');
+  const G = GADGETS.meteor; const r33 = PASS_REWARDS[33];
   return {
-    meta: G && { cd: G.cd, price: G.price, icon: G.icon },
-    shop: SHOP_ITEMS.some((i) => i.id === 'meteor' && i.gadget && i.price === 1000),
+    meta: G && { cd: G.cd, icon: G.icon },
+    inShop: SHOP_ITEMS.some((i) => i.id === 'meteor'),
+    cap: PASS_MAX_LEVEL,
+    reward33: r33 && { type: r33.type, id: r33.id },
   };
 });
-check(meta.meta && meta.meta.cd === 45 && meta.meta.price === 1000 && meta.meta.icon === '☄️', 'мета: 45с cd, 1000 монет, ☄️', JSON.stringify(meta));
-check(meta.shop, 'товар є в магазині за 1000');
+check(meta.meta && meta.meta.cd === 45 && meta.meta.icon === '☄️', 'мета гаджета: 45с cd, ☄️', JSON.stringify(meta.meta));
+check(meta.cap === 33, 'Зоряний шлях продовжено до 33', String(meta.cap));
+check(!meta.inShop, 'метеорит НЕ продається в магазині (лише нагорода шляху)');
+check(meta.reward33 && meta.reward33.type === 'gadget' && meta.reward33.id === 'meteor', 'нагорода рівня 33 = гаджет «Метеорит»', JSON.stringify(meta.reward33));
 
-const buy = await page.evaluate(() => {
+// 🎖️ розблокування: рівень 33 видає метеорит БЕЗКОШТОВНО (як лазер@28)
+const grant = await page.evaluate(() => {
   const g = window.__game;
-  g.test.giveCoins(3000);
-  const before = g.save.coins;
-  g.test.shopBuy('meteor');
-  return { owned: g.save.gadgetsOwned.includes('meteor'), cost: before - g.save.coins };
+  g.save.xp = 0;
+  const before = g.save.gadgetsOwned.includes('meteor');
+  g.test.addXp(30000); // > сумарного XP до рівня 33
+  return { before, level: g.progress.level, owned: g.save.gadgetsOwned.includes('meteor') };
 });
-check(buy.owned && buy.cost === 1000, 'куплений метеорит owned, -1000 монет', JSON.stringify(buy));
+check(grant.level >= 33, `досягнуто рівня 33 (${grant.level})`);
+check(!grant.before && grant.owned, 'рівень 33 ВИДАВ гаджет «Метеорит» безкоштовно', JSON.stringify(grant));
 
 // === удар: 135 рівно по найближчому зомбі ===
 const hit = await page.evaluate(() => {
