@@ -336,7 +336,7 @@ export const COUNTRIES = {
     map: japanMap,
     difficulty: { hp: 2.4, dmg: 1.48, counts: 1.58 },
     coinReward: 800,
-    extraZombie: 'gladiator',
+    extraZombie: 'samurai',
     shieldGuards: 4,
     boss: { name: t('👑 СУМО-ЗОМБІ'), hp: 6900, frost: false, style: 'sumo' },
     banner: t('Сакура, ворота торії й СУМО-ЗОМБІ! Стережись велетенського борця! 🌸'),

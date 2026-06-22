@@ -1207,6 +1207,44 @@ function buildZombie(type, rng) {
     rig.ztype = 'gladiator';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'samurai') {
+    // 🇯🇵 самурай-зомбі: темна броня, пов'язка хачімаки й довга катана.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.12, belly: 1.02, armsForward: 0.95, headR: 0.24, lean: -0.08,
+      skin: 0x8fb56a, shirt: 0x263044, pants: 0x1f2635, shoes: 0x171b24,
+      eyeWhite: 0xfff0e0, pupilColor: 0xc62828, brow: 0.55,
+      mouth: 'open', teeth: true, nose: false,
+    }));
+    const armorM = toonMat(0x2d3448, 0x141824, 0.15);
+    const redM = toonMat(0xc62828);
+    const bladeM = toonMat(0xc9d0d8, 0xffffff, 0.2);
+    const headband = box(0.48, 0.07, 0.07, redM);
+    headband.position.set(0, 0.22, -0.23);
+    rig.parts.head.add(headband);
+    const hairM = toonMat(0x1f1713);
+    const bun = sphere(0.09, hairM, 8, 6);
+    bun.position.set(0, 0.37, 0.08);
+    rig.parts.head.add(bun);
+    const cuirass = box(0.52, 0.5, 0.14, armorM);
+    cuirass.position.set(0, 0.32, -0.27);
+    rig.parts.torso.add(cuirass);
+    const skirtM = toonMat(0x394150);
+    const skirt = box(0.48, 0.34, 0.38, skirtM);
+    skirt.position.set(0, -0.18, 0);
+    rig.parts.torso.add(skirt);
+    const blade = box(0.055, 0.82, 0.025, bladeM);
+    blade.position.set(0, -0.86, -0.02);
+    blade.rotation.z = -0.12;
+    const hilt = box(0.14, 0.07, 0.06, toonMat(0x6b2233));
+    hilt.position.set(0, -0.47, 0);
+    rig.parts.armR.add(blade, hilt);
+    const scabbard = box(0.08, 0.72, 0.06, toonMat(0x2a1717));
+    scabbard.position.set(-0.28, -0.05, 0.18);
+    scabbard.rotation.z = -0.65;
+    rig.parts.torso.add(scabbard);
+    rig.ztype = 'samurai';
+    addZombieWear(rig);
+    return rig;
   } else if (type === 'imp') {
     // 🧟 шкет: дрібний і дуже швидкий зомбі — впізнавано МАЛЕНЬКИЙ (≈0.66 зросту),
     // велика голова й вирячені очі надають хижого «дитячого» вигляду

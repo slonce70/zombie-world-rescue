@@ -22,11 +22,19 @@ const cfg = await page.evaluate(async () => {
   out.lastInOrder = CAMPAIGN_ORDER[CAMPAIGN_ORDER.length - 1];
   out.count = CAMPAIGN_ORDER.length;
   const J = COUNTRIES.JPN;
+  out.extra = J && J.extraZombie;
   out.bossStyle = J && J.boss.style;
   out.biome = J && J.biome;
   out.hasBiome = !!(J && BIOMES[J.biome]);
   out.coin = J && J.coinReward;
   out.zombies = window.__game.level.zombies.list.length;
+  out.types = {};
+  for (const z of window.__game.level.zombies.list) out.types[z.type] = (out.types[z.type] || 0) + 1;
+  try {
+    const ar = window.__game.level.world.layout.arena;
+    const z = window.__game.level.zombies.spawn('samurai', ar.x + 16, ar.z, {});
+    out.samuraiBuilt = z.type === 'samurai' && z.rig.ztype === 'samurai' && z.charger && z.stats.hp === 150;
+  } catch (e) { out.errors.push('spawn(samurai): ' + e.message); }
   try { const rig = makeBoss('sumo'); out.sumoBuilt = !!(rig && rig.group && rig.ztype === 'boss'); }
   catch (e) { out.errors.push('makeBoss(sumo): ' + e.message); }
   return out;
@@ -35,6 +43,10 @@ const cfg = await page.evaluate(async () => {
 check(cfg.inLevel === 'JPN', 'рівень Японії завантажився', JSON.stringify({ inLevel: cfg.inLevel, zombies: cfg.zombies }));
 check(cfg.inOrder && cfg.lastInOrder === 'JPN' && cfg.count === 10, 'JPN — 10-та і остання в CAMPAIGN_ORDER', JSON.stringify({ last: cfg.lastInOrder, count: cfg.count }));
 check(cfg.hasBiome && cfg.biome === 'sakura', 'біом sakura існує', cfg.biome);
+check(cfg.extra === 'samurai', 'унікальний моб Японії — samurai', cfg.extra);
+check((cfg.types.samurai || 0) > 0, 'samurai присутній у спавні Японії', JSON.stringify(cfg.types));
+check(!cfg.types.gladiator, 'гладіатори не спавняться в Японії', JSON.stringify(cfg.types));
+check(cfg.samuraiBuilt, 'spawn(samurai) будує унікального самурая-чарджера', cfg.errors.join('|'));
 check(cfg.bossStyle === 'sumo', 'бос — стиль sumo', cfg.bossStyle);
 check(cfg.sumoBuilt, 'makeBoss(sumo) будує риг без помилок', cfg.errors.join('|'));
 check(cfg.coin === 800, 'нагорода — монети (як фінал)', String(cfg.coin));

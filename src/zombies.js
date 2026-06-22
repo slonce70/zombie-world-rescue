@@ -44,6 +44,8 @@ const TYPE_STATS = {
   // МІЦНИЙ ближній боєць (високий hp, боляче рубає мечем), середня швидкість.
   // Здаля РОЗГАНЯЄТЬСЯ у випад мечем (charger): телеграф → ривок → удар.
   gladiator: { hp: 175, speed: 1.4, chaseSpeed: 3.6, aggro: 28, dmg: 19, attackR: 2.2, coins: 22, pitch: 0.62, charger: true },
+  // ponytail: самурай переюзує готовий charger; окрему катана-механику додамо, коли вона реально потрібна.
+  samurai: { hp: 150, speed: 1.65, chaseSpeed: 4.0, aggro: 30, dmg: 17, attackR: 2.1, coins: 20, pitch: 0.78, charger: true },
   // 🧟 шкет (imp): дрібний, слабкий (50hp), зате ДУЖЕ швидкий (швидше за runner) — наздожене будь-кого.
   // Доступний з усіх країн, у т.ч. UKR: лише швидкий, новачку не страшно.
   imp: { hp: 50, speed: 2.8, chaseSpeed: 6.2, aggro: 32, dmg: 6, attackR: 1.5, coins: 6, pitch: 1.8, small: true },
@@ -912,7 +914,8 @@ export class Zombies {
                       : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
                         : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
                           : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
-                            : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                            : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
+                              : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
               const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
                 { horde: false, noCoopScale: !!z._stormWave });
               mz.aggroed = true;

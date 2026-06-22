@@ -866,6 +866,8 @@ export const EN = {
 "Повільна, але жилава і боляче хапає.": "Slow but sturdy, and its grab hurts.",
 "Гладіатор": "Gladiator",
 "Бронзовий шолом, меч і щит — розганяється у випад!": "Bronze helmet, sword and shield — charges into a lunge!",
+"Самурай": "Samurai",
+"Катана, темна броня і швидкий ривок.": "Katana, dark armor and a fast dash.",
 "Торо": "Toro",
 "Зомбі-бик — розганяється і б’є рогами!": "A zombie bull — it charges and gores with its horns!",
 "Шкет": "Imp",
