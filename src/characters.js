@@ -2,6 +2,17 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 
+function patchToonGradientRampShader() {
+  const chunk = THREE.ShaderChunk.gradientmap_pars_fragment;
+  const grayscaleSample = 'return vec3( texture2D( gradientMap, coord ).r );';
+  const colorSample = 'return texture2D( gradientMap, coord ).rgb;';
+  if (typeof chunk === 'string' && chunk.includes(grayscaleSample) && !chunk.includes(colorSample)) {
+    THREE.ShaderChunk.gradientmap_pars_fragment = chunk.replace(grayscaleSample, colorSample);
+  }
+}
+
+patchToonGradientRampShader();
+
 let gradMap = null;
 function getGradMap() {
   if (!gradMap) {

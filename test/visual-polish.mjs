@@ -36,6 +36,7 @@ const res = await page.evaluate(async () => {
   const g = window.__game;
   const THREE = await import('/vendor/three.module.js');
   const out = { errors: [] };
+  out.colorRampShader = THREE.ShaderChunk.gradientmap_pars_fragment.includes('texture2D( gradientMap, coord ).rgb');
 
   out.contextHooks = typeof g._onContextLost === 'function' && typeof g._onContextRestored === 'function';
   const canvas = document.getElementById('game-canvas');
@@ -111,6 +112,7 @@ check(res.contextHooks, 'WebGL context lost/restored hooks registered', JSON.str
 check(res.contextPrevented, 'synthetic webglcontextlost is prevented', JSON.stringify(res));
 check(res.exposureOk, 'summer biome applies exposure 1.08', JSON.stringify({ exposure: res.exposure }));
 check(res.rampLifted, 'toon ramp is colored RGBA and darkest band lifted', JSON.stringify({ len: res.rampLen }));
+check(res.colorRampShader, 'toon shader samples gradient ramp color');
 check(res.toonDither, 'toon materials enable dithering');
 check(res.terrainDither, 'terrain-like vertex-color materials enable dithering');
 check(res.highAdaptive, 'High quality can still adapt pixel ratio downward', JSON.stringify({ start: res.highStartRatio, dropped: res.highDroppedRatio }));
