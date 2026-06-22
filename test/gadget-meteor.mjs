@@ -42,40 +42,43 @@ const grant = await page.evaluate(() => {
 check(grant.level >= 33, `досягнуто рівня 33 (${grant.level})`);
 check(!grant.before && grant.owned, 'рівень 33 ВИДАВ гаджет «Метеорит» безкоштовно', JSON.stringify(grant));
 
-// === удар: 135 рівно по найближчому зомбі ===
-const hit = await page.evaluate(() => {
+// === площа 7×7: 135 усім у зоні, поза зоною — нікому (детерміновано, в ізольованій точці) ===
+const aoe = await page.evaluate(() => {
   const g = window.__game; const p = g.level.player;
-  g.test.unlockGadget('meteor'); g.test.gadgetCdReset();
-  // ставимо tank (230 HP — переживе 135) впритул, щоб він був найближчим
-  const tank = g.level.zombies.spawn('tank', p.pos.x + 2, p.pos.z + 1, {});
-  // знаходимо найближчого тією ж логікою, що й гаджет
-  let near = null, bd = 1e9;
-  for (const zb of g.level.zombies.list) { if (zb.state === 'dead') continue; const d = Math.hypot(zb.x - p.pos.x, zb.z - p.pos.z); if (d < bd) { bd = d; near = zb; } }
-  const nid = near.nid, hp0 = near.hp, isTank = near === tank;
-  g.test.useGadget();
-  const flying = g.level.effects._meteors.length;
-  for (let i = 0; i < 12; i++) g.level.effects.update(0.15); // >1.3с — приземлення
-  const after = g.level.zombies.byNid(nid);
-  return { flying, isTank, dmg: hp0 - (after ? after.hp : hp0), landed: g.level.effects._meteors.length };
+  const cx = p.pos.x + 40, cz = p.pos.z + 40; // подалі від орди — лише наші tank-и
+  const mk = (dx, dz) => g.level.zombies.spawn('tank', cx + dx, cz + dz, {}); // 230 HP — переживуть 135
+  const list = [mk(0, 0), mk(3.4, 0), mk(3.4, 3.4), mk(5, 0)]; // центр, край, кут (у зоні), 5м (поза)
+  const hp0 = list.map((z) => z.hp);
+  g.level.gadgets._meteorAoE(cx, cz); // прямий удар по площі в точці (cx,cz)
+  return { dmg: list.map((z, i) => hp0[i] - z.hp) };
 });
-check(hit.flying >= 1, 'метеорит вилетів (у польоті)', JSON.stringify(hit));
-check(hit.dmg === 135, 'завдав рівно 135 шкоди найближчому', JSON.stringify(hit));
-check(hit.landed === 0, 'метеорит приземлився (зник із польоту)', JSON.stringify(hit));
+check(aoe.dmg[0] === 135 && aoe.dmg[1] === 135 && aoe.dmg[2] === 135, 'усі троє в зоні 7×7 (центр/край/кут) отримали 135', JSON.stringify(aoe.dmg));
+check(aoe.dmg[3] === 0, 'зомбі за межами 7×7 (5 м) НЕ постраждав', JSON.stringify(aoe.dmg));
 
-// === обхід щита: падіння згори ігнорує фронтальний щит ===
+// === обхід щита: удар згори ігнорує фронтальний щит (у зоні AoE) ===
 const shield = await page.evaluate(() => {
   const g = window.__game; const p = g.level.player;
-  g.test.gadgetCdReset();
-  // щитоносець впритул — тепер він найближчий
-  const sh = g.level.zombies.spawn('shield', p.pos.x + 1, p.pos.z, {});
-  const shieldHp0 = sh.shieldHp, bodyHp0 = sh.hp, nid = sh.nid;
-  g.test.useGadget();
-  for (let i = 0; i < 12; i++) g.level.effects.update(0.15);
-  const after = g.level.zombies.byNid(nid);
-  return { shieldHp0, bodyHp0, shieldHpAfter: sh.shieldHp, bodyDmg: bodyHp0 - (after ? after.hp : bodyHp0), dead: !after || after.state === 'dead' };
+  const cx = p.pos.x - 40, cz = p.pos.z - 40;
+  const sh = g.level.zombies.spawn('shield', cx, cz, {});
+  const shieldHp0 = sh.shieldHp, bodyHp0 = sh.hp;
+  g.level.gadgets._meteorAoE(cx, cz);
+  return { shieldHp0, shieldHpAfter: sh.shieldHp, bodyDmg: bodyHp0 - sh.hp, dead: sh.state === 'dead' };
 });
 check(shield.shieldHpAfter === shield.shieldHp0, 'щит НЕ постраждав — метеорит б\'є згори, повз фронтальний щит', JSON.stringify(shield));
 check(shield.bodyDmg === 135, 'тіло щитоносця отримало 135 (обхід щита)', JSON.stringify(shield));
+
+// === візуал: метеорит реально вилітає й приземляється ===
+const fly = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.unlockGadget('meteor'); g.test.gadgetCdReset();
+  g.level.zombies.spawn('tank', g.level.player.pos.x + 2, g.level.player.pos.z + 1, {});
+  g.test.useGadget();
+  const flying = g.level.effects._meteors.length;
+  for (let i = 0; i < 12; i++) g.level.effects.update(0.15); // >1.3с — приземлення
+  return { flying, landed: g.level.effects._meteors.length };
+});
+check(fly.flying >= 1, 'метеорит вилетів (у польоті)', JSON.stringify(fly));
+check(fly.landed === 0, 'метеорит приземлився (зник із польоту)', JSON.stringify(fly));
 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }

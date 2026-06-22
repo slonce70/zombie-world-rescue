@@ -961,7 +961,7 @@ export const EN = {
 "🦖 ТАЄМНИЙ ОСТРІВ!": "🦖 SECRET ISLAND!",
 "останній бій — натисни!": "final battle — tap!",
 "Метеорит": "Meteor",
-"Метеорит з космосу на найближчого зомбі — 135 шкоди": "A meteor from space onto the nearest zombie — 135 damage",
+"Метеорит з космосу — 135 шкоди по площі 7×7 м": "A meteor from space — 135 damage over a 7×7 m area",
 "☄️ Метеорит летить!": "☄️ Meteor incoming!",
 "☄️ Немає цілі поблизу!": "☄️ No target nearby!",
 "750 монет": "750 coins",
