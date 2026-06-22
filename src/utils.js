@@ -36,8 +36,6 @@ export const smoothstep = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 
-export const dist2 = (x1, z1, x2, z2) => Math.hypot(x2 - x1, z2 - z1);
-
 // Відстань від точки до відрізка у площині XZ
 export function distToSeg(px, pz, ax, az, bx, bz) {
   const dx = bx - ax, dz = bz - az;
@@ -100,28 +98,6 @@ export function closestRaySeg(o, d, p0, p1, out) {
   const dist = Math.hypot(px, py, pz);
   if (out) { out.dist = dist; out.t = t; out.u = u; return out; }
   return { dist, t, u };
-}
-
-// Промінь проти AABB (slab-метод). Повертає t входу або Infinity.
-export function rayAABB(o, d, box) {
-  let tmin = 0, tmax = Infinity;
-  const axes = [
-    [o.x, d.x, box.minX, box.maxX],
-    [o.y, d.y, box.minY, box.maxY],
-    [o.z, d.z, box.minZ, box.maxZ],
-  ];
-  for (const [ov, dv, lo, hi] of axes) {
-    if (Math.abs(dv) < 1e-9) {
-      if (ov < lo || ov > hi) return Infinity;
-    } else {
-      let t1 = (lo - ov) / dv, t2 = (hi - ov) / dv;
-      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
-      tmin = Math.max(tmin, t1);
-      tmax = Math.min(tmax, t2);
-      if (tmin > tmax) return Infinity;
-    }
-  }
-  return tmin;
 }
 
 // Звільнення GPU-ресурсів об'єкта. Спільні кеші (userData.shared — toonMat,

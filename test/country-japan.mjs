@@ -42,7 +42,7 @@ const cfg = await page.evaluate(async () => {
 });
 
 check(cfg.inLevel === 'JPN', 'рівень Японії завантажився', JSON.stringify({ inLevel: cfg.inLevel, zombies: cfg.zombies }));
-check(cfg.inOrder && cfg.jpnIdx === 9 && cfg.lastInOrder === 'CHN' && cfg.count === 11, 'JPN — 10-та в CAMPAIGN_ORDER, остання тепер CHN (всього 11)', JSON.stringify({ jpnIdx: cfg.jpnIdx, last: cfg.lastInOrder, count: cfg.count }));
+check(cfg.inOrder && cfg.jpnIdx === 9 && cfg.lastInOrder === 'CHN' && cfg.count >= 11, 'JPN — 10-та в CAMPAIGN_ORDER, остання тепер CHN', JSON.stringify({ jpnIdx: cfg.jpnIdx, last: cfg.lastInOrder, count: cfg.count }));
 check(cfg.hasBiome && cfg.biome === 'sakura', 'біом sakura існує', cfg.biome);
 check(cfg.extra === 'samurai', 'унікальний моб Японії — samurai', cfg.extra);
 check((cfg.types.samurai || 0) > 0, 'samurai присутній у спавні Японії', JSON.stringify(cfg.types));

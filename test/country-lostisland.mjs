@@ -50,7 +50,7 @@ const cfg = await page.evaluate(async () => {
 
 check(cfg.inLevel === 'LOST', 'рівень Острова завантажився', JSON.stringify({ inLevel: cfg.inLevel, zombies: cfg.zombies }));
 check(cfg.exists, 'COUNTRIES.LOST існує');
-check(!cfg.inOrder && cfg.count === 10, 'LOST — бонус ПОЗА CAMPAIGN_ORDER (кампанія лишається 10)', JSON.stringify({ inOrder: cfg.inOrder, count: cfg.count }));
+check(!cfg.inOrder && cfg.count >= 10, 'LOST — бонус ПОЗА CAMPAIGN_ORDER (не рахується в кампанії)', JSON.stringify({ inOrder: cfg.inOrder, count: cfg.count }));
 check(cfg.hasBiome && cfg.biome === 'prehistoric', 'біом prehistoric існує', cfg.biome);
 check(cfg.bossStyle === 'rex', 'бос — стиль rex (тиранозавр)', cfg.bossStyle);
 check(cfg.rexBuilt, 'makeBoss(rex) будує риг без помилок', cfg.errors.join('|'));

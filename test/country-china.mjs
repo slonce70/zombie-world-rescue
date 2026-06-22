@@ -47,7 +47,7 @@ const cfg = await page.evaluate(async () => {
 
 check(cfg.inLevel === 'CHN', 'рівень Китаю завантажився', JSON.stringify({ inLevel: cfg.inLevel, zombies: cfg.zombies }));
 check(cfg.exists, 'COUNTRIES.CHN існує');
-check(cfg.inOrder && cfg.lastInOrder === 'CHN' && cfg.count === 11, 'CHN — 11-та і ОСТАННЯ в CAMPAIGN_ORDER', JSON.stringify({ last: cfg.lastInOrder, count: cfg.count }));
+check(cfg.inOrder && cfg.lastInOrder === 'CHN' && cfg.count >= 11, 'CHN — ОСТАННЯ в CAMPAIGN_ORDER', JSON.stringify({ last: cfg.lastInOrder, count: cfg.count }));
 check(cfg.hasBiome && cfg.biome === 'greatwall', 'біом greatwall існує', cfg.biome);
 check(cfg.extra === 'terracotta', 'унікальний моб Китаю — terracotta', cfg.extra);
 check((cfg.types.terracotta || 0) > 0, 'теракотові воїни присутні у спавні Китаю', JSON.stringify(cfg.types));

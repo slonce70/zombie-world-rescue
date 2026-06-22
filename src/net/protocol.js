@@ -25,8 +25,6 @@ export const PF = {
 export const ZS = { WANDER: 0, CHASE: 1, ATTACK: 2, DEAD: 3, FLEE: 4 };
 export const ZF = { MOVING: 8, CHARGING: 16, TELEGRAPH: 32, SLEEPING: 64, ENRAGED: 128 };
 
-export const STATE_NAMES = ['wander', 'chase', 'attack', 'dead', 'flee'];
-
 export function packZombieState(z, moving) {
   let b = ZS[z.state.toUpperCase()] ?? ZS.WANDER;
   if (moving) b |= ZF.MOVING;

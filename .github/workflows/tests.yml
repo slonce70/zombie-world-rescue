@@ -41,6 +41,8 @@ jobs:
         run: node test/coop-damage.mjs
       - name: Coop nick (фільтр лайки в коопних ніках — безпека дітей)
         run: node test/coop-nick.mjs
+      - name: Save migration (захист сейва дитини — БЛОКУЮЧИЙ: пошкоджений сейв = втрачений прогрес)
+        run: node test/save-migration.mjs
 
   # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі smoke).
   # NON-BLOCKING (continue-on-error): на безкоштовному раннері headless-вкладку гостя так
@@ -97,7 +99,7 @@ jobs:
   # (як coop), але червоніє в Actions при регресії квестів/Шторму/гаджетів/карт.
   extended:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 90
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -107,10 +109,22 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8741 &
-      - name: Save migration guard
-        run: node test/save-migration.mjs
-      - name: Extended battery
+      # Глоб замість хардкод-списку: НОВИЙ тест автоматично потрапляє в батарею.
+      # Раніше тест, забутий у списку, тихо не запускався НІДЕ (реальна гниль: новий
+      # контент країн/босів/гаджетів був без гейта). Пропускаємо лише те, що вже бігає
+      # в smoke/coop/e2e-джобах, і ручні скриншот-хелпери (_relay/_shot/_touch*).
+      # Падіння одного тесту НЕ ховає решту — збираємо всі провали й червонимо в кінці
+      # (джоб non-blocking: видимий сигнал у Actions, але не валить деплой хибним флейком).
+      - name: Extended battery (glob — без ручного списку)
         run: |
-          for t in update2 update3 update4 update5 update6 update8 update9 update10 update11 update-bugfix weapons-fuel enemies-v47 update-spain update-italy crate-toast weapon-unlock xray-ghost gadget-watchtower stun-bullets gadget-teleport pets hero-editor living-hq skins-v66 lobby-today campaign maps flows replay terrain-geometry; do
-            echo "=== $t ==="; SLOW=4 node test/$t.mjs || exit 1
+          SKIP="version-sync relay-reconnect smoke version-check cloudsave i18n coop-damage coop-nick e2e save-migration _relay _shot _touch-shot _touch-stress"
+          fails=""
+          for f in test/*.mjs; do
+            t=$(basename "$f" .mjs)
+            case " $SKIP " in *" $t "*) continue;; esac
+            case "$t" in coop*) continue;; esac
+            echo "=== $t ==="
+            SLOW=4 node "$f" || fails="$fails $t"
           done
+          if [ -n "$fails" ]; then echo "❌ ПРОВАЛИЛИСЯ:$fails"; exit 1; fi
+          echo "✅ усі розширені тести пройшли"
