@@ -1,6 +1,6 @@
 // 🦖 Загублений Острів (LOST) — фінальний бонус-рівень поза CAMPAIGN_ORDER.
 // Перевіряє: карту lostisland.js + біом prehistoric + вулкан-ландмарк + боса rex +
-// нагороду-лазер + ГЕЙТ розблокування (лише коли звільнено всі 10 країн).
+// нагороду-лазер + ГЕЙТ розблокування (лише коли звільнено всі країни кампанії).
 import { chromium } from 'playwright';
 const BASE = 'http://localhost:8741';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
@@ -37,7 +37,7 @@ const cfg = await page.evaluate(async () => {
   out.reward = L && L.weaponReward;
   out.landmarks = window.__game.level.country.map.landmarks;
   out.zombies = window.__game.level.zombies.list.length;
-  // 🔒 ГЕЙТ: закрито, поки не звільнено всі 10; відкрито лише з повним світом
+  // 🔒 ГЕЙТ: закрито, поки не звільнено всі країни кампанії; відкрито лише з повним світом
   const all = {}; for (const c of CAMPAIGN_ORDER) all[c] = true;
   const partial = { UKR: true, POL: true };
   out.openPartial = isCountryOpen(partial, 'LOST');  // false
@@ -62,7 +62,7 @@ check(cfg.zombies > 0, 'зомбі на острові', String(cfg.zombies));
 // гейт розблокування
 check(cfg.openPartial === false, '🔒 закрито з частковим прогресом (UKR+POL)');
 check(cfg.openMissingOne === false, '🔒 закрито, якщо бракує хоч однієї країни (JPN)');
-check(cfg.openAll === true, '🔓 відкрито лише коли звільнено всі 10 країн');
+check(cfg.openAll === true, '🔓 відкрито лише коли звільнено всі країни кампанії');
 
 // ===== наскрізний прохід: місії → орди → ТИРАНОЗАВР → перемога → ЛАЗЕР =====
 console.log('▸ Наскрізний прохід фіналу');

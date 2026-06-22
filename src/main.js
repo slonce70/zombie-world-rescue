@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1826,7 +1826,7 @@ class Game {
     const recBadge = isRecord && res.completed ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const best = this.save.arenaBest;
     document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">👑</span><span class="stat-name">${t('Босів переможено')}</span><span class="stat-val">${res.bosses} / 6</span></div>
+      <div class="stat"><span class="stat-icon">👑</span><span class="stat-name">${t('Босів переможено')}</span><span class="stat-val">${res.bosses} / ${CAMPAIGN_ORDER.length}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${best ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>` : ''}
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>`;

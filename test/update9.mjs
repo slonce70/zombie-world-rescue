@@ -228,9 +228,10 @@ const firstBoss = await page.evaluate(() => ({
 check(firstBoss.style === 'king', `перший бос — Король (${firstBoss.style})`);
 check(firstBoss.hp === Math.round(1800 * 0.8), `HP наростання: 80% від базового (${firstBoss.hp})`);
 
-// проходимо всіх шістьох
+// проходимо всіх босів кампанії
 const arenaRun = await page.evaluate(async () => {
   const g = window.__game;
+  const { CAMPAIGN_ORDER } = await import('/src/countries.js');
   const slp = (ms) => new Promise((r) => setTimeout(r, ms));
   const styles = [];
   // реальний забіг триває хвилини — симулюємо чесний час, щоб пройти sanity Ліги
@@ -252,12 +253,15 @@ const arenaRun = await page.evaluate(async () => {
     completed: g.level.bossRush.completed,
     best: g.save.arenaBest,
     overlay: document.getElementById('overlay-arena-end').classList.contains('show'),
+    bossText: document.querySelector('#arena-stats .stat .stat-val')?.textContent || '',
+    total: CAMPAIGN_ORDER.length,
   };
 });
-check(arenaRun.over && arenaRun.completed, 'усі 11 босів переможено — забіг завершено');
+check(arenaRun.over && arenaRun.completed, `усі ${arenaRun.total} босів переможено — забіг завершено`);
 check(arenaRun.styles.length === 10, `усі стилі босів зустрілись (${arenaRun.styles.join(',')})`);
 check(arenaRun.best > 0, `рекорд часу записано (${Math.round(arenaRun.best / 1000)}с)`);
 check(arenaRun.overlay, 'фінальний екран Арени показано');
+check(arenaRun.bossText === `${arenaRun.total} / ${arenaRun.total}`, `фінальний екран Арени показує ${arenaRun.total} босів (${arenaRun.bossText})`);
 const arenaPlace = await page.waitForFunction(() => {
   const t = document.getElementById('arena-league-place').textContent;
   return t.includes('#') ? t : false;
