@@ -716,7 +716,7 @@ export class Effects {
   }
 
   ring(pos, colorHex = 0xff8844, maxR = 6) {
-    const slot = this.ringPool.find((r) => !r.mesh.visible) || this.ringPool[0];
+    const slot = this.ringPool.find((r) => !r.mesh.visible) || this.rings[0] || this.ringPool[0];
     const old = this.rings.indexOf(slot);
     if (old >= 0) this.rings.splice(old, 1);
     slot.t = 0;
