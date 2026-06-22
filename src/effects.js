@@ -814,6 +814,26 @@ export class Effects {
     this.ring(pos, 0xffd23f, 3.0);
   }
 
+  // 🤖💥 вибух бойового робота при смерті — великий вогняний бабах (ЛИШЕ ВІЗУАЛ).
+  // Шкоду гравцям наносить _kill у zombies.js через _hurt; реплікація гостям — через netEv('bm').
+  robotBoom(pos) {
+    this.burst(pos, 0xffd24a, 26, { speed: 8, up: 7, life: 0.9, size: 2.1 }); // золота спалаха гармати
+    this.burst(pos, 0xffa040, 20, { speed: 7, up: 6, life: 0.85, size: 1.9 }); // помаранчеве полум'я
+    this.burst(pos, 0x444a52, 14, { speed: 5, up: 4, life: 0.7, size: 1.4 }); // металевий дим/уламки
+    this.ring(pos, 0xffd24a, 6.5);
+    this.ring(pos, 0xff6a2a, 3.4);
+    this.flashLight.position.copy(pos);
+    this.flashLight.color.setHex(0xffc966);
+    this.flashLight.intensity = 40;
+    this.flashT = 0.16;
+    this.audio.explosion();
+    const pp = this.getPlayerPos ? this.getPlayerPos() : null;
+    if (pp && this.levelRef) {
+      const pd = Math.hypot(pp.x - pos.x, pp.z - pos.z);
+      if (pd < 9) this.levelRef.player.camShake = Math.max(this.levelRef.player.camShake, 1.4);
+    }
+  }
+
   // пес або інший помічник збирає предмет негайно
   collectCoinNow(c) {
     const L = this.levelRef;

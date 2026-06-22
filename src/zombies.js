@@ -56,6 +56,12 @@ const TYPE_STATS = {
   ghost: { hp: 60, speed: 2.0, chaseSpeed: 4.2, aggro: 30, dmg: 12, attackR: 1.8, coins: 20, pitch: 1.4, invisible: true },
   // 🪬 зомбі-шаман: звичайний мелі, але ВОСКРЕСАЄ один раз (добий двічі); може лишити тотем безсмертя
   shaman: { hp: 125, speed: 1.5, chaseSpeed: 3.0, aggro: 28, dmg: 14, attackR: 1.9, coins: 30, pitch: 0.9 },
+  // 🤖 зомбі-робот: важкий МЕХ із пілотом (1255hp, НЕ бос). Меч зблизька (dmg 20),
+  // гармата здаля (ranged 10). При смерті ВИБУХАЄ по площі (157, обробка в _kill).
+  robot: {
+    hp: 1255, speed: 1.0, chaseSpeed: 2.1, aggro: 26, dmg: 20, attackR: 2.4, coins: 55, pitch: 0.45,
+    ranged: { min: 9, max: 34, hold: 13, cd: 2.4, projSpeed: 26, dmg: 10, size: 0.32, color: 0xffd24a },
+  },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -100,6 +106,8 @@ export class Zombies {
     this._allowGhost = this.diff.dmg > 1 || this.diffStar > 1;
     // 🪬 шаман — рідкісний спец-ворог пізніших країн (той самий гейт, що й привид)
     this._allowShaman = this.diff.dmg > 1 || this.diffStar > 1;
+    // 🤖 робот — рідкісний важкий МЕХ: гейт як у важких (з середини кампанії, не UKR ★1)
+    this._allowRobot = this.diff.hp >= 1.5 || this.diffStar > 1;
     this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
@@ -278,6 +286,8 @@ export class Zombies {
         else if (this._allowGhost && this.rng.chance(0.07)) type = 'ghost';
         // 🪬 зомбі-шаман — рідкісний; воскресає раз і може лишити тотем безсмертя
         else if (this._allowShaman && this.rng.chance(0.06)) type = 'shaman';
+        // 🤖 зомбі-робот — рідкісний важкий МЕХ (~4%); гейт важких ворогів (з середини кампанії)
+        else if (this._allowRobot && this.rng.chance(0.04)) type = 'robot';
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
@@ -615,6 +625,23 @@ export class Zombies {
       }
       // 🪬 шаман на остаточній смерті: 15% лишає тотем безсмертя
       if (z.type === 'shaman' && this.rng.chance(0.15)) level.effects.spawnPickup(z.x, z.z, 'totem');
+    }
+    // 🤖💥 зомбі-робот: при смерті ВИБУХАЄ й б'є гравців по площі (радіус 6м, 157 шкоди)
+    if (z.type === 'robot') {
+      const boomPos = new THREE.Vector3(z.x, z.y + 1.0, z.z);
+      level.effects.robotBoom(boomPos); // великий вибуховий візуал (локально у всіх)
+      if (!level.net || level.net.authority) {
+        const R = 6;
+        const pls = level.players
+          || [{ pid: 1, pos: level.player.pos, get health() { return level.player.health; } }];
+        for (const pl of pls) {
+          if (pl.health <= 0) continue;
+          if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, 157, z.x, z.z);
+        }
+        // реплікація ВІЗУАЛУ гостям наявним каналом 'bm' → client.netExplosion()
+        level.netEv('bm', Math.round(boomPos.x * 10) / 10, Math.round(boomPos.y * 10) / 10,
+          Math.round(boomPos.z * 10) / 10, R, 0, 0);
+      }
     }
     if (z.horde) this.hordeRemaining--;
     if (z.golden) {

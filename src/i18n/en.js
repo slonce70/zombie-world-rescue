@@ -981,4 +981,6 @@ export const EN = {
 "🪬 Тотем безсмертя!": "🪬 Totem of Undying!",
 "🪬 Тотем урятував тебе!": "🪬 The Totem saved you!",
 "🪬 Шаман воскрес! Добий ще раз!": "🪬 The Shaman revived! Kill it again!",
+"Зомбі-робот": "Zombie Mech",
+"Бойовий мех із пілотом-зомбі: меч зблизька, гармата здаля. Коли падає — ВИБУХАЄ! Відскоч.": "Battle mech piloted by a zombie: sword up close, cannon from afar. When it falls — it EXPLODES! Back off.",
 };

@@ -1332,6 +1332,86 @@ function buildZombie(type, rng) {
     rig.ztype = 'shaman';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'robot') {
+    // 🤖 ЗОМБІ-РОБОТ: важкий бойовий мех. У сталевій кабіні стирчить голова
+    // зомбі-пілота (зелена). ОДНА рука = великий МЕЧ, ДРУГА = ГАРМАТА-дуло.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.7, belly: 1.0, armsForward: 0.35, headR: 0.2, lean: 0,
+      skin: 0x5fae4a, shirt: 0x394150, pants: 0x2a313c, shoes: 0x20262e,
+      eyeWhite: 0xd8ffcf, eyeL: 0.06, eyeR: 0.06, pupilColor: 0x2fae57, brow: 0.5,
+      mouth: 'open', teeth: true, nose: false,
+    }));
+    const steelM = toonMat(0x9aa3ad, 0x3a4148, 0.08);  // основний корпус
+    const steelD = toonMat(0x5c636b);                  // темна сталь (стики/таз)
+    const trimM = toonMat(0xb9c2cc, 0xffffff, 0.12);   // світлі канти
+    const warnM = toonMat(0xffb300);                   // попереджувальні смуги
+    const visorM = toonMat(0xff3322, 0xff2a18, 0.95);  // світний червоний візор
+    // коробчастий корпус-кабіна навколо тулуба пілота
+    const chest = box(0.78, 0.7, 0.6, steelM);
+    chest.position.set(0, 0.34, -0.04);
+    rig.parts.torso.add(chest);
+    const chestTrim = box(0.84, 0.1, 0.64, trimM);
+    chestTrim.position.set(0, 0.06, -0.04);
+    rig.parts.torso.add(chestTrim);
+    const warnBand = box(0.62, 0.09, 0.02, warnM);
+    warnBand.position.set(0, 0.5, -0.35);
+    rig.parts.torso.add(warnBand);
+    for (const side of [-1, 1]) {
+      const pauldron = box(0.26, 0.26, 0.4, steelD);
+      pauldron.position.set(side * 0.46, 0.52, -0.02);
+      rig.parts.torso.add(pauldron);
+    }
+    const pelvis = box(0.7, 0.32, 0.5, steelD);
+    pelvis.position.set(0, -0.12, 0);
+    rig.parts.torso.add(pelvis);
+    for (const side of [-1, 1]) {
+      const thigh = box(0.26, 0.5, 0.3, steelM);
+      thigh.position.set(0, -0.22, 0);
+      const shin = box(0.22, 0.42, 0.26, steelD);
+      shin.position.set(0, -0.66, 0);
+      const footPlate = box(0.32, 0.16, 0.46, steelM);
+      footPlate.position.set(0, -0.9, -0.06);
+      rig.parts[side < 0 ? 'legL' : 'legR'].add(thigh, shin, footPlate);
+    }
+    // кабіна-візор: світна червона смуга на фронті голови (фронт = -Z)
+    const helm = box(0.5, 0.42, 0.46, steelM);
+    helm.position.set(0, 0.16, 0.02);
+    rig.parts.head.add(helm);
+    const visor = box(0.46, 0.12, 0.04, visorM);
+    visor.position.set(0, 0.18, -0.22);
+    rig.parts.head.add(visor);
+    const visorTrim = box(0.5, 0.04, 0.04, trimM);
+    visorTrim.position.set(0, 0.27, -0.22);
+    rig.parts.head.add(visorTrim);
+    const antenna = cylinder(0.012, 0.012, 0.3, steelD, 6);
+    antenna.position.set(0.18, 0.46, 0.08);
+    const antTip = sphere(0.04, visorM, 8, 6);
+    antTip.position.set(0.18, 0.62, 0.08);
+    rig.parts.head.add(antenna, antTip);
+    // 🗡️ ПРАВА рука = великий МЕЧ
+    const armCasingR = box(0.2, 0.34, 0.2, steelM);
+    armCasingR.position.set(0, -0.34, 0);
+    const guard = box(0.34, 0.08, 0.12, steelD);
+    guard.position.set(0, -0.62, -0.04);
+    const blade = box(0.1, 1.0, 0.04, trimM);
+    blade.position.set(0, -1.12, -0.04);
+    const bladeTip = cone(0.05, 0.22, trimM, 4);
+    bladeTip.position.set(0, -1.73, -0.04);
+    rig.parts.armR.add(armCasingR, guard, blade, bladeTip);
+    // 🔫 ЛІВА рука = ГАРМАТА-дуло
+    const armCasingL = box(0.22, 0.34, 0.22, steelM);
+    armCasingL.position.set(0, -0.34, 0);
+    const cannon = cylinder(0.14, 0.16, 0.7, steelD, 12);
+    cannon.rotation.x = Math.PI / 2;
+    cannon.position.set(0, -0.6, -0.34);
+    const muzzle = cylinder(0.17, 0.14, 0.16, steelM, 12);
+    muzzle.rotation.x = Math.PI / 2;
+    muzzle.position.set(0, -0.6, -0.72);
+    const muzzleGlow = sphere(0.1, toonMat(0xffd24a, 0xffd24a, 0.8), 10, 8);
+    muzzleGlow.position.set(0, -0.6, -0.78);
+    rig.parts.armL.add(armCasingL, cannon, muzzle, muzzleGlow);
+    rig.ztype = 'robot';
+    return rig;
   } else if (type === 'imp') {
     // 🧟 шкет: дрібний і дуже швидкий зомбі — впізнавано МАЛЕНЬКИЙ (≈0.66 зросту),
     // велика голова й вирячені очі надають хижого «дитячого» вигляду
