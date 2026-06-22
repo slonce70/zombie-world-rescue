@@ -389,9 +389,7 @@ export class World {
       const arch = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.22, 6, 14, Math.PI), ironM2);
       arch.position.set(x, gy + 1.2, z + side * 4.5);
       this.staticGroup.add(arch);
-      const arch2 = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.22, 6, 14, Math.PI));
-      arch2.material = arch.material;
-      arch2.geometry = arch.geometry;
+      const arch2 = new THREE.Mesh(arch.geometry, arch.material); // переюз гео/мат арки — без осиротілої TorusGeometry
       arch2.position.set(x + side * 4.5, gy + 1.2, z);
       arch2.rotation.y = Math.PI / 2;
       this.staticGroup.add(arch2);
@@ -692,7 +690,7 @@ export class World {
       const lily = new THREE.Mesh(new THREE.CircleGeometry(0.45, 8), toonMat(0x57b83e));
       lily.rotation.x = -Math.PI / 2;
       lily.position.set(lx, this.groundH(lx, lz) + 0.4, lz);
-      this.scene.add(lily);
+      this.staticGroup.add(lily); // статична непрозора декорація — у батч, не повз нього
     }
   }
 

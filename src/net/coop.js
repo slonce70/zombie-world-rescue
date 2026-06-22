@@ -49,7 +49,6 @@ export class CoopSession {
     this.onCfg = null;         // (countryId)
     this.onEnd = null;         // (reason) — кімната померла
     this.onStarted = null;     // () => {} — рівень стартував (закрити лобі)
-    this._helloTimers = new Map();
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);

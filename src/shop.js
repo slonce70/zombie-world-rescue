@@ -251,7 +251,7 @@ export class Shop {
       case 'teleport':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
-        game.hud.toast(t('{i} {n} — твій назавжди! Клавіша F (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name }));
+        game.hud.toast(t('{i} {n} — твій назавжди! {k} (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name, k: keyHint('кнопка 🧰', 'Клавіша F') }));
         break;
     }
     game.audio.purchase();

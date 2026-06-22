@@ -414,7 +414,7 @@ export const GADGETS = {
   wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 1000, get desc() { return t('Стіна на 100 міцності ({k})', { k: keyHint('кнопка ✋ — забрати', 'E — забрати') }); } },
   // 🤖 преміум: автоматична вогнева підтримка
   turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 1000, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
-  watchtower: { name: t('Башня спостереження'), icon: '🗼', cd: 125, price: 1000, desc: t('Залізна башта: натисни Y, щоб залізти або спуститися') },
+  watchtower: { name: t('Башня спостереження'), icon: '🗼', cd: 125, price: 1000, get desc() { return t('Залізна башта: {k} — залізти або спуститися', { k: interactKey() }); } },
   // 🩻 Ікс-рей: підсвічує всіх невидимих зомбі (Привидів) на 4с, перезарядка 25с
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
   infammo: { name: t('Бескінечні патрони'), icon: '♾️', cd: 45, price: 1000, desc: t('3 секунди автомат і швидкостріл не витрачають патрони') },
@@ -495,6 +495,11 @@ export class Gadgets {
     if (allowControl && input.pressed('KeyY')) {
       this._toggleWatchtower();
       input.justPressed.delete('KeyY');
+    } else if (allowControl && input.pressed('KeyE') && this._toggleWatchtower()) {
+      // ✋ на тачі клавіші Y немає — підйом/спуск через кнопку взаємодії.
+      // ponytail: KeyE з'їдається лише коли поряд башта (toggle вернув true), тож E-взаємодії місій цілі;
+      // колізія можлива лише якщо башту поставлено в <2.6м від E-точки місії — рідкісний край.
+      input.justPressed.delete('KeyE');
     }
     if (allowControl && p.health > 0 && input.pressed('KeyF')) this.use();
 

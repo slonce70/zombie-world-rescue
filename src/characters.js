@@ -351,6 +351,7 @@ export function setAnim(rig, mode) {
   if (rig.anim.mode === mode) return;
   rig.anim.mode = mode;
   rig.anim.t = 0;
+  rig.anim.armLZ = rig.anim.armRZ = undefined; // інакше поза рук танцю/самоката залипає на наступний режим
   if (mode === 'attack') rig.anim.attackT = 0;
   if (mode === 'die') rig.anim.dieT = 0;
 }

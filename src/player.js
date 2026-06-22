@@ -855,9 +855,11 @@ export class Player {
       this._contSfxT = 0.11;
       if (w.beam) level.audio.beamTick(); else level.audio.flameTick();
       this._contAudio = true;
+      // ponytail: лік дроселюємо разом зі звуком (~9/с). Без цього континуалка
+      // накручує ~300 «пострілів» за балон і робить статистику точності сміттям.
+      if (anyHit) level.stats.shotsHit++;
+      level.stats.shotsFired++;
     }
-    if (anyHit) level.stats.shotsHit++;
-    level.stats.shotsFired++;
   }
 
   // 🔫 ЛАЗЕР: миттєвий промінь-хітскан уперед, пробиває кількох зомбі на лінії.

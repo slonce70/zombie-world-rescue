@@ -124,14 +124,17 @@ export function rayAABB(o, d, box) {
   return tmin;
 }
 
-// Повне звільнення GPU-ресурсів об'єкта (унікальні геометрії/текстури)
+// Звільнення GPU-ресурсів об'єкта. Спільні кеші (userData.shared — toonMat,
+// gradientMap, запечені меші) НЕ чіпаємо: вони живуть на весь сеанс і
+// переюзані всіма. Дзеркалить teardown у main.js — інакше влучання ракети чи
+// вибух бочки диспозили б спільний матеріал → ривок GPU на телефоні.
 export function disposeObject(root) {
   root.traverse((o) => {
-    if (o.geometry) o.geometry.dispose();
+    if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
     if (o.material) {
       (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-        if (!m) return;
-        if (m.map) m.map.dispose();
+        if (!m || (m.userData && m.userData.shared)) return;
+        if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
         m.dispose();
       });
     }

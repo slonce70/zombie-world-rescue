@@ -208,6 +208,7 @@ export class Room {
     }
     const peers = this._peers();
     peers.delete(att.id);
+    await this.state.storage.delete('key:' + att.id); // звільняємо секрет слота — інакше key:<id> течуть у storage, поки живий хост
     for (const [, sock] of peers) this._safeSend(sock, JSON.stringify({ t: 'peer', id: att.id, on: false }));
     if (att.id === 1) {
       // хост зник: реконекту хоста немає, тому грейс короткий — щоб гості
