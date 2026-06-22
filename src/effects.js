@@ -14,6 +14,25 @@ function segPointDist2(a, b, px, py, pz) {
   return dx * dx + dy * dy + dz * dz;
 }
 
+let glowTexture = null;
+function getGlowTexture() {
+  if (!glowTexture) {
+    const cv = document.createElement('canvas');
+    cv.width = 64;
+    cv.height = 64;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    glowTexture = new THREE.CanvasTexture(cv);
+    glowTexture.userData.shared = true;
+  }
+  return glowTexture;
+}
+
 export class Effects {
   constructor(scene, world, audio) {
     this.scene = scene;
@@ -67,6 +86,19 @@ export class Effects {
     this.laserCore.frustumCulled = false;
     this.laserCore.visible = false;
     scene.add(this.laserCore);
+    this.laserGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: getGlowTexture(),
+      color: 0x66ffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+    }));
+    this.laserGlow.visible = false;
+    this.laserGlow.frustumCulled = false;
+    scene.add(this.laserGlow);
 
     this._up = new THREE.Vector3(0, 1, 0);
     this._tmpDir = new THREE.Vector3();
@@ -87,8 +119,24 @@ export class Effects {
     this.ammoGeo = new THREE.BoxGeometry(0.35, 0.25, 0.25);
     this.ammoMat = toonMat(0x5e7050);
 
-    // кільця (слем боса)
+    // кільця (слем боса): фіксований пул без алокацій/GC у піку бою.
+    this.ringGeo = new THREE.TorusGeometry(1, 0.12, 8, 28);
+    this.ringGeo.userData.shared = true;
+    this.ringPool = [];
     this.rings = [];
+    for (let i = 0; i < 8; i++) {
+      const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({
+        color: 0xff8844,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }));
+      mesh.visible = false;
+      mesh.rotation.x = -Math.PI / 2;
+      scene.add(mesh);
+      this.ringPool.push({ mesh, t: 0, maxR: 0 });
+    }
 
     // снаряди ворогів (сніжки, отрута, багети)
     this.projectiles = [];
@@ -131,11 +179,12 @@ export class Effects {
     sc.remove(this.pMesh, this.flashLight);
     for (const t of this.tracerPool) { sc.remove(t.mesh); if (t.mesh.material) t.mesh.material.dispose(); }
     for (const d of this.dmgPool) { sc.remove(d.spr); if (d.spr.material) d.spr.material.dispose(); if (d.tex) d.tex.dispose(); }
-    sc.remove(this.laserMesh, this.laserCore);
+    sc.remove(this.laserMesh, this.laserCore, this.laserGlow);
+    for (const r of this.ringPool) { sc.remove(r.mesh); if (r.mesh.material) r.mesh.material.dispose(); }
     this.pMesh.geometry.dispose();
     this.pMesh.material.dispose();
-    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry]) g.dispose();
-    for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat, this.laserMat, this.laserCoreMat]) m.dispose();
+    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry, this.ringGeo]) g.dispose();
+    for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat, this.laserMat, this.laserCoreMat, this.laserGlow.material]) m.dispose();
     // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
   }
 
@@ -627,6 +676,10 @@ export class Effects {
       m.material.opacity = m === this.laserMesh ? 0.85 : 0.8;
     }
     // легке світіння в точці влучання
+    this.laserGlow.visible = true;
+    this.laserGlow.position.copy(to);
+    this.laserGlow.scale.setScalar(1.6 + Math.min(2.6, len * 0.04));
+    this.laserGlow.material.opacity = 0.7;
     this.flashLight.position.copy(to);
     this.flashLight.color.setHex(0x66ffff);
     this.flashLight.intensity = 8;
@@ -663,14 +716,18 @@ export class Effects {
   }
 
   ring(pos, colorHex = 0xff8844, maxR = 6) {
-    const geo = new THREE.TorusGeometry(1, 0.12, 8, 28);
-    const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.copy(pos);
-    m.position.y += 0.15;
-    this.scene.add(m);
-    this.rings.push({ mesh: m, t: 0, maxR });
+    const slot = this.ringPool.find((r) => !r.mesh.visible) || this.ringPool[0];
+    const old = this.rings.indexOf(slot);
+    if (old >= 0) this.rings.splice(old, 1);
+    slot.t = 0;
+    slot.maxR = maxR;
+    slot.mesh.visible = true;
+    slot.mesh.material.color.setHex(colorHex);
+    slot.mesh.material.opacity = 0.85;
+    slot.mesh.scale.set(0.001, 0.001, 1);
+    slot.mesh.position.copy(pos);
+    slot.mesh.position.y += 0.15;
+    this.rings.push(slot);
   }
 
   // пес або інший помічник збирає предмет негайно
@@ -836,7 +893,13 @@ export class Effects {
     // 🔫 промінь лазера: гасне за мить після відпускання вогню
     if (this.laserMesh.visible) {
       this.laserT -= dt;
-      if (this.laserT <= 0) { this.laserMesh.visible = false; this.laserCore.visible = false; }
+      if (this.laserT <= 0) {
+        this.laserMesh.visible = false;
+        this.laserCore.visible = false;
+        this.laserGlow.visible = false;
+      } else {
+        this.laserGlow.material.opacity = Math.max(0, this.laserT / 0.06) * 0.7;
+      }
     }
 
     // спалах
@@ -854,9 +917,7 @@ export class Effects {
       r.mesh.scale.set(rr, rr, 1);
       r.mesh.material.opacity = Math.max(0, 0.85 * (1 - r.t));
       if (r.t >= 1) {
-        this.scene.remove(r.mesh);
-        r.mesh.geometry.dispose();
-        r.mesh.material.dispose();
+        r.mesh.visible = false;
         this.rings.splice(i, 1);
       }
     }
