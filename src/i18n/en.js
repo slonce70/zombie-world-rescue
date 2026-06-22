@@ -938,4 +938,7 @@ export const EN = {
 "♾️ Бескінечні патрони на 3с! Автомат і швидкостріл шаленіють": "♾️ Endless ammo for 3s! The rifle and SMG go wild",
 "Тут не можна поставити башту 🙈": "Can't place the tower here 🙈",
 "🗼 Башту зламали!": "🗼 The watchtower was destroyed!",
+"Золоте яблуко": "Golden Apple",
+"+20 здоров'я на 5 секунд": "+20 health for 5 seconds",
+"🍎 Золоте яблуко: +20 здоров'я на 5с!": "🍎 Golden Apple: +20 health for 5s!",
 };

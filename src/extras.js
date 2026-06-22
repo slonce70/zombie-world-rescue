@@ -423,6 +423,8 @@ export const GADGETS = {
   // 🪄 Телепортація: миттєвий ривок уперед на ~8м (вирватись із натовпу), перезарядка 45с
   // (іконка 🪄, а не 🌀 — 🌀 уже зайнятий швидкострілом)
   teleport: { name: t('Телепортація'), icon: '🪄', cd: 45, price: 1000, desc: t('Миттєвий стрибок уперед — вирвись із натовпу') },
+  // 🍎 Золоте яблуко: +20 тимчасового HP на 5с (бонус-макс, згасає сам), перезарядка 45с
+  goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
 };
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
@@ -657,6 +659,14 @@ export class Gadgets {
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0x9b6bff, 18, { speed: 4, up: 3, life: 0.6 });
       level.audio.powerup();
       level.bus.emit('toast', t('🪄 Телепорт!'));
+      ok = true;
+    } else if (id === 'goldapple') {
+      // +20 бонус-HP на 5с; guard appleT<=0 не дає подвоїти бонус (cd 45с і так не дасть)
+      if (p.appleT <= 0) { p.maxHealth += 20; p.health += 20; }
+      p.appleT = 5;
+      level.audio.heal();
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0xffd23f, 16, { speed: 2.5, up: 3, life: 0.9 });
+      level.bus.emit('toast', t('🍎 Золоте яблуко: +20 здоров\'я на 5с!'));
       ok = true;
     }
     if (ok) {

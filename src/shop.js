@@ -22,6 +22,7 @@ export const SHOP_ITEMS = [
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'goldapple', icon: GADGETS.goldapple.icon, name: GADGETS.goldapple.name, desc: () => GADGETS.goldapple.desc + t(' · перезарядка {n}с', { n: GADGETS.goldapple.cd }), price: GADGETS.goldapple.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500
   ...Object.entries(PETS).map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
   // 🏅 золотий скін для гаджета-башти (камʼяний дається за Францію — не в магазині)
@@ -249,6 +250,7 @@ export class Shop {
       case 'infammo':
       case 'stunammo':
       case 'teleport':
+      case 'goldapple':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
         game.hud.toast(t('{i} {n} — твій назавжди! {k} (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name, k: keyHint('кнопка 🧰', 'Клавіша F') }));
