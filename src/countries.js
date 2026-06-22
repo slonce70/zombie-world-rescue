@@ -8,6 +8,7 @@ import spainMap from './maps/spain.js';
 import italyMap from './maps/italy.js';
 import turkeyMap from './maps/turkey.js';
 import egyptMap from './maps/egypt.js';
+import japanMap from './maps/japan.js';
 
 export const BIOMES = {
   summer: {
@@ -172,6 +173,26 @@ export const BIOMES = {
     lampGlow: 1.0,
     signText: t('ОАЗА ЗОЛОТА'),
   },
+  // 🌸 японська весна — рожева сакура, пастельне небо, летять пелюстки
+  sakura: {
+    skyTop: 0x6fb3ee, skyHorizon: 0xffe0ec, skyBottom: 0xe6cfe0,
+    fogColor: 0xf2dce8, fogNear: 125, fogFar: 420,
+    hemiSky: 0xfbe2ee, hemiGround: 0x9aa86a, hemiIntensity: 0.95,
+    sunColor: 0xfff0f0, sunIntensity: 1.85, sunPos: [82, 100, 52],
+    sunDisc: 0xffe2ea, sunDiscPos: [350, 380, 250],
+    grass1: 0x7cc24c, grass2: 0x66a83c, grass3: 0x96d45e,
+    rock: 0xa89a8a, peak: 0xd8ccc4, water: 0x49b8e8, riverbed: 0xb0a48f,
+    dirt: 0xb09a82, plaza: 0xc8b4a8, arenaGround: 0xa89488,
+    roadMain: 0xb4a496, roadEdge: 0x83746a,
+    treeGreens: [0xffb7d4, 0xff9ec4, 0xffc9de, 0xf7a8cc, 0xffd0e2], // крони сакури — рожеві
+    pineGreens: [0x3e7a4a, 0x356b42, 0x47885a],
+    pineRatio: 0.25, snow: false, snowfall: false, leaffall: true,
+    housePalette: [0xf5ece0, 0xf2dce4, 0xe8e0d4, 0xddd0e0, 0xf2e6dc],
+    roofPalette: [0x8a4a4a, 0x6e4458, 0x7a4a3e, 0x5a4a5a],
+    flowers: true, hay: false,
+    lampGlow: 0.85,
+    signText: t('СЕЛО САКУРОВЕ'),
+  },
 };
 
 export const COUNTRIES = {
@@ -307,9 +328,23 @@ export const COUNTRIES = {
     banner: t('Піраміди, мумії і сам ФАРАОН. Кусючі скарабеї літають! 🪲'),
     food: t('фінік'),
   },
+  JPN: {
+    id: 'JPN', name: t('Японія'), flag: '🇯🇵', seed: 8080,
+    lat: 36.2, lon: 138.3,
+    victoryTitle: t('🇯🇵 ЯПОНІЮ ЗВІЛЬНЕНО!'),
+    biome: 'sakura',
+    map: japanMap,
+    difficulty: { hp: 2.4, dmg: 1.48, counts: 1.58 },
+    coinReward: 800,
+    extraZombie: 'gladiator',
+    shieldGuards: 4,
+    boss: { name: t('👑 СУМО-ЗОМБІ'), hp: 6900, frost: false, style: 'sumo' },
+    banner: t('Сакура, ворота торії й СУМО-ЗОМБІ! Стережись велетенського борця! 🌸'),
+    food: t('онігірі'),
+  },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;

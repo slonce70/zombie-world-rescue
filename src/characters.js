@@ -1264,6 +1264,11 @@ const BOSS_SPECS = {
     skin: 0x7a6354, shirt: 0x8c2f3e, pants: 0xc89b4a, shoes: 0x3a2a1c,
     eyeWhite: 0xffe08a, pupilColor: 0xc62828, browColor: 0x2e2620,
   },
+  // 🇯🇵 Сумо-зомбі (бос Японії): рожево-засмагла шкіра рікісі, маваші-пояс, тьонмаге
+  sumo: {
+    skin: 0xd9a48f, shirt: 0x6b2233, pants: 0x2e2838, shoes: 0x2a2220,
+    eyeWhite: 0xfff0e0, pupilColor: 0x3a2a20, browColor: 0x2e2620,
+  },
 };
 
 export function makeBoss(style = 'king') {
@@ -1524,6 +1529,27 @@ export function makeBoss(style = 'king') {
     const scBoss = sphere(0.12, goldM, 10, 8);
     scBoss.position.set(0, -0.5, -0.24);
     rig.parts.armL.add(scutum, scBoss);
+  } else if (style === 'sumo') {
+    // 🇯🇵 СУМО-ЗОМБІ: велетень-рікісі. Пузо вже задано belly:1.7; підсилюємо торс
+    // і вішаємо маваші-пояс (лобовий «щит» у стилі щитоносця, але суто візуальний).
+    rig.parts.torso.scale.set(1.22, 1.04, 1.22);
+    const hairM = toonMat(0x2a221c);
+    const bun = sphere(0.1, hairM, 10, 8); bun.position.set(0, 0.4, 0.02);
+    const knot = cylinder(0.04, 0.05, 0.12, hairM, 8); knot.position.set(0, 0.34, 0.08); knot.rotation.x = 0.5;
+    rig.parts.head.add(bun, knot);
+    for (const side of [-1, 1]) {
+      const cheek = sphere(0.11, toonMat(0xd9a48f), 8, 6); // пухкі щоки
+      cheek.position.set(side * 0.16, -0.04, -0.14);
+      rig.parts.head.add(cheek);
+    }
+    const beltM = toonMat(0x6b2233, 0x3a121c, 0.2);
+    const belt = box(0.78, 0.34, 0.62, beltM); belt.position.set(0, -0.18, 0); // маваші-пояс
+    rig.parts.torso.add(belt);
+    for (let i = -2; i <= 2; i++) {
+      const cord = box(0.05, 0.3, 0.04, toonMat(0xe8c84a)); // сагарі — золоті шнури спереду
+      cord.position.set(i * 0.13, -0.42, -0.32);
+      rig.parts.torso.add(cord);
+    }
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'

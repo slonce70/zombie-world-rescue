@@ -941,4 +941,12 @@ export const EN = {
 "Золоте яблуко": "Golden Apple",
 "+20 здоров'я на 5 секунд": "+20 health for 5 seconds",
 "🍎 Золоте яблуко: +20 здоров'я на 5с!": "🍎 Golden Apple: +20 health for 5s!",
+"Японія": "Japan",
+"🇯🇵 ЯПОНІЮ ЗВІЛЬНЕНО!": "🇯🇵 JAPAN LIBERATED!",
+"👑 СУМО-ЗОМБІ": "👑 SUMO ZOMBIE",
+"Сакура, ворота торії й СУМО-ЗОМБІ! Стережись велетенського борця! 🌸": "Cherry blossoms, a torii gate and the SUMO ZOMBIE! Watch out for the giant wrestler! 🌸",
+"онігірі": "onigiri",
+"СЕЛО САКУРОВЕ": "CHERRY VILLAGE",
+"ВОРОТА ТОРІЇ": "TORII GATE",
+"СВЯТА ПАГОДА": "SACRED PAGODA",
 };

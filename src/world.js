@@ -112,10 +112,62 @@ export class World {
       colosseum: () => this._lmColosseum(P.colosseum),
       leaningTower: () => this._lmLeaningTower(P.leaningTower),
       romanRuins: () => this._lmRomanRuins(P.romanRuins),
+      torii: () => this._lmTorii(P.torii),
+      pagoda: () => this._lmPagoda(P.pagoda),
       birds: () => this._lmBirds(),
     };
     for (const id of lm) if (build[id]) build[id]();
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
+  }
+
+  // ⛩️ Ворота торії на вʼїзді в село: дві червоні колони + дві поперечні балки.
+  _lmTorii({ x, z }) {
+    const gy = this.groundH(x, z);
+    const redM = toonMat(0xd6402c);
+    const blackM = toonMat(0x2a211e);
+    const H = 6.0, SPAN = 5.0;
+    for (const sx of [-1, 1]) {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, H, 10), redM);
+      pillar.position.set(x + sx * SPAN, gy + H / 2, z);
+      pillar.castShadow = true;
+      this.staticGroup.add(pillar);
+      this._addCollider(x + sx * SPAN, z, 0.5, gy + H, 0.4);
+    }
+    const kasagi = new THREE.Mesh(new THREE.BoxGeometry(SPAN * 2 + 3.0, 0.55, 0.9), blackM); // верхня балка
+    kasagi.position.set(x, gy + H + 0.2, z);
+    const nuki = new THREE.Mesh(new THREE.BoxGeometry(SPAN * 2 + 0.6, 0.4, 0.6), redM);        // нижня балка
+    nuki.position.set(x, gy + H - 1.1, z);
+    const plaque = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.16), toonMat(0xf0e4d0));
+    plaque.position.set(x, gy + H - 0.5, z + 0.35);
+    this.staticGroup.add(kasagi, nuki, plaque);
+    this._makeSign(x + 3.5, z + 2, t('ВОРОТА ТОРІЇ'), 0);
+  }
+
+  // 🏯 Свята пагода: пʼятиярусна вежа з червоними дахами (суцільний орієнтир).
+  _lmPagoda({ x, z }) {
+    const gy = this.groundH(x, z);
+    const wallM = toonMat(0xefe7da);
+    const roofM = toonMat(0xc0392b);
+    const TIERS = 5;
+    let w = 9, y = gy;
+    for (let i = 0; i < TIERS; i++) {
+      const h = 2.0;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), wallM);
+      body.position.set(x, y + h / 2, z);
+      body.castShadow = i % 2 === 0;
+      body.receiveShadow = true;
+      const roof = new THREE.Mesh(this._prismGeo(w + 2.4, 1.1, w + 2.4), roofM);
+      roof.position.set(x, y + h + 0.55, z);
+      roof.castShadow = true;
+      this.staticGroup.add(body, roof);
+      y += h + 1.0;
+      w *= 0.82;
+    }
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.18, 2.2, 8), toonMat(0xffd23f, 0xcc8800, 0.3));
+    spire.position.set(x, y + 1.0, z);
+    this.staticGroup.add(spire);
+    this._addCollider(x, z, 5.0, gy + 13, 4.6); // суцільна вежа — крізь неї не пройти
+    this._makeSign(x + 7, z + 7, t('СВЯТА ПАГОДА'), 0.5);
   }
 
   _drapeXZGeometry(geo, cx, cz, offset = 0) {
