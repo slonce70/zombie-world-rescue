@@ -47,9 +47,10 @@ check(tur.food === 'лукум', `смаколик країни: ${tur.food}`);
 // бос Паша Кебаб кидає шампури
 const sultan = await page.evaluate(() => {
   const b = window.__game.level.zombies.spawnBoss();
-  return { style: b.bossStyle, hp: b.maxHp, ranged: !!b.ranged, projColor: b.ranged && b.ranged.color };
+  return { style: b.bossStyle, hp: b.maxHp, cfgHp: window.__game.level.country.boss.hp, ranged: !!b.ranged, projColor: b.ranged && b.ranged.color };
 });
-check(sultan.style === 'sultan' && sultan.hp === 5200, `ПАША КЕБАБ (${sultan.hp} HP)`);
+// HP звіряємо з конфігом гри (★1 соло: maxHp === boss.hp), не з літералом — не флакає при ребалансі
+check(sultan.style === 'sultan' && sultan.hp === sultan.cfgHp, `ПАША КЕБАБ (${sultan.hp} HP = конфіг)`);
 check(sultan.ranged, 'Паша кидає шампури (дальній бій)');
 
 // ===== 🇪🇬 ЄГИПЕТ =====
@@ -112,9 +113,9 @@ check(mummy.type === 'mummy' && mummy.hp > 200, `мумія жилава (${mumm
 // бос Фараон
 const pharaoh = await page.evaluate(() => {
   const b = window.__game.level.zombies.spawnBoss();
-  return { style: b.bossStyle, hp: b.maxHp, ranged: !!b.ranged };
+  return { style: b.bossStyle, hp: b.maxHp, cfgHp: window.__game.level.country.boss.hp, ranged: !!b.ranged };
 });
-check(pharaoh.style === 'pharaoh' && pharaoh.hp === 6400, `ФАРАОН ТУТ-АНХ-ЗОМБ (${pharaoh.hp} HP)`);
+check(pharaoh.style === 'pharaoh' && pharaoh.hp === pharaoh.cfgHp, `ФАРАОН ТУТ-АНХ-ЗОМБ (${pharaoh.hp} HP = конфіг)`);
 check(pharaoh.ranged, 'Фараон насилає скарабеїв');
 
 // ===== 🌙 ДЕНЬ/НІЧ =====

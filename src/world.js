@@ -2719,7 +2719,11 @@ export class World {
   _buildLamps() {
     // ліхтарі вздовж південної дороги
     const lampM = toonMat(0x37404f);
-    const lampHeadM = toonMat(0xffd97a, 0xffc233, this.biome.lampGlow);
+    // клон спільного toon-матеріалу: setNight мутує emissiveIntensity ЩОКАДРУ —
+    // на спільному кеші це протекло б у наступний рівень і в усі пропси з тим колір-ключем.
+    // userData скидаємо, щоб endLevel диспозив цей per-level клон (інакше .shared лишив би його жити).
+    const lampHeadM = toonMat(0xffd97a, 0xffc233, this.biome.lampGlow).clone();
+    lampHeadM.userData = {};
     this.lampHeadM = lampHeadM; // вночі розгоряється (setNight)
     for (const [lx, lz] of [[10, 130], [2, 90], [10, 50], [-4, 24], [12, 14], [-8, -2]]) {
       const ly = this.groundH(lx, lz);

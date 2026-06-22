@@ -4,6 +4,7 @@ import { t, keyHint, interactKey } from './i18n.js';
 import {
   makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh, PETS,
 } from './characters.js';
+import { disposeObject } from './utils.js';
 
 // ============================================================
 // 🦙 Мегабокс: святкова скриня з pity-механікою
@@ -48,6 +49,7 @@ export class Megabox {
       if (this.t - this.openedAt > 1.2) this.mesh.group.position.y -= dt * 0.7;
       if (this.t - this.openedAt > 3) {
         level.scene.remove(this.mesh.group);
+        disposeObject(this.mesh.group);
         this.done = true;
       }
       return;
@@ -133,7 +135,10 @@ export class Pet {
   }
 
   dispose() {
-    if (this.model && this.model.group) this.level.scene.remove(this.model.group);
+    if (this.model && this.model.group) {
+      this.level.scene.remove(this.model.group);
+      disposeObject(this.model.group);
+    }
   }
 
   update(dt) {
@@ -776,6 +781,7 @@ export class Gadgets {
       level.player.vel.set(0, 0, 0);
     }
     level.scene.remove(tower.mesh);
+    disposeObject(tower.mesh); // per-instance гео/матеріали вежі; спільний toon-кеш guard-неться
     level.world.colliders = level.world.colliders.filter((c) => c !== tower.collider);
     level.world._buildGrid();
     if (broken) {
@@ -834,6 +840,7 @@ export class Gadgets {
 
   _disposeTramp(t) {
     this.level.scene.remove(t.mesh);
+    disposeObject(t.mesh);
     const idx = this.level.world.jumpPads.indexOf(t.pad);
     if (idx >= 0) this.level.world.jumpPads.splice(idx, 1);
   }
@@ -981,6 +988,7 @@ export class Gadgets {
     this.turrets.splice(i, 1);
     if (level.net && level.net.authority) level.netEv('turrgo', tu.nid, broken ? 1 : 0);
     level.scene.remove(tu.mesh.group);
+    disposeObject(tu.mesh.group); // турелі експайрять кожні ~30с — інакше течуть весь сеанс
     level.world.colliders = level.world.colliders.filter((c) => c !== tu.collider);
     level.world._buildGrid();
     if (broken) {
@@ -1066,6 +1074,7 @@ export class Gadgets {
     this.walls.splice(i, 1);
     if (level.net && level.net.authority) level.netEv('wallgo', w.nid, broken ? 1 : 0);
     level.scene.remove(w.mesh);
+    disposeObject(w.mesh); // стіни рецикляться — диспозимо per-instance гео
     level.world.colliders = level.world.colliders.filter((c) => !w.colliders.includes(c));
     level.world._buildGrid();
     if (broken) {

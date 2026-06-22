@@ -312,9 +312,10 @@ export class CoopSession {
   }
 
   _onClose(reason) {
-    if (this.role === 'guest' && this.state === 'level' && this.net) {
-      // спроба тихого реконекту з тим самим pid
-      this.net.connectionLost();
+    // тихий реконект гостя з тим самим pid: і в РІВНІ (зберегти бій), і в ЛОБІ
+    // (моргання Wi-Fi у лобі не повинно вбивати кімнату). У лобі this.net ще немає.
+    if (this.role === 'guest' && this.myPid >= 2 && (this.state === 'level' || this.state === 'lobby')) {
+      if (this.net) this.net.connectionLost();
       this._tryReconnect();
       return;
     }

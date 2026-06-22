@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
 
-import { clamp, damp, dampAngle, closestRaySeg, RNG } from './utils.js';
+import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
 import { t } from './i18n.js';
 
 const TYPE_STATS = {
@@ -412,6 +412,7 @@ export class Zombies {
     const hpLeft = b.hp;
     b.gone = true;
     this.scene.remove(b.rig.group);
+    disposeObject(b.rig.group); // бос — свіжий ріг (makeBoss, не cloneRig): геометрія per-instance, безпечно
     this.byNidMap.delete(b.nid);
     this.level.netEv('zg', b.nid);
     this.list = this.list.filter((zb) => zb !== b);
@@ -702,6 +703,9 @@ export class Zombies {
           z.gone = true;
           removeAny = true;
           this.scene.remove(rig.group);
+          // лише бос: ріг свіжий (makeBoss), геометрія per-instance. Звичайні зомбі
+          // клонуються з кешу (cloneRig ділить mg за посиланням) — диспоз зламав би сіблінгів.
+          if (z.type === 'boss') disposeObject(rig.group);
           this.byNidMap.delete(z.nid);
         }
         continue;
@@ -1211,6 +1215,7 @@ export class Zombies {
     if (!z) return;
     z.gone = true;
     this.scene.remove(z.rig.group);
+    if (z.type === 'boss') disposeObject(z.rig.group); // бос per-instance; звичайні — спільний кеш
     this.byNidMap.delete(nid);
     if (this.boss === z) this.boss = null;
     this.list = this.list.filter((zb) => zb !== z);
@@ -1282,7 +1287,10 @@ export class Zombies {
   }
 
   clearAllPuppets() {
-    for (const z of this.list) this.scene.remove(z.rig.group);
+    for (const z of this.list) {
+      this.scene.remove(z.rig.group);
+      if (z.type === 'boss') disposeObject(z.rig.group); // бос per-instance; звичайні — спільний кеш
+    }
     this.list = [];
     this.byNidMap.clear();
     this.boss = null;
@@ -1305,6 +1313,9 @@ export class Zombies {
           z.gone = true;
           removeAny = true;
           this.scene.remove(rig.group);
+          // лише бос: ріг свіжий (makeBoss), геометрія per-instance. Звичайні зомбі
+          // клонуються з кешу (cloneRig ділить mg за посиланням) — диспоз зламав би сіблінгів.
+          if (z.type === 'boss') disposeObject(rig.group);
           this.byNidMap.delete(z.nid);
         }
         continue;

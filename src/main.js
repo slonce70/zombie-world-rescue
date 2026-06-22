@@ -56,7 +56,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -718,7 +718,7 @@ class Game {
       },
       {
         id: 'arena', icon: '👑', name: t('АРЕНА БОСІВ'), locked: libN < 2,
-        desc: libN < 2 ? t('Відкриється після двох звільнених країн') : t('Усі 6 босів поспіль на час. Час — у Лігу!'),
+        desc: libN < 2 ? t('Відкриється після двох звільнених країн') : t('Усі {n} босів поспіль на час. Час — у Лігу!', { n: CAMPAIGN_ORDER.length }),
       },
     ];
     const root = document.getElementById('solo-modes');

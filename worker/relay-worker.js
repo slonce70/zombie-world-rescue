@@ -208,7 +208,10 @@ export class Room {
     }
     const peers = this._peers();
     peers.delete(att.id);
-    await this.state.storage.delete('key:' + att.id); // звільняємо секрет слота — інакше key:<id> течуть у storage, поки живий хост
+    // НЕ видаляємо 'key:'+id тут: інакше гонка «close побачили раніше за resume» лишає гостя
+    // без ключа → новий pid → екран завантаження + втрата позиції (dev-relay тримає ключ у
+    // room.keys так само). Ключі прибирає alarm()→deleteAll() при зникненні хоста.
+    // ponytail: за вічно-живого хоста ключі ростуть з nextId; для родинного коопу (≤4) це дрібниця.
     for (const [, sock] of peers) this._safeSend(sock, JSON.stringify({ t: 'peer', id: att.id, on: false }));
     if (att.id === 1) {
       // хост зник: реконекту хоста немає, тому грейс короткий — щоб гості

@@ -51,7 +51,7 @@ export const EN = {
 "Виживи у колі, що звужується. Рекорд — у Лігу!": "Survive the shrinking circle. Records go to the League!",
 "АРЕНА БОСІВ": "BOSS ARENA",
 "Відкриється після двох звільнених країн": "Unlocks after two freed countries",
-"Усі 6 босів поспіль на час. Час — у Лігу!": "All 6 bosses in a row, timed. Times go to the League!",
+"Усі {n} босів поспіль на час. Час — у Лігу!": "All {n} bosses in a row, timed. Times go to the League!",
 "🔴 Натисни червону країну на глобусі — там зомбі!": "🔴 Tap a red country on the globe — zombies there!",
 "<div class=\"solo-cty-title\">Де переживати Шторм?</div>": "<div class=\"solo-cty-title\">Where to survive the Storm?</div>",
 "<div class=\"solo-cty-title\">Яку країну рятуємо?</div>": "<div class=\"solo-cty-title\">Which country are we saving?</div>",
