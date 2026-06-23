@@ -718,40 +718,12 @@ export class Zombies {
   }
 
   update(dt) {
-    // 👻 невидимі привиди видимі ЛИШЕ поки активний Ікс-рей (працює і для хоста, і для гостя)
-    if (this.xrayT > 0) this.xrayT = Math.max(0, this.xrayT - dt);
-    const reveal = this.xrayT > 0;
-    for (const z of this.list) if (z.invisible) z.rig.group.visible = reveal;
-    // 🔥 ВІЗУАЛ ГОРІННЯ ВАМПІРА — ДО mirror-гарду, щоб ГІСТЬ теж бачив полумʼя.
-    // nightK<0.5 (день) → burnFx видимий + час-базовий флікер; інакше прихований.
-    // Урон — ПІСЛЯ гарду (host-only); тут лише картинка. Синхронна через level.nightK + level.stats.time.
-    {
-      const nk = this.level.nightK || 0;
-      const burning = nk < 0.5;
-      const tnow = (this.level.stats && this.level.stats.time) || 0;
-      for (const z of this.list) {
-        if (z.type !== 'vampire' || !z.burnFx) continue;
-        const fx = z.burnFx;
-        if (burning && z.state !== 'dead' && !z.gone) {
-          fx.visible = true;
-          // флікер: per-instance фаза від nid, щоб язики не пульсували в унісон
-          const f = 0.85 + 0.25 * Math.sin(tnow * 14 + (z.nid || 0) * 1.7);
-          fx.scale.set(f, 0.8 + 0.4 * f, f);
-          // зрідка дим/іскри — кадеція на вампіра (раз на ~0.4с)
-          z._burnFxT = (z._burnFxT || 0) - dt;
-          if (z._burnFxT <= 0) {
-            z._burnFxT = 0.4;
-            this.level.effects.burst(new THREE.Vector3(z.x, z.y + 1.2, z.z), 0xff8a2a, 4, { speed: 2.2, up: 2.4, life: 0.5, size: 0.8 });
-          }
-        } else if (fx.visible) {
-          fx.visible = false;
-        }
-      }
-    }
+    // 👻 привиди (Ікс-рей) + 🔥 візуал горіння вампіра — ДО mirror-гарду, щоб їх бачив і ГІСТЬ.
+    this._updateGhostXray(dt);
+    this._updateVampireBurnFx(dt);
     if (this.mirror) { this._updateMirror(dt); return; }
     const level = this.level;
     const player = level.player;
-    const px = player.pos.x, pz = player.pos.z;
     // у коопі зомбі полюють на НАЙБЛИЖЧОГО живого гравця (хост або гості)
     const players = level.players
       || (this._soloPlayers || (this._soloPlayers = [{
@@ -761,127 +733,11 @@ export class Zombies {
       }]));
 
     // спавн орди хвилями
-    if (this.hordeActive && this.hordePending > 0) {
-      this._hordeIdleT = 0; // поки є незаспавнені — таймер простою не рахуємо
-      this.hordeSpawnT -= dt;
-      if (this.hordeSpawnT <= 0) {
-        this.hordeSpawnT = 1.3;
-        const batch = Math.min(4, this.hordePending);
-        const alivePl = players.filter((p) => p.health > 0);
-        for (let i = 0; i < batch; i++) {
-          const cp = alivePl.length ? alivePl[Math.floor(this.rng.next() * alivePl.length)].pos : player.pos;
-          const a = this.rng.next() * Math.PI * 2;
-          const r = this.rng.range(32, 48);
-          let x = cp.x + Math.cos(a) * r;
-          let z = cp.z + Math.sin(a) * r;
-          const dB = Math.hypot(x, z);
-          if (dB > this.L.BOUND - 5) {
-            x *= (this.L.BOUND - 8) / dB;
-            z *= (this.L.BOUND - 8) / dB;
-          }
-          const roll = this.rng.next();
-          const withShield = (this.level.country && this.level.country.shieldGuards) > 0;
-          const hard = this.diff.hp >= 1.5; // DEU/FRA — броньовики в ордах
-          let type;
-          if (this._allowGunner && this.rng.chance(0.08)) type = 'gunner';
-          else if (hard && this.rng.chance(0.09)) type = 'ironclad';
-          else if (this.extraZombie && withShield) {
-            type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie
-              : roll < 0.9 ? 'shield' : 'tank';
-          } else if (this.extraZombie) {
-            type = roll < 0.45 ? 'walker' : roll < 0.7 ? 'runner' : roll < 0.9 ? this.extraZombie : 'tank';
-          } else if (withShield) {
-            type = roll < 0.5 ? 'walker' : roll < 0.8 ? 'runner' : roll < 0.9 ? 'shield' : 'tank';
-          } else {
-            type = roll < 0.6 ? 'walker' : roll < 0.9 ? 'runner' : 'tank';
-          }
-          this.spawn(type, x, z, { horde: true });
-          this.hordePending--;
-        }
-      }
-    }
-    if (this.hordeActive && this.hordePending <= 0) {
-      // самокорекція лічильника + таймаут захист від застряглих зомбі
-      const aliveHorde = this.list.filter((z) => z.horde && z.state !== 'dead').length;
-      if (aliveHorde !== this.hordeRemaining) this.hordeRemaining = aliveHorde;
-      // скидаємо таймер простою якщо гравець робить прогрес (вбивства)
-      if (this._hordePrevAlive === undefined || aliveHorde < this._hordePrevAlive) {
-        this._hordeIdleT = 0;
-      } else {
-        this._hordeIdleT += dt;
-      }
-      this._hordePrevAlive = aliveHorde;
-      if (this._hordeIdleT > 25 && this.hordeRemaining > 0) {
-        for (const z of this.list) if (z.horde && z.state !== 'dead') z.horde = false;
-        this.hordeRemaining = 0;
-      }
-    }
-    if (this.hordeActive && this.hordePending <= 0 && this.hordeRemaining <= 0) {
-      this.hordeActive = false;
-      level.bus.emit('hordeEnd');
-      level.netEv('he'); // кооп: кінець орди гостю
-    }
+    this._updateHordeWaves(dt, players, player);
 
-    // 🧛 НІЧНИЙ СПАВНЕР ВАМПІРІВ (host/solo-only — ми вже ПІСЛЯ mirror-гарду, гість сюди не доходить).
-    // Поки ніч (nightK>0.5) і живий хоч один гравець — раз на ~7с підкидаємо 1-2 вампіри
-    // навколо гравця (як орда), доки живих вампірів < cap. Удень нові НЕ спавняться; таймер
-    // скидається на світанку (перехід ніч→день), щоб перша ніч-хвиля не йшла миттєво.
-    {
-      const isNight = (level.nightK || 0) > 0.5;
-      if (isNight && this._allowVampire) {
-        const VAMP_CAP = 6;
-        this._vampT -= dt;
-        if (this._vampT <= 0) {
-          this._vampT = 7; // кадеція ~7с
-          const aliveVamp = this.list.filter((z) => z.type === 'vampire' && z.state !== 'dead').length;
-          const alivePl = players.filter((p) => p.health > 0);
-          if (alivePl.length && aliveVamp < VAMP_CAP) {
-            const want = Math.min(this.rng.next() < 0.5 ? 1 : 2, VAMP_CAP - aliveVamp);
-            for (let i = 0; i < want; i++) {
-              const cp = alivePl[Math.floor(this.rng.next() * alivePl.length)].pos;
-              const a = this.rng.next() * Math.PI * 2;
-              const r = this.rng.range(30, 46);
-              let x = cp.x + Math.cos(a) * r;
-              let z = cp.z + Math.sin(a) * r;
-              const dB = Math.hypot(x, z);
-              if (dB > this.L.BOUND - 5) {
-                x *= (this.L.BOUND - 8) / dB;
-                z *= (this.L.BOUND - 8) / dB;
-              }
-              this.spawn('vampire', x, z, {});
-            }
-          }
-        }
-        this._vampWasNight = true;
-      } else if (this._vampWasNight) {
-        // 🌅 світанок: ніч скінчилась → скидаємо таймер. Нові НЕ спавняться, а наявні вампіри
-        // ВДЕНЬ ЗГОРАЮТЬ на сонці (DoT-блок горіння вище по update) — гинуть за кілька секунд.
-        this._vampT = 0;
-        this._vampWasNight = false;
-      }
-    }
-
-    // 🔥 УРОН ГОРІННЯ ВАМПІРА НА СОНЦІ — host/solo-only (ми вже ПІСЛЯ mirror-гарду).
-    // День (nightK<0.5) → DoT; sun=повнота сонця (1 у полудень). Повне сонце ~40 dps → 150hp за ~3.75с.
-    // НЕ йдемо через _damage (спамив би aggro/звук/тріщини щокадру) — прямий z.hp-=,
-    // damageNumber зрідка для читабельності, смерть через _kill(z, null) (синк гостю через netEv('zd')).
-    {
-      const nk = level.nightK || 0;
-      if (nk < 0.5) {
-        const sun = clamp((0.5 - nk) * 2, 0, 1);
-        const burnDps = 40 * sun;
-        for (const z of this.list) {
-          if (z.type !== 'vampire' || z.state === 'dead' || z.gone) continue;
-          z.hp -= burnDps * dt;
-          z._burnNumT = (z._burnNumT || 0) - dt;
-          if (z._burnNumT <= 0) {
-            z._burnNumT = 0.5;
-            level.effects.damageNumber(new THREE.Vector3(z.x, z.y + 1.4, z.z), burnDps * 0.5);
-          }
-          if (z.hp <= 0) this._kill(z, null);
-        }
-      }
-    }
+    // 🧛 нічний спавнер вампірів + 🔥 урон горіння на сонці — обидва host/solo-only (вже ПІСЛЯ mirror-гарду).
+    this._spawnNightVampires(dt, players);
+    this._burnVampiresInSun(dt);
 
     // 🧲 будуємо бакет-сітку зомбі раз/кадр — далі сепарація питає лише сусідні комірки
     this._buildSepGrid();
@@ -1060,115 +916,12 @@ export class Zombies {
 
       // --- 🐂 торо (charger, не-бос): телеграф → ривок рогами здаля ---
       if (z.charger && z.type !== 'boss' && z.state !== 'dead' && z.aggroed) {
-        z.chargeCd -= dt;
-        if (z.telegraph > 0) {
-          z.telegraph -= dt;
-          if (z.telegraph <= 0) {
-            z.charging = 0.8;
-            const d = Math.max(0.5, distP);
-            z.chargeDX = dxP / d;
-            z.chargeDZ = dzP / d;
-            z.didHit = false;
-            level.audio.shriek(0.5, st.pitch * 0.9);
-          }
-        } else if (z.charging > 0) {
-          z.charging -= dt;
-          const cs = 13;
-          z.x += z.chargeDX * cs * dt;
-          z.z += z.chargeDZ * cs * dt;
-          if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.3 && !z.didHit) {
-            z.didHit = true;
-            this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z);
-            level.audio.slam();
-          }
-          if (z.charging <= 0) {
-            z.didHit = false;
-            z.chargeCd = this.rng.range(3.5, 6);
-          }
-        } else if (z.chargeCd <= 0 && z.state === 'chase' && distP > 6 && distP < 26) {
-          // телеграф ривка лише з прямою видимістю — не крізь стіни
-          this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
-          this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
-          if (this.world.shotBlockDist(this._p0, this._p1, distP) > distP - 0.5) {
-            z.telegraph = 0.7;
-            z.didHit = false;
-            level.audio.zgroan(0.7, st.pitch);
-          } else {
-            z.chargeCd = 0.8;
-          }
-        }
+        this._updateChargerAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt);
       }
 
       // --- бос: чардж і призов ---
       if (z.type === 'boss' && z.state !== 'dead') {
-        const frac = (z.hp / z.maxHp) * 100;
-        for (const thr of [75, 50, 25]) {
-          if (frac <= thr && !z.summonedAt[thr]) {
-            z.summonedAt[thr] = true;
-            level.audio.bossRoar();
-            level.bus.emit('bossSummon');
-            for (let i = 0; i < 6; i++) {
-              const a = (i / 6) * 6.28;
-              const st = z.bossStyle || 'king';
-              const mtype = st === 'frost' ? (i % 2 ? 'snowman' : 'walker')
-                : st === 'iron' ? (i % 2 ? 'shield' : 'runner')
-                  : st === 'chef' ? (i % 2 ? 'spitter' : 'walker')
-                    : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
-                      : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
-                        : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
-                          : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
-                            : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
-                              : st === 'rex' ? (i % 2 ? 'toro' : 'imp')
-                                : st === 'emperor' ? (i % 2 ? 'terracotta' : 'runner')
-                                  : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
-              const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
-                { horde: false, noCoopScale: !!z._stormWave });
-              mz.aggroed = true;
-              mz.state = 'chase';
-              if (z._stormWave) mz._stormWave = true;
-            }
-          }
-        }
-        z.chargeCd -= dt;
-        if (z.telegraph > 0) {
-          z.telegraph -= dt;
-          if (z.telegraph <= 0) {
-            z.charging = 1.1;
-            const d = Math.max(0.5, distP);
-            z.chargeDX = dxP / d;
-            z.chargeDZ = dzP / d;
-          }
-        } else if (z.charging > 0) {
-          z.charging -= dt;
-          const cs = 15;
-          z.x += z.chargeDX * cs * dt;
-          z.z += z.chargeDZ * cs * dt;
-          if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
-            z.didHit = true;
-            this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
-            level.audio.slam();
-          }
-          if (z.charging <= 0) {
-            z.didHit = false;
-            z.chargeCd = this.rng.range(4.5, 7);
-          }
-        } else if (z.chargeCd <= 0 && distP > 7 && distP < 32 && z.state === 'chase') {
-          z.telegraph = 0.8;
-          z.didHit = false;
-          level.audio.chargeWarn();
-          level.bus.emit('bossCharge');
-        }
-        // лють лише у фазі низького HP; якщо ліш залікував боса вище 35% — спадає
-        z.enraged = frac < 35;
-        // ліш: бос не покидає околиці арени — повертається і лікується
-        const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);
-        if (!z.noLeash && !z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;
-        else if (z.leashed && dArena < 8) z.leashed = false;
-        if (z.leashed) {
-          z.telegraph = 0;
-          z.charging = 0;
-          z.hp = Math.min(z.maxHp, z.hp + 10 * dt);
-        }
+        this._updateBossAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt);
       }
 
       // --- 🧙 чарівник: призов / лікування / ре-каст щита ---
@@ -1181,116 +934,8 @@ export class Zombies {
         this._updateRobotShield(z, dt);
       }
 
-      // --- рух ---
-      let targetX = null, targetZ = null, spd = 0;
-      if (z.state === 'flee') {
-        targetX = z.x - dxP;
-        targetZ = z.z - dzP;
-        spd = 6.2;
-      } else if (z.state === 'chase') {
-        if (z.type === 'boss' && z.leashed) {
-          targetX = this.L.arena.x; targetZ = this.L.arena.z;
-        } else {
-          targetX = tp.x; targetZ = tp.z;
-        }
-        spd = st.chaseSpeed * (z.enraged ? 1.5 : 1);
-      } else if (z.state === 'wander') {
-        targetX = z.wx; targetZ = z.wz;
-        spd = st.speed;
-        if (Math.hypot(z.wx - z.x, z.wz - z.z) < 1) spd = 0;
-      }
-      if (z.charging > 0 || z.telegraph > 0) spd = 0;
-      // сніговик тримає дистанцію і кидає сніжки (зупиняється лише в зоні кидка)
-      if (z.ranged && z.ranged.hold > 0 && z.state === 'chase'
-        && distP < z.ranged.hold && distP > Math.max(st.attackR * 1.2, z.ranged.min)) spd = 0;
-
-      let moving = false;
-      if (spd > 0 && targetX !== null) {
-        const dx = targetX - z.x, dz = targetZ - z.z;
-        const d = Math.hypot(dx, dz);
-        if (d > 0.4) {
-          let mx = (dx / d) * spd * dt;
-          let mz = (dz / d) * spd * dt;
-          // сепарація від інших зомбі (квадрати відстаней — без зайвих sqrt).
-          // Кандидатів беремо з бакет-сітки: лише 3×3 сусідні комірки замість всього this.list.
-          const cgx = Math.floor(z.x / SEP_CELL), cgz = Math.floor(z.z / SEP_CELL);
-          for (let gx = -1; gx <= 1; gx++) {
-            for (let gz = -1; gz <= 1; gz++) {
-              const bucket = this._sepGrid.get(SKEY(cgx + gx, cgz + gz));
-              if (!bucket) continue;
-              for (const o of bucket) {
-                if (o === z || o.state === 'dead') continue;
-                const sx = z.x - o.x, sz = z.z - o.z;
-                const minD = (z.rig.radius + o.rig.radius) * 0.9;
-                const sd2 = sx * sx + sz * sz;
-                if (sd2 < minD * minD && sd2 > 1e-4) {
-                  const sd = Math.sqrt(sd2);
-                  mx += (sx / sd) * (minD - sd) * 0.5;
-                  mz += (sz / sd) * (minD - sd) * 0.5;
-                }
-              }
-            }
-          }
-          // 🏔️ чесні схили: у відвісну кручу зомбі не лізе — обходить уздовж стіни
-          if (this.world._terrainMod) {
-            // 🚀 висоту під зомбі семплимо раз/кадр: на старті кадру (x,z) ще ті самі,
-            // що в кінці минулого (рух застосовується нижче) — переюзаємо кеш точним збігом.
-            const ghO = (z._ghX === z.x && z._ghZ === z.z) ? z._gh : this.world.groundH(z.x, z.z);
-            const ok = (ax, az) =>
-              this.world.groundH(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
-            if (!ok(z.x + mx, z.z + mz)) {
-              if (ok(z.x + mx, z.z)) mz = 0;
-              else if (ok(z.x, z.z + mz)) mx = 0;
-              else {
-                // обидві осі впираються в крутий схил: ковзаємо вздовж нього (дотичний крок),
-                // а не завмираємо намертво — інакше зомбі «застрягає» біля нерівностей
-                const px = -mz, pz = mx;
-                if (ok(z.x + px, z.z + pz)) { mx = px; mz = pz; }
-                else if (ok(z.x - px, z.z - pz)) { mx = -px; mz = -pz; }
-                else { mx = 0; mz = 0; }
-              }
-            }
-          }
-          z.x += mx;
-          z.z += mz;
-          moving = true;
-        }
-      }
-      // колізії зі світом
-      const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
-      z.x = solved.x;
-      z.z = solved.z;
-      const gh = this.world.groundH(z.x, z.z);
-      z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
-      z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
-
-      // --- поворот і анімація ---
-      let faceX = 0, faceZ = 0;
-      if (z.state === 'attack' || z.telegraph > 0) {
-        faceX = dxP; faceZ = dzP;
-      } else if (z.charging > 0) {
-        faceX = z.chargeDX; faceZ = z.chargeDZ;
-      } else if (moving && targetX !== null) {
-        faceX = targetX - z.x; faceZ = targetZ - z.z;
-      }
-      if (faceX !== 0 || faceZ !== 0) {
-        const targetYaw = Math.atan2(-faceX, -faceZ);
-        rig.group.rotation.y = dampAngle(rig.group.rotation.y, targetYaw, 8, dt);
-      }
-      z._netMoving = moving;
-      rig.group.position.set(z.x, z.y, z.z);
-
-      if (z.state !== 'attack') {
-        if (z.telegraph > 0) {
-          setAnim(rig, 'cheer'); // махає руками — телеграф чарджу
-        } else if (moving) {
-          setAnim(rig, spd > 4 || z.charging > 0 ? 'run' : 'walk');
-          rig.anim.speed = z.charging > 0 ? 14 : spd;
-        } else {
-          setAnim(rig, 'idle');
-        }
-      }
-      updateRig(rig, dt);
+      // --- рух, колізії, поворот і анімація ---
+      this._moveAndAnimateZombie(z, dt, distP, dxP, dzP, tp);
 
       // --- звуки ---
       z.groanT -= dt;
@@ -1302,6 +947,393 @@ export class Zombies {
       }
     }
     if (removeAny) this.list = this.list.filter((z) => !z.gone);
+  }
+
+  // 👻 Ікс-рей: невидимі привиди видимі лише поки активний таймер (хост і гість).
+  _updateGhostXray(dt) {
+    if (this.xrayT > 0) this.xrayT = Math.max(0, this.xrayT - dt);
+    const reveal = this.xrayT > 0;
+    for (const z of this.list) if (z.invisible) z.rig.group.visible = reveal;
+  }
+
+  // 🔥 Візуал горіння вампіра — ДО mirror-гарду, щоб ГІСТЬ теж бачив полумʼя.
+  // nightK<0.5 (день) → burnFx видимий + час-базовий флікер; інакше прихований. Урон — окремо
+  // (host-only, _burnVampiresInSun); тут лише картинка. Синхронна через level.nightK + level.stats.time.
+  _updateVampireBurnFx(dt) {
+    const nk = this.level.nightK || 0;
+    const burning = nk < 0.5;
+    const tnow = (this.level.stats && this.level.stats.time) || 0;
+    for (const z of this.list) {
+      if (z.type !== 'vampire' || !z.burnFx) continue;
+      const fx = z.burnFx;
+      if (burning && z.state !== 'dead' && !z.gone) {
+        fx.visible = true;
+        // флікер: per-instance фаза від nid, щоб язики не пульсували в унісон
+        const f = 0.85 + 0.25 * Math.sin(tnow * 14 + (z.nid || 0) * 1.7);
+        fx.scale.set(f, 0.8 + 0.4 * f, f);
+        // зрідка дим/іскри — кадеція на вампіра (раз на ~0.4с)
+        z._burnFxT = (z._burnFxT || 0) - dt;
+        if (z._burnFxT <= 0) {
+          z._burnFxT = 0.4;
+          this.level.effects.burst(new THREE.Vector3(z.x, z.y + 1.2, z.z), 0xff8a2a, 4, { speed: 2.2, up: 2.4, life: 0.5, size: 0.8 });
+        }
+      } else if (fx.visible) {
+        fx.visible = false;
+      }
+    }
+  }
+
+  // 🌊 Спавн орди хвилями (host/solo-only). players — живі гравці кооперативу; player — фолбек.
+  _updateHordeWaves(dt, players, player) {
+    const level = this.level;
+    if (this.hordeActive && this.hordePending > 0) {
+      this._hordeIdleT = 0; // поки є незаспавнені — таймер простою не рахуємо
+      this.hordeSpawnT -= dt;
+      if (this.hordeSpawnT <= 0) {
+        this.hordeSpawnT = 1.3;
+        const batch = Math.min(4, this.hordePending);
+        const alivePl = players.filter((p) => p.health > 0);
+        for (let i = 0; i < batch; i++) {
+          const cp = alivePl.length ? alivePl[Math.floor(this.rng.next() * alivePl.length)].pos : player.pos;
+          const a = this.rng.next() * Math.PI * 2;
+          const r = this.rng.range(32, 48);
+          let x = cp.x + Math.cos(a) * r;
+          let z = cp.z + Math.sin(a) * r;
+          const dB = Math.hypot(x, z);
+          if (dB > this.L.BOUND - 5) {
+            x *= (this.L.BOUND - 8) / dB;
+            z *= (this.L.BOUND - 8) / dB;
+          }
+          const roll = this.rng.next();
+          const withShield = (this.level.country && this.level.country.shieldGuards) > 0;
+          const hard = this.diff.hp >= 1.5; // DEU/FRA — броньовики в ордах
+          let type;
+          if (this._allowGunner && this.rng.chance(0.08)) type = 'gunner';
+          else if (hard && this.rng.chance(0.09)) type = 'ironclad';
+          else if (this.extraZombie && withShield) {
+            type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie
+              : roll < 0.9 ? 'shield' : 'tank';
+          } else if (this.extraZombie) {
+            type = roll < 0.45 ? 'walker' : roll < 0.7 ? 'runner' : roll < 0.9 ? this.extraZombie : 'tank';
+          } else if (withShield) {
+            type = roll < 0.5 ? 'walker' : roll < 0.8 ? 'runner' : roll < 0.9 ? 'shield' : 'tank';
+          } else {
+            type = roll < 0.6 ? 'walker' : roll < 0.9 ? 'runner' : 'tank';
+          }
+          this.spawn(type, x, z, { horde: true });
+          this.hordePending--;
+        }
+      }
+    }
+    if (this.hordeActive && this.hordePending <= 0) {
+      // самокорекція лічильника + таймаут захист від застряглих зомбі
+      const aliveHorde = this.list.filter((z) => z.horde && z.state !== 'dead').length;
+      if (aliveHorde !== this.hordeRemaining) this.hordeRemaining = aliveHorde;
+      // скидаємо таймер простою якщо гравець робить прогрес (вбивства)
+      if (this._hordePrevAlive === undefined || aliveHorde < this._hordePrevAlive) {
+        this._hordeIdleT = 0;
+      } else {
+        this._hordeIdleT += dt;
+      }
+      this._hordePrevAlive = aliveHorde;
+      if (this._hordeIdleT > 25 && this.hordeRemaining > 0) {
+        for (const z of this.list) if (z.horde && z.state !== 'dead') z.horde = false;
+        this.hordeRemaining = 0;
+      }
+    }
+    if (this.hordeActive && this.hordePending <= 0 && this.hordeRemaining <= 0) {
+      this.hordeActive = false;
+      level.bus.emit('hordeEnd');
+      level.netEv('he'); // кооп: кінець орди гостю
+    }
+  }
+
+  // 🧛 Нічний спавнер вампірів (host/solo-only). Ніч (nightK>0.5) + живий гравець → раз на ~7с
+  // 1-2 вампіри навколо гравця, доки живих < cap. Удень нові НЕ спавняться; таймер скидаємо на світанку.
+  _spawnNightVampires(dt, players) {
+    const level = this.level;
+    const isNight = (level.nightK || 0) > 0.5;
+    if (isNight && this._allowVampire) {
+      const VAMP_CAP = 6;
+      this._vampT -= dt;
+      if (this._vampT <= 0) {
+        this._vampT = 7; // кадеція ~7с
+        const aliveVamp = this.list.filter((z) => z.type === 'vampire' && z.state !== 'dead').length;
+        const alivePl = players.filter((p) => p.health > 0);
+        if (alivePl.length && aliveVamp < VAMP_CAP) {
+          const want = Math.min(this.rng.next() < 0.5 ? 1 : 2, VAMP_CAP - aliveVamp);
+          for (let i = 0; i < want; i++) {
+            const cp = alivePl[Math.floor(this.rng.next() * alivePl.length)].pos;
+            const a = this.rng.next() * Math.PI * 2;
+            const r = this.rng.range(30, 46);
+            let x = cp.x + Math.cos(a) * r;
+            let z = cp.z + Math.sin(a) * r;
+            const dB = Math.hypot(x, z);
+            if (dB > this.L.BOUND - 5) {
+              x *= (this.L.BOUND - 8) / dB;
+              z *= (this.L.BOUND - 8) / dB;
+            }
+            this.spawn('vampire', x, z, {});
+          }
+        }
+      }
+      this._vampWasNight = true;
+    } else if (this._vampWasNight) {
+      // 🌅 світанок: ніч скінчилась → скидаємо таймер. Наявні вампіри вдень ЗГОРАЮТЬ (_burnVampiresInSun).
+      this._vampT = 0;
+      this._vampWasNight = false;
+    }
+  }
+
+  // 🔥 Урон горіння вампіра на сонці (host/solo-only). День (nightK<0.5) → DoT; повне сонце ~40 dps.
+  // НЕ через _damage (спамив би aggro/звук щокадру) — прямий z.hp-=, смерть через _kill (синк гостю 'zd').
+  _burnVampiresInSun(dt) {
+    const level = this.level;
+    const nk = level.nightK || 0;
+    if (nk >= 0.5) return;
+    const sun = clamp((0.5 - nk) * 2, 0, 1);
+    const burnDps = 40 * sun;
+    for (const z of this.list) {
+      if (z.type !== 'vampire' || z.state === 'dead' || z.gone) continue;
+      z.hp -= burnDps * dt;
+      z._burnNumT = (z._burnNumT || 0) - dt;
+      if (z._burnNumT <= 0) {
+        z._burnNumT = 0.5;
+        level.effects.damageNumber(new THREE.Vector3(z.x, z.y + 1.4, z.z), burnDps * 0.5);
+      }
+      if (z.hp <= 0) this._kill(z, null);
+    }
+  }
+
+  // 🐂 Charger (торо/гладіатор/самурай/теракота, не-бос): телеграф → ривок рогами здаля.
+  _updateChargerAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt) {
+    const st = z.stats;
+    const level = this.level;
+    z.chargeCd -= dt;
+    if (z.telegraph > 0) {
+      z.telegraph -= dt;
+      if (z.telegraph <= 0) {
+        z.charging = 0.8;
+        const d = Math.max(0.5, distP);
+        z.chargeDX = dxP / d;
+        z.chargeDZ = dzP / d;
+        z.didHit = false;
+        level.audio.shriek(0.5, st.pitch * 0.9);
+      }
+    } else if (z.charging > 0) {
+      z.charging -= dt;
+      const cs = 13;
+      z.x += z.chargeDX * cs * dt;
+      z.z += z.chargeDZ * cs * dt;
+      if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.3 && !z.didHit) {
+        z.didHit = true;
+        this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z);
+        level.audio.slam();
+      }
+      if (z.charging <= 0) {
+        z.didHit = false;
+        z.chargeCd = this.rng.range(3.5, 6);
+      }
+    } else if (z.chargeCd <= 0 && z.state === 'chase' && distP > 6 && distP < 26) {
+      // телеграф ривка лише з прямою видимістю — не крізь стіни
+      this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
+      this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
+      if (this.world.shotBlockDist(this._p0, this._p1, distP) > distP - 0.5) {
+        z.telegraph = 0.7;
+        z.didHit = false;
+        level.audio.zgroan(0.7, st.pitch);
+      } else {
+        z.chargeCd = 0.8;
+      }
+    }
+  }
+
+  // 👑 Бос: пороги призову (75/50/25%), чардж-ривок, лють (<35% HP) і ліш до арени.
+  _updateBossAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt) {
+    const level = this.level;
+    const frac = (z.hp / z.maxHp) * 100;
+    for (const thr of [75, 50, 25]) {
+      if (frac <= thr && !z.summonedAt[thr]) {
+        z.summonedAt[thr] = true;
+        level.audio.bossRoar();
+        level.bus.emit('bossSummon');
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * 6.28;
+          const st = z.bossStyle || 'king';
+          const mtype = st === 'frost' ? (i % 2 ? 'snowman' : 'walker')
+            : st === 'iron' ? (i % 2 ? 'shield' : 'runner')
+              : st === 'chef' ? (i % 2 ? 'spitter' : 'walker')
+                : st === 'sultan' ? (i % 2 ? 'gunner' : 'runner')
+                  : st === 'pharaoh' ? (i % 2 ? 'mummy' : 'walker')
+                    : st === 'matador' ? (i % 2 ? 'toro' : 'runner')
+                      : st === 'gladiator' ? (i % 2 ? 'gladiator' : 'runner')
+                        : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
+                          : st === 'rex' ? (i % 2 ? 'toro' : 'imp')
+                            : st === 'emperor' ? (i % 2 ? 'terracotta' : 'runner')
+                              : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+          const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
+            { horde: false, noCoopScale: !!z._stormWave });
+          mz.aggroed = true;
+          mz.state = 'chase';
+          if (z._stormWave) mz._stormWave = true;
+        }
+      }
+    }
+    z.chargeCd -= dt;
+    if (z.telegraph > 0) {
+      z.telegraph -= dt;
+      if (z.telegraph <= 0) {
+        z.charging = 1.1;
+        const d = Math.max(0.5, distP);
+        z.chargeDX = dxP / d;
+        z.chargeDZ = dzP / d;
+      }
+    } else if (z.charging > 0) {
+      z.charging -= dt;
+      const cs = 15;
+      z.x += z.chargeDX * cs * dt;
+      z.z += z.chargeDZ * cs * dt;
+      if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
+        z.didHit = true;
+        this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
+        level.audio.slam();
+      }
+      if (z.charging <= 0) {
+        z.didHit = false;
+        z.chargeCd = this.rng.range(4.5, 7);
+      }
+    } else if (z.chargeCd <= 0 && distP > 7 && distP < 32 && z.state === 'chase') {
+      z.telegraph = 0.8;
+      z.didHit = false;
+      level.audio.chargeWarn();
+      level.bus.emit('bossCharge');
+    }
+    // лють лише у фазі низького HP; якщо ліш залікував боса вище 35% — спадає
+    z.enraged = frac < 35;
+    // ліш: бос не покидає околиці арени — повертається і лікується
+    const dArena = Math.hypot(z.x - this.L.arena.x, z.z - this.L.arena.z);
+    if (!z.noLeash && !z.leashed && dArena > this.L.arena.r + 14) z.leashed = true;
+    else if (z.leashed && dArena < 8) z.leashed = false;
+    if (z.leashed) {
+      z.telegraph = 0;
+      z.charging = 0;
+      z.hp = Math.min(z.maxHp, z.hp + 10 * dt);
+    }
+  }
+
+  // 🚶 Рух + сепарація (бакет-сітка) + чесні схили + колізії + поворот + анімація. distP/dxP/dzP/tp — ціль.
+  _moveAndAnimateZombie(z, dt, distP, dxP, dzP, tp) {
+    const st = z.stats;
+    const rig = z.rig;
+    let targetX = null, targetZ = null, spd = 0;
+    if (z.state === 'flee') {
+      targetX = z.x - dxP;
+      targetZ = z.z - dzP;
+      spd = 6.2;
+    } else if (z.state === 'chase') {
+      if (z.type === 'boss' && z.leashed) {
+        targetX = this.L.arena.x; targetZ = this.L.arena.z;
+      } else {
+        targetX = tp.x; targetZ = tp.z;
+      }
+      spd = st.chaseSpeed * (z.enraged ? 1.5 : 1);
+    } else if (z.state === 'wander') {
+      targetX = z.wx; targetZ = z.wz;
+      spd = st.speed;
+      if (Math.hypot(z.wx - z.x, z.wz - z.z) < 1) spd = 0;
+    }
+    if (z.charging > 0 || z.telegraph > 0) spd = 0;
+    // сніговик тримає дистанцію і кидає сніжки (зупиняється лише в зоні кидка)
+    if (z.ranged && z.ranged.hold > 0 && z.state === 'chase'
+      && distP < z.ranged.hold && distP > Math.max(st.attackR * 1.2, z.ranged.min)) spd = 0;
+
+    let moving = false;
+    if (spd > 0 && targetX !== null) {
+      const dx = targetX - z.x, dz = targetZ - z.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.4) {
+        let mx = (dx / d) * spd * dt;
+        let mz = (dz / d) * spd * dt;
+        // сепарація від інших зомбі (квадрати відстаней — без зайвих sqrt).
+        // Кандидатів беремо з бакет-сітки: лише 3×3 сусідні комірки замість всього this.list.
+        const cgx = Math.floor(z.x / SEP_CELL), cgz = Math.floor(z.z / SEP_CELL);
+        for (let gx = -1; gx <= 1; gx++) {
+          for (let gz = -1; gz <= 1; gz++) {
+            const bucket = this._sepGrid.get(SKEY(cgx + gx, cgz + gz));
+            if (!bucket) continue;
+            for (const o of bucket) {
+              if (o === z || o.state === 'dead') continue;
+              const sx = z.x - o.x, sz = z.z - o.z;
+              const minD = (z.rig.radius + o.rig.radius) * 0.9;
+              const sd2 = sx * sx + sz * sz;
+              if (sd2 < minD * minD && sd2 > 1e-4) {
+                const sd = Math.sqrt(sd2);
+                mx += (sx / sd) * (minD - sd) * 0.5;
+                mz += (sz / sd) * (minD - sd) * 0.5;
+              }
+            }
+          }
+        }
+        // 🏔️ чесні схили: у відвісну кручу зомбі не лізе — обходить уздовж стіни
+        if (this.world._terrainMod) {
+          // 🚀 висоту під зомбі семплимо раз/кадр: на старті кадру (x,z) ще ті самі,
+          // що в кінці минулого (рух застосовується нижче) — переюзаємо кеш точним збігом.
+          const ghO = (z._ghX === z.x && z._ghZ === z.z) ? z._gh : this.world.groundH(z.x, z.z);
+          const ok = (ax, az) =>
+            this.world.groundH(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
+          if (!ok(z.x + mx, z.z + mz)) {
+            if (ok(z.x + mx, z.z)) mz = 0;
+            else if (ok(z.x, z.z + mz)) mx = 0;
+            else {
+              // обидві осі впираються в крутий схил: ковзаємо вздовж нього (дотичний крок),
+              // а не завмираємо намертво — інакше зомбі «застрягає» біля нерівностей
+              const px = -mz, pz = mx;
+              if (ok(z.x + px, z.z + pz)) { mx = px; mz = pz; }
+              else if (ok(z.x - px, z.z - pz)) { mx = -px; mz = -pz; }
+              else { mx = 0; mz = 0; }
+            }
+          }
+        }
+        z.x += mx;
+        z.z += mz;
+        moving = true;
+      }
+    }
+    // колізії зі світом
+    const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
+    z.x = solved.x;
+    z.z = solved.z;
+    const gh = this.world.groundH(z.x, z.z);
+    z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
+    z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
+
+    // --- поворот і анімація ---
+    let faceX = 0, faceZ = 0;
+    if (z.state === 'attack' || z.telegraph > 0) {
+      faceX = dxP; faceZ = dzP;
+    } else if (z.charging > 0) {
+      faceX = z.chargeDX; faceZ = z.chargeDZ;
+    } else if (moving && targetX !== null) {
+      faceX = targetX - z.x; faceZ = targetZ - z.z;
+    }
+    if (faceX !== 0 || faceZ !== 0) {
+      const targetYaw = Math.atan2(-faceX, -faceZ);
+      rig.group.rotation.y = dampAngle(rig.group.rotation.y, targetYaw, 8, dt);
+    }
+    z._netMoving = moving;
+    rig.group.position.set(z.x, z.y, z.z);
+
+    if (z.state !== 'attack') {
+      if (z.telegraph > 0) {
+        setAnim(rig, 'cheer'); // махає руками — телеграф чарджу
+      } else if (moving) {
+        setAnim(rig, spd > 4 || z.charging > 0 ? 'run' : 'walk');
+        rig.anim.speed = z.charging > 0 ? 14 : spd;
+      } else {
+        setAnim(rig, 'idle');
+      }
+    }
+    updateRig(rig, dt);
   }
 
   // 🧙 AI чарівника: викликається з update() щокадру (лише на хості/соло).

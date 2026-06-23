@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, bakeGroupMeshes } from './characters.js';
 
-import { clamp, damp, lerp, dampAngle } from './utils.js';
+import { clamp, damp, dampAngle } from './utils.js';
 import { t } from './i18n.js';
 
 export const WEAPONS = {
@@ -321,7 +321,72 @@ export class Player {
         mz += input.touchMove.z;
       }
     }
-    // бафи згасають
+    this._updateBuffTimers(dt);
+
+    const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
+    const sprint = !this.riding && moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
+    this._updateLocomotion(dt, moving, sprint, mx, mz);
+    this._updateGravityCollide(dt, input, allowControl);
+    this._updateJumpPads(dt);
+
+    // --- перемикання ---
+    if (allowControl) {
+      for (const [code, w] of Object.entries(SLOT_KEYS)) {
+        if (input.pressed(code)) this.switchWeapon(w);
+      }
+      if (input.pressed('KeyQ')) {
+        // швидке перемикання по колу
+        const have = this.weapons;
+        const next = have[(have.indexOf(this.cur) + 1) % have.length];
+        this.switchWeapon(next);
+      }
+      if (input.pressed('KeyV')) {
+        this.firstPerson = !this.firstPerson;
+        this._applyView();
+      }
+      if (input.pressed('KeyR')) this.startReload();
+      if (input.pressed('KeyG')) this.throwGrenade();
+      if (input.pressed('KeyN')) {
+        if (this.emoting) this.stopEmote();
+        else this.emote();
+      }
+    }
+    // рух, постріл або стрибок скасовують танець
+    if (this.emoting && (moving || input.justClicked || input.pressed('Space'))) this.stopEmote();
+    if (this.grenadeCd > 0) this.grenadeCd -= dt;
+
+    this._updateWeaponFiring(dt, input, allowControl);
+
+    // --- кроки ---
+    const hSpeed0 = Math.hypot(this.vel.x, this.vel.z);
+    if (this.onGround && hSpeed0 > 1.5) {
+      this.stepT -= dt * hSpeed0;
+      if (this.stepT <= 0) {
+        this.stepT = 3.1;
+        this.level.audio.step();
+      }
+    } else {
+      this.stepT = Math.min(this.stepT, 1.2);
+    }
+
+    // --- анімація і камера ---
+    const hSpeed = hSpeed0;
+    // на самокаті немає кроків — від 1-ї особи гасимо біговий боб (3-тя особа має позу 'ride')
+    const bobTarget = this.riding ? 0 : (this.onGround ? Math.min(1, hSpeed / 5) : 0);
+    this.bobAmp = damp(this.bobAmp, bobTarget, 8, dt);
+    this.bobPhase += dt * (4 + hSpeed * 1.15);
+    this.gunKick = Math.max(0, this.gunKick - dt * 7);
+    this.camShake = Math.max(0, this.camShake - dt * 3);
+    this.fovTarget = this.scoped ? 24 : sprint ? 82 : 75;
+    this.camera.fov = damp(this.camera.fov, this.fovTarget, 8, dt);
+    this.camera.updateProjectionMatrix();
+
+    this._updateCamera(dt, hSpeed);
+    this._updateRigs(dt, hSpeed, moving, sprint);
+  }
+
+  // згасання бафів/боєприпасних таймерів; 🍎 яблуко повертає бонус-HP при згасанні
+  _updateBuffTimers(dt) {
     for (const k in this.buffs) {
       if (this.buffs[k] > 0) this.buffs[k] -= dt;
     }
@@ -329,11 +394,12 @@ export class Player {
     if (this.stunAmmoT > 0) this.stunAmmoT = Math.max(0, this.stunAmmoT - dt);
     if (this.appleT > 0) {
       this.appleT = Math.max(0, this.appleT - dt);
-      if (this.appleT === 0) { this.maxHealth -= 20; if (this.health > this.maxHealth) this.health = this.maxHealth; } // 🍎 яблуко згасло — знімаємо бонус-HP
+      if (this.appleT === 0) { this.maxHealth -= 20; if (this.health > this.maxHealth) this.health = this.maxHealth; }
     }
+  }
 
-    const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
-    const sprint = !this.riding && moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
+  // 🛴 самокат (W газ / S гальмо / A,D кермо, без бокового ковзання) АБО пішки (із льодом-інерцією).
+  _updateLocomotion(dt, moving, sprint, mx, mz) {
     if (this.riding) {
       // 🛴 фізика самоката: W — газ, S — гальмо/назад, A/D — кермо. Вбік не ковзає!
       const gas = -mz;       // W = вперед
@@ -371,7 +437,11 @@ export class Player {
       this.vel.x = damp(this.vel.x, tx, accel, dt);
       this.vel.z = damp(this.vel.z, tz, accel, dt);
     }
+  }
 
+  // стрибок, гравітація, 🏔️ чесні схили (пішки у відвісну кручу не зайти), приземлення і колізії світу.
+  _updateGravityCollide(dt, input, allowControl) {
+    const world = this.world;
     // стрибок і гравітація
     if (allowControl && input.pressed('Space') && this.onGround) {
       this.vel.y = this.jumpPower;
@@ -412,8 +482,11 @@ export class Player {
     if (this.riding && Math.hypot(solved.x - preX, solved.z - preZ) > 0.04) {
       this.rideSpeed *= 0.35;
     }
+  }
 
-    // --- батути ---
+  // 🦘 батути: торкання активної площадки підкидає гравця вгору (з кулдауном).
+  _updateJumpPads(dt) {
+    const world = this.world;
     for (const jp of world.jumpPads) {
       if (jp.cd > 0) jp.cd -= dt;
       if (this.onGround && jp.cd <= 0
@@ -429,33 +502,10 @@ export class Player {
         );
       }
     }
+  }
 
-    // --- перемикання ---
-    if (allowControl) {
-      for (const [code, w] of Object.entries(SLOT_KEYS)) {
-        if (input.pressed(code)) this.switchWeapon(w);
-      }
-      if (input.pressed('KeyQ')) {
-        // швидке перемикання по колу
-        const have = this.weapons;
-        const next = have[(have.indexOf(this.cur) + 1) % have.length];
-        this.switchWeapon(next);
-      }
-      if (input.pressed('KeyV')) {
-        this.firstPerson = !this.firstPerson;
-        this._applyView();
-      }
-      if (input.pressed('KeyR')) this.startReload();
-      if (input.pressed('KeyG')) this.throwGrenade();
-      if (input.pressed('KeyN')) {
-        if (this.emoting) this.stopEmote();
-        else this.emote();
-      }
-    }
-    // рух, постріл або стрибок скасовують танець
-    if (this.emoting && (moving || input.justClicked || input.pressed('Space'))) this.stopEmote();
-    if (this.grenadeCd > 0) this.grenadeCd -= dt;
-
+  // перезарядка (дострілювання магазину/балона) + тригер пострілу (континуал чи дискретний).
+  _updateWeaponFiring(dt, input, allowControl) {
     // --- перезарядка ---
     if (this.reloading > 0) {
       this.reloading -= dt;
@@ -505,33 +555,6 @@ export class Player {
       this.level.audio.stopBeam && this.level.audio.stopBeam();
       this._contAudio = false;
     }
-
-    // --- кроки ---
-    const hSpeed0 = Math.hypot(this.vel.x, this.vel.z);
-    if (this.onGround && hSpeed0 > 1.5) {
-      this.stepT -= dt * hSpeed0;
-      if (this.stepT <= 0) {
-        this.stepT = 3.1;
-        this.level.audio.step();
-      }
-    } else {
-      this.stepT = Math.min(this.stepT, 1.2);
-    }
-
-    // --- анімація і камера ---
-    const hSpeed = hSpeed0;
-    // на самокаті немає кроків — від 1-ї особи гасимо біговий боб (3-тя особа має позу 'ride')
-    const bobTarget = this.riding ? 0 : (this.onGround ? Math.min(1, hSpeed / 5) : 0);
-    this.bobAmp = damp(this.bobAmp, bobTarget, 8, dt);
-    this.bobPhase += dt * (4 + hSpeed * 1.15);
-    this.gunKick = Math.max(0, this.gunKick - dt * 7);
-    this.camShake = Math.max(0, this.camShake - dt * 3);
-    this.fovTarget = this.scoped ? 24 : sprint ? 82 : 75;
-    this.camera.fov = damp(this.camera.fov, this.fovTarget, 8, dt);
-    this.camera.updateProjectionMatrix();
-
-    this._updateCamera(dt, hSpeed);
-    this._updateRigs(dt, hSpeed, moving, sprint);
   }
 
   _updateCamera(dt, hSpeed) {
@@ -671,11 +694,6 @@ export class Player {
     level.audio.shot(this.cur);
     level.stats.shotsFired++;
     const dmgMult = this.damageMult * (this.buffs.rage > 0 ? 2 : 1);
-    // віддача підкидає приціл ПІСЛЯ пострілу — куля летить туди, куди цілився
-    const applyRecoil = () => {
-      this.pitch = clamp(this.pitch + w.recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
-      this.yaw += (Math.random() - 0.5) * w.recoil * 0.4;
-    };
 
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
@@ -695,17 +713,7 @@ export class Player {
       : this._shootOrigin.copy(this.camera.position);
 
     // 🚀 базука: летить ракета, шкода — вибухом
-    if (w.rocket) {
-      const dir = this.forwardVec(this._shootDir).clone().normalize();
-      const ro = origin.clone().addScaledVector(dir, 0.7);
-      if (level.mirror) level.net.sendRocket(ro, dir, Math.round(w.dmg * dmgMult));
-      else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(w.dmg * dmgMult));
-      else level.effects.spawnRocket(ro, dir, w.dmg);
-      level.audio.rocket();
-      this.camShake = Math.max(this.camShake, 0.5);
-      applyRecoil();
-      return;
-    }
+    if (w.rocket) { this._fireRocket(origin, dmgMult); return; }
 
     // промені через приціл (дробовик — кілька шротин)
     const MAX_D = w.pellets ? 45 : 140;
@@ -805,7 +813,7 @@ export class Player {
       if (i < 3) level.effects.tracer(this._muzzlePos, endPoint);
       if (i === 0 && endPoint) netEnd = { x: endPoint.x, y: endPoint.y, z: endPoint.z };
     }
-    applyRecoil();
+    this._applyRecoil(w);
     if (level.net) {
       if (level.mirror) level.net.shotReport(this.cur, netEnd, netHits, netBar, netWalls, netBall);
       else level.net.onLocalShot(this.cur, netEnd);
@@ -818,6 +826,26 @@ export class Player {
       level.stats.shotsHit++;
       level.bus.emit('hitmarker', anyHeadshot);
     }
+  }
+
+  // віддача підкидає приціл ПІСЛЯ пострілу — куля летить туди, куди цілився
+  _applyRecoil(w) {
+    this.pitch = clamp(this.pitch + w.recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
+    this.yaw += (Math.random() - 0.5) * w.recoil * 0.4;
+  }
+
+  // 🚀 базука: летить ракета (соло — локально, кооп — через мережу), шкода — вибухом при влучанні.
+  _fireRocket(origin, dmgMult) {
+    const w = this.weapon;
+    const level = this.level;
+    const dir = this.forwardVec(this._shootDir).clone().normalize();
+    const ro = origin.clone().addScaledVector(dir, 0.7);
+    if (level.mirror) level.net.sendRocket(ro, dir, Math.round(w.dmg * dmgMult));
+    else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(w.dmg * dmgMult));
+    else level.effects.spawnRocket(ro, dir, w.dmg);
+    level.audio.rocket();
+    this.camShake = Math.max(this.camShake, 0.5);
+    this._applyRecoil(w);
   }
 
   // 🔋 паливна зброя: безперервна стрільба з дренажем палива і щокадровою шкодою.
