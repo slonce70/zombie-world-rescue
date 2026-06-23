@@ -84,11 +84,41 @@ const nightVamps = await countVamps();
 check(nightVamps > 0, 'вночі зʼявляються вампіри', String(nightVamps));
 check(nightVamps <= 6, 'не більше cap=6 живих вампірів', String(nightVamps));
 
-console.log('▸ Світанок: наявні вампіри ЛИШАЮТЬСЯ, нові НЕ спавняться');
-const before = await countVamps();
-await tick(0, 60); // знову день — спавнер мовчить
+console.log('▸ Контроль: ВНОЧІ (nightK=1) HP вампіра СТАБІЛЬНИЙ — не горить');
+await clearVamps();
+const nightHpBefore = await page.evaluate(() => {
+  const g = window.__game; const Z = g.level.zombies;
+  const z = Z.spawn('vampire', g.level.player.pos.x + 20, g.level.player.pos.z, {});
+  return z.hp;
+});
+await tick(1, 6); // 6с ночі
+const nightHpAfter = await page.evaluate(() => {
+  const Z = window.__game.level.zombies;
+  const z = Z.list.find((z) => z.type === 'vampire' && z.state !== 'dead' && !z.gone);
+  return z ? z.hp : -1;
+});
+check(nightHpAfter >= nightHpBefore - 1, 'вночі HP вампіра не падає від сонця', `${nightHpBefore} → ${nightHpAfter}`);
+
+console.log('▸ Світанок: наявні вампіри ЗГОРАЮТЬ на сонці (HP падає → гинуть)');
+await clearVamps();
+await tick(1, 30); // ніч: спавнимо кілька вампірів
+const beforeDawn = await countVamps();
+check(beforeDawn > 0, 'вночі є кого спалювати', String(beforeDawn));
+const hpBeforeDawn = await page.evaluate(() => {
+  const Z = window.__game.level.zombies;
+  const z = Z.list.find((z) => z.type === 'vampire' && z.state !== 'dead' && !z.gone);
+  return z ? z.hp : -1;
+});
+await tick(0, 1); // ДЕНЬ, 1с — HP має почати падати (40dps)
+const hpDayShort = await page.evaluate(() => {
+  const Z = window.__game.level.zombies;
+  const z = Z.list.find((z) => z.type === 'vampire' && !z.gone);
+  return z ? z.hp : -1;
+});
+check(hpDayShort < hpBeforeDawn, 'удень HP вампіра падає від горіння', `${hpBeforeDawn} → ${hpDayShort}`);
+await tick(0, 8); // ДЕНЬ, ще 8с — усі мають згоріти насмерть
 const afterDay = await countVamps();
-check(afterDay === before, 'удень кількість вампірів не зростає (наявні лишаються)', `${before} → ${afterDay}`);
+check(afterDay === 0, 'удень вампіри згоряють і гинуть (count→0)', `${beforeDawn} → ${afterDay}`);
 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }

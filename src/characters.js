@@ -871,6 +871,26 @@ export function makeShieldMesh(fireproof = false) {
   return { group: g, cracks1, cracks2, cracks3 };
 }
 
+// 🔥 Вогонь горіння вампіра на сонці — per-instance група (cone/toonMat = SHARED geo/mat).
+// Чіпляється у zombies.spawn() на rig.body (як щит), тоглиться/флікериться у zombies.update().
+// .visible=false за замовч. Будуємо у spawn (НЕ в buildZombie), бо bakeRig/cloneRig запекли б групу.
+export function makeBurnFx() {
+  const flameM = toonMat(0xff7a18, 0xffd24a, 0.9); // помаранч→жовтий, сильний emissive
+  const g = new THREE.Group();
+  g.visible = false;
+  for (const [fx, fy, fz, fr, fh] of [
+    [0, 0.95, 0, 0.34, 1.05],   // голова/плечі — найбільший язик
+    [0.22, 0.45, 0.05, 0.24, 0.8],
+    [-0.22, 0.5, -0.05, 0.24, 0.85],
+    [0, 0.1, 0.12, 0.26, 0.75],
+  ]) {
+    const flame = cone(fr, fh, flameM, 6);
+    flame.position.set(fx, fy, fz);
+    g.add(flame);
+  }
+  return g;
+}
+
 function buildZombie(type, rng) {
   if (type === 'snowman') return buildSnowman(rng);
   if (type === 'mummy') {

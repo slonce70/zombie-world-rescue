@@ -1,6 +1,6 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
-import { makeZombie, makeBoss, makeShieldMesh, updateRig, setAnim, toonMat } from './characters.js';
+import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, updateRig, setAnim, toonMat } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
 import { t } from './i18n.js';
@@ -250,6 +250,11 @@ export class Zombies {
       });
     } else {
       z_.chestHp = 0;
+    }
+    if (type === 'vampire') {
+      // 🔥 вогонь горіння на сонці — per-instance, чіпляємо як щит (на rig.body). Тоглиться вдень в update().
+      z_.burnFx = makeBurnFx();
+      rig.body.add(z_.burnFx);
     }
     z_.damage = (amt, dir, headshot, opts) => this._damage(z_, amt, dir, headshot, opts);
     if (opts.golden) this._makeGolden(z_);
@@ -717,6 +722,32 @@ export class Zombies {
     if (this.xrayT > 0) this.xrayT = Math.max(0, this.xrayT - dt);
     const reveal = this.xrayT > 0;
     for (const z of this.list) if (z.invisible) z.rig.group.visible = reveal;
+    // 🔥 ВІЗУАЛ ГОРІННЯ ВАМПІРА — ДО mirror-гарду, щоб ГІСТЬ теж бачив полумʼя.
+    // nightK<0.5 (день) → burnFx видимий + час-базовий флікер; інакше прихований.
+    // Урон — ПІСЛЯ гарду (host-only); тут лише картинка. Синхронна через level.nightK + level.stats.time.
+    {
+      const nk = this.level.nightK || 0;
+      const burning = nk < 0.5;
+      const tnow = (this.level.stats && this.level.stats.time) || 0;
+      for (const z of this.list) {
+        if (z.type !== 'vampire' || !z.burnFx) continue;
+        const fx = z.burnFx;
+        if (burning && z.state !== 'dead' && !z.gone) {
+          fx.visible = true;
+          // флікер: per-instance фаза від nid, щоб язики не пульсували в унісон
+          const f = 0.85 + 0.25 * Math.sin(tnow * 14 + (z.nid || 0) * 1.7);
+          fx.scale.set(f, 0.8 + 0.4 * f, f);
+          // зрідка дим/іскри — кадеція на вампіра (раз на ~0.4с)
+          z._burnFxT = (z._burnFxT || 0) - dt;
+          if (z._burnFxT <= 0) {
+            z._burnFxT = 0.4;
+            this.level.effects.burst(new THREE.Vector3(z.x, z.y + 1.2, z.z), 0xff8a2a, 4, { speed: 2.2, up: 2.4, life: 0.5, size: 0.8 });
+          }
+        } else if (fx.visible) {
+          fx.visible = false;
+        }
+      }
+    }
     if (this.mirror) { this._updateMirror(dt); return; }
     const level = this.level;
     const player = level.player;
@@ -823,9 +854,32 @@ export class Zombies {
         }
         this._vampWasNight = true;
       } else if (this._vampWasNight) {
-        // 🌅 світанок: ніч скінчилась → скидаємо таймер (наявні вампіри лишаються, не зникають)
+        // 🌅 світанок: ніч скінчилась → скидаємо таймер. Нові НЕ спавняться, а наявні вампіри
+        // ВДЕНЬ ЗГОРАЮТЬ на сонці (DoT-блок горіння вище по update) — гинуть за кілька секунд.
         this._vampT = 0;
         this._vampWasNight = false;
+      }
+    }
+
+    // 🔥 УРОН ГОРІННЯ ВАМПІРА НА СОНЦІ — host/solo-only (ми вже ПІСЛЯ mirror-гарду).
+    // День (nightK<0.5) → DoT; sun=повнота сонця (1 у полудень). Повне сонце ~40 dps → 150hp за ~3.75с.
+    // НЕ йдемо через _damage (спамив би aggro/звук/тріщини щокадру) — прямий z.hp-=,
+    // damageNumber зрідка для читабельності, смерть через _kill(z, null) (синк гостю через netEv('zd')).
+    {
+      const nk = level.nightK || 0;
+      if (nk < 0.5) {
+        const sun = clamp((0.5 - nk) * 2, 0, 1);
+        const burnDps = 40 * sun;
+        for (const z of this.list) {
+          if (z.type !== 'vampire' || z.state === 'dead' || z.gone) continue;
+          z.hp -= burnDps * dt;
+          z._burnNumT = (z._burnNumT || 0) - dt;
+          if (z._burnNumT <= 0) {
+            z._burnNumT = 0.5;
+            level.effects.damageNumber(new THREE.Vector3(z.x, z.y + 1.4, z.z), burnDps * 0.5);
+          }
+          if (z.hp <= 0) this._kill(z, null);
+        }
       }
     }
 
