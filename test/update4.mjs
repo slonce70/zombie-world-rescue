@@ -368,6 +368,10 @@ const wave2 = await page.evaluate(async () => {
   // чекаємо, поки шторм сам помітить пустку і поставить таймер, потім пришвидшуємо
   const t0 = performance.now();
   while (performance.now() - t0 < 20000 && g.level.storm.wave < 2) {
+    // «Прокачка»: відбита соло-хвиля відкриває драфт і завмирає головний цикл
+    // (main.js: blocked |= draft.isOpen) → storm.update не тікає _spawnWaveSoon.
+    // Беремо картку, як реальний гравець, інакше хвиля 2 ніколи не настане.
+    if (g.draft && g.draft.isOpen) g.draft.pick(0);
     if (g.level.storm._spawnWaveSoon !== undefined && g.level.storm._spawnWaveSoon > 0.3) {
       g.level.storm._spawnWaveSoon = 0.3;
     }
