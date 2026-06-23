@@ -64,6 +64,9 @@ const TYPE_STATS = {
     // 🛡 щит-гаджет меха: фронтальний (як wizard/shield), 555 міцності, ре-каст через ~8с після зламу
     shieldHp: 555,
   },
+  // 🧛 вампір: швидкий НІЧНИЙ хижак. Зʼявляється лише вночі (nightK>0.5), у будь-якій країні.
+  // 150 hp, прудкий у погоні; БЕЗ ranged, БЕЗ щита, без lifesteal (lifesteal — окрема майбутня опція).
+  vampire: { hp: 150, speed: 1.7, chaseSpeed: 4.0, aggro: 30, dmg: 14, attackR: 1.9, coins: 24, pitch: 1.15 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
@@ -115,6 +118,11 @@ export class Zombies {
     this._allowShaman = this.diff.dmg > 1 || this.diffStar > 1;
     // 🤖 робот — важкий МЕХ: у КОЖНІЙ країні, ОКРІМ України (за будь-якої складності)
     this._allowRobot = !!(level.country && level.country.id !== 'UKR');
+    // 🧛 вампір — НІЧНИЙ хижак: дозволений у КОЖНІЙ країні (ніч універсальна; сама ніч є умовою появи).
+    // Спавн — лише вночі (nightK>0.5), див. нічний спавнер в update(). Стан таймера/лічильника тримаємо тут.
+    this._allowVampire = true;
+    this._vampT = 0;        // акумулятор кадецію нічного спавну (~7с)
+    this._vampWasNight = false; // для скидання таймера на світанку (перехід ніч→день)
     this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
@@ -781,6 +789,44 @@ export class Zombies {
       this.hordeActive = false;
       level.bus.emit('hordeEnd');
       level.netEv('he'); // кооп: кінець орди гостю
+    }
+
+    // 🧛 НІЧНИЙ СПАВНЕР ВАМПІРІВ (host/solo-only — ми вже ПІСЛЯ mirror-гарду, гість сюди не доходить).
+    // Поки ніч (nightK>0.5) і живий хоч один гравець — раз на ~7с підкидаємо 1-2 вампіри
+    // навколо гравця (як орда), доки живих вампірів < cap. Удень нові НЕ спавняться; таймер
+    // скидається на світанку (перехід ніч→день), щоб перша ніч-хвиля не йшла миттєво.
+    {
+      const isNight = (level.nightK || 0) > 0.5;
+      if (isNight && this._allowVampire) {
+        const VAMP_CAP = 6;
+        this._vampT -= dt;
+        if (this._vampT <= 0) {
+          this._vampT = 7; // кадеція ~7с
+          const aliveVamp = this.list.filter((z) => z.type === 'vampire' && z.state !== 'dead').length;
+          const alivePl = players.filter((p) => p.health > 0);
+          if (alivePl.length && aliveVamp < VAMP_CAP) {
+            const want = Math.min(this.rng.next() < 0.5 ? 1 : 2, VAMP_CAP - aliveVamp);
+            for (let i = 0; i < want; i++) {
+              const cp = alivePl[Math.floor(this.rng.next() * alivePl.length)].pos;
+              const a = this.rng.next() * Math.PI * 2;
+              const r = this.rng.range(30, 46);
+              let x = cp.x + Math.cos(a) * r;
+              let z = cp.z + Math.sin(a) * r;
+              const dB = Math.hypot(x, z);
+              if (dB > this.L.BOUND - 5) {
+                x *= (this.L.BOUND - 8) / dB;
+                z *= (this.L.BOUND - 8) / dB;
+              }
+              this.spawn('vampire', x, z, {});
+            }
+          }
+        }
+        this._vampWasNight = true;
+      } else if (this._vampWasNight) {
+        // 🌅 світанок: ніч скінчилась → скидаємо таймер (наявні вампіри лишаються, не зникають)
+        this._vampT = 0;
+        this._vampWasNight = false;
+      }
     }
 
     // 🧲 будуємо бакет-сітку зомбі раз/кадр — далі сепарація питає лише сусідні комірки

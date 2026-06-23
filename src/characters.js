@@ -1332,6 +1332,57 @@ function buildZombie(type, rng) {
     rig.ztype = 'shaman';
     addZombieWear(rig);
     return rig;
+  } else if (type === 'vampire') {
+    // 🧛 зомбі-вампір: швидкий нічний хижак. Бліда шкіра, ТЕМНА НАКИДКА за спиною
+    // з високим коміром, ЧЕРВОНІ світні очі, прилизане чорне волосся й натяк на ікла.
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.04, belly: 0.82, armsForward: 0.7, lean: -0.12, headR: 0.23,
+      skin: 0xd8d3df, shirt: 0x1a1622, pants: 0x14121c, shoes: 0x0e0c14,
+      eyeWhite: 0xff5a3c, eyeL: 0.085, eyeR: 0.085, pupilColor: 0xff1a0a, brow: 0.55,
+      mouth: 'crooked', teeth: true, nose: false, sleeves: 'shirt',
+    }));
+    const capeM = toonMat(0x140a14, 0x080308, 0.12);   // майже чорна тканина накидки
+    const liningM = toonMat(0x6a0d1f, 0x3a0610, 0.25);  // криваво-червона підкладка
+    const hairM = toonMat(0x100c12);                    // прилизане чорне волосся
+    const fangM = toonMat(0xfff4ec, 0xfff4ec, 0.15);    // білі ікла
+    // НАКИДКА — конус від плечей донизу за спиною (фронт = -Z, тож накидка ззаду = +Z)
+    const cape = cone(0.4, 1.1, capeM, 12);
+    cape.position.set(0, -0.16, 0.16);
+    cape.scale.set(1, 1, 0.55);                         // приплюснута до спини
+    cape.rotation.x = -0.12;
+    rig.parts.torso.add(cape);
+    // червона підкладка — тонший конус трохи попереду тканини
+    const lining = cone(0.3, 0.9, liningM, 10);
+    lining.position.set(0, -0.18, 0.06);
+    lining.scale.set(1, 1, 0.5);
+    rig.parts.torso.add(lining);
+    // високий стоячий комір накидки за головою (дві трапеції-крила)
+    for (const side of [-1, 1]) {
+      const collar = box(0.06, 0.34, 0.26, capeM);
+      collar.position.set(side * 0.2, 0.18, 0.18);
+      collar.rotation.z = side * 0.45;
+      collar.rotation.x = -0.25;
+      rig.parts.torso.add(collar);
+    }
+    // прилизане чорне волосся «вдовиний клин» на голові
+    const hairCap = sphere(0.26, hairM, 12, 10);
+    hairCap.scale.set(1.02, 0.7, 1.04);
+    hairCap.position.set(0, 0.18, 0.04);
+    rig.parts.head.add(hairCap);
+    const widowPeak = cone(0.05, 0.12, hairM, 5);
+    widowPeak.rotation.x = Math.PI;
+    widowPeak.position.set(0, 0.22, -0.21);
+    rig.parts.head.add(widowPeak);
+    // двоє іклів під ротом (фронт = -Z)
+    for (const side of [-1, 1]) {
+      const fang = cone(0.022, 0.075, fangM, 5);
+      fang.rotation.x = Math.PI;
+      fang.position.set(side * 0.05, -0.12, -0.22);
+      rig.parts.head.add(fang);
+    }
+    rig.ztype = 'vampire';
+    addZombieWear(rig);
+    return rig;
   } else if (type === 'robot') {
     // 🤖 ЗОМБІ-РОБОТ: важкий бойовий мех. У сталевій кабіні стирчить голова
     // зомбі-пілота (зелена). ОДНА рука = великий МЕЧ, ДРУГА = ГАРМАТА-дуло.
