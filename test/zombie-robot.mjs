@@ -14,6 +14,12 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 await page.goto(`${BASE}/?test&fresh&country=FRA`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
 
+console.log('▸ Знаходжуваність: гарантований спавн');
+const found = await page.evaluate(() => ({
+  robots: window.__game.level.zombies.list.filter((z) => z.type === 'robot').length,
+}));
+check(found.robots >= 1, 'у дозволеній країні (FRA) гарантовано є ≥1 робот на рівні', JSON.stringify(found));
+
 console.log('▸ Зомбі-робот: стати + дві атаки');
 const cfg = await page.evaluate(() => {
   const out = { errors: [] };
@@ -55,6 +61,15 @@ const boom = await page.evaluate(() => {
 check(boom.nearDead, 'робот гине від смертельної шкоди', JSON.stringify(boom));
 check(boom.nearDrop === 157, 'вибух завдав РІВНО 157 гравцю в радіусі', JSON.stringify(boom));
 check(boom.farDrop === 0, 'гравець за межами радіуса (12м) НЕ постраждав від вибуху', JSON.stringify(boom));
+
+console.log('▸ Гейт: туторіал-Україна без робота');
+await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+const ukr = await page.evaluate(() => ({
+  allow: window.__game.level.zombies._allowRobot,
+  robots: window.__game.level.zombies.list.filter((z) => z.type === 'robot').length,
+}));
+check(ukr.allow === false && ukr.robots === 0, 'в Україні ★1 робота немає (туторіал чистий)', JSON.stringify(ukr));
 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }

@@ -106,8 +106,8 @@ export class Zombies {
     this._allowGhost = this.diff.dmg > 1 || this.diffStar > 1;
     // 🪬 шаман — рідкісний спец-ворог пізніших країн (той самий гейт, що й привид)
     this._allowShaman = this.diff.dmg > 1 || this.diffStar > 1;
-    // 🤖 робот — рідкісний важкий МЕХ: гейт як у важких (з середини кампанії, не UKR ★1)
-    this._allowRobot = this.diff.hp >= 1.5 || this.diffStar > 1;
+    // 🤖 робот — важкий МЕХ: дозволений з Польщі (НЕ навчальна Україна ★1), як шаман/привид
+    this._allowRobot = this.diff.dmg > 1 || this.diffStar > 1;
     this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];
@@ -295,6 +295,10 @@ export class Zombies {
         });
       }
     });
+    // 🤖 гарантуємо ОДНОГО зомбі-робота на рівень (де дозволено) — щоб його точно було видно й де знайти
+    if (this._allowRobot) {
+      this.spawn('robot', 56, -44, { anchor: { x: 60, z: -40, r: 16 }, groupId: 1 });
+    }
     // охорона місій
     const guardSets = [
       { site: this.L.rescue, types: ['tank', 'runner', 'walker', 'walker', 'walker', 'walker'], gid: 100 },
