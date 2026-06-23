@@ -1,4 +1,4 @@
-// ☄️ Гаджет «Метеорит»: викликає метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
+// ☄️ Гаджет «Метеорит»: викликає метеорит на НАЙБЛИЖЧОГО зомбі — 250 шкоди згори
 // (обходить фронтальний щит і нагрудник). Перезарядка 45с.
 import { chromium } from 'playwright';
 const BASE = 'http://localhost:8741';
@@ -42,17 +42,18 @@ const grant = await page.evaluate(() => {
 check(grant.level >= 33, `досягнуто рівня 33 (${grant.level})`);
 check(!grant.before && grant.owned, 'рівень 33 ВИДАВ гаджет «Метеорит» безкоштовно', JSON.stringify(grant));
 
-// === площа 7×7: 135 усім у зоні, поза зоною — нікому (детерміновано, в ізольованій точці) ===
+// === площа 7×7: 250 усім у зоні, поза зоною — нікому (детерміновано, в ізольованій точці) ===
 const aoe = await page.evaluate(() => {
   const g = window.__game; const p = g.level.player;
   const cx = p.pos.x + 40, cz = p.pos.z + 40; // подалі від орди — лише наші tank-и
-  const mk = (dx, dz) => g.level.zombies.spawn('tank', cx + dx, cz + dz, {}); // 230 HP — переживуть 135
+  const mk = (dx, dz) => g.level.zombies.spawn('tank', cx + dx, cz + dz, {});
   const list = [mk(0, 0), mk(3.4, 0), mk(3.4, 3.4), mk(5, 0)]; // центр, край, кут (у зоні), 5м (поза)
+  for (const z of list) { z.hp = z.maxHp = 1000; } // HP вгору, щоб пережили 250 і вимір був чистий
   const hp0 = list.map((z) => z.hp);
   g.level.gadgets._meteorAoE(cx, cz); // прямий удар по площі в точці (cx,cz)
   return { dmg: list.map((z, i) => hp0[i] - z.hp) };
 });
-check(aoe.dmg[0] === 135 && aoe.dmg[1] === 135 && aoe.dmg[2] === 135, 'усі троє в зоні 7×7 (центр/край/кут) отримали 135', JSON.stringify(aoe.dmg));
+check(aoe.dmg[0] === 250 && aoe.dmg[1] === 250 && aoe.dmg[2] === 250, 'усі троє в зоні 7×7 (центр/край/кут) отримали 250', JSON.stringify(aoe.dmg));
 check(aoe.dmg[3] === 0, 'зомбі за межами 7×7 (5 м) НЕ постраждав', JSON.stringify(aoe.dmg));
 
 // === обхід щита: удар згори ігнорує фронтальний щит (у зоні AoE) ===
@@ -65,7 +66,7 @@ const shield = await page.evaluate(() => {
   return { shieldHp0, shieldHpAfter: sh.shieldHp, bodyDmg: bodyHp0 - sh.hp, dead: sh.state === 'dead' };
 });
 check(shield.shieldHpAfter === shield.shieldHp0, 'щит НЕ постраждав — метеорит б\'є згори, повз фронтальний щит', JSON.stringify(shield));
-check(shield.bodyDmg === 135, 'тіло щитоносця отримало 135 (обхід щита)', JSON.stringify(shield));
+check(shield.bodyDmg === 250, 'тіло щитоносця отримало 250 (обхід щита)', JSON.stringify(shield));
 
 // === візуал: метеорит реально вилітає й приземляється ===
 const fly = await page.evaluate(() => {

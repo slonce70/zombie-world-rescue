@@ -432,7 +432,7 @@ export const GADGETS = {
   // 🍎 Золоте яблуко: +20 тимчасового HP на 5с (бонус-макс, згасає сам), перезарядка 45с
   goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
   // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
-  meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 135 шкоди по площі 7×7 м') },
+  meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 250 шкоди по площі 7×7 м') },
 };
 
 // ☄️ напрямок удару метеорита — згори вниз: обходить фронтальний щит (кут) і нагрудник (headshot)
@@ -707,7 +707,7 @@ export class Gadgets {
     for (const zb of this.level.zombies.list) {
       if (zb.state === 'dead' || zb.gone) continue;
       if (Math.abs(zb.x - x) <= 3.5 && Math.abs(zb.z - z) <= 3.5) {
-        zb.damage(zb.type === 'robot' ? 500 : 135, METEOR_DOWN, true);
+        zb.damage(zb.type === 'robot' ? 500 : 250, METEOR_DOWN, true);
       }
     }
   }
