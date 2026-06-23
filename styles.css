@@ -767,6 +767,17 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 /* 📣 тач-кнопка командних пінгів: показуємо ЛИШЕ у кооп-рівні (клас .avail з hud.js) */
 #tb-ping { display: none; }
 #tb-ping.avail { display: block; }
+/* ✋ кнопка взаємодії: коли поряд є об'єкт (вежа/мегабокс/самокат/барикада) — пульсуюча жовта рамка.
+   #tb-interact завжди видима, тож НЕ чіпаємо display — лише підсвітка. */
+#tb-interact.avail {
+  border-color: var(--accent);
+  background: rgba(255, 210, 63, 0.28);
+  animation: tb-interact-pulse 0.9s ease-in-out infinite;
+}
+@keyframes tb-interact-pulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,.35), 0 0 0 0 rgba(255, 210, 63, 0.55); }
+  50%      { box-shadow: 0 4px 12px rgba(0,0,0,.35), 0 0 0 7px rgba(255, 210, 63, 0); }
+}
 
 /* вкладки магазину */
 #shop-tabs { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }

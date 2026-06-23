@@ -359,6 +359,7 @@ export class Vehicles {
     r.sc.group.rotation.z = 0;
     this.level.audio.bell();
     this.level.bus.emit('toast', keyHint('🛴 Кермуй джойстиком, ✋ — зійти', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
+    this.level.bus.emit('scooterRide'); // 🎓 HUD покаже разове знайомство (раз назавжди)
   }
 
   dismountLocal(x, z) {

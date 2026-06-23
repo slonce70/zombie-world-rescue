@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -395,6 +395,8 @@ class Game {
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [],
       diffStar: 1,
+      // 🎓 разові підказки-знайомства (вежа/самокат/гаджет/робот): { ключ: 1 } = вже показано
+      hints: {},
     };
   }
 
@@ -469,6 +471,7 @@ class Game {
         if (!out.records || typeof out.records !== 'object') out.records = {};
         if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
         if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
+        if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
       }
     } catch (e) { /* зіпсований сейв — почнемо заново */ }

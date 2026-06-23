@@ -79,6 +79,11 @@ const BANDERILLA_RANGED = { min: 8, max: 40, hold: 0, cd: 3.0, projSpeed: 24, dm
 // 🔱 Цезар-зомбі (бос Італії) метає вогняні списи-пілуми (видовжені золоті снаряди)
 const PILUM_RANGED = { min: 8, max: 42, hold: 0, cd: 2.9, projSpeed: 26, dmg: 20, size: 0.32, color: 0xffb030, stretch: true };
 
+// ── Легка бакет-сітка зомбі для сепарації (пошук сусідів O(сусіди) замість O(N)) ──
+// CELL=4 м: будь-яка пара зомбі взаємодіє в межах minD ≤ ~1.7 м, тож 3×3 комірки покривають усіх.
+const SEP_CELL = 4;
+const SKEY = (cx, cz) => (cx + 512) * 4096 + (cz + 512);
+
 export class Zombies {
   constructor(level, seed = 999) {
     this.level = level;
@@ -125,6 +130,8 @@ export class Zombies {
     this._hordePrevAlive = undefined;
     this._p0 = new THREE.Vector3();
     this._p1 = new THREE.Vector3();
+    // 🧲 бакет-сітка зомбі для сепарації: rebuild раз/кадр (Map переюзуємо clear-ом, без алокацій)
+    this._sepGrid = new Map();
     // 🪦 тривалість трупа: на тачі коротша (1.6с) — менший вторинний CPU-пік
     // одразу після бою; на десктопі лишаємо 3.0с (видовищніше).
     const touch = !!(level.game && level.game.input && level.game.input.touchMode);
@@ -482,6 +489,7 @@ export class Zombies {
   // (щити, стійкі до вогню): тоді перевірятимемо z.shieldFireproof && opts.fire тут.
   _damage(z, amt, dir, headshot, opts) {
     if (z.state === 'dead') return;
+    if (z.type === 'robot') this.level.bus.emit('robotMet'); // 🎓 перша зустріч з роботом → разовий банер
     const fire = !!(opts && opts.fire);
     // 🛡 щит: фронтальні влучання та вибухи приймає на себе щит
     if (z.shieldHp > 0) {
@@ -683,6 +691,19 @@ export class Zombies {
     }
   }
 
+  // Перебудовує бакет-сітку зомбі (раз/кадр). Лише живі — сепарація однаково пропускає мертвих.
+  _buildSepGrid() {
+    const g = this._sepGrid;
+    g.clear();
+    for (const z of this.list) {
+      if (z.state === 'dead' || z.gone) continue;
+      const key = SKEY(Math.floor(z.x / SEP_CELL), Math.floor(z.z / SEP_CELL));
+      let bucket = g.get(key);
+      if (!bucket) { bucket = []; g.set(key, bucket); }
+      bucket.push(z);
+    }
+  }
+
   update(dt) {
     // 👻 невидимі привиди видимі ЛИШЕ поки активний Ікс-рей (працює і для хоста, і для гостя)
     if (this.xrayT > 0) this.xrayT = Math.max(0, this.xrayT - dt);
@@ -761,6 +782,9 @@ export class Zombies {
       level.bus.emit('hordeEnd');
       level.netEv('he'); // кооп: кінець орди гостю
     }
+
+    // 🧲 будуємо бакет-сітку зомбі раз/кадр — далі сепарація питає лише сусідні комірки
+    this._buildSepGrid();
 
     let removeAny = false;
     for (const z of this.list) {
@@ -1087,21 +1111,31 @@ export class Zombies {
         if (d > 0.4) {
           let mx = (dx / d) * spd * dt;
           let mz = (dz / d) * spd * dt;
-          // сепарація від інших зомбі (квадрати відстаней — без зайвих sqrt)
-          for (const o of this.list) {
-            if (o === z || o.state === 'dead') continue;
-            const sx = z.x - o.x, sz = z.z - o.z;
-            const minD = (z.rig.radius + o.rig.radius) * 0.9;
-            const sd2 = sx * sx + sz * sz;
-            if (sd2 < minD * minD && sd2 > 1e-4) {
-              const sd = Math.sqrt(sd2);
-              mx += (sx / sd) * (minD - sd) * 0.5;
-              mz += (sz / sd) * (minD - sd) * 0.5;
+          // сепарація від інших зомбі (квадрати відстаней — без зайвих sqrt).
+          // Кандидатів беремо з бакет-сітки: лише 3×3 сусідні комірки замість всього this.list.
+          const cgx = Math.floor(z.x / SEP_CELL), cgz = Math.floor(z.z / SEP_CELL);
+          for (let gx = -1; gx <= 1; gx++) {
+            for (let gz = -1; gz <= 1; gz++) {
+              const bucket = this._sepGrid.get(SKEY(cgx + gx, cgz + gz));
+              if (!bucket) continue;
+              for (const o of bucket) {
+                if (o === z || o.state === 'dead') continue;
+                const sx = z.x - o.x, sz = z.z - o.z;
+                const minD = (z.rig.radius + o.rig.radius) * 0.9;
+                const sd2 = sx * sx + sz * sz;
+                if (sd2 < minD * minD && sd2 > 1e-4) {
+                  const sd = Math.sqrt(sd2);
+                  mx += (sx / sd) * (minD - sd) * 0.5;
+                  mz += (sz / sd) * (minD - sd) * 0.5;
+                }
+              }
             }
           }
           // 🏔️ чесні схили: у відвісну кручу зомбі не лізе — обходить уздовж стіни
           if (this.world._terrainMod) {
-            const ghO = this.world.groundH(z.x, z.z);
+            // 🚀 висоту під зомбі семплимо раз/кадр: на старті кадру (x,z) ще ті самі,
+            // що в кінці минулого (рух застосовується нижче) — переюзаємо кеш точним збігом.
+            const ghO = (z._ghX === z.x && z._ghZ === z.z) ? z._gh : this.world.groundH(z.x, z.z);
             const ok = (ax, az) =>
               this.world.groundH(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
             if (!ok(z.x + mx, z.z + mz)) {
@@ -1126,7 +1160,9 @@ export class Zombies {
       const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
       z.x = solved.x;
       z.z = solved.z;
-      z.y = Math.max(this.world.groundH(z.x, z.z), this.world.floorAt(z.x, z.z, z.y));
+      const gh = this.world.groundH(z.x, z.z);
+      z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
+      z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
 
       // --- поворот і анімація ---
       let faceX = 0, faceZ = 0;

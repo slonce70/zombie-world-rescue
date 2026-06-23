@@ -53,6 +53,7 @@ export class HUD {
       scope: $('scope'),
       tbScope: $('tb-scope'),
       tbPing: $('tb-ping'),
+      tbInteract: $('tb-interact'),
       teamPanel: $('team-panel'),
     };
     this._lastCombo = 0;
@@ -96,6 +97,29 @@ export class HUD {
         this.toast(t('🛡 Щит розбито! Тепер щитоносець беззахисний — добивай!'));
       }
     });
+    // 🎓 РАЗОВІ знайомства з новими елементами (кожне — раз назавжди, великим банером):
+    bus.on('scooterRide', () => this.hintOnce('scooter',
+      t('🛴 ЦЕ САМОКАТ!'),
+      t('Газуй джойстиком уперед, кермуй ліворуч/праворуч. ✋ — зійти. На ньому швидко! 💨')));
+    bus.on('gadgetUsed', (id) => { if (id !== 'watchtower') this.hintOnce('gadget',
+      t('🧰 ТИ ВЖИВ ГАДЖЕТ!'),
+      t('Гаджети мають перезарядку ⏳. Обирай інший у Гардеробі на глобусі!')); });
+    bus.on('gadgetUsed', (id) => { if (id === 'watchtower') this.hintOnce('tower',
+      t('🗼 ВЕЖА СПОСТЕРЕЖЕННЯ!'),
+      t('Залізь на неї — згори видно всіх зомбі й зручно стріляти. Її можна зламати, тож стережись!')); });
+    bus.on('robotMet', () => this.hintOnce('robot',
+      t('🤖 ЗОМБІ-РОБОТ!'),
+      t('Великий і міцний, має щит. Збий щит, тримай дистанцію — коли гине, він ВИБУХАЄ! 💥')));
+  }
+
+  // 🎓 Разова підказка-знайомство: ВЕЛИКИЙ банер РІВНО ОДИН раз назавжди (прапорець у save.hints).
+  hintOnce(key, title, sub = '') {
+    const save = this.game && this.game.save;
+    if (!save || !save.hints) return;
+    if (save.hints[key]) return;
+    save.hints[key] = 1;
+    if (this.game.saveGame) this.game.saveGame();
+    this.banner(title, sub, 4.5);
   }
 
   banner(title, sub = '', dur = 3.2) {
@@ -309,6 +333,7 @@ export class HUD {
     const prompt = level.missions.prompt;
     if (prompt) {
       this.el.prompt.classList.add('show');
+      if (this.el.tbInteract) this.el.tbInteract.classList.add('avail'); // ✋ поряд є ціль — підсвічуємо кнопку
       this.el.promptText.textContent = prompt.text;
       if (prompt.hold) {
         this.el.promptBar.style.display = 'block';
@@ -318,6 +343,7 @@ export class HUD {
       }
     } else {
       this.el.prompt.classList.remove('show');
+      if (this.el.tbInteract) this.el.tbInteract.classList.remove('avail');
     }
 
     // банер
