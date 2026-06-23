@@ -45,22 +45,42 @@ console.log('▸ Вибух при смерті: 157 по площі');
 const boom = await page.evaluate(() => {
   const g = window.__game; const p = g.level.player;
   p.maxHealth = 400; p.health = 400; p.armor = 0; p.gadgetShield = 0; p.respawnProtect = 0;
-  // робот ВПРИТУЛ (у радіусі вибуху 6м)
+  // робот ВПРИТУЛ (у радіусі вибуху 6м). 1-й удар ламає щит, 2-й (вже без щита) вбиває → вибух
   const zNear = g.level.zombies.spawn('robot', p.pos.x + 3, p.pos.z, {});
   const hp0 = p.health;
-  zNear.damage(999999, null, false); // вбиваємо → має вибухнути
+  zNear.damage(999999, null, false); // ламає щит (тіло ціле)
+  zNear.damage(999999, null, false); // щита немає → тіло гине → вибух
   const nearDrop = hp0 - p.health, nearDead = zNear.state === 'dead';
   // робот ДАЛЕКО (поза радіусом вибуху)
   p.health = 400; p.respawnProtect = 0;
   const zFar = g.level.zombies.spawn('robot', p.pos.x + 12, p.pos.z, {});
   const hp1 = p.health;
-  zFar.damage(999999, null, false);
+  zFar.damage(999999, null, false); // ламає щит
+  zFar.damage(999999, null, false); // вбиває → вибух (але гравець за 12м)
   const farDrop = hp1 - p.health;
   return { nearDrop, nearDead, farDrop };
 });
 check(boom.nearDead, 'робот гине від смертельної шкоди', JSON.stringify(boom));
 check(boom.nearDrop === 157, 'вибух завдав РІВНО 157 гравцю в радіусі', JSON.stringify(boom));
 check(boom.farDrop === 0, 'гравець за межами радіуса (12м) НЕ постраждав від вибуху', JSON.stringify(boom));
+
+console.log('▸ Щит-гаджет: 555, поглинання, перекаст');
+const sh = await page.evaluate(() => {
+  const Z = window.__game.level.zombies;
+  const z = Z.spawn('robot', window.__game.level.player.pos.x + 30, window.__game.level.player.pos.z, {});
+  const start = { shieldHp: z.shieldHp, hasShield: !!z.shieldObj, bodyHp: z.hp };
+  z.damage(100, null, false);            // удар у щит (null dir → завжди в щит); тіло ціле
+  const afterHit = { shieldHp: z.shieldHp, bodyHp: z.hp };
+  z.damage(9999, null, false);           // ламаємо щит
+  const afterBreak = { shieldObj: !!z.shieldObj, recast: z.shieldRecastCd, bodyHp: z.hp };
+  Z._updateRobotShield(z, 9);            // спливає ~8с таймера → новий щит
+  const afterRecast = { shieldHp: z.shieldHp, hasShield: !!z.shieldObj };
+  return { start, afterHit, afterBreak, afterRecast };
+});
+check(sh.start.shieldHp === 555 && sh.start.hasShield, 'робот стартує зі щитом 555', JSON.stringify(sh.start));
+check(sh.afterHit.shieldHp === 455 && sh.afterHit.bodyHp === sh.start.bodyHp, 'щит поглинає шкоду, тіло ціле', JSON.stringify(sh.afterHit));
+check(!sh.afterBreak.shieldObj && sh.afterBreak.recast === 8 && sh.afterBreak.bodyHp === sh.start.bodyHp, 'щит ламається (555 поглинуто) → перекаст 8с, тіло ще ціле', JSON.stringify(sh.afterBreak));
+check(sh.afterRecast.hasShield && sh.afterRecast.shieldHp === 555, 'через ~8с робот ставить НОВИЙ щит 555', JSON.stringify(sh.afterRecast));
 
 console.log('▸ Гейт: туторіал-Україна без робота');
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });

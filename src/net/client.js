@@ -220,6 +220,7 @@ export class GuestNet {
       }
       case 'zg': level.zombies.puppetGone(a[0]); break;
       case 'zsb': level.zombies.puppetShieldBreak(a[0]); break;
+      case 'zsr': level.zombies.puppetShieldRecast(a[0]); break;
       case 'zcb': level.zombies.puppetChestBreak(a[0]); break;
       case 'zrev': { // 🪬 шаман воскрес — спалах у гостя
         const zr = level.zombies.byNid(a[0]);

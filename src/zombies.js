@@ -61,6 +61,8 @@ const TYPE_STATS = {
   robot: {
     hp: 1255, speed: 1.0, chaseSpeed: 2.1, aggro: 26, dmg: 20, attackR: 2.4, coins: 55, pitch: 0.45,
     ranged: { min: 9, max: 34, hold: 13, cd: 2.4, projSpeed: 26, dmg: 10, size: 0.32, color: 0xffd24a },
+    // 🛡 щит-гаджет меха: фронтальний (як wizard/shield), 555 міцності, ре-каст через ~8с після зламу
+    shieldHp: 555,
   },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
@@ -211,6 +213,17 @@ export class Zombies {
       z_.shieldObj = shield;
       z_.summonCd = this.rng.range(3, 6);
       z_.healCd = this.rng.range(2, 4);
+    }
+    if (type === 'robot') {
+      // 🤖🛡 щит-гаджет меха — той самий механізм shieldHp (фронтальний, ре-каст), масштабований під великого меха
+      z_.shieldHp = z_.shieldMax = stats.shieldHp; // 555
+      const shield = makeShieldMesh();
+      // мех великий (rig scale 1.7) → щит помітно більший і вищий
+      shield.group.scale.setScalar(1.8);
+      shield.group.position.set(0, 1.35, -0.78);
+      rig.body.add(shield.group);
+      z_.shieldObj = shield;
+      z_.shieldRecastCd = 0; // стартує зі щитом; >0 лише після зламу
     }
     if (type === 'ironclad') {
       // 🦾 нагрудник: окрема група на тулубі (клонована з шаблоном)
@@ -517,8 +530,9 @@ export class Zombies {
           z.shieldHp = 0;
           z.rig.body.remove(z.shieldObj.group);
           z.shieldObj = null;
-          // 🧙 чарівник: щит зламано → запускаємо ре-каст через ~5с
+          // 🧙 чарівник: щит зламано → ре-каст через ~5с; 🤖 робот → новий щит-гаджет через ~8с
           if (z.type === 'wizard') z.shieldRecastCd = 5;
+          else if (z.type === 'robot') z.shieldRecastCd = 8;
           level.effects.burst(sparkPos, 0x7d8aa0, 14, { speed: 4.5, up: 4, life: 0.7, size: 1.3 });
           level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.5);
           level.audio.shieldBreak();
@@ -1038,6 +1052,11 @@ export class Zombies {
         this._updateWizard(z, dt);
       }
 
+      // --- 🤖 робот: ре-каст щита-гаджета по таймеру ---
+      if (z.type === 'robot' && z.state !== 'dead') {
+        this._updateRobotShield(z, dt);
+      }
+
       // --- рух ---
       let targetX = null, targetZ = null, spd = 0;
       if (z.state === 'flee') {
@@ -1218,6 +1237,36 @@ export class Zombies {
     }
   }
 
+  _updateRobotShield(z, dt) {
+    // ре-каст лише коли щит зламано (shieldObj === null) і запущено таймер
+    if (z.shieldObj || z.shieldRecastCd <= 0) return;
+    // КООП: новий щит ставить ЛИШЕ authority (host); гість дізнається через подію 'zsr'
+    const net = this.level.net;
+    if (net && !net.authority) return;
+    z.shieldRecastCd -= dt;
+    if (z.shieldRecastCd > 0) return;
+    this._recastRobotShield(z);
+    this.level.netEv('zsr', z.nid);
+  }
+
+  // створює (або відновлює) щит-гаджет меха; викликається authority і гостем (через 'zsr')
+  _recastRobotShield(z) {
+    if (z.shieldObj) return;
+    const level = this.level;
+    z.shieldHp = z.shieldMax = z.stats.shieldHp;
+    const shield = makeShieldMesh();
+    shield.group.scale.setScalar(1.8);
+    shield.group.position.set(0, 1.35, -0.78);
+    z.rig.body.add(shield.group);
+    z.shieldObj = shield;
+    z.shieldFire = false;
+    z.shieldRecastCd = 0;
+    // ефект касту — жовтогаряче кільце (під колір меха/гармати)
+    level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xffd24a, 3.6);
+    level.effects.burst(new THREE.Vector3(z.x, z.y + 1.3, z.z), 0xffd24a, 14, { speed: 3.2, up: 3, life: 0.6, size: 1.2 });
+    level.audio.clang();
+  }
+
   // 🤝 множник команди: соло/дзеркало = 1, кооп = кількість гравців
   coopMul() {
     const level = this.level;
@@ -1288,6 +1337,12 @@ export class Zombies {
     const z = this.byNidMap.get(nid);
     if (!z || !z.shieldObj) return;
     this._applyShieldPct(z, 0);
+  }
+
+  puppetShieldRecast(nid) {
+    const z = this.byNidMap.get(nid);
+    if (!z || z.type !== 'robot' || z.shieldObj) return;
+    this._recastRobotShield(z);
   }
 
   puppetChestBreak(nid) {
