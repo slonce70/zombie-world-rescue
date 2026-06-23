@@ -41,7 +41,7 @@ jobs:
         run: node test/coop-damage.mjs
       - name: Coop nick (фільтр лайки в коопних ніках — безпека дітей)
         run: node test/coop-nick.mjs
-      - name: Save migration (захист сейва дитини — БЛОКУЮЧИЙ: пошкоджений сейв = втрачений прогрес)
+      - name: "Save migration (захист сейва дитини — БЛОКУЮЧИЙ: пошкоджений сейв = втрачений прогрес)"
         run: node test/save-migration.mjs
 
   # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі smoke).
