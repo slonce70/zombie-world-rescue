@@ -106,8 +106,8 @@ export class Zombies {
     this._allowGhost = this.diff.dmg > 1 || this.diffStar > 1;
     // 🪬 шаман — рідкісний спец-ворог пізніших країн (той самий гейт, що й привид)
     this._allowShaman = this.diff.dmg > 1 || this.diffStar > 1;
-    // 🤖 робот — важкий МЕХ: дозволений з Польщі (НЕ навчальна Україна ★1), як шаман/привид
-    this._allowRobot = this.diff.dmg > 1 || this.diffStar > 1;
+    // 🤖 робот — важкий МЕХ: у КОЖНІЙ країні, ОКРІМ України (за будь-якої складності)
+    this._allowRobot = !!(level.country && level.country.id !== 'UKR');
     this.xrayT = 0; // таймер підсвічування привидів (гаджет «Ікс-рей»)
     this.extraZombie = (level.country && level.country.extraZombie) || null;
     this.list = [];

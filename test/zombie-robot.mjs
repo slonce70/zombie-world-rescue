@@ -35,7 +35,7 @@ const cfg = await page.evaluate(() => {
   } catch (e) { out.errors.push('robot: ' + e.message); }
   return out;
 });
-check(cfg.allowRobot === true, 'робот дозволений у FRA (гейт diff.hp>=1.5)', String(cfg.allowRobot));
+check(cfg.allowRobot === true, 'робот дозволений у FRA (країна ≠ Україна)', String(cfg.allowRobot));
 check(cfg.built, 'spawn(robot) будує риг меха', cfg.errors.join('|'));
 check(cfg.maxHp >= 1255, 'робот ~1255 HP (×складність)', String(cfg.maxHp));
 check(cfg.meleeDmg === 20, 'меч зблизька — 20 шкоди', String(cfg.meleeDmg));
