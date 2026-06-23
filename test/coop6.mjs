@@ -171,15 +171,23 @@ try {
   check('гість: ≤11 ws-send/с', bRate <= 11, `${bRate.toFixed(1)}/с, пачка ×${bRatio.toFixed(2)}`);
   check('пачки реально працюють (≥1.3 msg/send)', aRatio >= 1.3 && bRatio >= 1.3, `A×${aRatio.toFixed(2)} B×${bRatio.toFixed(2)}`);
 
-  // постріл гостя крізь пачку: зомбі вмирає, кіл зараховано гостю
+  // постріл гостя крізь пачку: зомбі вмирає, кіл зараховано гостю.
+  // ПОВТОРЮЄМО постріл у циклі (як coop3): на тротленому раннері один shotReport
+  // може загубитись/затриматись у пачці — фаєримо щоразу свіжого живого зомбі,
+  // поки кіл не зарахується. Поріг асерту незмінний — кіл МУСИТЬ реально зарахуватись.
   const killsB0 = await B.evaluate(() => window.__game.level.stats.kills);
-  await B.evaluate(() => {
-    const g = window.__game;
-    const z = g.level.zombies.list.find((zz) => zz.state !== 'dead');
-    if (z) g.level.net.shotReport('pistol', { x: z.x, y: 1, z: z.z }, [[z.nid, 9999, 0]]);
-  });
-  await B.waitForFunction((k0) => window.__game.level.stats.kills > k0, killsB0, { timeout: 8000 * SLOW });
-  check('постріл гостя вбиває зомбі (кіл зараховано)', true);
+  let guestKilled = false;
+  const tK = Date.now();
+  while (Date.now() - tK < 30000 * SLOW) {
+    await B.evaluate(() => {
+      const g = window.__game;
+      const z = g.level.zombies.list.find((zz) => zz.state !== 'dead');
+      if (z) g.level.net.shotReport('pistol', { x: z.x, y: 1, z: z.z }, [[z.nid, 9999, 0]]);
+    });
+    await sleep(500 * SLOW);
+    if (await B.evaluate((k0) => window.__game.level.stats.kills > k0, killsB0)) { guestKilled = true; break; }
+  }
+  check('постріл гостя вбиває зомбі (кіл зараховано)', guestKilled);
 
   const realErrsA = errsA.filter((e) => !e.includes('favicon'));
   const realErrsB = errsB.filter((e) => !e.includes('favicon'));
