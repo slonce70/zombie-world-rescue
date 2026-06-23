@@ -73,6 +73,22 @@ try {
   const extra = await connect('');
   opened.push(extra.ws);
   check('новий пʼятий гравець усе ще отримує full', extra.msg.t === 'err' && extra.msg.code === 'full', JSON.stringify(extra.msg));
+
+  // 🔌 ХОСТ (pid=1) теж reconnect’иться своїм ключем — авторитет повертається у межах грейсу
+  const hostKey = host.msg.rk;
+  check('relay видає секрет слота хосту (rk)', typeof hostKey === 'string' && hostKey.length >= 8, String(hostKey));
+  const hostNoKey = await connect('&resume=1'); // без ключа — слот 1 не перехопити
+  opened.push(hostNoKey.ws);
+  check('resume=1 БЕЗ ключа не перехоплює хоста (→ full)', hostNoKey.msg.t === 'err' && hostNoKey.msg.code === 'full', JSON.stringify(hostNoKey.msg));
+  const hostReconn = await connect('&resume=1&resumeKey=' + encodeURIComponent(hostKey));
+  opened.push(hostReconn.ws);
+  check('ХОСТ resume=1 з ключем повертає слот 1 (авторитет)', hostReconn.msg.t === 'relay' && hostReconn.msg.you === 1, JSON.stringify(hostReconn.msg));
+  let hostOldClosed = false;
+  host.ws.once('close', () => { hostOldClosed = true; });
+  await sleep(500);
+  check('старий сокет хоста закрито після resume=1', hostOldClosed || host.ws.readyState === WebSocket.CLOSED);
+  const hostPeerOff = g3.messages.find((m) => m.t === 'peer' && m.id === 1 && m.on === false);
+  check('reconnect хоста НЕ шле peer-off для pid=1 (гості не бачать «хост зник»)', !hostPeerOff);
 } catch (e) {
   failures++;
   console.error('❌ ТЕСТ ВПАВ:', e.message);

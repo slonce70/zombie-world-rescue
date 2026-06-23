@@ -253,7 +253,7 @@ wss.on('connection', (ws, req) => {
 
   let id, validResume = false;
   if (create) id = 1;
-  else if (resumeId >= 2 && resumeKey && room.keys.get(resumeId) === resumeKey) {
+  else if ((resumeId === 1 || resumeId >= 2) && resumeKey && room.keys.get(resumeId) === resumeKey) {
     // resume чесний лише з правильним секретом слота (дзеркалить воркер: анти-перехоплення pid)
     validResume = true;
     if (!room.sockets.has(resumeId) && room.sockets.size >= MAX_PLAYERS) { send(ws, { t: 'err', code: 'full' }); ws.close(); return; }

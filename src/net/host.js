@@ -537,8 +537,22 @@ export class HostNet {
     return state;
   }
 
-  connectionLost() { /* хост не реконектиться — relay тримає кімнату */ }
-  connectionBack() { /* — */ }
+  connectionLost() {
+    // хост лишається авторитетом і симулює далі; снапшоти у мертвий сокет — no-op (readyState-гард).
+    this._netDown = true;
+  }
+
+  connectionBack() {
+    this._netDown = false;
+    // прогалина снапшотів за час простою → повна пересинхронізація кожному гостю свіжим captureState
+    // (як у відповідь на lvlready: гість у _applyState скидає _lastSnapSeq і приймає свіжий стан).
+    if (this.level && this.level.player) {
+      const state = this.captureState();
+      for (const pid of this.session.roster.keys()) {
+        if (pid !== 1) this.session.transport.send(pid, state, true);
+      }
+    }
+  }
 
   dispose() {
     for (const rp of this.remotes.values()) rp.dispose();

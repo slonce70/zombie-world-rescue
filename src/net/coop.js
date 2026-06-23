@@ -312,6 +312,14 @@ export class CoopSession {
   }
 
   _onClose(reason) {
+    // 🔌 тихий реконект ХОСТА: моргання мережі не повинно вбивати кімнату (relay тримає
+    // грейс ~30с). Хост лишається АВТОРИТЕТОМ (симуляція в памʼяті вкладки) — повертає
+    // слот 1 (resume=1) і ре-синкає гостей. Без hello (хост не представляється сам собі).
+    if (this.role === 'host' && this.myPid === 1 && (this.state === 'level' || this.state === 'lobby')) {
+      if (this.net) this.net.connectionLost();
+      this._tryReconnectHost();
+      return;
+    }
     // тихий реконект гостя з тим самим pid: і в РІВНІ (зберегти бій), і в ЛОБІ
     // (моргання Wi-Fi у лобі не повинно вбивати кімнату). У лобі this.net ще немає.
     if (this.role === 'guest' && this.myPid >= 2 && (this.state === 'level' || this.state === 'lobby')) {
@@ -320,6 +328,22 @@ export class CoopSession {
       return;
     }
     this._roomOver(reason);
+  }
+
+  // 🔌 тихий реконект ХОСТА: повертаємо авторитетний слот 1 (resume=1 + resumeKey) у межах грейсу.
+  async _tryReconnectHost() {
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, 1200 + i * 800));
+      try {
+        await this.transport.connect(this.room, { resume: 1 });
+        // грейс минув → relay видав нам НОВИЙ pid як гостю: авторитету вже нема, кімната мертва
+        if (this.transport.you !== 1) { this._roomOver('lost'); return; }
+        this.myPid = 1;
+        if (this.net) this.net.connectionBack(); // відновити розсилку + повна пересинхронізація гостей
+        return;
+      } catch (e) { /* ще спроба (taken/closed/timeout) */ }
+    }
+    this._roomOver('lost');
   }
 
   async _tryReconnect() {

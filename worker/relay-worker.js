@@ -95,7 +95,9 @@ export class Room {
       // resume чесний лише з правильним СЕКРЕТНИМ ключем цього pid (видається при першому вході).
       // Без нього будь-хто з кодом кімнати міг би вибити конкретного гостя й зайняти його слот
       // (impersonation), тож невалідний resume трактуємо як звичайне нове приєднання.
-      if (resume >= 2 && resumeKey) {
+      // id===1 (хост) теж може resume — тим самим секретним ключем слота (видається при create):
+      // тихий reconnect хоста повертає АВТОРИТЕТНИЙ слот 1 у межах грейсу (анти-перехоплення як у гостей).
+      if ((resume === 1 || resume >= 2) && resumeKey) {
         const stored = await this.state.storage.get('key:' + resume);
         if (stored && resumeKey === stored) validResume = true;
       }
@@ -119,6 +121,11 @@ export class Room {
     const [client, server] = Object.values(pair);
     this.state.acceptWebSocket(server);
     server.serializeAttachment({ id, key });
+    // 🔌 хост повернувся (resume=1) у межах грейсу: знімаємо смертний таймер кімнати
+    if (id === 1) {
+      await this.state.storage.delete('hostGoneAt');
+      await this.state.storage.deleteAlarm();
+    }
     server.send(JSON.stringify({
       t: 'relay', you: id, isHost: id === 1, rk: key,
       peers: [...peers.keys()].filter((p) => p !== id),
@@ -214,8 +221,8 @@ export class Room {
     // ponytail: за вічно-живого хоста ключі ростуть з nextId; для родинного коопу (≤4) це дрібниця.
     for (const [, sock] of peers) this._safeSend(sock, JSON.stringify({ t: 'peer', id: att.id, on: false }));
     if (att.id === 1) {
-      // хост зник: реконекту хоста немає, тому грейс короткий — щоб гості
-      // не висіли в «чекаємо хоста» довше за 30с
+      // хост зник: грейс ~30с на тихий reconnect (resume=1 у fetch() зніме цей alarm).
+      // Якщо не повернувся — alarm() закриває кімнату й чистить ключі.
       await this.state.storage.put('hostGoneAt', Date.now());
       await this.state.storage.setAlarm(Date.now() + 30_000);
     }
