@@ -286,8 +286,6 @@ export class Zombies {
         else if (this._allowGhost && this.rng.chance(0.07)) type = 'ghost';
         // 🪬 зомбі-шаман — рідкісний; воскресає раз і може лишити тотем безсмертя
         else if (this._allowShaman && this.rng.chance(0.06)) type = 'shaman';
-        // 🤖 зомбі-робот — рідкісний важкий МЕХ (~4%); гейт важких ворогів (з середини кампанії)
-        else if (this._allowRobot && this.rng.chance(0.04)) type = 'robot';
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
@@ -295,9 +293,11 @@ export class Zombies {
         });
       }
     });
-    // 🤖 гарантуємо ОДНОГО зомбі-робота на рівень (де дозволено) — щоб його точно було видно й де знайти
+    // 🤖 рівно 3 зомбі-роботи на рівень (де дозволено), рознесені по карті
     if (this._allowRobot) {
-      this.spawn('robot', 56, -44, { anchor: { x: 60, z: -40, r: 16 }, groupId: 1 });
+      for (const [rx, rz] of [[56, -44], [-44, 56], [24, 80]]) {
+        this.spawn('robot', rx, rz, { anchor: { x: rx, z: rz, r: 16 }, groupId: 1 });
+      }
     }
     // охорона місій
     const guardSets = [

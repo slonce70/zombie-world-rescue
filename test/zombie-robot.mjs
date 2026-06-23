@@ -18,7 +18,7 @@ console.log('▸ Знаходжуваність: гарантований спа
 const found = await page.evaluate(() => ({
   robots: window.__game.level.zombies.list.filter((z) => z.type === 'robot').length,
 }));
-check(found.robots >= 1, 'у дозволеній країні (FRA) гарантовано є ≥1 робот на рівні', JSON.stringify(found));
+check(found.robots === 3, 'у дозволеній країні (FRA) рівно 3 роботи на рівні', JSON.stringify(found));
 
 console.log('▸ Зомбі-робот: стати + дві атаки');
 const cfg = await page.evaluate(() => {
