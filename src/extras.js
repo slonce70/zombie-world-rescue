@@ -700,19 +700,34 @@ export class Gadgets {
     return best;
   }
 
-  // 💥 135 шкоди ЗГОРИ по ВСІХ живих зомбі в зоні 7×7 м навколо точки удару
-  // (METEOR_DOWN обходить фронтальний щит, headshot — нагрудник)
+  // 💥 шкода ЗГОРИ по ВСІХ живих зомбі в зоні 7×7 м: 135 звичайним, 500 роботу (мех трощиться).
+  // METEOR_DOWN обходить фронтальний щит, headshot — нагрудник.
   _meteorAoE(x, z) {
     for (const zb of this.level.zombies.list) {
       if (zb.state === 'dead' || zb.gone) continue;
-      if (Math.abs(zb.x - x) <= 3.5 && Math.abs(zb.z - z) <= 3.5) zb.damage(135, METEOR_DOWN, true);
+      if (Math.abs(zb.x - x) <= 3.5 && Math.abs(zb.z - z) <= 3.5) {
+        zb.damage(zb.type === 'robot' ? 500 : 135, METEOR_DOWN, true);
+      }
     }
+  }
+
+  // ціль метеорита: ПРІОРИТЕТНО найближчий робот поблизу (≤50м), інакше найближчий зомбі
+  // (робот великий/повільний — без пріоритету метеорит падав би на дрібних)
+  _meteorTarget(x, z) {
+    let robot = null, rd = Infinity;
+    for (const zb of this.level.zombies.list) {
+      if (zb.type !== 'robot' || zb.state === 'dead' || zb.gone) continue;
+      const d = Math.hypot(zb.x - x, zb.z - z);
+      if (d < rd) { rd = d; robot = zb; }
+    }
+    if (robot && rd <= 50) return robot;
+    return this._nearestZombie(x, z);
   }
 
   // соло/хост: метеорит падає на точку найближчого зомбі, б'є площу 7×7; візуал гостям ('met')
   _callMeteor() {
     const level = this.level;
-    const zb = this._nearestZombie(level.player.pos.x, level.player.pos.z);
+    const zb = this._meteorTarget(level.player.pos.x, level.player.pos.z);
     if (!zb) { level.bus.emit('toast', t('☄️ Немає цілі поблизу!')); level.game.audio.denied(); return false; }
     const ix = zb.x, iz = zb.z;
     level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz), level.player.pos.x, level.player.pos.z);
@@ -731,7 +746,7 @@ export class Gadgets {
 
   // хост: метеорит на найближчого до позиції гравця-замовника, площа 7×7 + розсилка візуалу
   hostMeteor(x, z) {
-    const zb = this._nearestZombie(x, z);
+    const zb = this._meteorTarget(x, z);
     if (!zb) return;
     const ix = zb.x, iz = zb.z;
     this.level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz), x, z);

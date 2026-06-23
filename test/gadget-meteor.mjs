@@ -80,6 +80,22 @@ const fly = await page.evaluate(() => {
 check(fly.flying >= 1, 'метеорит вилетів (у польоті)', JSON.stringify(fly));
 check(fly.landed === 0, 'метеорит приземлився (зник із польоту)', JSON.stringify(fly));
 
+console.log('▸ Анти-робот: пріоритет цілі + 500 шкоди');
+const rob = await page.evaluate(() => {
+  const Z = window.__game.level.zombies; const p = window.__game.level.player;
+  const px = p.pos.x + 60, pz = p.pos.z + 60; // ізольована точка, подалі від орди
+  Z.spawn('walker', px + 4, pz, {});          // дрібний — БЛИЖЧЕ
+  const robot = Z.spawn('robot', px + 20, pz, {}); // робот — далі, але ≤50м
+  const target = window.__game.level.gadgets._meteorTarget(px, pz);
+  const targetsRobot = target === robot;
+  const hp0 = robot.hp, sh0 = robot.shieldHp;
+  window.__game.level.gadgets._meteorAoE(robot.x, robot.z); // пряма AoE по роботу
+  return { targetsRobot, robotDmg: hp0 - robot.hp, shieldKept: robot.shieldHp === sh0 };
+});
+check(rob.targetsRobot, 'метеорит ПРІОРИТЕТНО цілиться в робота (а не в дрібного ближчого)', JSON.stringify(rob));
+check(rob.robotDmg === 500, 'роботу метеорит завдає 500 (обходить щит згори)', JSON.stringify(rob));
+check(rob.shieldKept, 'щит робота не зачеплено (удар згори повз нього)', JSON.stringify(rob));
+
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 МЕТЕОРИТ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
