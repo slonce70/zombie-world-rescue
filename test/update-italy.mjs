@@ -8,12 +8,15 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:8741';
+// SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
+// час тече ~N× повільніше — даємо стану гри дозріти, не послаблюючи асерти.
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
 async function waitFor(page, fn, timeoutMs, label) {
   const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await page.evaluate(fn)) return true;
     await page.waitForTimeout(300);
   }
@@ -99,13 +102,13 @@ const glad = await page.evaluate(async () => {
 check(glad.hp === 175 && glad.charger, `gladiator: 175 HP, charger=${glad.charger}`);
 check(glad.ztype === 'gladiator', 'gladiator має власний вигляд (шолом+меч+щит)', glad.ztype);
 // gladiator мусить телеграфувати випад і виконати його (чиста лінія видимості в арені)
-const charged = await page.evaluate(async () => {
+const charged = await page.evaluate(async (SLOW) => {
   const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
   const ar = g.level.world.layout.arena;
   const z = Z.list.find((q) => q.type === 'gladiator' && q.state !== 'dead');
   z.chargeCd = 0;
   let sawTelegraph = false, sawCharge = false;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 60 * SLOW; i++) {
     p.pos.x = ar.x; p.pos.z = ar.z;
     if (z.telegraph <= 0 && z.charging <= 0) {
       z.x = ar.x + 15; z.z = ar.z;
@@ -118,7 +121,7 @@ const charged = await page.evaluate(async () => {
     if (sawCharge) break;
   }
   return { sawTelegraph, sawCharge, alive: z.state !== 'dead' };
-});
+}, SLOW);
 check(charged.sawTelegraph || charged.sawCharge,
   `gladiator телеграфує/виконує випад мечем (tg=${charged.sawTelegraph}, charge=${charged.sawCharge})`);
 
@@ -136,7 +139,7 @@ await page.evaluate(() => {
 });
 let bossUnlocked = false;
 const tH = Date.now();
-while (Date.now() - tH < 60000) {
+while (Date.now() - tH < 60000 * SLOW) {
   const stH = await page.evaluate(() => ({
     active: window.__game.level.zombies.hordeActive,
     unlocked: window.__game.level.missions.bossUnlocked,
@@ -163,7 +166,7 @@ check(boss && boss.ranged, 'бос має дальню атаку (пілуми)
 // КРИТИЧНО (анти-баг гробниці EGY): центр арени-Колізею має бути ВІЛЬНИЙ від
 // колайдерів-перешкод, бос стоїть рівно на землі (не «вгруз» у суцільну геометрію)
 // і може зрушити з місця при погоні. Перевіряємо все три умови.
-const reachable = await page.evaluate(async () => {
+const reachable = await page.evaluate(async (SLOW) => {
   const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
   const w = g.level.world; const ar = w.layout.arena; const b = Z.boss;
   // 1) колайдерів у самому центрі арени немає (пісок чистий — пілони ярусів далеко)
@@ -171,17 +174,26 @@ const reachable = await page.evaluate(async () => {
   for (const c of w.colliders) if (Math.hypot(c.x - ar.x, c.z - ar.z) < 8) collInCore++;
   // 2) бос рівно на землі (не провалився / не виштовхнутий угору геометрією)
   b.x = ar.x; b.z = ar.z; b.rig.group.position.set(b.x, b.y, b.z);
-  await new Promise((r) => setTimeout(r, 120));
+  await new Promise((r) => setTimeout(r, 120 * SLOW));
   const gh = w.groundH(b.x, b.z);
   const onGround = Math.abs(b.y - gh) < 1.5;
   // 3) бос зрушує до гравця (інтер'єр прохідний; чисто — нема ривків/телеграфу під час заміру)
   p.pos.x = ar.x + 24; p.pos.z = ar.z; p.respawnProtect = 1e9;
   b.aggroed = true; b.state = 'chase'; b.leashed = false; b.chargeCd = 99;
   const x0 = b.x, z0 = b.z;
-  for (let i = 0; i < 40; i++) { b.chargeCd = 99; await new Promise((r) => setTimeout(r, 80)); }
-  const moved = Math.hypot(b.x - x0, b.z - z0);
+  // Бос осідає й кілька перших кадрів дрейфує/розвертається (нетто-зсув від старту ще <1м),
+  // і лише потім стабільно йде до гравця — нетто-дистанція перетинає 1м аж ~50-го кадру.
+  // Тож даємо широке вікно (90*SLOW кадрів), а щойно реально зрушив >1м — годі (рання зупинка).
+  // SLOW множить вікно для софт-рендера CI; поріг 1.0 НЕ чіпаємо — реальна регресія все одно впаде.
+  let moved = 0;
+  for (let i = 0; i < 90 * SLOW; i++) {
+    b.chargeCd = 99;
+    await new Promise((r) => setTimeout(r, 80));
+    moved = Math.hypot(b.x - x0, b.z - z0);
+    if (moved > 1.0) break;
+  }
   return { collInCore, onGround, moved };
-});
+}, SLOW);
 check(reachable.collInCore === 0 && reachable.onGround && reachable.moved > 1.0,
   `бос на чистому інтер'єрі Колізею (колайдерів у центрі ${reachable.collInCore}, на землі=${reachable.onGround}, зрушив ${reachable.moved.toFixed(1)}м)`);
 

@@ -8,6 +8,7 @@ import { spawnRelay } from './_relay.mjs';
 const BASE = 'http://localhost:8741';
 const RELAY_PORT = 8749; // окремий порт від coop.mjs (8743), щоб тести не билися
 const RELAY = `ws://localhost:${RELAY_PORT}`;
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failures = 0;
@@ -18,7 +19,7 @@ const check = (name, ok, extra = '') => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(fn, timeoutMs, label) {
   const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await fn()) return true;
     await sleep(300);
   }
@@ -56,8 +57,8 @@ try {
   guestPage.setDefaultTimeout(60000);
   await hostPage.goto(`${BASE}/?test&fresh&relay=${RELAY}`);
   await guestPage.goto(`${BASE}/?test&fresh&relay=${RELAY}`);
-  await hostPage.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 });
-  await guestPage.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 });
+  await hostPage.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 * SLOW });
+  await guestPage.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 * SLOW });
   check('обидва клієнти на глобусі', true);
 
   // 2. хост створює кімнату
@@ -77,15 +78,15 @@ try {
     window.__game.test.coopSetCountry('UKR');
     window.__game.test.coopStartLevel();
   });
-  await hostPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
-  await guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+  await hostPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 * SLOW });
+  await guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 * SLOW });
   check('обидва увійшли в рівень', true);
 
   // гість має дочекатися повного стану від хоста (щоб net жив на обох боках)
   await guestPage.waitForFunction(() => {
     const s = window.__game.test.coopState();
     return s.aliveZombies > 5;
-  }, null, { timeout: 15000 }).catch(() => {});
+  }, null, { timeout: 15000 * SLOW }).catch(() => {});
 
   // ============ 📣 ПІНГИ ============
   // 5. шпигуємо за тостами хоста; гість шле пінг #1 (Допоможи!)

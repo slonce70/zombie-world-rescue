@@ -6,6 +6,8 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:8741';
+// CI під софт-рендером (SLOW=4): ігровий час тече повільніше — масштабуємо всі чекання/таймаути.
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
@@ -17,11 +19,11 @@ page.on('pageerror', (e) => errors.push(e.message));
 
 // Заходимо у пізнішу країну (DEU, dmg=1.55>1) — там дозволено чарівника й fireproof-щити.
 await page.goto(`${BASE}/?test&fresh`);
-await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 * SLOW });
 await page.evaluate(() => { window.__game.save.liberated = { UKR: true, POL: true, DEU: true }; });
 await page.evaluate(() => window.__game.startLevel('DEU'));
-await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
-await page.waitForTimeout(600);
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 * SLOW });
+await page.waitForTimeout(600 * SLOW);
 
 // ---------- (а0) Гейтинг типу: на UKR ★1 чарівник НЕ дозволений, на DEU — дозволений ----------
 const gate = await page.evaluate(() => ({ deu: window.__game.level.zombies._allowWizard }));
@@ -46,7 +48,7 @@ check(ranged.stats.hp === 200, 'чарівник: базові 200 HP', ranged.s
 check(ranged.stats.dmg === 15, 'чарівник: дальня шкода 15', ranged.stats.dmg);
 check(ranged.stats.sh === 100, 'чарівник: щит 100', ranged.stats.sh);
 // проганяємо ~6 секунд симуляції — снаряди мають долетіти й поранити
-await page.waitForTimeout(6500);
+await page.waitForTimeout(6500 * SLOW);
 const afterRanged = await page.evaluate(() => window.__game.level.player.health);
 check(afterRanged < ranged.hp0, `чарівник поранив гравця здалека (${ranged.hp0} → ${afterRanged})`);
 
