@@ -674,12 +674,13 @@ export class Gadgets {
       level.bus.emit('toast', t('🪄 Телепорт!'));
       ok = true;
     } else if (id === 'goldapple') {
-      // +20 бонус-HP на 5с; guard appleT<=0 не дає подвоїти бонус (cd 45с і так не дасть)
-      if (p.appleT <= 0) { p.maxHealth += 20; p.health += 20; }
+      const hp = (game.save.gadgetHypers || []).includes('goldapple') ? 40 : 20;
+      // бонус-HP на 5с; guard appleT<=0 не дає подвоїти бонус (cd 45с і так не дасть)
+      if (p.appleT <= 0) { p.appleBonus = hp; p.maxHealth += hp; p.health += hp; }
       p.appleT = 5;
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0xffd23f, 16, { speed: 2.5, up: 3, life: 0.9 });
-      level.bus.emit('toast', t('🍎 Золоте яблуко: +20 здоров\'я на 5с!'));
+      level.bus.emit('toast', t('🍎 Золоте яблуко: +{n} здоров\'я на 5с!', { n: hp }));
       ok = true;
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму

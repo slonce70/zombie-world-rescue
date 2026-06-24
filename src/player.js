@@ -60,7 +60,7 @@ export class Player {
     this.gadgetShield = 0; // 🛡️ гаджет-щит: поглинає шкоду повністю, поки не розіб'ється
     this.infiniteAmmoT = 0;
     this.stunAmmoT = 0; // 💫 гаджет «Оглушливі кулі»: кулі пістолета/магнума оглушують зомбі
-    this.appleT = 0; // 🍎 золоте яблуко: поки >0, maxHealth тримає +20 (бонус згасає сам)
+    this.appleT = 0; this.appleBonus = 20; // 🍎 золоте яблуко: тимчасовий maxHealth бонус згасає сам
 
     // 💃 емоції-танці та 🛴 їзда на самокаті
     this.emoting = null;
@@ -394,7 +394,7 @@ export class Player {
     if (this.stunAmmoT > 0) this.stunAmmoT = Math.max(0, this.stunAmmoT - dt);
     if (this.appleT > 0) {
       this.appleT = Math.max(0, this.appleT - dt);
-      if (this.appleT === 0) { this.maxHealth -= 20; if (this.health > this.maxHealth) this.health = this.maxHealth; }
+      if (this.appleT === 0) { this.maxHealth -= this.appleBonus || 20; this.appleBonus = 20; if (this.health > this.maxHealth) this.health = this.maxHealth; }
     }
   }
 
