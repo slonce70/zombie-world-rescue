@@ -875,6 +875,20 @@ export class Gadgets {
       } else {
         setAnim(c.rig, 'idle');
       }
+      for (let j = 0; j < this.clones.length; j++) {
+        if (j === i) continue;
+        const o = this.clones[j];
+        let sx = c.x - o.x, sz = c.z - o.z;
+        let sd = Math.hypot(sx, sz);
+        if (sd >= 1.35) continue;
+        if (sd < 0.001) { const a = (i + 1) * 2.4; sx = Math.cos(a); sz = Math.sin(a); sd = 1; }
+        const push = (1.35 - sd) * 0.75;
+        c.x += (sx / sd) * push;
+        c.z += (sz / sd) * push;
+        const solved = level.world.collide(c.x, c.z, 0.45, c.y);
+        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z);
+        c.mesh.position.set(c.x, c.y, c.z);
+      }
       c.hitT -= dt;
       if (c.hitT <= 0 && dist <= 16) {
         const melee = dist <= 2.1;

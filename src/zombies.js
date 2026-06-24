@@ -731,6 +731,14 @@ export class Zombies {
         get pos() { return player.pos; },
         get health() { return player.health; },
       }]));
+    const clones = (level.gadgets && level.gadgets.clones) || [];
+    const targets = clones.length
+      ? players.concat(clones.filter((c) => c.hp > 0).map((c) => ({
+        clone: c,
+        get pos() { return { x: c.x, y: c.y, z: c.z }; },
+        get health() { return c.hp; },
+      })))
+      : players;
 
     // спавн орди хвилями
     this._updateHordeWaves(dt, players, player);
@@ -777,7 +785,7 @@ export class Zombies {
 
       let tgt = null;
       let distP = Infinity;
-      for (const pl of players) {
+      for (const pl of targets) {
         if (pl.health <= 0) continue;
         const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
         if (d < distP) { distP = d; tgt = pl; }
@@ -1449,6 +1457,7 @@ export class Zombies {
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
   _hurt(tgt, dmg, fx, fz) {
     if (!tgt) return;
+    if (tgt.clone) { tgt.clone.hp -= dmg; return; }
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
     if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return;

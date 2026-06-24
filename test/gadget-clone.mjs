@@ -131,6 +131,56 @@ check(hyperFight.used && hyperFight.count === 2, 'гіпер-клон спавн
 check(hyperFight.hp.length === 2 && hyperFight.hp.every((hp) => hp === 50), 'у кожного гіпер-клона 50 HP', JSON.stringify(hyperFight));
 check(hyperFight.farDmg === 10, 'обидва гіпер-клони мають пістолет по 5 HP', JSON.stringify(hyperFight));
 
+const cloneAggro = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = [];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(0, 120);
+  p.yaw = 0;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  g.test.useGadget();
+  const clone = g.level.gadgets.clones[0];
+  g.test.teleport(80, 120);
+  const z = g.test.spawnZombie('walker', clone.x + 1.0, clone.z);
+  z.state = 'wander';
+  z.aggroed = false;
+  z.sleeping = false;
+  clone.hp = 50;
+  for (let i = 0; i < 8; i++) g.level.zombies.update(0.2);
+  return { aggroed: z.aggroed, state: z.state, cloneHp: clone.hp, playerHp: p.health };
+});
+check(cloneAggro.aggroed && cloneAggro.cloneHp < 50 && cloneAggro.playerHp === 100,
+  'зомбі агряться на клона і бʼють його, коли гравець далеко', JSON.stringify(cloneAggro));
+
+const formation = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = ['clone'];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(20, 120);
+  p.yaw = 0;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  g.test.useGadget();
+  const clones = g.level.gadgets.clones;
+  const target = g.test.spawnZombie('tank', clones[0].x + 18, clones[0].z);
+  target.hp = target.maxHp = 1000;
+  target.aggroed = false;
+  for (const c of clones) c.hitT = 999;
+  let minDist = Infinity;
+  for (let i = 0; i < 30; i++) {
+    g.level.gadgets._updateClones(0.1);
+    minDist = Math.min(minDist, Math.hypot(clones[0].x - clones[1].x, clones[0].z - clones[1].z));
+  }
+  return { count: clones.length, minDist, finalDist: Math.hypot(clones[0].x - clones[1].x, clones[0].z - clones[1].z) };
+});
+check(formation.count === 2 && formation.minDist >= 0.9,
+  'гіпер-клони рухаються поруч, а не всередині один одного', JSON.stringify(formation));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
