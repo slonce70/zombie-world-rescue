@@ -892,6 +892,8 @@ export class Gadgets {
       c.hitT -= dt;
       if (c.hitT <= 0 && dist <= 16) {
         const melee = dist <= 2.1;
+        const visible = melee || level.world.shotBlockDist(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(dx, 0, dz).normalize(), dist) >= dist - 0.2;
+        if (!visible) { c.hitT = 0.25; updateRig(c.rig, dt); continue; }
         c.hitT = melee ? 0.7 : 0.9;
         target.lastHitBy = 1;
         target.damage(melee ? 10 : 5, new THREE.Vector3(dx, 0, dz).normalize(), false);

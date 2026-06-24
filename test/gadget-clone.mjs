@@ -181,6 +181,30 @@ const formation = await page.evaluate(() => {
 check(formation.count === 2 && formation.minDist >= 0.9,
   'гіпер-клони рухаються поруч, а не всередині один одного', JSON.stringify(formation));
 
+const blockedShot = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = [];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(40, 120);
+  p.yaw = 0;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  g.test.useGadget();
+  const clone = g.level.gadgets.clones[0];
+  const target = g.test.spawnZombie('tank', clone.x + 8, clone.z);
+  target.hp = target.maxHp = 1000;
+  target.aggroed = false;
+  clone.hitT = 0;
+  const old = g.level.world.shotBlockDist;
+  g.level.world.shotBlockDist = () => 1;
+  g.level.gadgets._updateClones(0.1);
+  g.level.world.shotBlockDist = old;
+  return { hp: target.hp, dmg: 1000 - target.hp };
+});
+check(blockedShot.dmg === 0, 'клон не стріляє крізь стіну будинка', JSON.stringify(blockedShot));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
