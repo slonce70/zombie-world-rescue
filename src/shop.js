@@ -27,6 +27,7 @@ export const SHOP_ITEMS = [
   { id: 'watchtower', icon: GADGETS.watchtower.icon, name: GADGETS.watchtower.name, desc: () => GADGETS.watchtower.desc + t(' · перезарядка {n}с', { n: GADGETS.watchtower.cd }), price: GADGETS.watchtower.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'xray', icon: GADGETS.xray.icon, name: GADGETS.xray.name, desc: () => GADGETS.xray.desc + t(' · перезарядка {n}с', { n: GADGETS.xray.cd }), price: GADGETS.xray.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'invisibility', icon: GADGETS.invisibility.icon, name: GADGETS.invisibility.name, desc: () => GADGETS.invisibility.desc + t(' · перезарядка {n}с', { n: GADGETS.invisibility.cd }), price: 0, crystalPrice: 5, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo-hyper', icon: '⚡', name: t('Гіперзаряд: Оглушливі кулі'), desc: t('Постійне покращення: зомбі оглушаються на 1 секунду'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'stunammo', needsGadget: 'stunammo' },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -288,6 +289,7 @@ export class Shop {
       case 'watchtower':
       case 'xray':
       case 'infammo':
+      case 'invisibility':
       case 'stunammo':
       case 'teleport':
       case 'goldapple':

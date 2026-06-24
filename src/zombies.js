@@ -732,6 +732,7 @@ export class Zombies {
         pid: 1,
         get pos() { return player.pos; },
         get health() { return player.health; },
+        get invisibleT() { return player.invisibleT || 0; },
       }]));
     const clones = (level.gadgets && level.gadgets.clones) || [];
     const targets = clones.length
@@ -789,6 +790,7 @@ export class Zombies {
       let distP = Infinity;
       for (const pl of targets) {
         if (pl.health <= 0) continue;
+        if (!pl.clone && pl.invisibleT > 0) continue;
         const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
         if (d < distP) { distP = d; tgt = pl; }
       }
