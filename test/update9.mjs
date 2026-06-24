@@ -212,7 +212,7 @@ console.log('▸ Арена босів');
 await page.evaluate(() => {
   const g = window.__game;
   g.endLevel();
-  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, ITA: true, TUR: true, SWE: true, EGY: true, JPN: true, CHN: true };
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, SWE: true, EGY: true, JPN: true, CHN: true };
   g.saveGame();
   g.test.startArena();
 });

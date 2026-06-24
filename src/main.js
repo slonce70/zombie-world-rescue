@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1562,7 +1562,7 @@ class Game {
   // нагорода-зброя за країну: видається і запам'ятовується назавжди.
   // Якщо зброя вже куплена в магазині — компенсація монетами.
   unlockWeapon(id) {
-    if (!id) return; // 🛡 ESP/ITA більше не мають weaponReward — гард від unlockWeapon(undefined)
+    if (!id) return; // 🛡 ESP/PRT/ITA більше не мають weaponReward — гард від unlockWeapon(undefined)
     if (!this.level) return;
     if (this.save.weapons.includes(id)) {
       this.level.addCoins(300);

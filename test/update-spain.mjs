@@ -50,7 +50,7 @@ check(cfg.coin === 600, 'нагорода — 600 МОНЕТ (coinReward)', cfg.
 check(cfg.extra === 'toro', 'extraZombie = toro', cfg.extra);
 check(cfg.bossStyle === 'matador' && cfg.bossHp > 0, `бос matador, ${cfg.bossHp} HP`);
 check(cfg.idx === 4 && cfg.order[3] === 'FRA' && cfg.order.indexOf('TUR') > cfg.idx,
-  `ESP стоїть після FRA, перед TUR (між ними тепер ITA): ${cfg.order.join('→')}`);
+  `ESP стоїть після FRA, перед TUR (між ними тепер PRT/ITA): ${cfg.order.join('→')}`);
 // монотонність складності FRA < ESP < TUR
 const mono = cfg.fraDiff.hp < cfg.diff.hp && cfg.diff.hp < cfg.turDiff.hp
   && cfg.fraDiff.dmg < cfg.diff.dmg && cfg.diff.dmg < cfg.turDiff.dmg

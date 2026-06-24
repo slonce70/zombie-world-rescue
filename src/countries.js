@@ -5,6 +5,7 @@ import polandMap from './maps/poland.js';
 import germanyMap from './maps/germany.js';
 import franceMap from './maps/france.js';
 import spainMap from './maps/spain.js';
+import portugalMap from './maps/portugal.js';
 import italyMap from './maps/italy.js';
 import turkeyMap from './maps/turkey.js';
 import egyptMap from './maps/egypt.js';
@@ -314,6 +315,20 @@ export const COUNTRIES = {
     banner: t('Сонячна Іспанія, корида й МАТАДОР-ЗОМБІ! Стережись рогів зомбі-биків! 🐂'),
     food: t('чурос'),
   },
+  PRT: {
+    id: 'PRT', name: t('Португалія'), flag: '🇵🇹', seed: 4747,
+    lat: 39.5, lon: -8.0,
+    victoryTitle: t('🇵🇹 ПОРТУГАЛІЮ ЗВІЛЬНЕНО!'),
+    biome: 'spainSun',
+    map: portugalMap,
+    difficulty: { hp: 1.925, dmg: 1.378, counts: 1.485 },
+    coinReward: 650,
+    extraZombie: 'toro',
+    shieldGuards: 3,
+    boss: { name: t('👑 КАПІТАН АТЛАНТИК'), hp: 5100, frost: false, style: 'matador' },
+    banner: t('Атлантичне сонце, білі будиночки й КАПІТАН АТЛАНТИК! Не дай зомбі захопити узбережжя! 🌊'),
+    food: t('паштел-де-ната'),
+  },
   ITA: {
     id: 'ITA', name: t('Італія'), flag: '🇮🇹', seed: 4949,
     lat: 41.9, lon: 12.5,
@@ -402,7 +417,7 @@ export const COUNTRIES = {
     food: t('дамплінг'),
   },
   // 🦖 ФІНАЛ-БОНУС: острів поза CAMPAIGN_ORDER. Відкривається лише після звільнення
-  // всіх 11 країн (isCountryOpen). Нагорода — ЛАЗЕР (інакше лише за зірковий рівень 28).
+  // всіх 12 країн (isCountryOpen). Нагорода — ЛАЗЕР (інакше лише за зірковий рівень 28).
   LOST: {
     id: 'LOST', name: t('Острів Динозаврів'), flag: '🦖', seed: 9090,
     lat: -16.5, lon: -148.2,
@@ -420,7 +435,7 @@ export const COUNTRIES = {
   },
 };
 
-export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
+export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
 
 export function getBiome(countryId) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;
@@ -439,7 +454,7 @@ export function nextTarget(liberated) {
 // після її звільнення відкривається ВЕСЬ світ (грай у будь-якому порядку)
 export function isCountryOpen(liberated, id) {
   if (!COUNTRIES[id]) return false;
-  // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 11 країн кампанії)
+  // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 12 країн кампанії)
   if (id === 'LOST') return CAMPAIGN_ORDER.every((c) => !!(liberated && liberated[c]));
   return id === 'UKR' || !!(liberated && liberated.UKR);
 }

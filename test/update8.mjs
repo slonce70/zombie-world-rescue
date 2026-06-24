@@ -179,7 +179,7 @@ void order;
 await page.goto(`${BASE}/?test`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
 const target = await page.evaluate(() => window.__game.globe.targetId);
-// після UKR→POL→DEU→FRA наступна незвільнена в CAMPAIGN_ORDER — Іспанія (далі ITA→TUR→SWE→EGY)
+// після UKR→POL→DEU→FRA наступна незвільнена в CAMPAIGN_ORDER — Іспанія (далі PRT→ITA→TUR→SWE→EGY)
 check(target === 'ESP', `після Франції ціль — Іспанія (${target})`);
 
 console.log('');

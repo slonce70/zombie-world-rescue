@@ -43,7 +43,7 @@ const cfg = await page.evaluate(async () => {
     extra: C && C.extraZombie, bossStyle: C && C.boss.style, bossHp: C && C.boss.hp,
     diff: C && C.difficulty, hasBiome: !!mod.BIOMES[C && C.biome],
     order, idx: order.indexOf('ITA'),
-    espDiff: mod.COUNTRIES.ESP.difficulty, turDiff: mod.COUNTRIES.TUR.difficulty,
+    prtDiff: mod.COUNTRIES.PRT.difficulty, turDiff: mod.COUNTRIES.TUR.difficulty,
   };
 });
 check(cfg.exists, 'COUNTRIES.ITA існує');
@@ -53,13 +53,13 @@ check(!cfg.reward, 'ITA більше не має weaponReward (лазер — з
 check(cfg.coin === 600, 'нагорода — 600 МОНЕТ (coinReward)', cfg.coin);
 check(cfg.extra === 'gladiator', 'extraZombie = gladiator', cfg.extra);
 check(cfg.bossStyle === 'gladiator' && cfg.bossHp > 0, `бос gladiator, ${cfg.bossHp} HP`);
-check(cfg.idx === 5 && cfg.order[4] === 'ESP' && cfg.order[6] === 'TUR',
-  `ITA стоїть після ESP, перед TUR: ${cfg.order.join('→')}`);
-// монотонність складності ESP < ITA < TUR
-const mono = cfg.espDiff.hp < cfg.diff.hp && cfg.diff.hp < cfg.turDiff.hp
-  && cfg.espDiff.dmg < cfg.diff.dmg && cfg.diff.dmg < cfg.turDiff.dmg
-  && cfg.espDiff.counts < cfg.diff.counts && cfg.diff.counts < cfg.turDiff.counts;
-check(mono, `крива складності монотонна (ESP ${cfg.espDiff.hp} < ITA ${cfg.diff.hp} < TUR ${cfg.turDiff.hp})`);
+check(cfg.idx === 6 && cfg.order[5] === 'PRT' && cfg.order[7] === 'TUR',
+  `ITA стоїть після PRT, перед TUR: ${cfg.order.join('→')}`);
+// монотонність складності PRT < ITA < TUR
+const mono = cfg.prtDiff.hp < cfg.diff.hp && cfg.diff.hp < cfg.turDiff.hp
+  && cfg.prtDiff.dmg < cfg.diff.dmg && cfg.diff.dmg < cfg.turDiff.dmg
+  && cfg.prtDiff.counts < cfg.diff.counts && cfg.diff.counts < cfg.turDiff.counts;
+check(mono, `крива складності монотонна (PRT ${cfg.prtDiff.hp} < ITA ${cfg.diff.hp} < TUR ${cfg.turDiff.hp})`);
 
 // ===== Завантажуємо рівень ITA =====
 console.log('▸ Рівень ITA завантажується');
