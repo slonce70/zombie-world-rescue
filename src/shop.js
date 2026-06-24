@@ -10,18 +10,18 @@ export const SHOP_ITEMS = [
   { id: 'grenade', icon: '💣', name: t('Граната'), desc: () => t('+1 граната ({k})', { k: keyHint('кнопка 💣', 'G — кинути') }), price: 35, max: Infinity, cat: t('Припаси') },
   { id: 'rocket', icon: '🧨', name: t('Ракета'), desc: t('+1 ракета для базуки'), price: 60, max: Infinity, cat: t('Припаси'), needsBazooka: true },
   { id: 'armorplate', icon: '🛡️', name: t('Бронепластина'), desc: t('+40 броні зараз'), price: 80, max: Infinity, cat: t('Припаси') },
-  { id: 'coins500', icon: '💰', name: t('500 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 10, coinBundle: 500, max: Infinity, cat: t('Припаси') },
+  { id: 'coins500', icon: '💰', name: t('500 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 10, coinBundle: 500, max: Infinity, cat: t('Подарунки') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'shield-hyper', icon: '⚡', name: t('Гіперзаряд: Щит'), desc: t('Постійне покращення щита: 100 HP'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'shield', needsGadget: 'shield' },
+  { id: 'shield-hyper', icon: '⚡', name: t('Гіперзаряд: Щит'), desc: t('Постійне покращення щита: 100 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'shield', needsGadget: 'shield' },
   { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: () => GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: () => GADGETS.turret.desc + t(' · перезарядка {n}с', { n: GADGETS.turret.cd }), price: GADGETS.turret.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'turret-hyper', icon: '⚡', name: t('Гіперзаряд: Турель'), desc: t('Постійне покращення турелі: 100 HP і 25 шкоди за постріл'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'turret', needsGadget: 'turret' },
+  { id: 'turret-hyper', icon: '⚡', name: t('Гіперзаряд: Турель'), desc: t('Постійне покращення турелі: 100 HP і 25 шкоди за постріл'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'turret', needsGadget: 'turret' },
   { id: 'clone', icon: GADGETS.clone.icon, name: GADGETS.clone.name, desc: () => GADGETS.clone.desc + t(' · перезарядка {n}с', { n: GADGETS.clone.cd }), price: GADGETS.clone.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'clone-hyper', icon: '⚡', name: t('Гіперзаряд: Клон'), desc: t('Постійне покращення: спавнить 2 клони'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'clone', needsGadget: 'clone' },
+  { id: 'clone-hyper', icon: '⚡', name: t('Гіперзаряд: Клон'), desc: t('Постійне покращення: спавнить 2 клони'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'clone', needsGadget: 'clone' },
   { id: 'healtotem', icon: GADGETS.healtotem.icon, name: GADGETS.healtotem.name, desc: () => GADGETS.healtotem.desc + t(' · перезарядка {n}с', { n: GADGETS.healtotem.cd }), price: 0, crystalPrice: 20, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'damagetotem', icon: GADGETS.damagetotem.icon, name: GADGETS.damagetotem.name, desc: () => GADGETS.damagetotem.desc + t(' · перезарядка {n}с', { n: GADGETS.damagetotem.cd }), price: 0, crystalPrice: 25, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'watchtower', icon: GADGETS.watchtower.icon, name: GADGETS.watchtower.name, desc: () => GADGETS.watchtower.desc + t(' · перезарядка {n}с', { n: GADGETS.watchtower.cd }), price: GADGETS.watchtower.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -29,11 +29,11 @@ export const SHOP_ITEMS = [
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'invisibility', icon: GADGETS.invisibility.icon, name: GADGETS.invisibility.name, desc: () => GADGETS.invisibility.desc + t(' · перезарядка {n}с', { n: GADGETS.invisibility.cd }), price: 0, crystalPrice: 5, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'stunammo-hyper', icon: '⚡', name: t('Гіперзаряд: Оглушливі кулі'), desc: t('Постійне покращення: зомбі оглушаються на 1 секунду'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'stunammo', needsGadget: 'stunammo' },
+  { id: 'stunammo-hyper', icon: '⚡', name: t('Гіперзаряд: Оглушливі кулі'), desc: t('Постійне покращення: зомбі оглушаються на 1 секунду'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'stunammo', needsGadget: 'stunammo' },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'goldapple', icon: GADGETS.goldapple.icon, name: GADGETS.goldapple.name, desc: () => GADGETS.goldapple.desc + t(' · перезарядка {n}с', { n: GADGETS.goldapple.cd }), price: GADGETS.goldapple.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
-  { id: 'goldapple-hyper', icon: '⚡', name: t('Гіперзаряд: Золоте яблуко'), desc: t('Постійне покращення яблука: +40 HP'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'goldapple', needsGadget: 'goldapple' },
-  { id: 'meteor-hyper', icon: '⚡', name: t('Гіперзаряд: Метеорит'), desc: t('Після падіння лишає вогонь: 5 HP кожні 0.5с'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'meteor', needsGadget: 'meteor' },
+  { id: 'goldapple-hyper', icon: '⚡', name: t('Гіперзаряд: Золоте яблуко'), desc: t('Постійне покращення яблука: +40 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'goldapple', needsGadget: 'goldapple' },
+  { id: 'meteor-hyper', icon: '⚡', name: t('Гіперзаряд: Метеорит'), desc: t('Після падіння лишає вогонь: 5 HP кожні 0.5с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'meteor', needsGadget: 'meteor' },
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
   // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500
   ...Object.entries(PETS).map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
@@ -45,10 +45,10 @@ export const SHOP_ITEMS = [
   { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
   // 🔥 Вогнемет (рівень 25) і 🔫 Лазер (рівень 28) — нагороди за ЗІРКОВИЙ РІВЕНЬ, у магазині їх НЕМАЄ.
   // --- скіни героя ---
-  { id: 'frogskin', icon: HERO_SKINS.frog.icon, name: HERO_SKINS.frog.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'frog' },
-  { id: 'superskin', icon: HERO_SKINS.super.icon, name: HERO_SKINS.super.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'super' },
-  { id: 'militaryskin', icon: HERO_SKINS.military.icon, name: HERO_SKINS.military.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'military' },
-  { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Спорядження'), skin: 'gold' },
+  { id: 'frogskin', icon: HERO_SKINS.frog.icon, name: HERO_SKINS.frog.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Скіни'), skin: 'frog' },
+  { id: 'superskin', icon: HERO_SKINS.super.icon, name: HERO_SKINS.super.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Скіни'), skin: 'super' },
+  { id: 'militaryskin', icon: HERO_SKINS.military.icon, name: HERO_SKINS.military.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Скіни'), skin: 'military' },
+  { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Скіни'), skin: 'gold' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
