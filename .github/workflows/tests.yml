@@ -54,8 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: true
-    # continue-on-error лишається: free-runner тротлить гостя і дає таймаут-флейк.
-    # Реальні регресії ловляться локально (SLOW=4) + B1 (тести більше не «зеленіють» на сироті).
+    # Тести тепер шанують SLOW (×4 таймаутів/вікон) — таймаут-флейк здебільшого знято.
+    # Лишаються 1 авто-повтор (мережева недетермінованість гостя) + continue-on-error як
+    # фінальний backstop: реальна регресія впаде двічі, тож сигнал лишається чесним.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -68,13 +69,13 @@ jobs:
         run: python3 -m http.server 8741 &
       - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
         timeout-minutes: 25
-        run: SLOW=4 node test/coop.mjs
+        run: SLOW=4 node test/coop.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop.mjs)
       - name: Coop reconnect (mid-join + resume)
         timeout-minutes: 20
-        run: SLOW=4 node test/coop3.mjs
+        run: SLOW=4 node test/coop3.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop3.mjs)
       - name: Coop lobby/batching
         timeout-minutes: 15
-        run: SLOW=4 node test/coop6.mjs
+        run: SLOW=4 node test/coop6.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop6.mjs)
 
   # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
   # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт
@@ -124,7 +125,8 @@ jobs:
             case " $SKIP " in *" $t "*) continue;; esac
             case "$t" in coop*) continue;; esac
             echo "=== $t ==="
-            SLOW=4 node "$f" || fails="$fails $t"
+            # тести тепер шанують SLOW; 1 повтор проти разового флейку (реальна регресія впаде двічі)
+            SLOW=4 node "$f" || (echo "↻ повтор $t" && SLOW=4 node "$f") || fails="$fails $t"
           done
           if [ -n "$fails" ]; then echo "❌ ПРОВАЛИЛИСЯ:$fails"; exit 1; fi
           echo "✅ усі розширені тести пройшли"

@@ -6,12 +6,13 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:8741';
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
 async function waitFor(page, fn, timeoutMs, label) {
   const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await page.evaluate(fn)) return true;
     await page.waitForTimeout(300);
   }
@@ -117,7 +118,7 @@ const espWin = await page.evaluate(() => {
 // відбиваємо орди → арена → бос → перемога
 let unlocked = false;
 const tH = Date.now();
-while (Date.now() - tH < 60000) {
+while (Date.now() - tH < 60000 * SLOW) {
   const stH = await page.evaluate(() => ({
     active: window.__game.level.zombies.hordeActive,
     unlocked: window.__game.level.missions.bossUnlocked,

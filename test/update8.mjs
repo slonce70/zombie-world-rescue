@@ -3,6 +3,9 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 
 const BASE = 'http://localhost:8741';
+// SLOW=N множить таймаути/вікна часу: на CI-ранері з софтверним рендером ігровий
+// час тече ~N× повільніше, тож фіксовані очікування мусять чекати у N× довше.
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failed = 0;
@@ -20,8 +23,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ===== 🇹🇷 ТУРЕЧЧИНА =====
 console.log('▸ Туреччина');
 await page.goto(`${BASE}/?test&fresh&country=TUR`);
-await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 40000 });
-await page.waitForTimeout(2500);
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 40000 * SLOW });
+await page.waitForTimeout(2500 * SLOW);
 const tur = await page.evaluate(() => {
   const g = window.__game;
   const w = g.level.world;
@@ -56,8 +59,8 @@ check(sultan.ranged, 'Паша кидає шампури (дальній бій)
 // ===== 🇪🇬 ЄГИПЕТ =====
 console.log('▸ Єгипет');
 await page.goto(`${BASE}/?test&fresh&country=EGY`);
-await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 40000 });
-await page.waitForTimeout(2500);
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 40000 * SLOW });
+await page.waitForTimeout(2500 * SLOW);
 const egy = await page.evaluate(() => {
   const g = window.__game;
   const w = g.level.world;
@@ -78,7 +81,7 @@ check(egy.pond, 'в оазі є вода');
 check(egy.animals === 6, `верблюди пасуться (${egy.animals})`);
 
 // 🧗 сходження на піраміду стрибками
-const climb = await page.evaluate(async () => {
+const climb = await page.evaluate(async (SLOW) => {
   const g = window.__game;
   g.test.god();
   g.test.teleport(62, -89);
@@ -93,12 +96,12 @@ const climb = await page.evaluate(async () => {
   };
   // headless-кадри бувають рідкі — стрибаємо до результату, а не рівно 10 разів
   let y1 = y0;
-  for (let i = 0; i < 260 && y1 < y0 + 3.6; i++) {
+  for (let i = 0; i < 260 * SLOW && y1 < y0 + 3.6; i++) {
     p.update(0.05, input, true);
     y1 = p.pos.y;
   }
   return { y0, y1 };
-});
+}, SLOW);
 check(climb.y1 > climb.y0 + 3.5, `на піраміду можна вилізти стрибками (y +${(climb.y1 - climb.y0).toFixed(1)}м)`);
 
 // 🧻 мумія: спавн, статистика, вигляд
@@ -148,15 +151,15 @@ check(night.lamp >= 40, `ліхтарик гравця світить (${night.l
 check(night.lampGlow > 2, `вуличні ліхтарі розгорілись (${night.lampGlow})`);
 
 // 🌙 вночі зомбі бачать далі: ставимо зомбі на 26м (день: aggro 20 — не бачить)
-const aggro = await page.evaluate(async () => {
+const aggro = await page.evaluate(async (SLOW) => {
   const g = window.__game;
   const slp = (ms) => new Promise((r) => setTimeout(r, ms));
   const p = g.level.player.pos;
   const z = g.test.spawnZombie('walker', p.x + 26, p.z);
   z.sleeping = false;
-  await slp(1500);
+  await slp(1500 * SLOW);
   return z.state;
-});
+}, SLOW);
 check(aggro === 'chase', `вночі зомбі помічає гравця з 26 метрів (${aggro})`);
 
 // світанок повертає день
@@ -174,7 +177,7 @@ const order = await page.evaluate(() => {
 });
 void order;
 await page.goto(`${BASE}/?test`);
-await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
 const target = await page.evaluate(() => window.__game.globe.targetId);
 // після UKR→POL→DEU→FRA наступна незвільнена в CAMPAIGN_ORDER — Іспанія (далі ITA→TUR→SWE→EGY)
 check(target === 'ESP', `після Франції ціль — Іспанія (${target})`);

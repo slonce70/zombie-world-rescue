@@ -2,6 +2,9 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:8741';
+// SLOW=N множить усі таймаути: на CI-ранері з софтверним рендером ігровий час
+// тече ~4× повільніше, тож фіксовані очікування мають чекати у N разів довше.
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -16,7 +19,7 @@ const check = (cond, msg) => {
 const state = () => page.evaluate(() => window.__game.test.state());
 async function waitFor(fn, timeoutMs, label) {
   const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
+  while (Date.now() - t0 < timeoutMs * SLOW) {
     if (await fn()) return true;
     await page.waitForTimeout(300);
   }
