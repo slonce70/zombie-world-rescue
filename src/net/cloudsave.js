@@ -45,6 +45,9 @@ export function saveHasProgress(s) {
     || (s.dances || []).length > 1                          // більше за ['shuffle']
     || (s.tracers || []).length > 1                         // більше за ['classic']
     || (s.gadgetsOwned || []).length > 0                    // куплені гаджети
+    || (s.gadgetHypers || []).length > 0                    // постійні гіперзаряди гаджетів
+    || (s.pets || []).length > 0                            // куплені улюбленці
+    || (s.towerSkins || []).length > 1                      // куплені скіни башти
     || (s.diffStar | 0) > 1                                 // піднята складність
     || (s.weapons || []).length > 0;                        // здобута/розблокована зброя
 }
