@@ -19,6 +19,7 @@ export const SHOP_ITEMS = [
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: () => GADGETS.turret.desc + t(' · перезарядка {n}с', { n: GADGETS.turret.cd }), price: GADGETS.turret.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'turret-hyper', icon: '⚡', name: t('Гіперзаряд: Турель'), desc: t('Постійне покращення турелі: 100 HP і 25 шкоди за постріл'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'turret', needsGadget: 'turret' },
+  { id: 'clone', icon: GADGETS.clone.icon, name: GADGETS.clone.name, desc: () => GADGETS.clone.desc + t(' · перезарядка {n}с', { n: GADGETS.clone.cd }), price: GADGETS.clone.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'watchtower', icon: GADGETS.watchtower.icon, name: GADGETS.watchtower.name, desc: () => GADGETS.watchtower.desc + t(' · перезарядка {n}с', { n: GADGETS.watchtower.cd }), price: GADGETS.watchtower.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'xray', icon: GADGETS.xray.icon, name: GADGETS.xray.name, desc: () => GADGETS.xray.desc + t(' · перезарядка {n}с', { n: GADGETS.xray.cd }), price: GADGETS.xray.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -260,6 +261,7 @@ export class Shop {
       case 'tramp':
       case 'wall':
       case 'turret':
+      case 'clone':
       case 'watchtower':
       case 'xray':
       case 'infammo':

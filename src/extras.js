@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { t, keyHint, interactKey } from './i18n.js';
 import {
-  makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh, PETS,
+  makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
+  makeHero, updateRig, setAnim, PETS,
 } from './characters.js';
 import { disposeObject } from './utils.js';
 
@@ -420,6 +421,7 @@ export const GADGETS = {
   wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 1000, get desc() { return t('Стіна на 100 міцності ({k})', { k: keyHint('кнопка ✋ — забрати', 'E — забрати') }); } },
   // 🤖 преміум: автоматична вогнева підтримка
   turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 1000, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
+  clone: { name: t('Клон'), icon: '🧍', cd: 50, price: 1000, desc: t('Союзник: 50 HP, меч 10 зблизька, пістолет 5 здалека') },
   watchtower: { name: t('Башня спостереження'), icon: '🗼', cd: 125, price: 1000, get desc() { return t('Залізна башта: {k} — залізти або спуститися', { k: interactKey() }); } },
   // 🩻 Ікс-рей: підсвічує всіх невидимих зомбі (Привидів) на 4с, перезарядка 25с
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
@@ -484,6 +486,7 @@ export class Gadgets {
     this.tramps = [];
     this.walls = [];
     this.turrets = [];
+    this.clones = [];
     this.towers = [];
     this._meteorFires = [];
     this._thunkCd = 0;
@@ -568,6 +571,7 @@ export class Gadgets {
     }
     // 🤖 турелі: стрільба/тиск/життя (рахує лише хост/соло)
     this._updateTurrets(dt);
+    this._updateClones(dt);
     this._updateTowers(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
     this._thunkCd -= dt;
@@ -633,6 +637,12 @@ export class Gadgets {
     } else if (id === 'turret') {
       if (level.mirror) ok = this._requestPlace('turret', 2.2);
       else ok = this._placeTurret();
+    } else if (id === 'clone') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Клон доступний тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._spawnClone();
     } else if (id === 'watchtower') {
       if (level.mirror) {
         level.bus.emit('toast', t('Башта доступна тільки в соло 🙈'));
@@ -801,6 +811,77 @@ export class Gadgets {
     const solved = this.level.world.collide(x, z, 0.7);
     if (Math.hypot(solved.x - x, solved.z - z) > 0.4) return null;
     return { x, z, y: this.level.world.groundH(x, z) };
+  }
+
+  _spawnClone() {
+    const pos = this._placePos(1.8);
+    if (!pos) {
+      this.level.bus.emit('toast', t('Тут не можна створити клона 🙈'));
+      return false;
+    }
+    if (this.clones.length) this._removeClone(0, false);
+    const rig = makeHero('ninja');
+    rig.group.position.set(pos.x, pos.y, pos.z);
+    this.level.scene.add(rig.group);
+    this.clones.push({ x: pos.x, z: pos.z, y: pos.y, hp: 50, hitT: 0, rig, mesh: rig.group });
+    this.level.audio.powerup();
+    this.level.effects.ring(new THREE.Vector3(pos.x, pos.y, pos.z), 0x8fd3ff, 1.8);
+    this.level.bus.emit('toast', t('🧍 Клон у бою!'));
+    return true;
+  }
+
+  _removeClone(i, broken) {
+    const c = this.clones[i];
+    if (!c) return;
+    this.clones.splice(i, 1);
+    this.level.scene.remove(c.mesh);
+    disposeObject(c.mesh);
+    if (broken) {
+      this.level.effects.burst(new THREE.Vector3(c.x, c.y + 1, c.z), 0x8fd3ff, 12, { speed: 3, up: 3, life: 0.6 });
+      this.level.bus.emit('toast', t('🧍 Клона перемогли!'));
+    }
+  }
+
+  _updateClones(dt) {
+    const level = this.level;
+    for (let i = this.clones.length - 1; i >= 0; i--) {
+      const c = this.clones[i];
+      let pressure = 0;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || !z.aggroed) continue;
+        if (Math.hypot(z.x - c.x, z.z - c.z) < 1.6) pressure += z.stats.dmg;
+      }
+      c.hp -= pressure * dt * 0.85;
+      if (c.hp <= 0) { this._removeClone(i, true); continue; }
+
+      const target = this._nearestZombie(c.x, c.z);
+      if (!target) { setAnim(c.rig, 'idle'); updateRig(c.rig, dt); continue; }
+      const dx = target.x - c.x, dz = target.z - c.z;
+      const dist = Math.hypot(dx, dz);
+      c.mesh.rotation.y = Math.atan2(-dx, -dz);
+      if (dist > 2.0) {
+        const step = Math.min(dist - 1.8, 5.5 * dt);
+        const solved = level.world.collide(c.x + (dx / dist) * step, c.z + (dz / dist) * step, 0.45, c.y);
+        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z);
+        c.mesh.position.set(c.x, c.y, c.z);
+        setAnim(c.rig, 'run');
+      } else {
+        setAnim(c.rig, 'idle');
+      }
+      c.hitT -= dt;
+      if (c.hitT <= 0 && dist <= 16) {
+        const melee = dist <= 2.1;
+        c.hitT = melee ? 0.7 : 0.9;
+        target.lastHitBy = 1;
+        target.damage(melee ? 10 : 5, new THREE.Vector3(dx, 0, dz).normalize(), false);
+        setAnim(c.rig, melee ? 'attack' : 'aim');
+        if (!melee) {
+          level.effects.tracer(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(target.x, target.y + target.rig.height * 0.6, target.z));
+          level.audio.shot('pistol');
+        }
+      }
+      updateRig(c.rig, dt);
+    }
   }
 
   // ================= 🗼 БАШТА СПОСТЕРЕЖЕННЯ =================
