@@ -77,6 +77,32 @@ check(buy.militaryBought.crystals === 0 && buy.militaryBought.owned && buy.milit
   '15 кристалів купують військовий скін і одягають його', JSON.stringify(buy.militaryBought));
 check(buy.militaryBuilt, 'makeHero("military") будується без помилок');
 
+console.log('▸ Обмін кристалів на монети');
+const exchange = await page.evaluate(async () => {
+  const { SHOP_ITEMS } = await import('/src/shop.js');
+  const g = window.__game;
+  const item = SHOP_ITEMS.find((i) => i.id === 'coins500');
+  g.save.coins = 50;
+  g.save.crystals = 9;
+  g.test.shopBuy('coins500');
+  const denied = { coins: g.save.coins, crystals: g.save.crystals };
+  g.save.crystals = 10;
+  g.test.shopBuy('coins500');
+  const bought = { coins: g.save.coins, crystals: g.save.crystals };
+  g.save.crystals = 10;
+  g.test.shopBuy('coins500');
+  const second = { coins: g.save.coins, crystals: g.save.crystals };
+  return { item: item && { crystalPrice: item.crystalPrice, coinBundle: item.coinBundle, max: item.max }, denied, bought, second };
+});
+check(exchange.item && exchange.item.crystalPrice === 10 && exchange.item.coinBundle === 500 && exchange.item.max === Infinity,
+  '500 монет є в магазині за 10 кристалів', JSON.stringify(exchange.item));
+check(exchange.denied.coins === 50 && exchange.denied.crystals === 9,
+  '9 кристалів недостатньо для обміну', JSON.stringify(exchange.denied));
+check(exchange.bought.coins === 550 && exchange.bought.crystals === 0,
+  '10 кристалів купують 500 монет', JSON.stringify(exchange.bought));
+check(exchange.second.coins === 1050 && exchange.second.crystals === 0,
+  'обмін можна купувати повторно', JSON.stringify(exchange.second));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
