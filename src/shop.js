@@ -23,6 +23,7 @@ export const SHOP_ITEMS = [
   { id: 'clone', icon: GADGETS.clone.icon, name: GADGETS.clone.name, desc: () => GADGETS.clone.desc + t(' · перезарядка {n}с', { n: GADGETS.clone.cd }), price: GADGETS.clone.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'clone-hyper', icon: '⚡', name: t('Гіперзаряд: Клон'), desc: t('Постійне покращення: спавнить 2 клони'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'clone', needsGadget: 'clone' },
   { id: 'healtotem', icon: GADGETS.healtotem.icon, name: GADGETS.healtotem.name, desc: () => GADGETS.healtotem.desc + t(' · перезарядка {n}с', { n: GADGETS.healtotem.cd }), price: 0, crystalPrice: 20, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'damagetotem', icon: GADGETS.damagetotem.icon, name: GADGETS.damagetotem.name, desc: () => GADGETS.damagetotem.desc + t(' · перезарядка {n}с', { n: GADGETS.damagetotem.cd }), price: 0, crystalPrice: 25, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'watchtower', icon: GADGETS.watchtower.icon, name: GADGETS.watchtower.name, desc: () => GADGETS.watchtower.desc + t(' · перезарядка {n}с', { n: GADGETS.watchtower.cd }), price: GADGETS.watchtower.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'xray', icon: GADGETS.xray.icon, name: GADGETS.xray.name, desc: () => GADGETS.xray.desc + t(' · перезарядка {n}с', { n: GADGETS.xray.cd }), price: GADGETS.xray.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -283,6 +284,7 @@ export class Shop {
       case 'turret':
       case 'clone':
       case 'healtotem':
+      case 'damagetotem':
       case 'watchtower':
       case 'xray':
       case 'infammo':

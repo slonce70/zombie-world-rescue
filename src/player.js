@@ -48,6 +48,7 @@ export class Player {
     this.health = 100;
     this.speedMult = 1;
     this.damageMult = 1;
+    this.damageTotemMult = 1;
     this.respawnProtect = 0;
     // броня: поглинає 60% шкоди, поки є
     this.armor = 0;
@@ -693,7 +694,7 @@ export class Player {
     this.gunKick = 1;
     level.audio.shot(this.cur);
     level.stats.shotsFired++;
-    const dmgMult = this.damageMult * (this.buffs.rage > 0 ? 2 : 1);
+    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
 
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
@@ -867,7 +868,7 @@ export class Player {
     this.fuel[this.cur] = Math.max(0, fuel - dt);
     this.gunKick = Math.min(0.5, this.gunKick + dt * 2); // легке тремтіння ствола
     const level = this.level;
-    const dmgMult = this.damageMult * (this.buffs.rage > 0 ? 2 : 1);
+    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
     const dmgThisFrame = w.dps * dmgMult * dt;
 
     // точка вильоту (як у _shoot)
