@@ -1,6 +1,6 @@
 // Магазин (клавіша B): вкладки категорій, зброя, гаджети, спорядження, прокачування
 import { GADGETS, TOWER_SKINS } from './extras.js';
-import { PETS } from './characters.js';
+import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 
 export const SHOP_ITEMS = [
@@ -40,6 +40,8 @@ export const SHOP_ITEMS = [
   { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
   { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
   // 🔥 Вогнемет (рівень 25) і 🔫 Лазер (рівень 28) — нагороди за ЗІРКОВИЙ РІВЕНЬ, у магазині їх НЕМАЄ.
+  // --- скіни героя ---
+  { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Спорядження'), skin: 'gold' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -105,6 +107,7 @@ export class Shop {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
     if (item.hyper) return (this.game.save.gadgetHypers || []).includes(item.hyper) ? 1 : 0;
+    if (item.skin) return this.game.save.skins.includes(item.skin) ? 1 : 0;
     if (item.pet) return this.game.save.pets.includes(item.id) ? 1 : 0;
     if (item.towerSkin) return (this.game.save.towerSkins || []).includes(item.towerSkin) ? 1 : 0;
     return this.game.save.upgrades[item.id] || 0;
@@ -205,7 +208,12 @@ export class Shop {
       return;
     }
     save.coins -= price;
-    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin) save.upgrades[id] = count + 1;
+    if (item.skin) {
+      if (!save.skins.includes(item.skin)) save.skins.push(item.skin);
+      save.activeSkin = item.skin;
+      game.hud.toast(t('{i} {n} — одягнено! Обрати інший — Гардероб 🎒', { i: item.icon, n: item.name }));
+    }
     if (item.pet) {
       if (!save.pets.includes(id)) save.pets.push(id);
       save.activePet = id; // куплений улюбленець одразу стає активним і з'являється поряд
