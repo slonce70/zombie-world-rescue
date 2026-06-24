@@ -749,7 +749,7 @@ export class Gadgets {
       if (f.damage) {
         for (const zb of this.level.zombies.list) {
           if (zb.state === 'dead' || zb.gone) continue;
-          if (Math.hypot(zb.x - f.x, zb.z - f.z) <= 3.5) zb.damage(5 * dt, null, false, { fire: true });
+          if (Math.hypot(zb.x - f.x, zb.z - f.z) <= 3.5) zb.damage(10 * dt, null, false, { fire: true });
         }
       }
       if (f.life <= 0) {

@@ -148,8 +148,8 @@ const fire = await page.evaluate(() => {
 });
 check(fire.baseFires === 0, 'звичайний метеорит не лишає вогонь', JSON.stringify(fire));
 check(fire.hyperFires === 1, 'гіпер-метеорит лишає вогонь на місці падіння', JSON.stringify(fire));
-check(fire.after2s.nearDmg === 10 && fire.after2s.farDmg === 0,
-  'вогонь гіпер-метеорита наносить 5 HP/с у зоні', JSON.stringify(fire.after2s));
+check(fire.after2s.nearDmg === 20 && fire.after2s.farDmg === 0,
+  'вогонь гіпер-метеорита наносить 5 HP кожні 0.5с у зоні', JSON.stringify(fire.after2s));
 check(fire.expired === 0, 'вогонь згасає і прибирається', JSON.stringify(fire));
 
 console.log('');
