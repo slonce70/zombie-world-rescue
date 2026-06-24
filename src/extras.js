@@ -606,9 +606,10 @@ export class Gadgets {
     const p = level.player;
     let ok = false;
     if (id === 'shield') {
-      p.gadgetShield = 50;
+      const hp = (game.save.gadgetHypers || []).includes('shield') ? 100 : 50;
+      p.gadgetShield = hp;
       level.audio.powerup();
-      level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине 50 шкоди!'));
+      level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине {n} шкоди!', { n: hp }));
       ok = true;
     } else if (id === 'heal') {
       if (p.health >= p.maxHealth) {

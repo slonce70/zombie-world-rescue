@@ -13,6 +13,7 @@ export const SHOP_ITEMS = [
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'shield-hyper', icon: '⚡', name: t('Гіперзаряд: Щит'), desc: t('Постійне покращення щита: 100 HP'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'shield', needsGadget: 'shield' },
   { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: () => GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
