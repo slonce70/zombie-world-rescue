@@ -254,7 +254,7 @@ export class HostNet {
         zb.lastHitBy = from;
         zb.damage(clampDmg(h[1]), dir, !!h[2], w.flame ? { fire: true } : undefined);
         // 💫 гаджет «Оглушливі кулі» гостя: оглушуємо лише з пістолета/магнума
-        if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead') zb.stunT = h[4] === 1 ? 1 : 0.5;
+        if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead' && !(zb.stats && zb.stats.stunImmune)) zb.stunT = h[4] === 1 ? 1 : 0.5;
       }
     }
     if (Array.isArray(d.bar)) for (const e of d.bar) {

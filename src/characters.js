@@ -958,6 +958,22 @@ function buildZombie(type, rng) {
       scale: 0.92, belly: 0.78, armsForward: 0.6, lean: -0.3,
       tongue: true, mouth: 'open',
     }));
+  } else if (type === 'headphones') {
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.02, belly: 0.95, armsForward: 0.7, shirt: 0x5a7fb0,
+      eyeL: 0.07, eyeR: 0.07, brow: 0.35,
+    }));
+    const cupM = toonMat(0x202633);
+    const padM = toonMat(0x4fd8ff, 0x2288cc, 0.35);
+    const band = box(0.48, 0.05, 0.08, cupM);
+    band.position.set(0, 0.37, 0);
+    rig.parts.head.add(band);
+    for (const side of [-1, 1]) {
+      const cup = sphere(0.09, padM, 8, 6);
+      cup.position.set(0.27 * side, 0.12, 0);
+      cup.scale.set(0.55, 1, 1);
+      rig.parts.head.add(cup);
+    }
   } else if (type === 'tank') {
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.35, belly: 1.65, armsForward: 0.9, headR: 0.22,

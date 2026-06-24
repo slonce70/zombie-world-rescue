@@ -770,10 +770,11 @@ export class Player {
       } else if (hit) {
         endPoint = hit.point;
         let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
-        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, stunShot ? 1 : 0, stunTime]);
+        const canStun = stunShot && !(hit.zombie.stats && hit.zombie.stats.stunImmune);
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, canStun ? 1 : 0, stunTime]);
         else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot); }
         // оглушення хост-авторитетне: соло/хост ставлять одразу, гість шле прапорець хосту (4-й елемент)
-        if (stunShot && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = stunTime;
+        if (canStun && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = stunTime;
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;
         acc.point = hit.point;

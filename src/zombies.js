@@ -8,6 +8,7 @@ import { t } from './i18n.js';
 const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
+  headphones: { hp: 102, speed: 1.6, chaseSpeed: 3.3, aggro: 24, dmg: 10, attackR: 1.8, coins: 11, pitch: 1.05, stunImmune: true },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
   // 🛡 щитоносець: тіло слабке (20 hp), але щит дуже міцний (1000) — НЕ ламай у лоб, ОБІЙДИ збоку/ззаду!
   // фронтальний конус щита (v42) лишається: збоку та ззаду тіло вразливе.
@@ -321,6 +322,7 @@ export class Zombies {
         else if (this._allowShaman && this.rng.chance(0.06)) type = 'shaman';
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
+        else if (this.rng.chance(0.08)) type = 'headphones';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });
@@ -1018,6 +1020,7 @@ export class Zombies {
           let type;
           if (this._allowGunner && this.rng.chance(0.08)) type = 'gunner';
           else if (hard && this.rng.chance(0.09)) type = 'ironclad';
+          else if (this.rng.chance(0.08)) type = 'headphones';
           else if (this.extraZombie && withShield) {
             type = roll < 0.4 ? 'walker' : roll < 0.62 ? 'runner' : roll < 0.8 ? this.extraZombie
               : roll < 0.9 ? 'shield' : 'tank';
