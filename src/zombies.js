@@ -1460,7 +1460,7 @@ export class Zombies {
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
   _hurt(tgt, dmg, fx, fz) {
     if (!tgt) return;
-    if (tgt.clone) { tgt.clone.hp -= dmg; return; }
+    if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return; }
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
     if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return;

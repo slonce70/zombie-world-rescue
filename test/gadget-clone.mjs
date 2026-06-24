@@ -131,6 +131,31 @@ check(hyperFight.used && hyperFight.count === 2, 'гіпер-клон спавн
 check(hyperFight.hp.length === 2 && hyperFight.hp.every((hp) => hp === 50), 'у кожного гіпер-клона 50 HP', JSON.stringify(hyperFight));
 check(hyperFight.farDmg === 10, 'обидва гіпер-клони мають пістолет по 5 HP', JSON.stringify(hyperFight));
 
+const cloneShield = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = [];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(30, 120);
+  p.yaw = 0;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  g.test.useGadget();
+  const clone = g.level.gadgets.clones[0];
+  const start = { hp: clone.hp, shield: clone.shieldHp };
+  g.level.zombies._hurt({ clone }, 12);
+  const after12 = { hp: clone.hp, shield: clone.shieldHp };
+  g.level.zombies._hurt({ clone }, 10);
+  return { start, after12, final: { hp: clone.hp, shield: clone.shieldHp } };
+});
+check(cloneShield.start.hp === 50 && cloneShield.start.shield === 20,
+  'клон стартує з 50 HP і 1 щитом на 20 HP', JSON.stringify(cloneShield.start));
+check(cloneShield.after12.hp === 50 && cloneShield.after12.shield === 8,
+  'щит клона поглинає перші 12 шкоди', JSON.stringify(cloneShield.after12));
+check(cloneShield.final.hp === 48 && cloneShield.final.shield === 0,
+  'після 20 шкоди щит зникає, решта проходить у HP', JSON.stringify(cloneShield.final));
+
 const cloneAggro = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
@@ -150,9 +175,9 @@ const cloneAggro = await page.evaluate(() => {
   z.sleeping = false;
   clone.hp = 50;
   for (let i = 0; i < 8; i++) g.level.zombies.update(0.2);
-  return { aggroed: z.aggroed, state: z.state, cloneHp: clone.hp, playerHp: p.health };
+  return { aggroed: z.aggroed, state: z.state, cloneHp: clone.hp, cloneShield: clone.shieldHp, playerHp: p.health };
 });
-check(cloneAggro.aggroed && cloneAggro.cloneHp < 50 && cloneAggro.playerHp === 100,
+check(cloneAggro.aggroed && (cloneAggro.cloneHp < 50 || cloneAggro.cloneShield < 20) && cloneAggro.playerHp === 100,
   'зомбі агряться на клона і бʼють його, коли гравець далеко', JSON.stringify(cloneAggro));
 
 const formation = await page.evaluate(() => {

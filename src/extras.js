@@ -829,7 +829,13 @@ export class Gadgets {
       const rig = makeHero('ninja');
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
-      this.clones.push({ x, z, y, hp: 50, hitT: 0, rig, mesh: rig.group });
+      const clone = { x, z, y, hp: 50, shieldHp: 20, hitT: 0, rig, mesh: rig.group };
+      clone.takeDamage = (dmg) => {
+        const block = Math.min(clone.shieldHp || 0, dmg);
+        clone.shieldHp = Math.max(0, (clone.shieldHp || 0) - block);
+        clone.hp -= dmg - block;
+      };
+      this.clones.push(clone);
     }
     this.level.audio.powerup();
     this.level.effects.ring(new THREE.Vector3(pos.x, pos.y, pos.z), 0x8fd3ff, 1.8);
@@ -858,7 +864,10 @@ export class Gadgets {
         if (z.state === 'dead' || !z.aggroed) continue;
         if (Math.hypot(z.x - c.x, z.z - c.z) < 1.6) pressure += z.stats.dmg;
       }
-      c.hp -= pressure * dt * 0.85;
+      if (pressure) {
+        if (c.takeDamage) c.takeDamage(pressure * dt * 0.85);
+        else c.hp -= pressure * dt * 0.85;
+      }
       if (c.hp <= 0) { this._removeClone(i, true); continue; }
 
       const target = this._nearestZombie(c.x, c.z);
