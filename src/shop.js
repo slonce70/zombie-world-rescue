@@ -17,10 +17,12 @@ export const SHOP_ITEMS = [
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'turret', icon: GADGETS.turret.icon, name: GADGETS.turret.name, desc: () => GADGETS.turret.desc + t(' · перезарядка {n}с', { n: GADGETS.turret.cd }), price: GADGETS.turret.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'turret-hyper', icon: '⚡', name: t('Гіперзаряд: Турель'), desc: t('Постійне покращення турелі: 100 HP і 25 шкоди за постріл'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'turret', needsGadget: 'turret' },
   { id: 'watchtower', icon: GADGETS.watchtower.icon, name: GADGETS.watchtower.name, desc: () => GADGETS.watchtower.desc + t(' · перезарядка {n}с', { n: GADGETS.watchtower.cd }), price: GADGETS.watchtower.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'xray', icon: GADGETS.xray.icon, name: GADGETS.xray.name, desc: () => GADGETS.xray.desc + t(' · перезарядка {n}с', { n: GADGETS.xray.cd }), price: GADGETS.xray.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'stunammo-hyper', icon: '⚡', name: t('Гіперзаряд: Оглушливі кулі'), desc: t('Постійне покращення: зомбі оглушаються на 1 секунду'), price: 5000, max: 1, cat: t('Гаджети й друзі'), hyper: 'stunammo', needsGadget: 'stunammo' },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'goldapple', icon: GADGETS.goldapple.icon, name: GADGETS.goldapple.name, desc: () => GADGETS.goldapple.desc + t(' · перезарядка {n}с', { n: GADGETS.goldapple.cd }), price: GADGETS.goldapple.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
@@ -97,6 +99,7 @@ export class Shop {
   getCount(item) {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
+    if (item.hyper) return (this.game.save.gadgetHypers || []).includes(item.hyper) ? 1 : 0;
     if (item.pet) return this.game.save.pets.includes(item.id) ? 1 : 0;
     if (item.towerSkin) return (this.game.save.towerSkins || []).includes(item.towerSkin) ? 1 : 0;
     return this.game.save.upgrades[item.id] || 0;
@@ -125,15 +128,17 @@ export class Shop {
       const count = this.getCount(item);
       const maxed = count >= item.max;
       const locked = item.needsBazooka && !hasBazooka;
+      const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
       const price = this.priceOf(item);
       const afford = save.coins >= price;
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = locked ? '🔒' : maxed ? (item.weapon || item.gadget ? t('Є!') : t('МАКС')) : price + surge + ' <span class="coin-icon">₴</span>';
+      const priceLabel = (locked || lockedGadget) ? '🔒' : maxed ? (item.weapon || item.gadget ? t('Є!') : t('МАКС')) : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
+        : lockedGadget ? t('Спершу купи базовий гаджет')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !maxed && !locked;
+      const goalOk = item.cat !== t('Припаси') && !maxed && !locked && !lockedGadget;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
@@ -177,7 +182,8 @@ export class Shop {
     const count = this.getCount(item);
     const price = this.priceOf(item);
     if (count >= item.max || save.coins < price
-      || (item.needsBazooka && !save.weapons.includes('bazooka'))) {
+      || (item.needsBazooka && !save.weapons.includes('bazooka'))
+      || (item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget))) {
       game.audio.denied();
       return;
     }
@@ -194,7 +200,7 @@ export class Shop {
       return;
     }
     save.coins -= price;
-    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper) save.upgrades[id] = count + 1;
     if (item.pet) {
       if (!save.pets.includes(id)) save.pets.push(id);
       save.activePet = id; // куплений улюбленець одразу стає активним і з'являється поряд
@@ -206,6 +212,11 @@ export class Shop {
       if (!save.towerSkins.includes(item.towerSkin)) save.towerSkins.push(item.towerSkin);
       save.activeTowerSkin = item.towerSkin; // одразу активуємо куплений скін башти
       game.hud.toast(t('{i} {n} — обрано! Постав башту (гаджет) 🗼', { i: item.icon, n: item.name }));
+    }
+    if (item.hyper) {
+      if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
+      if (!save.gadgetHypers.includes(item.hyper)) save.gadgetHypers.push(item.hyper);
+      game.hud.toast(t('{i} {n} активовано назавжди!', { i: item.icon, n: item.name }));
     }
     switch (id) {
       case 'medkit': player.heal(50); break;

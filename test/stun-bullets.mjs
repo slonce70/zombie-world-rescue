@@ -20,14 +20,41 @@ const meta = await page.evaluate(async () => {
   const { GADGETS } = await import('/src/extras.js');
   const { SHOP_ITEMS } = await import('/src/shop.js');
   const G = GADGETS.stunammo;
+  const hyper = SHOP_ITEMS.find((i) => i.id === 'stunammo-hyper');
   return {
     gadget: G && { cd: G.cd, price: G.price, icon: G.icon },
     shop: SHOP_ITEMS.some((i) => i.id === 'stunammo' && i.gadget && i.price === 1000),
+    hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper },
   };
 });
 check(meta.gadget && meta.gadget.cd === 45 && meta.gadget.price === 1000 && meta.gadget.icon === '💫',
   'мета: 45с cd, 1000 монет, 💫', JSON.stringify(meta));
 check(meta.shop, 'товар є в магазині');
+check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'stunammo',
+  'гіперзаряд оглушливих куль коштує 5000₴ і купується один раз', JSON.stringify(meta.hyper));
+
+const hyperBuy = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.unlockGadget('stunammo');
+  g.test.giveCoins(12000);
+  const before = g.save.coins;
+  g.test.shopBuy('stunammo-hyper');
+  const afterFirst = g.save.coins;
+  g.test.shopBuy('stunammo-hyper');
+  const afterSecond = g.save.coins;
+  return {
+    hypers: g.save.gadgetHypers || [],
+    firstCost: before - afterFirst,
+    secondCost: afterFirst - afterSecond,
+  };
+});
+check(hyperBuy.hypers.includes('stunammo') && hyperBuy.firstCost === 5000 && hyperBuy.secondCost === 0,
+  'гіперзаряд оглушливих куль зберігається назавжди', JSON.stringify(hyperBuy));
+
+await page.goto(`${BASE}/?test&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+const hyperPersisted = await page.evaluate(() => (window.__game.save.gadgetHypers || []).includes('stunammo'));
+check(hyperPersisted, 'гіперзаряд оглушливих куль лишається після перезавантаження сторінки');
 
 // баф + проводка пострілу: пістолет і магнум оглушують, інша зброя — ні
 const fire = await page.evaluate(() => {
@@ -35,6 +62,7 @@ const fire = await page.evaluate(() => {
   const pl = g.level.player;
   const Z = g.level.zombies;
   for (const z of [...Z.list]) z.state = 'dead';
+  g.save.gadgetHypers = [];
   g.test.unlockGadget('stunammo');
   g.test.gadgetCdReset();
   pl.firstPerson = true;
@@ -61,11 +89,15 @@ const fire = await page.evaluate(() => {
   const rifle = shootFresh('rifle', 0, -6); // контроль: автомат не оглушує
   pl.stunAmmoT = 0;
   const pistolNoBuff = shootFresh('pistol', 0, -6); // контроль: без бафа не оглушує
-  return { used, buff, cd, pistol, magnum, rifle, pistolNoBuff };
+  g.save.gadgetHypers = ['stunammo'];
+  pl.stunAmmoT = 3;
+  const pistolHyper = shootFresh('pistol', 0, -6);
+  return { used, buff, cd, pistol, magnum, rifle, pistolNoBuff, pistolHyper };
 });
 check(fire.used && fire.buff === 3 && fire.cd === 45, 'гаджет вмикає баф на 3с і ставить cd 45с', JSON.stringify(fire));
 check(fire.pistol === 0.5, 'пістолет під бафом оглушує на 0.5с', JSON.stringify(fire));
 check(fire.magnum === 0.5, 'магнум під бафом оглушує на 0.5с', JSON.stringify(fire));
+check(fire.pistolHyper === 1, 'гіперзаряд збільшує оглушення до 1с', JSON.stringify(fire));
 check(fire.rifle === 0, 'автомат НЕ оглушує (контроль)', JSON.stringify(fire));
 check(fire.pistolNoBuff === 0, 'без бафа пістолет НЕ оглушує (контроль)', JSON.stringify(fire));
 
@@ -117,14 +149,18 @@ const host = await page.evaluate(async () => {
   h._onShot(2, { w: weaponToIdx('pistol'), hits: [[88, 30, 0, 1]] });
   const pistol = zombie.stunT;
   zombie = mk();
+  h._onShot(2, { w: weaponToIdx('pistol'), hits: [[88, 30, 0, 1, 1]] });
+  const pistolHyper = zombie.stunT;
+  zombie = mk();
   h._onShot(2, { w: weaponToIdx('rifle'), hits: [[88, 30, 0, 1]] }); // контроль: автомат не оглушує
   const rifle = zombie.stunT;
   zombie = mk();
   h._onShot(2, { w: weaponToIdx('pistol'), hits: [[88, 30, 0, 0]] }); // контроль: без прапорця
   const noFlag = zombie.stunT;
-  return { pistol, rifle, noFlag };
+  return { pistol, pistolHyper, rifle, noFlag };
 });
 check(host.pistol === 0.5, 'хост оглушує з пістолета гостя', JSON.stringify(host));
+check(host.pistolHyper === 1, 'хост приймає гіпер-оглушення гостя на 1с', JSON.stringify(host));
 check(host.rifle === 0, 'хост НЕ оглушує з автомата гостя (контроль)', JSON.stringify(host));
 check(host.noFlag === 0, 'хост НЕ оглушує без прапорця (контроль)', JSON.stringify(host));
 

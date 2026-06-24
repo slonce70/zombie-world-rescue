@@ -440,6 +440,7 @@ const METEOR_DOWN = new THREE.Vector3(0, -1, 0);
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
+export const TURRET_HYPER = { hp: 100, dmg: 25 };
 const WATCHTOWER_HP = 200;
 
 // 🗼 скіни башти: id → кольори (metal — ноги/щаблі, dark — платформа) + метадані для UI
@@ -872,7 +873,8 @@ export class Gadgets {
         : kind === 'turret' ? t('Тут не можна поставити турель 🙈') : t('Тут не можна поставити батут 🙈'));
       return false;
     }
-    this.level.net.sendGadget(kind, pos.x, pos.z, this.level.player.yaw);
+    const hyper = kind === 'turret' && (this.level.game.save.gadgetHypers || []).includes('turret');
+    this.level.net.sendGadget(kind, pos.x, pos.z, this.level.player.yaw, hyper);
     return true;
   }
 
@@ -1019,21 +1021,21 @@ export class Gadgets {
       this.level.bus.emit('toast', t('Тут не можна поставити турель 🙈'));
       return false;
     }
-    this.placeTurretAt(pos.x, pos.z, 1);
+    this.placeTurretAt(pos.x, pos.z, 1, (this.level.game.save.gadgetHypers || []).includes('turret'));
     return true;
   }
 
-  placeTurretAt(x, z, ownerPid) {
+  placeTurretAt(x, z, ownerPid, hyper = false) {
     const level = this.level;
     const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
-    this._buildTurret(nid, x, z, ownerPid);
+    this._buildTurret(nid, x, z, ownerPid, hyper);
     if (level.net && level.net.authority) {
       level.netEv('turr', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10);
     }
     return true;
   }
 
-  _buildTurret(nid, x, z, ownerPid) {
+  _buildTurret(nid, x, z, ownerPid, hyper = false) {
     const level = this.level;
     // одна активна турель на гравця — нова замінює стару
     const oldIdx = this.turrets.findIndex((t) => t.ownerPid === ownerPid);
@@ -1047,7 +1049,9 @@ export class Gadgets {
     level.world._buildGrid();
     this.turrets.push({
       nid, ownerPid, x, z, y,
-      hp: TURRET.hp, life: TURRET.life, fireT: 0.6,
+      hp: hyper ? TURRET_HYPER.hp : TURRET.hp,
+      dmg: hyper ? TURRET_HYPER.dmg : TURRET.dmg,
+      life: TURRET.life, fireT: 0.6,
       mesh: m, collider, idleSpin: 0,
     });
     level.audio.powerup();
@@ -1134,7 +1138,7 @@ export class Gadgets {
       if (Math.hypot(t.x - p.x, t.z - p.z) < 55) level.audio.shot('pistol');
       const dir = new THREE.Vector3(best.x - t.x, 0, best.z - t.z).normalize();
       best.lastHitBy = t.ownerPid;
-      best.damage(TURRET.dmg, dir, false);
+      best.damage(t.dmg || TURRET.dmg, dir, false);
       if (level.net && level.net.authority) {
         level.netEv('tsh', t.nid, Math.round(best.x * 10) / 10, Math.round(ty * 10) / 10, Math.round(best.z * 10) / 10);
       }

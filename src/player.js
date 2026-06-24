@@ -722,8 +722,9 @@ export class Player {
 
     let anyHit = false;
     let anyHeadshot = false;
-    // 💫 «Оглушливі кулі»: лише пістолет і магнум оглушують на 0.5с
+    // 💫 «Оглушливі кулі»: лише пістолет і магнум оглушують на 0.5с / 1с з гіперзарядом
     const stunShot = this.stunAmmoT > 0 && (this.cur === 'pistol' || this.cur === 'magnum');
+    const stunTime = stunShot && (level.game.save.gadgetHypers || []).includes('stunammo') ? 1 : 0.5;
     const dmgByZombie = new Map();
     for (let i = 0; i < pellets; i++) {
       const dir = this.forwardVec(this._shootDir);
@@ -769,10 +770,10 @@ export class Player {
       } else if (hit) {
         endPoint = hit.point;
         let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
-        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, stunShot ? 1 : 0]);
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, stunShot ? 1 : 0, stunTime]);
         else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot); }
         // оглушення хост-авторитетне: соло/хост ставлять одразу, гість шле прапорець хосту (4-й елемент)
-        if (stunShot && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = 0.5;
+        if (stunShot && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = stunTime;
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;
         acc.point = hit.point;

@@ -254,7 +254,7 @@ export class HostNet {
         zb.lastHitBy = from;
         zb.damage(clampDmg(h[1]), dir, !!h[2], w.flame ? { fire: true } : undefined);
         // 💫 гаджет «Оглушливі кулі» гостя: оглушуємо лише з пістолета/магнума
-        if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead') zb.stunT = 0.5;
+        if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead') zb.stunT = h[4] === 1 ? 1 : 0.5;
       }
     }
     if (Array.isArray(d.bar)) for (const e of d.bar) {
@@ -345,7 +345,7 @@ export class HostNet {
     if (Math.hypot(solved.x - d.x, solved.z - d.z) > 0.4) return;
     if (d.kind === 'wall') level.gadgets.placeWallAt(d.x, d.z, d.yaw, from);
     else if (d.kind === 'tramp') level.gadgets.placeTrampAt(d.x, d.z, from);
-    else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from);
+    else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from, !!d.hyper);
     else if (d.kind === 'meteor') level.gadgets.hostMeteor(d.x, d.z); // ☄️ метеорит на найближчого до гостя
   }
 

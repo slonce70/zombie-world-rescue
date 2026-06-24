@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -387,7 +387,7 @@ class Game {
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
-      gadgetsOwned: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
+      gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
@@ -422,6 +422,7 @@ class Game {
         }
         // вкладені об'єкти і списки могли прийти зі старого сейва неповними
         if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
+        if (!Array.isArray(out.gadgetHypers)) out.gadgetHypers = [];
         // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
         if (out.gadgets) {
           if (out.gadgets.tramp > 0 && !out.gadgetsOwned.includes('tramp')) out.gadgetsOwned.push('tramp');
