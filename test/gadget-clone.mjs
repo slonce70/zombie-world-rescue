@@ -143,18 +143,21 @@ const cloneShield = await page.evaluate(() => {
   for (const z of g.level.zombies.list) z.state = 'dead';
   g.test.useGadget();
   const clone = g.level.gadgets.clones[0];
-  const start = { hp: clone.hp, shield: clone.shieldHp };
+  const start = { hp: clone.hp, shield: clone.shieldHp, visual: !!clone.shieldMesh?.parent };
   g.level.zombies._hurt({ clone }, 12);
-  const after12 = { hp: clone.hp, shield: clone.shieldHp };
+  const after12 = { hp: clone.hp, shield: clone.shieldHp, visual: !!clone.shieldMesh?.parent };
   g.level.zombies._hurt({ clone }, 10);
-  return { start, after12, final: { hp: clone.hp, shield: clone.shieldHp } };
+  return { start, after12, final: { hp: clone.hp, shield: clone.shieldHp, visual: !!clone.shieldMesh?.parent } };
 });
 check(cloneShield.start.hp === 50 && cloneShield.start.shield === 20,
   'клон стартує з 50 HP і 1 щитом на 20 HP', JSON.stringify(cloneShield.start));
+check(cloneShield.start.visual, 'щит клона видно на моделі', JSON.stringify(cloneShield.start));
 check(cloneShield.after12.hp === 50 && cloneShield.after12.shield === 8,
   'щит клона поглинає перші 12 шкоди', JSON.stringify(cloneShield.after12));
+check(cloneShield.after12.visual, 'пошкоджений щит клона ще видно', JSON.stringify(cloneShield.after12));
 check(cloneShield.final.hp === 48 && cloneShield.final.shield === 0,
   'після 20 шкоди щит зникає, решта проходить у HP', JSON.stringify(cloneShield.final));
+check(!cloneShield.final.visual, 'після зламу щит клона зникає з моделі', JSON.stringify(cloneShield.final));
 
 const cloneAggro = await page.evaluate(() => {
   const g = window.__game;

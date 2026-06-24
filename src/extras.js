@@ -851,13 +851,23 @@ export class Gadgets {
       const z = pos.z - Math.sin(this.level.player.yaw) * off;
       const y = this.level.world.groundH(x, z);
       const rig = makeHero('ninja');
+      const shieldMesh = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.72, 1),
+        new THREE.MeshBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      shieldMesh.position.y = 1.05;
+      rig.group.add(shieldMesh);
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
-      const clone = { x, z, y, hp: 50, shieldHp: 20, hitT: 0, rig, mesh: rig.group };
+      const clone = { x, z, y, hp: 50, shieldHp: 20, shieldMesh, hitT: 0, rig, mesh: rig.group };
       clone.takeDamage = (dmg) => {
         const block = Math.min(clone.shieldHp || 0, dmg);
         clone.shieldHp = Math.max(0, (clone.shieldHp || 0) - block);
         clone.hp -= dmg - block;
+        if (clone.shieldMesh) {
+          if (clone.shieldHp > 0) clone.shieldMesh.material.opacity = 0.16 + 0.18 * (clone.shieldHp / 20);
+          else { rig.group.remove(clone.shieldMesh); disposeObject(clone.shieldMesh); clone.shieldMesh = null; }
+        }
       };
       this.clones.push(clone);
     }
