@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 106;
+const APP_VERSION = 107;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -383,7 +383,7 @@ class Game {
 
   _newSave() {
     return {
-      coins: NEW_SAVE_COINS, upgrades: {}, liberated: {}, weapons: [], records: {},
+      coins: NEW_SAVE_COINS, crystals: 0, upgrades: {}, liberated: {}, weapons: [], records: {},
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
@@ -472,6 +472,7 @@ class Game {
         if (!out.records || typeof out.records !== 'object') out.records = {};
         if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
         if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
+        if (typeof out.crystals !== 'number' || !isFinite(out.crystals)) out.crystals = 0;
         if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
       }
@@ -1501,6 +1502,10 @@ class Game {
   openMegaboxReward(x, z) {
     const save = this.save;
     const level = this.level;
+    if (Math.random() < 0.78) {
+      save.crystals = (save.crystals || 0) + 15;
+      this.hud.toast(t('💎 +15 кристалів з Мегабокса!'));
+    }
     const unownedSkins = ['frog', 'super'].filter((id) => !save.skins.includes(id));
     const unownedDances = ['jump', 'chicken'].filter((id) => !save.dances.includes(id));
     const hasCosmetic = unownedSkins.length + unownedDances.length > 0;
@@ -2160,6 +2165,7 @@ class Game {
       state: () => ({
         state: g.state,
         coins: g.save.coins,
+        crystals: g.save.crystals || 0,
         fps: g.fps,
         country: g.level ? g.level.countryId : null,
         grenades: g.level ? g.level.player.grenades : 0,

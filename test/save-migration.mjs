@@ -43,6 +43,7 @@ async function loadWith(raw) {
   const { save, errs } = await loadWith('{ це не json');
   check(errs.length === 0, `битий JSON: без винятків (${errs[0] || 'ok'})`);
   check(typeof save.coins === 'number' && isFinite(save.coins), 'битий JSON: coins — скінченне число');
+  check(typeof save.crystals === 'number' && isFinite(save.crystals), 'битий JSON: crystals — скінченне число');
   check(Array.isArray(save.weapons), 'битий JSON: weapons — валідний масив (стартовий pistol неявний, у player.js)');
 }
 
@@ -51,6 +52,7 @@ async function loadWith(raw) {
   const { save, errs } = await loadWith('{}');
   check(errs.length === 0, `порожній {}: без винятків (${errs[0] || 'ok'})`);
   check(save.activeSkin === 'classic' && Array.isArray(save.skins), 'порожній {}: дефолти скінів на місці');
+  check(save.crystals === 0, 'порожній {}: crystals = 0');
 }
 
 // 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.

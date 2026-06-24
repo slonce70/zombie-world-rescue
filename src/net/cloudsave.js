@@ -33,6 +33,7 @@ export function saveHasProgress(s) {
     || Object.keys(s.missionRuns || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
     || (s.coins | 0) > NEW_SAVE_COINS                       // більше за стартові монети
+    || (s.crystals | 0) > 0                                  // преміальна валюта зі скінів
     || Object.keys(s.upgrades || {}).length > 0             // куплені прокачування
     || Object.keys(s.bestiary || {}).length > 0             // бачені вороги
     || (s.chapter && (s.chapter.done || Object.keys(s.chapter.p || {}).length > 0))

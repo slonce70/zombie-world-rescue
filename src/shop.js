@@ -41,6 +41,8 @@ export const SHOP_ITEMS = [
   { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
   // 🔥 Вогнемет (рівень 25) і 🔫 Лазер (рівень 28) — нагороди за ЗІРКОВИЙ РІВЕНЬ, у магазині їх НЕМАЄ.
   // --- скіни героя ---
+  { id: 'frogskin', icon: HERO_SKINS.frog.icon, name: HERO_SKINS.frog.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'frog' },
+  { id: 'superskin', icon: HERO_SKINS.super.icon, name: HERO_SKINS.super.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'super' },
   { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Спорядження'), skin: 'gold' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
@@ -58,8 +60,8 @@ export function goalInfo(game) {
   if (!id) return null;
   const item = SHOP_ITEMS.find((i) => i.id === id);
   if (!item) return null;
-  const need = item.price;
-  const have = game.save.coins || 0;
+  const need = item.crystalPrice || item.price;
+  const have = item.crystalPrice ? (game.save.crystals || 0) : (game.save.coins || 0);
   return { item, need, have, remaining: Math.max(0, need - have), done: have >= need };
 }
 
@@ -115,7 +117,7 @@ export class Shop {
 
   render() {
     const save = this.game.save;
-    this.elCoins.textContent = save.coins;
+    this.elCoins.textContent = `${save.coins} · 💎 ${save.crystals || 0}`;
     const hasBazooka = save.weapons.includes('bazooka');
     // вкладки категорій
     const cats = [...new Set(SHOP_ITEMS.map((i) => i.cat))];
@@ -138,10 +140,11 @@ export class Shop {
       const locked = item.needsBazooka && !hasBazooka;
       const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
       const price = this.priceOf(item);
-      const afford = save.coins >= price;
+      const afford = item.crystalPrice ? (save.crystals || 0) >= item.crystalPrice : save.coins >= price;
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = (locked || lockedGadget) ? '🔒' : maxed ? (item.weapon || item.gadget ? t('Є!') : t('МАКС')) : price + surge + ' <span class="coin-icon">₴</span>';
+      const priceLabel = (locked || lockedGadget) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin ? t('Є!') : t('МАКС'))
+        : item.crystalPrice ? `${item.crystalPrice} 💎` : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
@@ -177,7 +180,7 @@ export class Shop {
     const goalEl = document.getElementById('shop-goal');
     if (goalEl) goalEl.textContent = gi
       ? (gi.done ? t('🎯 Ціль: {i} {n} — можна купити! 🎉', { i: gi.item.icon, n: gi.item.name })
-                 : t('🎯 Ціль: {i} {n} — ще {r} ₴', { i: gi.item.icon, n: gi.item.name, r: gi.remaining }))
+                 : t('🎯 Ціль: {i} {n} — ще {r} {u}', { i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: gi.item.crystalPrice ? '💎' : '₴' }))
       : t('🎯 Обери ціль — тисни 🎯 на товарі');
   }
 
@@ -189,7 +192,7 @@ export class Shop {
     if (!item || !player) return;
     const count = this.getCount(item);
     const price = this.priceOf(item);
-    if (count >= item.max || save.coins < price
+    if (count >= item.max || save.coins < price || (item.crystalPrice && (save.crystals || 0) < item.crystalPrice)
       || (item.needsBazooka && !save.weapons.includes('bazooka'))
       || (item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget))) {
       game.audio.denied();
@@ -207,7 +210,8 @@ export class Shop {
       game.hud.toast(t('Броня вже повна! 🛡️'));
       return;
     }
-    save.coins -= price;
+    if (item.crystalPrice) save.crystals -= item.crystalPrice;
+    else save.coins -= price;
     if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin) save.upgrades[id] = count + 1;
     if (item.skin) {
       if (!save.skins.includes(item.skin)) save.skins.push(item.skin);
