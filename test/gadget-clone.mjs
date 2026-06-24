@@ -19,13 +19,17 @@ console.log('▸ Гаджет «Клон»');
 const meta = await page.evaluate(async () => {
   const { GADGETS } = await import('/src/extras.js');
   const { SHOP_ITEMS } = await import('/src/shop.js');
+  const hyper = SHOP_ITEMS.find((i) => i.id === 'clone-hyper');
   return {
     gadget: GADGETS.clone && { cd: GADGETS.clone.cd, price: GADGETS.clone.price },
     shop: SHOP_ITEMS.some((i) => i.id === 'clone' && i.gadget && i.price === 1000),
+    hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper, needsGadget: hyper.needsGadget },
   };
 });
 check(meta.gadget && meta.gadget.cd === 50 && meta.gadget.price === 1000, 'мета: 50с cd, 1000 монет', JSON.stringify(meta));
 check(meta.shop, 'товар є в магазині');
+check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'clone' && meta.hyper.needsGadget === 'clone',
+  'гіперзаряд клона коштує 5000 і потребує базовий клон', JSON.stringify(meta.hyper));
 
 const bought = await page.evaluate(() => {
   const g = window.__game;
@@ -44,10 +48,32 @@ const bought = await page.evaluate(() => {
 check(bought.owned && bought.active === 'clone', 'куплений клон стає owned/active', JSON.stringify(bought));
 check(bought.firstCost === 1000 && bought.secondCost === 0, 'клона не можна купити вдруге', JSON.stringify(bought));
 
+const hyperBuy = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.giveCoins(12000);
+  const before = g.save.coins;
+  g.test.shopBuy('clone-hyper');
+  const afterFirst = g.save.coins;
+  g.test.shopBuy('clone-hyper');
+  return {
+    hypers: g.save.gadgetHypers || [],
+    firstCost: before - afterFirst,
+    secondCost: afterFirst - g.save.coins,
+  };
+});
+check(hyperBuy.hypers.includes('clone') && hyperBuy.firstCost === 5000 && hyperBuy.secondCost === 0,
+  'гіперзаряд клона купується один раз і зберігається', JSON.stringify(hyperBuy));
+
+await page.goto(`${BASE}/?test&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+const persisted = await page.evaluate(() => (window.__game.save.gadgetHypers || []).includes('clone'));
+check(persisted, 'гіперзаряд клона лишається після перезавантаження сторінки');
+
 const fight = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
   g.test.unlockGadget('clone');
+  g.save.gadgetHypers = [];
   g.save.activeGadget = 'clone';
   g.test.gadgetCdReset();
   g.test.teleport(0, 120);
@@ -60,6 +86,7 @@ const fight = await page.evaluate(() => {
   const far = g.test.spawnZombie('tank', clone.x + 8, clone.z);
   near.hp = near.maxHp = 1000;
   far.hp = far.maxHp = 1000;
+  near.aggroed = far.aggroed = false;
   clone.hitT = 0;
   g.level.gadgets._updateClones(0.1);
   const nearDmg = 1000 - near.hp;
@@ -80,6 +107,29 @@ check(fight.hp === 50, 'у клона 50 HP', JSON.stringify(fight));
 check(fight.cd === 50, 'перезарядка 50с', JSON.stringify(fight));
 check(fight.nearDmg === 10, 'зблизька меч наносить 10 HP', JSON.stringify(fight));
 check(fight.farDmg === 5, 'здалека пістолет наносить 5 HP', JSON.stringify(fight));
+
+const hyperFight = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = ['clone'];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(10, 120);
+  p.yaw = 0;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  const used = g.test.useGadget();
+  const clones = g.level.gadgets.clones || [];
+  const target = g.test.spawnZombie('tank', clones[0].x + 8, clones[0].z);
+  target.hp = target.maxHp = 1000;
+  target.aggroed = false;
+  for (const c of clones) c.hitT = 0;
+  g.level.gadgets._updateClones(0.1);
+  return { used, count: clones.length, hp: clones.map((c) => c.hp), farDmg: 1000 - target.hp };
+});
+check(hyperFight.used && hyperFight.count === 2, 'гіпер-клон спавнить 2 клони', JSON.stringify(hyperFight));
+check(hyperFight.hp.length === 2 && hyperFight.hp.every((hp) => hp === 50), 'у кожного гіпер-клона 50 HP', JSON.stringify(hyperFight));
+check(hyperFight.farDmg === 10, 'обидва гіпер-клони мають пістолет по 5 HP', JSON.stringify(hyperFight));
 
 console.log('');
 if (errors.length) {

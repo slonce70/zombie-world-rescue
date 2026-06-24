@@ -819,14 +819,21 @@ export class Gadgets {
       this.level.bus.emit('toast', t('Тут не можна створити клона 🙈'));
       return false;
     }
-    if (this.clones.length) this._removeClone(0, false);
-    const rig = makeHero('ninja');
-    rig.group.position.set(pos.x, pos.y, pos.z);
-    this.level.scene.add(rig.group);
-    this.clones.push({ x: pos.x, z: pos.z, y: pos.y, hp: 50, hitT: 0, rig, mesh: rig.group });
+    while (this.clones.length) this._removeClone(0, false);
+    const count = (this.level.game.save.gadgetHypers || []).includes('clone') ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const off = (i - (count - 1) / 2) * 1.1;
+      const x = pos.x + Math.cos(this.level.player.yaw) * off;
+      const z = pos.z - Math.sin(this.level.player.yaw) * off;
+      const y = this.level.world.groundH(x, z);
+      const rig = makeHero('ninja');
+      rig.group.position.set(x, y, z);
+      this.level.scene.add(rig.group);
+      this.clones.push({ x, z, y, hp: 50, hitT: 0, rig, mesh: rig.group });
+    }
     this.level.audio.powerup();
     this.level.effects.ring(new THREE.Vector3(pos.x, pos.y, pos.z), 0x8fd3ff, 1.8);
-    this.level.bus.emit('toast', t('🧍 Клон у бою!'));
+    this.level.bus.emit('toast', count > 1 ? t('🧍🧍 Клони у бою!') : t('🧍 Клон у бою!'));
     return true;
   }
 
