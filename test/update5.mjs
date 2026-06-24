@@ -74,18 +74,19 @@ const scopeRes = await page.evaluate(async () => {
   g.test.giveWeapon('sniper');
   const p = g.level.player;
   const fovBefore = p.camera.fov;
+  const drive = (n) => {
+    for (let i = 0; i < n; i++) {
+      p.update(0.05, g.input, true);
+      g.hud.update(0.05);
+    }
+  };
   g.input.rmbDown = true;
-  const tS = performance.now();
-  while (performance.now() - tS < 9000 && p.camera.fov > 40) await new Promise((r) => setTimeout(r, 250));
+  drive(80);
   const scoped = p.scoped;
   const fovScoped = p.camera.fov;
   const overlay = document.getElementById('scope').classList.contains('show');
   g.input.rmbDown = false;
-  // scoped знімається миттєво, але FOV вертається плавно (damp). За низького fps у headless
-  // ease-back триває довше за фіксовані 1200мс → чекаємо на нього так само, як на ease-in
-  // (опитуванням, не фіксованим сном). Поведінка гри коректна — тесту лише треба дати їй час.
-  const tU = performance.now();
-  while (performance.now() - tU < 9000 && p.camera.fov < 65) await new Promise((r) => setTimeout(r, 200));
+  drive(80);
   return { fovBefore, scoped, fovScoped, overlay, unscoped: !p.scoped, fovBack: p.camera.fov };
 });
 check(scopeRes.scoped, 'ПКМ вмикає оптику зі снайперкою');

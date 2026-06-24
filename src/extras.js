@@ -412,7 +412,7 @@ export class Vehicles {
 // ============================================================
 // 🧰 Гаджети: обираєш ОДИН перед боєм (Гардероб), клавіша F, перезарядка
 // ============================================================
-// ponytail: усі гаджети коштують 1000 монет (один прайс — джерело правди для магазину)
+// ponytail: більшість гаджетів коштує 1000 монет; кристальні винятки задає магазин.
 export const GADGETS = {
   shield: { name: t('Щит'), icon: '🛡️', cd: 30, price: 1000, desc: t('Аварійна бульбашка: поглинає 50 шкоди') },
   heal: { name: t('Відновлення'), icon: '💚', cd: 25, price: 1000, desc: t('+50 здоров\'я миттєво') },
@@ -422,6 +422,7 @@ export const GADGETS = {
   // 🤖 преміум: автоматична вогнева підтримка
   turret: { name: t('Турель'), icon: '🤖', cd: 45, price: 1000, desc: t('Сторожова турель: 30с сама обстрілює зомбі поруч') },
   clone: { name: t('Клон'), icon: '🧍', cd: 50, price: 1000, desc: t('Союзник: 50 HP, меч 10 зблизька, пістолет 5 здалека') },
+  healtotem: { name: t('Тотем відновлення'), icon: '🪬', cd: 45, price: 0, desc: t('50 HP, лікує 5 HP/с у площі 8×8 м') },
   watchtower: { name: t('Башня спостереження'), icon: '🗼', cd: 125, price: 1000, get desc() { return t('Залізна башта: {k} — залізти або спуститися', { k: interactKey() }); } },
   // 🩻 Ікс-рей: підсвічує всіх невидимих зомбі (Привидів) на 4с, перезарядка 25с
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
@@ -479,6 +480,21 @@ function makeWatchtowerMesh(skinId) {
   return g;
 }
 
+function makeHealTotemMesh() {
+  const g = new THREE.Group();
+  const gold = new THREE.MeshToonMaterial({ color: 0xffd23f });
+  const green = new THREE.MeshBasicMaterial({ color: 0x39ff88, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.8, 6), gold);
+  body.position.y = 0.4;
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshToonMaterial({ color: 0x2fe08a }));
+  gem.position.y = 0.86;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(4, 0.035, 8, 36), green);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.04;
+  g.add(body, gem, ring);
+  return g;
+}
+
 export class Gadgets {
   constructor(level) {
     this.level = level;
@@ -487,6 +503,7 @@ export class Gadgets {
     this.walls = [];
     this.turrets = [];
     this.clones = [];
+    this.totems = [];
     this.towers = [];
     this._meteorFires = [];
     this._thunkCd = 0;
@@ -572,6 +589,7 @@ export class Gadgets {
     // 🤖 турелі: стрільба/тиск/життя (рахує лише хост/соло)
     this._updateTurrets(dt);
     this._updateClones(dt);
+    this._updateTotems(dt);
     this._updateTowers(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
     this._thunkCd -= dt;
@@ -643,6 +661,12 @@ export class Gadgets {
         return false;
       }
       ok = this._spawnClone();
+    } else if (id === 'healtotem') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Тотем доступний тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._placeHealTotem();
     } else if (id === 'watchtower') {
       if (level.mirror) {
         level.bus.emit('toast', t('Башта доступна тільки в соло 🙈'));
@@ -852,6 +876,62 @@ export class Gadgets {
     if (broken) {
       this.level.effects.burst(new THREE.Vector3(c.x, c.y + 1, c.z), 0x8fd3ff, 12, { speed: 3, up: 3, life: 0.6 });
       this.level.bus.emit('toast', t('🧍 Клона перемогли!'));
+    }
+  }
+
+  _placeHealTotem() {
+    const pos = this._placePos(2.0);
+    if (!pos) {
+      this.level.bus.emit('toast', t('Тут не можна поставити тотем 🙈'));
+      return false;
+    }
+    while (this.totems.length) this._removeTotem(0, false);
+    const mesh = makeHealTotemMesh();
+    mesh.position.set(pos.x, pos.y, pos.z);
+    this.level.scene.add(mesh);
+    this.totems.push({ x: pos.x, z: pos.z, y: pos.y, hp: 50, pulseT: 0, mesh });
+    this.level.audio.heal();
+    this.level.effects.totemBurst(new THREE.Vector3(pos.x, pos.y + 0.6, pos.z));
+    this.level.bus.emit('toast', t('🪬 Тотем відновлення поставлено!'));
+    return true;
+  }
+
+  _removeTotem(i, broken) {
+    const ttm = this.totems[i];
+    if (!ttm) return;
+    this.totems.splice(i, 1);
+    this.level.scene.remove(ttm.mesh);
+    disposeObject(ttm.mesh);
+    if (broken) {
+      this.level.effects.burst(new THREE.Vector3(ttm.x, ttm.y + 0.6, ttm.z), 0x39ff88, 12, { speed: 3, up: 3, life: 0.6 });
+      this.level.bus.emit('toast', t('🪬 Тотем зламали!'));
+    }
+  }
+
+  _updateTotems(dt) {
+    const level = this.level;
+    for (let i = this.totems.length - 1; i >= 0; i--) {
+      const ttm = this.totems[i];
+      let pressure = 0;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || !z.aggroed) continue;
+        if (Math.hypot(z.x - ttm.x, z.z - ttm.z) < 2.4) pressure += z.stats.dmg;
+      }
+      if (pressure) {
+        ttm.hp -= pressure * dt * 0.85;
+        if (ttm.hp <= 0) { this._removeTotem(i, true); continue; }
+      }
+      const players = level.players || [level.player];
+      for (const pl of players) {
+        if (pl.health <= 0 || Math.abs(pl.pos.x - ttm.x) > 4 || Math.abs(pl.pos.z - ttm.z) > 4) continue;
+        if (pl === level.player || pl.pid === 1 || !level.net || !level.net.authority) pl.heal(5 * dt);
+        else level.net.healPlayer(pl, 5 * dt);
+      }
+      ttm.pulseT -= dt;
+      if (ttm.pulseT <= 0) {
+        ttm.pulseT = 1;
+        level.effects.ring(new THREE.Vector3(ttm.x, ttm.y, ttm.z), 0x39ff88, 4);
+      }
     }
   }
 

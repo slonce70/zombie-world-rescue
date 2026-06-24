@@ -36,7 +36,8 @@ const gad = await page.evaluate(async () => {
   const prices = Object.fromEntries(Object.entries(GADGETS).map(([k, v]) => [k, v.price]));
   return { prices, xray: GADGETS.xray ? { cd: GADGETS.xray.cd, icon: GADGETS.xray.icon, price: GADGETS.xray.price } : null };
 });
-check(Object.values(gad.prices).every((p) => p === 1000), 'усі гаджети коштують 1000', JSON.stringify(gad.prices));
+check(Object.entries(gad.prices).every(([id, p]) => id === 'healtotem' ? p === 0 : p === 1000),
+  'монетні гаджети коштують 1000, тотем купується за кристали', JSON.stringify(gad.prices));
 check(gad.xray && gad.xray.price === 1000 && gad.xray.cd === 25, 'гаджет xray: 1000 монет, перезарядка 25с', JSON.stringify(gad.xray));
 
 // у магазині є товар xray за 1000
