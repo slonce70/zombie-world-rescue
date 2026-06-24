@@ -143,14 +143,17 @@ const fire = await page.evaluate(() => {
   }
   for (let i = 0; i < 4; i++) g.level.gadgets._updateMeteorFires(0.5);
   const after2s = { nearDmg: 1000 - near.hp, farDmg: 1000 - far.hp, fires: g.level.gadgets._meteorFires.length };
-  for (let i = 0; i < 10; i++) g.level.gadgets._updateMeteorFires(0.5);
-  return { baseFires, hyperFires, after2s, expired: g.level.gadgets._meteorFires.length };
+  for (let i = 0; i < 14; i++) g.level.gadgets._updateMeteorFires(0.5);
+  const after9s = g.level.gadgets._meteorFires.length;
+  for (let i = 0; i < 3; i++) g.level.gadgets._updateMeteorFires(0.5);
+  return { baseFires, hyperFires, after2s, after9s, expired: g.level.gadgets._meteorFires.length };
 });
 check(fire.baseFires === 0, 'звичайний метеорит не лишає вогонь', JSON.stringify(fire));
 check(fire.hyperFires === 1, 'гіпер-метеорит лишає вогонь на місці падіння', JSON.stringify(fire));
 check(fire.after2s.nearDmg === 20 && fire.after2s.farDmg === 0,
   'вогонь гіпер-метеорита наносить 5 HP кожні 0.5с у зоні', JSON.stringify(fire.after2s));
-check(fire.expired === 0, 'вогонь згасає і прибирається', JSON.stringify(fire));
+check(fire.after9s === 1, 'вогонь гіпер-метеорита тримається 10 секунд: після 9с ще горить', JSON.stringify(fire));
+check(fire.expired === 0, 'вогонь згасає після 10 секунд і прибирається', JSON.stringify(fire));
 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }

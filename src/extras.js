@@ -736,7 +736,7 @@ export class Gadgets {
     );
     mesh.position.set(x, y, z);
     this.level.scene.add(mesh);
-    this._meteorFires.push({ x, z, mesh, life: 6, damage });
+    this._meteorFires.push({ x, z, mesh, life: 10, damage });
   }
 
   _updateMeteorFires(dt) {
