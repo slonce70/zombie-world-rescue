@@ -19,9 +19,11 @@ const meta = await page.evaluate(async () => {
   const { SHOP_ITEMS } = await import('/src/shop.js');
   const { PASS_REWARDS, PASS_MAX_LEVEL } = await import('/src/progress.js');
   const G = GADGETS.meteor; const r33 = PASS_REWARDS[33];
+  const hyper = SHOP_ITEMS.find((i) => i.id === 'meteor-hyper');
   return {
     meta: G && { cd: G.cd, icon: G.icon },
     inShop: SHOP_ITEMS.some((i) => i.id === 'meteor'),
+    hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper, needsGadget: hyper.needsGadget },
     cap: PASS_MAX_LEVEL,
     reward33: r33 && { type: r33.type, id: r33.id },
   };
@@ -29,6 +31,8 @@ const meta = await page.evaluate(async () => {
 check(meta.meta && meta.meta.cd === 45 && meta.meta.icon === '☄️', 'мета гаджета: 45с cd, ☄️', JSON.stringify(meta.meta));
 check(meta.cap === 33, 'Зоряний шлях продовжено до 33', String(meta.cap));
 check(!meta.inShop, 'метеорит НЕ продається в магазині (лише нагорода шляху)');
+check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'meteor' && meta.hyper.needsGadget === 'meteor',
+  'гіперзаряд метеорита коштує 5000 і потребує базовий метеорит', JSON.stringify(meta.hyper));
 check(meta.reward33 && meta.reward33.type === 'gadget' && meta.reward33.id === 'meteor', 'нагорода рівня 33 = гаджет «Метеорит»', JSON.stringify(meta.reward33));
 
 // 🎖️ розблокування: рівень 33 видає метеорит БЕЗКОШТОВНО (як лазер@28)
@@ -41,6 +45,28 @@ const grant = await page.evaluate(() => {
 });
 check(grant.level >= 33, `досягнуто рівня 33 (${grant.level})`);
 check(!grant.before && grant.owned, 'рівень 33 ВИДАВ гаджет «Метеорит» безкоштовно', JSON.stringify(grant));
+
+const hyperBuy = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.giveCoins(12000);
+  const before = g.save.coins;
+  g.test.shopBuy('meteor-hyper');
+  const afterFirst = g.save.coins;
+  g.test.shopBuy('meteor-hyper');
+  const afterSecond = g.save.coins;
+  return {
+    hypers: g.save.gadgetHypers || [],
+    firstCost: before - afterFirst,
+    secondCost: afterFirst - afterSecond,
+  };
+});
+check(hyperBuy.hypers.includes('meteor') && hyperBuy.firstCost === 5000 && hyperBuy.secondCost === 0,
+  'гіперзаряд метеорита купується один раз і зберігається', JSON.stringify(hyperBuy));
+
+await page.goto(`${BASE}/?test&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+const persisted = await page.evaluate(() => (window.__game.save.gadgetHypers || []).includes('meteor'));
+check(persisted, 'гіперзаряд метеорита лишається після перезавантаження сторінки');
 
 // === площа 7×7: 250 усім у зоні, поза зоною — нікому (детерміновано, в ізольованій точці) ===
 const aoe = await page.evaluate(() => {
@@ -96,6 +122,35 @@ const rob = await page.evaluate(() => {
 check(rob.targetsRobot, 'метеорит ПРІОРИТЕТНО цілиться в робота (а не в дрібного ближчого)', JSON.stringify(rob));
 check(rob.robotDmg === 500, 'роботу метеорит завдає 500 (обходить щит згори)', JSON.stringify(rob));
 check(rob.shieldKept, 'щит робота не зачеплено (удар згори повз нього)', JSON.stringify(rob));
+
+const fire = await page.evaluate(() => {
+  const g = window.__game; const p = g.level.player;
+  const cx = p.pos.x + 80, cz = p.pos.z + 80;
+  for (const zb of g.level.zombies.list) zb.state = 'dead';
+  const near = g.level.zombies.spawn('tank', cx, cz, {});
+  const far = g.level.zombies.spawn('tank', cx + 5, cz, {});
+  near.hp = near.maxHp = 1000;
+  far.hp = far.maxHp = 1000;
+  g.level.gadgets._meteorFires = [];
+  g.level.gadgets._meteorAoE(cx, cz, false);
+  const baseFires = g.level.gadgets._meteorFires.length;
+  near.hp = far.hp = 1000;
+  g.level.gadgets._meteorAoE(cx, cz, true);
+  const hyperFires = g.level.gadgets._meteorFires.length;
+  near.hp = far.hp = 1000;
+  if (typeof g.level.gadgets._updateMeteorFires !== 'function') {
+    return { baseFires, hyperFires, after2s: { nearDmg: 0, farDmg: 0, fires: hyperFires }, expired: hyperFires };
+  }
+  for (let i = 0; i < 4; i++) g.level.gadgets._updateMeteorFires(0.5);
+  const after2s = { nearDmg: 1000 - near.hp, farDmg: 1000 - far.hp, fires: g.level.gadgets._meteorFires.length };
+  for (let i = 0; i < 10; i++) g.level.gadgets._updateMeteorFires(0.5);
+  return { baseFires, hyperFires, after2s, expired: g.level.gadgets._meteorFires.length };
+});
+check(fire.baseFires === 0, 'звичайний метеорит не лишає вогонь', JSON.stringify(fire));
+check(fire.hyperFires === 1, 'гіпер-метеорит лишає вогонь на місці падіння', JSON.stringify(fire));
+check(fire.after2s.nearDmg === 10 && fire.after2s.farDmg === 0,
+  'вогонь гіпер-метеорита наносить 5 HP/с у зоні', JSON.stringify(fire.after2s));
+check(fire.expired === 0, 'вогонь згасає і прибирається', JSON.stringify(fire));
 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }

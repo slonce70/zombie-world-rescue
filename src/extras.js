@@ -485,6 +485,7 @@ export class Gadgets {
     this.walls = [];
     this.turrets = [];
     this.towers = [];
+    this._meteorFires = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
     // 🛡 бульбашка гаджет-щита довкола героя
@@ -516,6 +517,7 @@ export class Gadgets {
       input.justPressed.delete('KeyE');
     }
     if (allowControl && p.health > 0 && input.pressed('KeyF')) this.use();
+    this._updateMeteorFires(dt);
 
     // бульбашка щита слідує за героєм і тане з міцністю
     if (p.gadgetShield > 0) {
@@ -706,11 +708,45 @@ export class Gadgets {
 
   // 💥 шкода ЗГОРИ по ВСІХ живих зомбі в зоні 7×7 м: 135 звичайним, 500 роботу (мех трощиться).
   // METEOR_DOWN обходить фронтальний щит, headshot — нагрудник.
-  _meteorAoE(x, z) {
+  _meteorAoE(x, z, hyper = false) {
     for (const zb of this.level.zombies.list) {
       if (zb.state === 'dead' || zb.gone) continue;
       if (Math.abs(zb.x - x) <= 3.5 && Math.abs(zb.z - z) <= 3.5) {
         zb.damage(zb.type === 'robot' ? 500 : 250, METEOR_DOWN, true);
+      }
+    }
+    if (hyper) this._addMeteorFire(x, z, true);
+  }
+
+  _addMeteorFire(x, z, damage = true) {
+    const y = this.level.world.groundH(x, z) + 0.04;
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.5, 3.5, 0.05, 24),
+      new THREE.MeshBasicMaterial({ color: 0xff6a18, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    mesh.position.set(x, y, z);
+    this.level.scene.add(mesh);
+    this._meteorFires.push({ x, z, mesh, life: 6, damage });
+  }
+
+  _updateMeteorFires(dt) {
+    for (let i = this._meteorFires.length - 1; i >= 0; i--) {
+      const f = this._meteorFires[i];
+      f.life -= dt;
+      f.mesh.rotation.y += dt * 1.7;
+      const pulse = 0.96 + Math.sin(f.life * 9) * 0.04;
+      f.mesh.scale.set(pulse, 1, pulse);
+      if (f.damage) {
+        for (const zb of this.level.zombies.list) {
+          if (zb.state === 'dead' || zb.gone) continue;
+          if (Math.hypot(zb.x - f.x, zb.z - f.z) <= 3.5) zb.damage(5 * dt, null, false, { fire: true });
+        }
+      }
+      if (f.life <= 0) {
+        this.level.scene.remove(f.mesh);
+        f.mesh.geometry.dispose();
+        f.mesh.material.dispose();
+        this._meteorFires.splice(i, 1);
       }
     }
   }
@@ -734,27 +770,28 @@ export class Gadgets {
     const zb = this._meteorTarget(level.player.pos.x, level.player.pos.z);
     if (!zb) { level.bus.emit('toast', t('☄️ Немає цілі поблизу!')); level.game.audio.denied(); return false; }
     const ix = zb.x, iz = zb.z;
-    level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz), level.player.pos.x, level.player.pos.z);
+    const hyper = (level.game.save.gadgetHypers || []).includes('meteor');
+    level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz, hyper), level.player.pos.x, level.player.pos.z);
     level.audio.powerup();
     level.bus.emit('toast', t('☄️ Метеорит летить!'));
-    if (level.net && level.net.authority) level.netEv('met', Math.round(ix * 10) / 10, Math.round(iz * 10) / 10);
+    if (level.net && level.net.authority) level.netEv('met', Math.round(ix * 10) / 10, Math.round(iz * 10) / 10, hyper ? 1 : 0);
     return true;
   }
 
   // гість: просимо хоста викликати метеорит (шле нашу позицію — хост шукає ціль)
   _requestMeteor() {
     const p = this.level.player;
-    this.level.net.sendGadget('meteor', p.pos.x, p.pos.z, p.yaw);
+    this.level.net.sendGadget('meteor', p.pos.x, p.pos.z, p.yaw, (this.level.game.save.gadgetHypers || []).includes('meteor'));
     return true;
   }
 
   // хост: метеорит на найближчого до позиції гравця-замовника, площа 7×7 + розсилка візуалу
-  hostMeteor(x, z) {
+  hostMeteor(x, z, hyper = false) {
     const zb = this._meteorTarget(x, z);
     if (!zb) return;
     const ix = zb.x, iz = zb.z;
-    this.level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz), x, z);
-    this.level.netEv('met', Math.round(ix * 10) / 10, Math.round(iz * 10) / 10);
+    this.level.effects.callMeteor(ix, iz, () => this._meteorAoE(ix, iz, hyper), x, z);
+    this.level.netEv('met', Math.round(ix * 10) / 10, Math.round(iz * 10) / 10, hyper ? 1 : 0);
   }
 
   _placePos(dist) {
