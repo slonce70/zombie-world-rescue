@@ -35,9 +35,11 @@ check(drop.afterMiss === drop.afterHit, 'roll 0.78 не дає кристали'
 
 console.log('▸ Купівля скінів за кристали');
 const buy = await page.evaluate(async () => {
+  const { HERO_SKINS, makeHero } = await import('/src/characters.js');
   const { SHOP_ITEMS } = await import('/src/shop.js');
   const g = window.__game;
   const item = SHOP_ITEMS.find((i) => i.id === 'frogskin');
+  const military = SHOP_ITEMS.find((i) => i.id === 'militaryskin');
   g.save.crystals = 14;
   const coins0 = g.save.coins;
   g.test.shopBuy('frogskin');
@@ -46,14 +48,34 @@ const buy = await page.evaluate(async () => {
   g.test.shopBuy('frogskin');
   const bought = { crystals: g.save.crystals, coins: g.save.coins, owned: g.save.skins.includes('frog'), active: g.save.activeSkin };
   g.test.shopBuy('frogskin');
-  return { item: item && { crystalPrice: item.crystalPrice, skin: item.skin, max: item.max }, coins0, denied, bought, afterSecond: g.save.crystals };
+  const afterSecond = g.save.crystals;
+  g.save.crystals = 15;
+  g.test.shopBuy('militaryskin');
+  const militaryBought = { crystals: g.save.crystals, owned: g.save.skins.includes('military'), active: g.save.activeSkin };
+  let militaryBuilt = false;
+  try { militaryBuilt = !!makeHero('military', g.save.hero).group; } catch (e) { militaryBuilt = false; }
+  return {
+    item: item && { crystalPrice: item.crystalPrice, skin: item.skin, max: item.max },
+    military: HERO_SKINS.military && military && { name: HERO_SKINS.military.name, crystalPrice: military.crystalPrice, skin: military.skin, max: military.max },
+    militaryBought,
+    militaryBuilt,
+    coins0,
+    denied,
+    bought,
+    afterSecond,
+  };
 });
 check(buy.item && buy.item.crystalPrice === 15 && buy.item.skin === 'frog' && buy.item.max === 1,
   'frog skin є в магазині за 15 кристалів', JSON.stringify(buy.item));
+check(buy.military && buy.military.crystalPrice === 15 && buy.military.skin === 'military' && buy.military.max === 1,
+  'військовий скін є в магазині за 15 кристалів', JSON.stringify(buy.military));
 check(buy.denied.crystals === 14 && !buy.denied.owned, '14 кристалів недостатньо для покупки', JSON.stringify(buy.denied));
 check(buy.bought.crystals === 0 && buy.bought.coins === buy.coins0 && buy.bought.owned && buy.bought.active === 'frog',
   '15 кристалів купують скін без списання монет і одягають його', JSON.stringify(buy.bought));
 check(buy.afterSecond === 0, 'повторна покупка не списує кристали', JSON.stringify(buy));
+check(buy.militaryBought.crystals === 0 && buy.militaryBought.owned && buy.militaryBought.active === 'military',
+  '15 кристалів купують військовий скін і одягають його', JSON.stringify(buy.militaryBought));
+check(buy.militaryBuilt, 'makeHero("military") будується без помилок');
 
 console.log('');
 if (errors.length) {

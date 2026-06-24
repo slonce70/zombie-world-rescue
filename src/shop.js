@@ -43,6 +43,7 @@ export const SHOP_ITEMS = [
   // --- скіни героя ---
   { id: 'frogskin', icon: HERO_SKINS.frog.icon, name: HERO_SKINS.frog.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'frog' },
   { id: 'superskin', icon: HERO_SKINS.super.icon, name: HERO_SKINS.super.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'super' },
+  { id: 'militaryskin', icon: HERO_SKINS.military.icon, name: HERO_SKINS.military.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Спорядження'), skin: 'military' },
   { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Спорядження'), skin: 'gold' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },

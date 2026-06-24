@@ -2137,6 +2137,7 @@ export const HERO_SKINS = {
   robot: { name: t('Робот'), icon: '🤖', desc: t('Біп-буп, зомбі!') },
   frog: { name: t('Жабеня'), icon: '🐸', desc: t('Ква проти зомбі (з Мегабокса)') },
   super: { name: t('Супергерой'), icon: '🦸', desc: t('Плащ майорить! (з Мегабокса)') },
+  military: { name: t('Військовий'), icon: '🪖', desc: t('Купи в магазині за кристали') },
   hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
   thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
@@ -2449,6 +2450,24 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       const capeKnot = box(0.46, 0.06, 0.06, toonMat(0xb03a3a));
       capeKnot.position.set(0, 0.58, 0.05);
       rig.parts.torso.add(capeKnot);
+      return rig;
+    },
+    military() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffc9a3, shirt: 0x4f6b3a, pants: 0x2f3d24, shoes: 0x24281d,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.08, cast: 'all', sleeves: 'shirt',
+      });
+      const camo = toonMat(0x3f512c);
+      const helmet = sphere(0.29, camo, 16, 10);
+      helmet.position.y = 0.22;
+      helmet.scale.set(1.05, 0.62, 1.05);
+      const brim = box(0.34, 0.035, 0.18, camo);
+      brim.position.set(0, 0.24, -0.28);
+      const vest = box(0.42, 0.34, 0.05, toonMat(0x2f3d24));
+      vest.position.set(0, 0.3, -0.27);
+      rig.parts.head.add(helmet, brim);
+      rig.parts.torso.add(vest);
       return rig;
     },
     // 🛡️ Лицар: сталеві лати, шолом із плюмажем, золотий хрест — за зірковий шлях 30
