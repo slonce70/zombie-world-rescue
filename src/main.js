@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 118;
+const APP_VERSION = 119;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1381,8 +1381,8 @@ class Game {
     };
 
     this.hud.wire(level.bus);
-    level.bus.on('hitmarker', (crit) => {
-      if (crit) this._hitstopT = Math.max(this._hitstopT, 0.055);
+    level.bus.on('hitmarker', (crit, weapon) => {
+      if (crit && weapon !== 'rifle' && weapon !== 'smg') this._hitstopT = Math.max(this._hitstopT, 0.055);
     });
     level.bus.on('zombieKilled', (z) => {
       if (level.mirror) return;

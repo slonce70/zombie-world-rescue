@@ -2530,8 +2530,9 @@ export class World {
     roof.castShadow = true;
     g.add(ceil, roof);
     if (this.biome.snow) {
-      const cap = new THREE.Mesh(this._prismGeo(w + 0.8, h * 0.18, d + 0.8), toonMat(0xf4f9fc));
-      cap.position.y = 0.46 + h + h * 0.38;
+      const capH = h * 0.06;
+      const cap = new THREE.Mesh(this._prismGeo(w + 0.8, capH, d + 0.8), toonMat(0xf4f9fc));
+      cap.position.y = 0.46 + h + h * 0.5 + 0.04 - capH;
       g.add(cap);
     }
 
@@ -2671,8 +2672,9 @@ export class World {
     g.add(found, walls, roof);
     if (this.biome.snow) {
       // снігова шапка на даху
-      const cap = new THREE.Mesh(this._prismGeo(w + 0.8, h * 0.2, d + 0.8), toonMat(0xf4f9fc));
-      cap.position.y = 0.4 + h + h * 0.42;
+      const capH = h * 0.06;
+      const cap = new THREE.Mesh(this._prismGeo(w + 0.8, capH, d + 0.8), toonMat(0xf4f9fc));
+      cap.position.y = 0.4 + h + h * 0.55 + 0.04 - capH;
       g.add(cap);
     }
 

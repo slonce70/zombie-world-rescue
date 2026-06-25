@@ -833,7 +833,7 @@ export class Player {
     if (anyHit) {
       level.audio.hit(anyHeadshot);
       level.stats.shotsHit++;
-      level.bus.emit('hitmarker', anyHeadshot);
+      level.bus.emit('hitmarker', anyHeadshot, this.cur);
     }
   }
 
