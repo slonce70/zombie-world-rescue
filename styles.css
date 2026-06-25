@@ -724,6 +724,8 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .ward-card.locked:hover { transform: none; border-color: var(--ui-border); }
 .ward-ico { font-size: 34px; }
 .ward-name { color: #fff; font-weight: 800; font-size: 14px; margin-top: 5px; }
+.ward-desc { color: #cfe0f5; font-weight: 700; font-size: 12px; line-height: 1.25; margin-top: 5px; min-height: 30px; }
+.ward-stat { color: var(--accent); font-weight: 900; font-size: 12px; margin-top: 4px; }
 .ward-tag { font-size: 12px; font-weight: 700; color: #9fb8d4; margin-top: 3px; }
 .ward-card.equipped .ward-tag { color: #58c14c; }
 .hero-swatch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
@@ -732,13 +734,27 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .hero-swatch.on { border-color: #fff; transform: scale(1.12); }
 /* 🎨 редактор кастом-героя: 3D-прев'ю + контролі */
 .hero-editor { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.hero-stage { flex: 0 0 260px; }
 .hero-preview { width: 260px; height: 300px; border-radius: 14px; background: linear-gradient(180deg, #bfe3ff, #e7d2ff); flex: 0 0 auto; box-shadow: inset 0 0 0 1px var(--ui-border); }
+.hero-preview-tools { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.hero-view-btn, .hero-pose-btn {
+  min-height: 34px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: rgba(255,255,255,0.08); color: #fff; font-weight: 800; cursor: pointer;
+}
+.hero-view-btn.on, .hero-pose-btn.on {
+  border-color: #58c14c;
+  background: rgba(88, 193, 76, 0.22);
+}
+.hero-view-btn { width: 40px; }
+.hero-pose-btn { flex: 1; padding: 0 8px; }
+#hero-zoom { flex: 1; min-width: 86px; }
+.hero-random { margin: 0 0 8px; }
 .hero-controls { flex: 1 1 320px; min-width: 280px; }
 .hero-sub { color: var(--accent); font-weight: 900; font-size: 13px; margin: 12px 0 6px; }
 .hero-parts { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); }
 .hero-pick { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 9px; border: 2px dashed rgba(255,255,255,.6); margin: 3px; cursor: pointer; font-size: 16px; overflow: hidden; position: relative; }
 .hero-pick input[type=color] { position: absolute; inset: 0; opacity: 0; cursor: pointer; border: 0; padding: 0; }
-@media (max-width: 640px) { .hero-preview { width: 100%; height: 240px; } }
+@media (max-width: 640px) { .hero-stage, .hero-preview { width: 100%; flex-basis: 100%; } .hero-preview { height: 240px; } }
 #wardrobe-content { max-height: 62vh; overflow-y: auto; padding-right: 6px; }
 
 /* шторм */

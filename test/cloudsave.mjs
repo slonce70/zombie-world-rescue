@@ -90,6 +90,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     const fresh = window.__game._newSave();
     const out = {};
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
+    out.legacyDefaultHero = saveHasProgress({ ...fresh, hero: { shirt: DEFAULT_HERO.shirt, pants: DEFAULT_HERO.pants, skin: DEFAULT_HERO.skin, shoes: DEFAULT_HERO.shoes, hatColor: DEFAULT_HERO.hatColor, hat: DEFAULT_HERO.hat, face: DEFAULT_HERO.face } }) === false;
     const hero = { ...fresh, hero: { ...DEFAULT_HERO, shirt: 0x123456 } };
     out.customHero = saveHasProgress(hero) === true;
     out.goal = saveHasProgress({ ...fresh, goal: 'sniper' }) === true;
@@ -108,6 +109,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     return out;
   });
   check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
+  check('legacy default hero без нових ключів ≠ прогрес', res.legacyDefaultHero);
   check('стартові 50 монет ≠ прогрес', res.startCoinsNotProgress);
   check('кастом-герой → прогрес=true', res.customHero);
   check('ціль → прогрес=true', res.goal);

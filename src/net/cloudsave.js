@@ -13,7 +13,10 @@ const SAVE_KEY = 'zr-save-v1'; // тримати в синхроні з main.js
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
 // двох місцях, вони розійдуться при будь-якій зміні палітри. Тримаємо тут, бо саме
 // тут живе захист від перезапису прогресу.
-export const DEFAULT_HERO = { shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3, shoes: 0x303642, hatColor: 0x2f80c3, hat: 'cap', face: 'smile' };
+export const DEFAULT_HERO = {
+  shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3, shoes: 0x303642, hatColor: 0x2f80c3,
+  hat: 'cap', face: 'smile', body: 'regular', hair: 'none', accessory: 'none', back: 'pack',
+};
 export const NEW_SAVE_COINS = 50;
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -24,10 +27,9 @@ export const NEW_SAVE_COINS = 50;
 // попередження, а bootSync міг adopt-нути хмару поверх живого локального.
 export function saveHasProgress(s) {
   if (!s || typeof s !== 'object') return false;
+  const hero = s.hero && typeof s.hero === 'object' ? { ...DEFAULT_HERO, ...s.hero } : null;
   const heroChanged = s.hero && typeof s.hero === 'object'
-    && (s.hero.shirt !== DEFAULT_HERO.shirt
-      || s.hero.pants !== DEFAULT_HERO.pants
-      || s.hero.skin !== DEFAULT_HERO.skin);
+    && Object.keys(DEFAULT_HERO).some((k) => hero[k] !== DEFAULT_HERO[k]);
   return Object.keys(s.liberated || {}).length > 0
     || (s.xp | 0) > 0
     || Object.keys(s.missionRuns || {}).length > 0

@@ -29,7 +29,12 @@ const ward = await page.evaluate(() => {
   const active1 = document.querySelector('#wardrobe-content .ward-tab.on')?.textContent.trim();
   const visible1 = [...document.querySelectorAll('#wardrobe-content .ward-pane:not([hidden]) .ward-card')]
     .map((el) => el.dataset.kind);
-  return { tabs, active0, visible0, active1, visible1 };
+  const shield = document.querySelector('#wardrobe-content .ward-card[data-kind="gadget"][data-id="shield"]');
+  return {
+    tabs, active0, visible0, active1, visible1,
+    shieldDesc: shield?.querySelector('.ward-desc')?.textContent.trim() || '',
+    shieldStat: shield?.querySelector('.ward-stat')?.textContent.trim() || '',
+  };
 });
 
 check(['Скіни', 'Гаджети', 'Танці', 'Улюбленці', 'Башта', 'Кулі', 'Герой'].every((x) => ward.tabs.includes(x)),
@@ -38,6 +43,8 @@ check(ward.active0 === 'Скіни' && ward.visible0.length && ward.visible0.eve
   `за замовчуванням видно тільки скіни: ${ward.active0}/${ward.visible0.join(', ')}`);
 check(ward.active1 === 'Гаджети' && ward.visible1.length && ward.visible1.every((x) => x === 'gadget'),
   `вкладка гаджетів показує тільки гаджети: ${ward.active1}/${ward.visible1.join(', ')}`);
+check(ward.shieldDesc.includes('поглинає 50 шкоди') && ward.shieldStat.includes('30с'),
+  `картка гаджета пояснює дію і перезарядку: ${ward.shieldDesc}/${ward.shieldStat}`);
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

@@ -37,12 +37,27 @@ check(txt.play !== uk.play, 'en: play відрізняється від uk', txt
 check(txt.coop.toUpperCase().includes('PLAY') && txt.coop.toUpperCase().includes('TOGETHER'), 'en: PLAY TOGETHER', txt.coop);
 check(txt.ward.toLowerCase().includes('wardrobe'), 'en: Wardrobe', txt.ward);
 check(txt.htmlLang === 'en', 'en: html lang', txt.htmlLang);
+const heroEn = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.activeSkin = 'custom';
+  g.renderWardrobe();
+  g._showOverlay('overlay-wardrobe');
+  return {
+    subs: [...document.querySelectorAll('.hero-sub')].map((x) => x.textContent.trim()),
+    run: document.querySelector('.hero-pose-btn[data-pose="run"]')?.textContent.trim() || '',
+    cape: document.querySelector('.hero-part-card[data-part="back"][data-id="cape"] .ward-name')?.textContent.trim() || '',
+  };
+});
+check(heroEn.run === 'Run' && heroEn.cape === 'Cape'
+  && heroEn.subs.includes('🎩 Hat') && heroEn.subs.includes('😀 Face'),
+  'en: hero editor labels translated', JSON.stringify(heroEn));
+check(![heroEn.run, heroEn.cape, ...heroEn.subs].some((s) => ['Біг', 'Плащ', '🎩 Шапка', '😀 Обличчя'].includes(s)),
+  'en: hero editor labels are not Ukrainian', JSON.stringify(heroEn));
 // игровой уровень на английском: названия миссий
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
 const mEn = await page.evaluate(() => window.__game.level.missions.getHudList().map((m) => m.title));
 check(mEn.some((s) => /Rescue|Repair|Clear/.test(s)), 'en: місії перекладено', mEn.join(' | ').slice(0, 90));
-await page.screenshot({ path: 'shots/i18n-en-level.png' });
 
 // 3. русский
 await page.evaluate(() => localStorage.setItem('zr-lang', 'ru'));
@@ -55,11 +70,26 @@ txt = await page.evaluate(() => ({
 check(txt.play.includes('ИГРАТЬ'), 'ru: ИГРАТЬ', txt.play);
 check(txt.play !== uk.play, 'ru: play відрізняється від uk', txt.play);
 check(txt.prog.toLowerCase().includes('прогресс') || txt.prog.toLowerCase().includes('прогрес'), 'ru: Прогресс', txt.prog);
+const heroRu = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.activeSkin = 'custom';
+  g.renderWardrobe();
+  g._showOverlay('overlay-wardrobe');
+  return {
+    subs: [...document.querySelectorAll('.hero-sub')].map((x) => x.textContent.trim()),
+    run: document.querySelector('.hero-pose-btn[data-pose="run"]')?.textContent.trim() || '',
+    cape: document.querySelector('.hero-part-card[data-part="back"][data-id="cape"] .ward-name')?.textContent.trim() || '',
+  };
+});
+check(heroRu.run === 'Бег' && heroRu.cape === 'Плащ'
+  && heroRu.subs.includes('🎩 Головной убор') && heroRu.subs.includes('😀 Лицо'),
+  'ru: hero editor labels translated', JSON.stringify(heroRu));
+check(![heroRu.run, heroRu.cape, ...heroRu.subs].some((s) => ['Біг', '🎩 Шапка', '😀 Обличчя'].includes(s)),
+  'ru: hero editor labels are not Ukrainian', JSON.stringify(heroRu));
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
 const mRu = await page.evaluate(() => window.__game.level.missions.getHudList().map((m) => m.title));
 check(mRu.some((s) => /Спаси|Почини|Зачисти/.test(s)), 'ru: миссии переведены', mRu.join(' | ').slice(0, 90));
-await page.screenshot({ path: 'shots/i18n-ru-level.png' });
 
 check(errs.length === 0, 'без JS-ошибок', errs.slice(0, 2).join('|'));
 console.log(failed === 0 ? '🎉 ЛОКАЛІЗАЦІЯ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failed}`);

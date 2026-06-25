@@ -2081,6 +2081,29 @@ export const HERO_PALETTE = {
 };
 
 // частини редактора героя (id → метадані для UI; геометрію будує buildHeroHat / faceSpec)
+export const HERO_BODY_TYPES = {
+  regular: { name: t('Звичайний'), icon: '🙂' },
+  compact: { name: t('Спритний'), icon: '⚡' },
+  armor: { name: t('Броньований'), icon: '🛡️' },
+};
+export const HERO_HAIR = {
+  none: { name: t('Без волосся'), icon: '🚫' },
+  spikes: { name: t('Їжачок'), icon: '✨' },
+  bob: { name: t('Каре'), icon: '💇' },
+  mohawk: { name: t('Ірокез'), icon: '🔥' },
+};
+export const HERO_ACCESSORIES = {
+  none: { name: t('Без аксесуара'), icon: '➖' },
+  scarf: { name: t('Шарф'), icon: '🧣' },
+  star: { name: t('Зірка'), icon: '⭐' },
+  shoulder: { name: t('Наплічник'), icon: '🦾' },
+};
+export const HERO_BACKS = {
+  none: { name: t('Без спини'), icon: '➖' },
+  pack: { name: t('Рюкзак'), icon: '🎒' },
+  cape: { name: t('Плащ'), icon: '🦸' },
+  jetpack: { name: t('Ранці-ракети'), icon: '🚀' },
+};
 export const HERO_HATS = {
   none: { name: t('Без шапки'), icon: '🚫' },
   cap: { name: t('Кепка'), icon: '🧢' },
@@ -2100,24 +2123,24 @@ export const HERO_FACES = {
 export function buildHeroHat(headG, hatId, hatColor) {
   const m = toonMat(hatColor != null ? hatColor : 0x2f80c3);
   if (hatId === 'cap') {
-    const top = sphere(0.275, m, 16, 10); top.position.y = 0.2; top.scale.set(1, 0.62, 1); headG.add(top);
-    const brim = box(0.26, 0.04, 0.2, m); brim.position.set(0, 0.16, -0.22); headG.add(brim);
+    const top = sphere(0.26, m, 16, 10); top.position.y = 0.4; top.scale.set(1, 0.48, 1); headG.add(top);
+    const brim = box(0.24, 0.035, 0.12, m); brim.position.set(0, 0.38, -0.22); headG.add(brim);
   } else if (hatId === 'beanie') {
-    const top = sphere(0.285, m, 16, 10); top.position.y = 0.16; top.scale.set(1, 0.7, 1); headG.add(top);
-    const band = cylinder(0.29, 0.29, 0.07, toonMat(0xffffff), 16); band.position.y = 0.05; headG.add(band);
-    const pom = sphere(0.06, toonMat(0xffffff), 10, 8); pom.position.y = 0.34; headG.add(pom);
+    const top = sphere(0.27, m, 16, 10); top.position.y = 0.45; top.scale.set(1, 0.5, 1); headG.add(top);
+    const band = cylinder(0.27, 0.27, 0.06, toonMat(0xffffff), 16); band.position.y = 0.37; headG.add(band);
+    const pom = sphere(0.06, toonMat(0xffffff), 10, 8); pom.position.y = 0.61; headG.add(pom);
   } else if (hatId === 'cowboy') {
-    const brim = cylinder(0.4, 0.4, 0.035, m, 18); brim.position.y = 0.12; headG.add(brim);
-    const crown = cylinder(0.2, 0.23, 0.18, m, 14); crown.position.y = 0.22; headG.add(crown);
+    const brim = cylinder(0.32, 0.32, 0.03, m, 18); brim.position.y = 0.4; brim.scale.set(1.16, 1, 0.68); headG.add(brim);
+    const crown = cylinder(0.17, 0.2, 0.16, m, 14); crown.position.y = 0.51; headG.add(crown);
   } else if (hatId === 'crown') {
     const gold = toonMat(0xf4c430, 0xf4c430, 0.25);
-    const band = cylinder(0.26, 0.26, 0.1, gold, 14); band.position.y = 0.22; headG.add(band);
-    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const sp = cone(0.04, 0.1, gold, 5); sp.position.set(Math.cos(a) * 0.24, 0.3, Math.sin(a) * 0.24); headG.add(sp); }
+    const band = cylinder(0.24, 0.24, 0.08, gold, 14); band.position.y = 0.42; headG.add(band);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const sp = cone(0.04, 0.1, gold, 5); sp.position.set(Math.cos(a) * 0.22, 0.53, Math.sin(a) * 0.22); headG.add(sp); }
   } else if (hatId === 'ears') {
-    for (const side of [-1, 1]) { const ear = sphere(0.08, m, 10, 8); ear.position.set(0.14 * side, 0.26, 0); headG.add(ear); const inr = sphere(0.045, toonMat(0xeaa6b0), 8, 6); inr.position.set(0.14 * side, 0.27, -0.04); headG.add(inr); }
+    for (const side of [-1, 1]) { const ear = sphere(0.105, m, 10, 8); ear.position.set(0.2 * side, 0.43, -0.01); headG.add(ear); const inr = sphere(0.06, toonMat(0xeaa6b0), 8, 6); inr.position.set(0.2 * side, 0.44, -0.07); headG.add(inr); }
   } else if (hatId === 'party') {
-    const cone1 = cone(0.16, 0.34, m, 14); cone1.position.y = 0.34; headG.add(cone1);
-    const pom = sphere(0.05, toonMat(0xffffff), 8, 6); pom.position.y = 0.52; headG.add(pom);
+    const cone1 = cone(0.14, 0.32, m, 14); cone1.position.y = 0.54; headG.add(cone1);
+    const pom = sphere(0.05, toonMat(0xffffff), 8, 6); pom.position.y = 0.73; headG.add(pom);
   }
 }
 
@@ -2126,6 +2149,92 @@ function faceSpec(faceId) {
   if (faceId === 'grin') return { mouth: 'open', teeth: true, glasses: false };
   if (faceId === 'cool') return { mouth: 'smile', teeth: false, glasses: true };
   return { mouth: 'smile', teeth: false, glasses: false };
+}
+
+function bodySpec(bodyId) {
+  if (bodyId === 'compact') return { scale: 0.94, belly: 0.9, headR: 0.29 };
+  if (bodyId === 'armor') return { scale: 1.04, belly: 1.18, headR: 0.265, armsForward: 0.04 };
+  return {};
+}
+
+function buildHeroHair(headG, hairId, color) {
+  const m = toonMat(color != null ? color : 0x3b2a1f);
+  if (hairId === 'spikes') {
+    for (let i = -2; i <= 2; i++) {
+      const tuft = cone(0.04, 0.16, m, 6);
+      tuft.position.set(i * 0.055, 0.36 - Math.abs(i) * 0.018, -0.03);
+      tuft.rotation.z = -i * 0.18;
+      headG.add(tuft);
+    }
+  } else if (hairId === 'bob') {
+    const cap = sphere(0.29, m, 14, 10);
+    cap.position.set(0, 0.2, 0.04);
+    cap.scale.set(1.06, 0.62, 1.03);
+    headG.add(cap);
+    for (const side of [-1, 1]) {
+      const lock = box(0.08, 0.22, 0.06, m);
+      lock.position.set(side * 0.22, 0.08, -0.02);
+      headG.add(lock);
+    }
+  } else if (hairId === 'mohawk') {
+    for (let i = -2; i <= 2; i++) {
+      const fin = cone(0.045, 0.2, m, 6);
+      fin.position.set(0, 0.32, i * 0.06);
+      fin.rotation.x = 0.2;
+      headG.add(fin);
+    }
+  }
+}
+
+function buildHeroAccessory(rig, id, color) {
+  const accent = toonMat(color != null ? color : 0xffd23f, color != null ? color : 0xffaa00, 0.25);
+  if (id === 'scarf') {
+    const scarf = cylinder(0.19, 0.22, 0.08, accent, 14);
+    scarf.position.y = -0.08;
+    rig.parts.head.add(scarf);
+    const tail = box(0.08, 0.34, 0.04, accent);
+    tail.position.set(0.18, 0.24, 0.18);
+    tail.rotation.x = 0.24;
+    rig.parts.torso.add(tail);
+  } else if (id === 'star') {
+    const star = cylinder(0.08, 0.08, 0.03, accent, 5);
+    star.rotation.x = Math.PI / 2;
+    star.position.set(0, 0.43, -0.27);
+    rig.parts.torso.add(star);
+  } else if (id === 'shoulder') {
+    for (const side of [-1, 1]) {
+      const pad = sphere(0.12, accent, 10, 8);
+      pad.position.set(0.28 * side, 0.46, -0.02);
+      pad.scale.set(1.2, 0.65, 0.9);
+      rig.parts.torso.add(pad);
+    }
+  }
+}
+
+function buildHeroBack(rig, id, color) {
+  if (id === 'pack') {
+    const pack = box(0.34, 0.4, 0.16, toonMat(color != null ? color : 0x55a04b));
+    pack.position.set(0, 0.34, 0.3);
+    rig.parts.torso.add(pack);
+  } else if (id === 'cape') {
+    const cape = box(0.52, 0.82, 0.045, toonMat(color != null ? color : 0xd84f4f));
+    cape.position.set(0, 0.1, 0.29);
+    cape.rotation.x = -0.08;
+    rig.parts.torso.add(cape);
+  } else if (id === 'jetpack') {
+    const shell = toonMat(0x7d8aa0);
+    const flame = toonMat(0x4fd8ff, 0x2288cc, 0.65);
+    for (const side of [-1, 1]) {
+      const tank = cylinder(0.07, 0.07, 0.38, shell, 10);
+      tank.position.set(0.1 * side, 0.34, 0.34);
+      tank.rotation.x = 0.02;
+      rig.parts.torso.add(tank);
+      const glow = cone(0.045, 0.12, flame, 8);
+      glow.position.set(0.1 * side, 0.08, 0.34);
+      glow.rotation.x = Math.PI;
+      rig.parts.torso.add(glow);
+    }
+  }
 }
 
 // ---------- Скіни героя ----------
@@ -2503,16 +2612,22 @@ export function makeHero(skinId = 'classic', heroColors = null) {
     custom() {
       const hc = heroColors || {};
       const f = faceSpec(hc.face || 'smile');
+      const b = bodySpec(hc.body || 'regular');
       const rig = makeHumanoid({
         scale: 1.0,
         skin: hc.skin || 0xffc9a3, shirt: hc.shirt || 0x2f80c3, pants: hc.pants || 0x474f63,
         shoes: hc.shoes != null ? hc.shoes : 0x303642,
         eyeL: 0.058, eyeR: 0.058, mouth: f.mouth, teeth: f.teeth, mouthColor: 0x8a4b3a, brow: -0.08, cast: 'all',
+        ...b,
       });
+      rig.spec.body = hc.body || 'regular';
       // 🎩 обрана шапка (колір hatColor); за замовчуванням кепка кольору сорочки
       const hatId = hc.hat || 'cap';
       const hatCol = hc.hatColor != null ? hc.hatColor : (hc.shirt || 0x2f80c3);
       buildHeroHat(rig.parts.head, hatId, hatCol);
+      buildHeroHair(rig.parts.head, hc.hair || 'none', hatCol);
+      buildHeroAccessory(rig, hc.accessory || 'none', hatCol);
+      buildHeroBack(rig, hc.back || 'pack', hc.shirt);
       // 😎 окуляри для «крутого» обличчя
       if (f.glasses) {
         const gl = box(0.34, 0.07, 0.04, toonMat(0x1a1a1a)); gl.position.set(0, 0.07, -0.235); rig.parts.head.add(gl);
@@ -2522,7 +2637,7 @@ export function makeHero(skinId = 'classic', heroColors = null) {
   };
   const rig = (builders[skinId] || builders.classic)();
   // спільне для всіх скінів: рюкзачок (крім астронавта — у нього ранець) і пояс
-  if (skinId !== 'astro') {
+  if (skinId !== 'astro' && skinId !== 'custom') {
     const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
     const pack = box(0.34, 0.4, 0.16, packM);
     pack.position.set(0, 0.34, 0.3);

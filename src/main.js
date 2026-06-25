@@ -20,7 +20,10 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES, PETS, makeHero } from './characters.js';
+import {
+  HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
+  HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, setAnim, updateRig,
+} from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
@@ -58,7 +61,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 119;
+const APP_VERSION = 123;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -449,6 +452,10 @@ class Game {
         }
         if (!HERO_HATS[out.hero.hat]) out.hero.hat = DEFAULT_HERO.hat;
         if (!HERO_FACES[out.hero.face]) out.hero.face = DEFAULT_HERO.face;
+        if (!HERO_BODY_TYPES[out.hero.body]) out.hero.body = DEFAULT_HERO.body;
+        if (!HERO_HAIR[out.hero.hair]) out.hero.hair = DEFAULT_HERO.hair;
+        if (!HERO_ACCESSORIES[out.hero.accessory]) out.hero.accessory = DEFAULT_HERO.accessory;
+        if (!HERO_BACKS[out.hero.back]) out.hero.back = DEFAULT_HERO.back;
         if (!Array.isArray(out.dances) || !out.dances.length) out.dances = ['shuffle'];
         if (!Array.isArray(out.tracers) || !out.tracers.length) out.tracers = ['classic'];
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
@@ -832,6 +839,8 @@ class Game {
       <div class="ward-card ${equipped ? 'equipped' : ''} ${owned ? '' : 'locked'}" data-kind="${kind}" data-id="${id}">
         <div class="ward-ico">${meta.icon}</div>
         <div class="ward-name">${meta.name}</div>
+        ${meta.detail ? `<div class="ward-desc">${meta.detail}</div>` : ''}
+        ${meta.stat ? `<div class="ward-stat">${meta.stat}</div>` : ''}
         <div class="ward-tag">${equipped ? t('✅ Одягнено') : owned ? t('Натисни — обрати') : '🔒 ' + (meta.desc || '')}</div>
       </div>`;
     const tabs = [
@@ -858,7 +867,17 @@ class Game {
       const h = save.hero;
       const slotLabel = { skin: t('Шкіра'), shirt: t('Футболка'), pants: t('Штани'), shoes: t('Взуття'), hatColor: t('Колір шапки') };
       const hex6 = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
-      heroHtml += '<div class="hero-editor"><canvas id="hero-preview" class="hero-preview" width="260" height="300"></canvas><div class="hero-controls">';
+      const partGroup = (title, part, items) => {
+        let out = `<div class="hero-sub">${title}</div><div class="ward-grid hero-parts">`;
+        for (const [id, m] of Object.entries(items)) {
+          out += `<div class="ward-card hero-part-card ${h[part] === id ? 'equipped' : ''}" data-part="${part}" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
+        }
+        return out + '</div>';
+      };
+      heroHtml += '<div class="hero-editor"><div class="hero-stage"><canvas id="hero-preview" class="hero-preview" width="260" height="300"></canvas>';
+      heroHtml += `<div class="hero-preview-tools"><button class="hero-view-btn on" data-view="front">↻</button><button class="hero-view-btn" data-view="left">←</button><button class="hero-view-btn" data-view="right">→</button><input id="hero-zoom" type="range" min="3.4" max="5.4" step="0.1" value="4.7"></div>`;
+      heroHtml += `<div class="hero-preview-tools"><button class="hero-pose-btn on" data-pose="idle">${t('Стійка')}</button><button class="hero-pose-btn" data-pose="run">${t('Біг')}</button><button class="hero-pose-btn" data-pose="dance">${t('Танець')}</button></div></div><div class="hero-controls">`;
+      heroHtml += `<button id="hero-random" class="btn hero-random">🎲 ${t('Випадковий герой')}</button>`;
       for (const slot of ['skin', 'shirt', 'pants', 'shoes', 'hatColor']) {
         heroHtml += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
         for (const hexv of HERO_PALETTE[slot]) {
@@ -868,15 +887,13 @@ class Game {
         heroHtml += `<label class="hero-pick" title="${t('Будь-який колір')}" style="background:${hex6(h[slot])}">🎨<input type="color" data-slot="${slot}" value="${hex6(h[slot])}"></label>`;
         heroHtml += '</div>';
       }
-      heroHtml += t('<div class="hero-sub">🎩 Шапка</div><div class="ward-grid hero-parts">');
-      for (const [id, m] of Object.entries(HERO_HATS)) {
-        heroHtml += `<div class="ward-card hero-part-card ${h.hat === id ? 'equipped' : ''}" data-part="hat" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
-      }
-      heroHtml += t('</div><div class="hero-sub">😀 Обличчя</div><div class="ward-grid hero-parts">');
-      for (const [id, m] of Object.entries(HERO_FACES)) {
-        heroHtml += `<div class="ward-card hero-part-card ${h.face === id ? 'equipped' : ''}" data-part="face" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
-      }
-      heroHtml += '</div></div></div>';
+      heroHtml += partGroup(t('🧍 Тіло'), 'body', HERO_BODY_TYPES);
+      heroHtml += partGroup(t('🎩 Шапка'), 'hat', HERO_HATS);
+      heroHtml += partGroup(t('💇 Волосся'), 'hair', HERO_HAIR);
+      heroHtml += partGroup(t('😀 Обличчя'), 'face', HERO_FACES);
+      heroHtml += partGroup(t('⭐ Аксесуар'), 'accessory', HERO_ACCESSORIES);
+      heroHtml += partGroup(t('🎒 Спина'), 'back', HERO_BACKS);
+      heroHtml += '</div></div>';
     }
     let danceHtml = t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
@@ -885,7 +902,7 @@ class Game {
     danceHtml += '</div>';
     let gadgetHtml = t('<div class="ward-section">Гаджет — береш ОДИН із собою ({k})</div><div class="ward-grid">', { k: keyHint('кнопка 🦘', 'F') });
     for (const [id, meta] of Object.entries(GADGETS)) {
-      const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
+      const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)'), detail: meta.desc, stat: `⏳ ${meta.cd}с` };
       gadgetHtml += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
     }
     gadgetHtml += '</div>';
@@ -973,6 +990,30 @@ class Game {
         onHeroChange();
       });
     });
+    const pickRandom = (items) => Object.keys(items)[Math.floor(Math.random() * Object.keys(items).length)];
+    const heroRandom = root.querySelector('#hero-random');
+    if (heroRandom) heroRandom.addEventListener('click', () => {
+      save.hero.body = pickRandom(HERO_BODY_TYPES);
+      save.hero.hat = pickRandom(HERO_HATS);
+      save.hero.hair = pickRandom(HERO_HAIR);
+      save.hero.face = pickRandom(HERO_FACES);
+      save.hero.accessory = pickRandom(HERO_ACCESSORIES);
+      save.hero.back = pickRandom(HERO_BACKS);
+      for (const slot of ['skin', 'shirt', 'pants', 'shoes', 'hatColor']) {
+        save.hero[slot] = HERO_PALETTE[slot][Math.floor(Math.random() * HERO_PALETTE[slot].length)];
+      }
+      this.audio.purchase();
+      this.saveGame();
+      this.renderWardrobe();
+    });
+    root.querySelectorAll('.hero-view-btn').forEach((el) => {
+      el.addEventListener('click', () => this._setHeroPreviewView(el.dataset.view));
+    });
+    root.querySelectorAll('.hero-pose-btn').forEach((el) => {
+      el.addEventListener('click', () => this._setHeroPreviewPose(el.dataset.pose));
+    });
+    const zoom = root.querySelector('#hero-zoom');
+    if (zoom) zoom.addEventListener('input', () => this._setHeroPreviewZoom(parseFloat(zoom.value)));
     if (save.activeSkin === 'custom' && this._wardrobeTab === 'hero') this._startHeroPreview();
   }
 
@@ -981,23 +1022,57 @@ class Game {
     const cv = document.getElementById('hero-preview');
     if (!cv) return;
     this._stopHeroPreview();
-    const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    } catch {
+      cv.dataset.previewFallback = 'webgl';
+      return;
+    }
     renderer.setSize(cv.width, cv.height, false);
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2));
     const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(2, 4, 2); scene.add(dir);
     const cam = new THREE.PerspectiveCamera(32, cv.width / cv.height, 0.1, 50);
-    cam.position.set(0, 1.15, -4.7); cam.lookAt(0, 1.05, 0); // -Z = перед героя (дивиться у -Z)
+    const zoom = parseFloat(document.getElementById('hero-zoom')?.value || '4.7');
+    cam.position.set(0, 1.15, -zoom); cam.lookAt(0, 1.05, 0); // -Z = перед героя (дивиться у -Z)
     const rig = makeHero('custom', this.save.hero);
     scene.add(rig.group);
-    let raf = 0; const t0 = performance.now();
+    let raf = 0;
+    const hp = { renderer, scene, cam, rig, raf, view: 'front', pose: 'idle', zoom };
     const loop = () => {
-      rig.group.rotation.y = (performance.now() - t0) / 1400;
+      if (hp.pose === 'run') { hp.rig.anim.speed = 5.5; setAnim(hp.rig, 'run'); updateRig(hp.rig, 1 / 60); }
+      else if (hp.pose === 'dance') { hp.rig.anim.danceStyle = this.save.activeDance || 'shuffle'; setAnim(hp.rig, 'dance'); updateRig(hp.rig, 1 / 60); }
+      else { setAnim(hp.rig, 'idle'); updateRig(hp.rig, 1 / 60); }
       renderer.render(scene, cam);
-      raf = requestAnimationFrame(loop);
+      hp.raf = requestAnimationFrame(loop);
     };
     loop();
-    this._heroPrev = { renderer, scene, cam, rig, raf };
+    this._heroPrev = hp;
+  }
+
+  _setHeroPreviewView(view) {
+    document.querySelectorAll('.hero-view-btn').forEach((btn) => btn.classList.toggle('on', btn.dataset.view === (view || 'front')));
+    const hp = this._heroPrev;
+    if (!hp) return;
+    hp.view = view || 'front';
+    hp.rig.group.rotation.y = hp.view === 'left' ? -Math.PI / 2 : hp.view === 'right' ? Math.PI / 2 : 0;
+  }
+
+  _setHeroPreviewPose(pose) {
+    document.querySelectorAll('.hero-pose-btn').forEach((btn) => btn.classList.toggle('on', btn.dataset.pose === (pose || 'idle')));
+    const hp = this._heroPrev;
+    if (!hp) return;
+    hp.pose = pose || 'idle';
+    setAnim(hp.rig, hp.pose === 'dance' ? 'dance' : hp.pose === 'run' ? 'run' : 'idle');
+  }
+
+  _setHeroPreviewZoom(zoom) {
+    const hp = this._heroPrev;
+    if (!hp || !isFinite(zoom)) return;
+    hp.zoom = zoom;
+    hp.cam.position.z = -zoom;
+    hp.cam.lookAt(0, 1.05, 0);
   }
 
   // звільняємо унікальну per-instance гео/матеріали рига (запечене тіло — НЕ shared),
@@ -1020,6 +1095,8 @@ class Game {
     hp.scene.remove(hp.rig.group);
     this._freeRig(hp.rig.group); // не лишаємо запечену гео старого рига в пам'яті GPU
     hp.rig = makeHero('custom', this.save.hero);
+    this._setHeroPreviewView(hp.view);
+    this._setHeroPreviewPose(hp.pose);
     hp.scene.add(hp.rig.group);
   }
 
