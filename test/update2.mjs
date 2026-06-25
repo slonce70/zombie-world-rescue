@@ -76,6 +76,15 @@ const gotProjectile = await waitFor(async () => page.evaluate(() => {
   return g.level.effects.projectiles.length > 0;
 }), 30000, 'сніжка летить');
 check(gotProjectile, 'сніговик кинув сніжку');
+await page.evaluate(() => {
+  const g = window.__game;
+  const pr = g.level.effects.projectiles[0];
+  if (!pr) return;
+  const p = g.level.player.pos;
+  pr.mesh.position.set(p.x, p.y + 1.1, p.z - 1.2);
+  pr.v.set(0, 0, 12);
+  pr.life = 1;
+});
 await waitFor(async () => (await state()).player.health < hpBefore, 12000, 'влучання сніжки');
 s = await state();
 check(s.player.health < hpBefore, `сніжка влучила (HP ${hpBefore}→${Math.round(s.player.health)})`);
