@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 117;
+const APP_VERSION = 118;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -834,68 +834,101 @@ class Game {
         <div class="ward-name">${meta.name}</div>
         <div class="ward-tag">${equipped ? t('✅ Одягнено') : owned ? t('Натисни — обрати') : '🔒 ' + (meta.desc || '')}</div>
       </div>`;
-    let html = t('<div class="ward-section">Скіни героя</div><div class="ward-grid">');
+    const tabs = [
+      ['skins', t('Скіни')],
+      ['gadget', t('Гаджети')],
+      ['dance', t('Танці')],
+      ['pet', t('Улюбленці')],
+      ['tower', t('Башта')],
+      ['tracer', t('Кулі')],
+      ['hero', t('Герой')],
+    ];
+    if (!this._wardrobeTab) this._wardrobeTab = save.activeSkin === 'custom' ? 'hero' : 'skins';
+    if (!tabs.some(([id]) => id === this._wardrobeTab)) this._wardrobeTab = 'skins';
+    const pane = (id, body) => `<div class="ward-pane" data-tab="${id}" ${this._wardrobeTab === id ? '' : 'hidden'}>${body}</div>`;
+    let skinsHtml = t('<div class="ward-section">Скіни героя</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(HERO_SKINS)) {
-      html += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
+      skinsHtml += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
     }
-    html += '</div>';
+    skinsHtml += '</div>';
+    let heroHtml = t('<div class="ward-section">🎨 Створи свого героя</div><div class="ward-grid">');
+    heroHtml += card('custom', HERO_SKINS.custom, save.skins.includes('custom'), save.activeSkin === 'custom', 'skin');
+    heroHtml += '</div>';
     if (save.activeSkin === 'custom') {
       const h = save.hero;
       const slotLabel = { skin: t('Шкіра'), shirt: t('Футболка'), pants: t('Штани'), shoes: t('Взуття'), hatColor: t('Колір шапки') };
       const hex6 = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
-      html += t('<div class="ward-section">🎨 Створи свого героя</div>');
-      html += '<div class="hero-editor"><canvas id="hero-preview" class="hero-preview" width="260" height="300"></canvas><div class="hero-controls">';
+      heroHtml += '<div class="hero-editor"><canvas id="hero-preview" class="hero-preview" width="260" height="300"></canvas><div class="hero-controls">';
       for (const slot of ['skin', 'shirt', 'pants', 'shoes', 'hatColor']) {
-        html += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
+        heroHtml += `<div class="hero-swatch-row"><span class="hero-swatch-lbl">${slotLabel[slot]}</span>`;
         for (const hexv of HERO_PALETTE[slot]) {
           const on = h[slot] === hexv ? ' on' : '';
-          html += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hexv}" style="background:${hex6(hexv)}"></button>`;
+          heroHtml += `<button class="hero-swatch${on}" data-slot="${slot}" data-hex="${hexv}" style="background:${hex6(hexv)}"></button>`;
         }
-        html += `<label class="hero-pick" title="${t('Будь-який колір')}" style="background:${hex6(h[slot])}">🎨<input type="color" data-slot="${slot}" value="${hex6(h[slot])}"></label>`;
-        html += '</div>';
+        heroHtml += `<label class="hero-pick" title="${t('Будь-який колір')}" style="background:${hex6(h[slot])}">🎨<input type="color" data-slot="${slot}" value="${hex6(h[slot])}"></label>`;
+        heroHtml += '</div>';
       }
-      html += t('<div class="hero-sub">🎩 Шапка</div><div class="ward-grid hero-parts">');
+      heroHtml += t('<div class="hero-sub">🎩 Шапка</div><div class="ward-grid hero-parts">');
       for (const [id, m] of Object.entries(HERO_HATS)) {
-        html += `<div class="ward-card hero-part-card ${h.hat === id ? 'equipped' : ''}" data-part="hat" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
+        heroHtml += `<div class="ward-card hero-part-card ${h.hat === id ? 'equipped' : ''}" data-part="hat" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
       }
-      html += t('</div><div class="hero-sub">😀 Обличчя</div><div class="ward-grid hero-parts">');
+      heroHtml += t('</div><div class="hero-sub">😀 Обличчя</div><div class="ward-grid hero-parts">');
       for (const [id, m] of Object.entries(HERO_FACES)) {
-        html += `<div class="ward-card hero-part-card ${h.face === id ? 'equipped' : ''}" data-part="face" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
+        heroHtml += `<div class="ward-card hero-part-card ${h.face === id ? 'equipped' : ''}" data-part="face" data-id="${id}"><div class="ward-ico">${m.icon}</div><div class="ward-name">${m.name}</div></div>`;
       }
-      html += '</div></div></div>';
+      heroHtml += '</div></div></div>';
     }
-    html += t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
+    let danceHtml = t('<div class="ward-section">Танці (N)</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(DANCES)) {
-      html += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
+      danceHtml += card(id, meta, save.dances.includes(id), save.activeDance === id, 'dance');
     }
-    html += t('</div><div class="ward-section">Гаджет — береш ОДИН із собою ({k})</div><div class="ward-grid">', { k: keyHint('кнопка 🦘', 'F') });
+    danceHtml += '</div>';
+    let gadgetHtml = t('<div class="ward-section">Гаджет — береш ОДИН із собою ({k})</div><div class="ward-grid">', { k: keyHint('кнопка 🦘', 'F') });
     for (const [id, meta] of Object.entries(GADGETS)) {
       const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
-      html += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
+      gadgetHtml += card(id, meta2, save.gadgetsOwned.includes(id), save.activeGadget === id, 'gadget');
     }
-    html += t('</div><div class="ward-section">🐾 Улюбленець — біжить поряд</div><div class="ward-grid">');
+    gadgetHtml += '</div>';
+    let petHtml = t('<div class="ward-section">🐾 Улюбленець — біжить поряд</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(PETS)) {
       const meta2 = { icon: meta.icon, name: meta.name, desc: meta.desc + t(' (купи в магазині)') };
-      html += card(id, meta2, save.pets.includes(id), save.activePet === id, 'pet');
+      petHtml += card(id, meta2, save.pets.includes(id), save.activePet === id, 'pet');
     }
-    html += t('</div><div class="ward-section">🗼 Скін башти (гаджет)</div><div class="ward-grid">');
+    petHtml += '</div>';
+    let towerHtml = t('<div class="ward-section">🗼 Скін башти (гаджет)</div><div class="ward-grid">');
     const towerOwned = (id) => id === 'default' || (id === 'stone' && !!(save.liberated && save.liberated.FRA)) || save.towerSkins.includes(id);
     for (const [id, meta] of Object.entries(TOWER_SKINS)) {
       const meta2 = { icon: meta.icon, name: meta.name, desc: id === 'stone' ? t('Звільни Францію 🇫🇷') : id === 'gold' ? t('Купи в магазині') : t('Базова') };
-      html += card(id, meta2, towerOwned(id), save.activeTowerSkin === id, 'tower');
+      towerHtml += card(id, meta2, towerOwned(id), save.activeTowerSkin === id, 'tower');
     }
-    html += t('</div><div class="ward-section">Сліди куль</div><div class="ward-grid">');
+    towerHtml += '</div>';
+    let tracerHtml = t('<div class="ward-section">Сліди куль</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TRACERS)) {
-      html += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
+      tracerHtml += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
     }
-    html += '</div>';
+    tracerHtml += '</div>';
+    let html = `<div class="ward-tabs">${tabs.map(([id, label]) => `<button class="shop-tab ward-tab ${this._wardrobeTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
+    html += pane('skins', skinsHtml) + pane('gadget', gadgetHtml) + pane('dance', danceHtml) + pane('pet', petHtml) + pane('tower', towerHtml) + pane('tracer', tracerHtml) + pane('hero', heroHtml);
     const root = document.getElementById('wardrobe-content');
     this._stopHeroPreview(); // прибрати старий рендер перед перемальовкою
     root.innerHTML = html;
+    root.querySelectorAll('.ward-tab').forEach((el) => {
+      el.addEventListener('click', () => {
+        this._wardrobeTab = el.dataset.tab;
+        this.audio.click();
+        root.querySelectorAll('.ward-tab').forEach((btn) => btn.classList.toggle('on', btn === el));
+        root.querySelectorAll('.ward-pane').forEach((p) => { p.hidden = p.dataset.tab !== this._wardrobeTab; });
+        if (this._wardrobeTab === 'hero' && save.activeSkin === 'custom') this._startHeroPreview();
+        else this._stopHeroPreview();
+      });
+    });
     root.querySelectorAll('.ward-card:not(.locked):not(.hero-part-card)').forEach((el) => {
       el.addEventListener('click', () => {
         const { kind, id } = el.dataset;
-        if (kind === 'skin') save.activeSkin = id;
+        if (kind === 'skin') {
+          save.activeSkin = id;
+          this._wardrobeTab = id === 'custom' ? 'hero' : 'skins';
+        }
         else if (kind === 'dance') save.activeDance = id;
         else if (kind === 'gadget') save.activeGadget = id;
         else if (kind === 'pet') { save.activePet = id; this.spawnPet(); }
@@ -940,7 +973,7 @@ class Game {
         onHeroChange();
       });
     });
-    if (save.activeSkin === 'custom') this._startHeroPreview();
+    if (save.activeSkin === 'custom' && this._wardrobeTab === 'hero') this._startHeroPreview();
   }
 
   // ---------- живий 3D-перегляд кастом-героя в гардеробі ----------

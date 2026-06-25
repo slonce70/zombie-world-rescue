@@ -711,6 +711,7 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .quest-prog { color: #9fb8d4; font-weight: 700; font-size: 13px; margin-top: 4px; }
 
 /* гардероб */
+.ward-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
 .ward-section { color: var(--accent); font-weight: 900; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; margin: 14px 0 8px; border-bottom: 1px solid var(--ui-border); padding-bottom: 4px; }
 .ward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .ward-card {
