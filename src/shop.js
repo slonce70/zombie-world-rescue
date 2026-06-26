@@ -11,6 +11,7 @@ export const SHOP_ITEMS = [
   { id: 'coins500', icon: '💰', name: t('500 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 10, coinBundle: 500, max: Infinity, cat: t('Ресурси') },
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
+  { id: 'passxp25', icon: '⭐', name: t('25 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 10, passXp: 25, max: Infinity, cat: t('Ресурси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -258,6 +259,10 @@ export class Shop {
       case 'coins5100':
         save.coins += item.coinBundle;
         game.hud.toast(t('💰 +{n} монет', { n: item.coinBundle }));
+        break;
+      case 'passxp25':
+        game.progress.addXp(item.passXp);
+        game.hud.toast(t('⭐ +{n} XP Зоряного шляху', { n: item.passXp }));
         break;
       case 'smg':
       case 'magnum':
