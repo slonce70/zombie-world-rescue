@@ -14,6 +14,7 @@ export const SHOP_ITEMS = [
   { id: 'passxp25', icon: '⭐', name: t('25 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 10, passXp: 25, max: Infinity, cat: t('Ресурси') },
   { id: 'starterpack', icon: '🎒', name: t('Стартовий набір'), desc: t('+2 гранати, +1 ракета для базуки, +30 патронів'), price: 500, crystalPrice: 10, max: Infinity, cat: t('Набори') },
   { id: 'propack', icon: '🏆', name: t('Профі набір'), desc: t('Золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'), price: 3500, crystalPrice: 35, max: Infinity, cat: t('Набори') },
+  { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -271,6 +272,14 @@ export class Shop {
         player.addAmmo(90);
         game.progress.addXp(250);
         game.hud.toast(t('🏆 Профі набір: золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'));
+        break;
+      case 'militarypack':
+        if (!save.skins.includes('military')) save.skins.push('military');
+        save.activeSkin = 'military';
+        player.grenades += 5;
+        player.addRockets(5);
+        player.addAmmo(120);
+        game.hud.toast(t('🪖 Військовий набір: військовий скін, +5 гранат, +5 ракет, +120 патронів'));
         break;
       case 'coins500':
       case 'coins1000':
