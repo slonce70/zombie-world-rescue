@@ -12,6 +12,7 @@ export const SHOP_ITEMS = [
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   { id: 'passxp25', icon: '⭐', name: t('25 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 10, passXp: 25, max: Infinity, cat: t('Ресурси') },
+  { id: 'starterpack', icon: '🎒', name: t('Стартовий набір'), desc: t('+2 гранати, +1 ракета для базуки, +30 патронів'), price: 500, crystalPrice: 10, max: Infinity, cat: t('Набори') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -148,16 +149,17 @@ export class Shop {
       const locked = item.needsBazooka && !hasBazooka;
       const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
       const price = this.priceOf(item);
-      const afford = item.crystalPrice ? (save.crystals || 0) >= item.crystalPrice : save.coins >= price;
+      const afford = save.coins >= price && (!item.crystalPrice || (save.crystals || 0) >= item.crystalPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
       const priceLabel = (locked || lockedGadget) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin ? t('Є!') : t('МАКС'))
+        : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.crystalPrice ? `${item.crystalPrice} 💎` : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !maxed && !locked && !lockedGadget;
+      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
@@ -218,7 +220,7 @@ export class Shop {
       return;
     }
     if (item.crystalPrice) save.crystals -= item.crystalPrice;
-    else save.coins -= price;
+    if (price) save.coins -= price;
     if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin) save.upgrades[id] = count + 1;
     if (item.skin) {
       if (!save.skins.includes(item.skin)) save.skins.push(item.skin);
@@ -254,6 +256,12 @@ export class Shop {
       case 'grenade': player.grenades++; break;
       case 'rocket': player.addRockets(1); break;
       case 'armorplate': player.addArmor(40); break;
+      case 'starterpack':
+        player.grenades += 2;
+        player.addRockets(1);
+        player.addAmmo(30);
+        game.hud.toast(t('🎒 Стартовий набір: +2 гранати, +1 ракета, +30 патронів'));
+        break;
       case 'coins500':
       case 'coins1000':
       case 'coins5100':
