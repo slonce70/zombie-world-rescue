@@ -81,6 +81,7 @@ export const EN = {
 "</div><div class=\"ward-section\">Сліди куль</div><div class=\"ward-grid\">": "</div><div class=\"ward-section\">Bullet tracers</div><div class=\"ward-grid\">",
 "⛈️🤝 У коопі Шторм запускається з лобі кімнати — обери режим «Шторм»!": "⛈️🤝 In co-op, Storm starts from the room lobby — pick the \"Storm\" mode!",
 "⛈️ Шторм відкриється після звільнення першої країни!": "⛈️ Storm unlocks after you free your first country!",
+"У Штормі магазину немає": "There is no shop in Storm",
 "👑🤝 У коопі Арена запускається з лобі кімнати — обери режим «Арена»!": "👑🤝 In co-op, Arena starts from the room lobby — pick the \"Arena\" mode!",
 "👑 Арена босів відкриється після звільнення 2 країн!": "👑 Boss Arena unlocks after freeing 2 countries!",
 "🔄 Вийшло оновлення v{v}! Онови сторінку: Ctrl(⌘)+Shift+R": "🔄 Update v{v} is out! Refresh the page: Ctrl(⌘)+Shift+R",

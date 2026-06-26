@@ -1,5 +1,5 @@
 // 🏆 Тести оновлення 9 «Ліга Шторму»: турель, щит-50, кооп-шторм передумови,
-// нагороди, пасс-30, арена босів, штормовий магазин (блоки додаються по ходу)
+// нагороди, пасс-30, арена босів (блоки додаються по ходу)
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 
@@ -177,19 +177,6 @@ await page.evaluate(() => {
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: 40000 });
 await warmUp();
-// 🛒 штормові ціни ростуть із хвилями
-const surge = await page.evaluate(() => {
-  const g = window.__game;
-  const medkit = g.shop.priceOf({ id: 'medkit', price: 50, cat: 'Припаси' });
-  g.level.storm.wave = 5;
-  const medkitW5 = g.shop.priceOf({ id: 'medkit', price: 50, cat: 'Припаси' });
-  const gadget = g.shop.priceOf({ id: 'fake_gadget', price: 450, cat: 'Гаджети й друзі' });
-  g.level.storm.wave = 1;
-  return { medkit, medkitW5, gadget };
-});
-check(surge.medkit === 50 && surge.medkitW5 === Math.ceil(50 * 1.48), `аптечка дорожчає: 50₴ → ${surge.medkitW5}₴ на хвилі 5`);
-check(surge.gadget === 450, 'гаджети НЕ дорожчають (лише припаси)');
-
 const milestones = await page.evaluate(() => {
   const g = window.__game;
   g.level.storm.wave = 12; // ніби дожили до 12-ї

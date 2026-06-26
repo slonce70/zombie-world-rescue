@@ -82,6 +82,13 @@ export class Shop {
 
   open() {
     if (!this.game.level) return;
+    if (this.game.level.storm) {
+      this.isOpen = false;
+      this.el.classList.remove('show');
+      this.game.audio.denied();
+      this.game.hud.toast(t('У Штормі магазину немає'));
+      return;
+    }
     this.isOpen = true;
     this.el.classList.add('show');
     this.game.input.exitLock();
@@ -101,12 +108,7 @@ export class Shop {
     else this.open();
   }
 
-  // ⛈️ у Штормі припаси дорожчають: +12% за кожну відбиту хвилю
   priceOf(item) {
-    const level = this.game.level;
-    if (level && level.storm && item.cat === t('Припаси')) {
-      return Math.ceil(item.price * (1 + 0.12 * Math.max(0, level.storm.wave - 1)));
-    }
     return item.price;
   }
 
@@ -191,6 +193,11 @@ export class Shop {
 
   buy(id) {
     const game = this.game;
+    if (game.level && game.level.storm) {
+      game.audio.denied();
+      game.hud.toast(t('У Штормі магазину немає'));
+      return;
+    }
     const save = game.save;
     const item = SHOP_ITEMS.find((i) => i.id === id);
     const player = game.level && game.level.player;
