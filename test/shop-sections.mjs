@@ -30,8 +30,9 @@ const shop = await page.evaluate(() => {
   const skins = clickTab('Скіни') || [];
   const resources = clickTab('Ресурси') || [];
   const supplies = clickTab('Припаси') || [];
+  const allItems = [...new Set(tabs.flatMap((tab) => clickTab(tab) || []))];
   g.shop.close();
-  return { tabs, hyper, skins, resources, supplies };
+  return { tabs, hyper, skins, resources, supplies, allItems };
 });
 
 check(shop.tabs.includes('Гіперзаряди'), `є вкладка «Гіперзаряди»: ${shop.tabs.join(', ')}`);
@@ -45,6 +46,10 @@ check(shop.resources.includes('coins500') && shop.resources.includes('coins1000'
   `ресурси окремо від припасів: ${shop.resources.join(', ')}`);
 check(!shop.supplies.includes('coins1000'),
   `1000 монет не у припасах: ${shop.supplies.join(', ')}`);
+check(!shop.supplies.includes('medkit') && !shop.supplies.includes('ammo'),
+  `аптечки й патрони не у припасах: ${shop.supplies.join(', ')}`);
+check(!shop.allItems.includes('medkit') && !shop.allItems.includes('ammo'),
+  `аптечки й патрони не рендеряться в магазині: ${shop.allItems.join(', ')}`);
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

@@ -134,10 +134,8 @@ console.log('▸ Магазин: повний цикл покупок');
 await page.evaluate(() => window.__game.test.giveCoins(3000));
 await page.keyboard.press('KeyB');
 await page.waitForTimeout(500);
-for (const id of ['medkit', 'speed', 'damage', 'ammo']) {
+for (const id of ['grenade', 'speed', 'damage']) {
   const before = await page.evaluate(() => window.__game.save.coins);
-  // medkit при повному HP не продається — спершу пошкодимось
-  if (id === 'medkit') await page.evaluate(() => { window.__game.level.player.health = 40; });
   // вкладки: шукаємо товар по всіх категоріях
   await page.evaluate((itemId) => {
     const tabs = [...document.querySelectorAll('.shop-tab')];
@@ -155,11 +153,11 @@ for (const id of ['medkit', 'speed', 'damage', 'ammo']) {
 const sm = await page.evaluate(() => ({
   speed: window.__game.level.player.speedMult,
   dmg: window.__game.level.player.damageMult,
-  hp: window.__game.level.player.health,
+  grenades: window.__game.level.player.grenades,
 }));
 check(sm.speed > 1, `швидкість застосована: ${sm.speed}`);
 check(sm.dmg > 1, `шкода застосована: ${sm.dmg}`);
-check(sm.hp > 40, `аптечка вилікувала: ${sm.hp}`);
+check(sm.grenades > 0, `граната додана: ${sm.grenades}`);
 await page.keyboard.press('KeyB');
 
 // === 6. Звук: ensure + кілька ефектів без помилок ===

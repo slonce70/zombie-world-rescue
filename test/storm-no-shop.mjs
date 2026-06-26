@@ -43,7 +43,7 @@ const stormShop = await page.evaluate(() => {
     shown: document.getElementById('shop').classList.contains('show'),
     coins: g.save.coins,
   };
-  g.test.shopBuy('medkit');
+  g.test.shopBuy('grenade');
   return {
     afterOpen,
     afterToggle,

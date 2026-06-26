@@ -5,8 +5,6 @@ import { t, keyHint } from './i18n.js';
 
 export const SHOP_ITEMS = [
   // --- припаси ---
-  { id: 'medkit', icon: '🩹', name: t('Аптечка'), desc: t('+50 здоров’я зараз'), price: 50, max: Infinity, cat: t('Припаси') },
-  { id: 'ammo', icon: '🔋', name: t('Патрони'), desc: t('Набої для всієї зброї'), price: 40, max: Infinity, cat: t('Припаси') },
   { id: 'grenade', icon: '💣', name: t('Граната'), desc: () => t('+1 граната ({k})', { k: keyHint('кнопка 💣', 'G — кинути') }), price: 35, max: Infinity, cat: t('Припаси') },
   { id: 'rocket', icon: '🧨', name: t('Ракета'), desc: t('+1 ракета для базуки'), price: 60, max: Infinity, cat: t('Припаси'), needsBazooka: true },
   { id: 'armorplate', icon: '🛡️', name: t('Бронепластина'), desc: t('+40 броні зараз'), price: 80, max: Infinity, cat: t('Припаси') },
@@ -211,12 +209,6 @@ export class Shop {
       game.audio.denied();
       return;
     }
-    // аптечка при повному HP — не продаємо
-    if (id === 'medkit' && player.health >= player.maxHealth) {
-      game.audio.denied();
-      game.hud.toast(t('Здоров’я і так повне! 💪'));
-      return;
-    }
     // бронепластина при повній броні — теж ні
     if (id === 'armorplate' && player.armor >= player.maxArmor) {
       game.audio.denied();
@@ -249,7 +241,6 @@ export class Shop {
       game.hud.toast(t('{i} {n} активовано назавжди!', { i: item.icon, n: item.name }));
     }
     switch (id) {
-      case 'medkit': player.heal(50); break;
       case 'maxhp':
         player.maxHealth += 25;
         player.health += 25;
@@ -258,7 +249,6 @@ export class Shop {
         player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1);
         break;
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
-      case 'ammo': player.addAmmo(90); break;
       case 'grenade': player.grenades++; break;
       case 'rocket': player.addRockets(1); break;
       case 'armorplate': player.addArmor(40); break;
