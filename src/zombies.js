@@ -655,17 +655,19 @@ export class Zombies {
       for (let i = 0; i < n; i++) {
         level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
       }
-      if (this.boss) {
-        // під час бою з босом міньйони гарантовано дають патрони
-        level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
-      } else if (this.rng.chance(0.07)) level.effects.spawnPickup(z.x + 1, z.z, 'medkit');
-      else if (this.rng.chance(0.13)) level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
-      else if (this.rng.chance(0.02)) {
-        // рідкісний сюрприз: тимчасове підсилення
-        level.effects.spawnPickup(z.x + 1, z.z, this.rng.pick(['speed', 'rage', 'bubble', 'magnet']));
+      if (!level.knockout) {
+        if (this.boss) {
+          // під час бою з босом міньйони гарантовано дають патрони
+          level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
+        } else if (this.rng.chance(0.07)) level.effects.spawnPickup(z.x + 1, z.z, 'medkit');
+        else if (this.rng.chance(0.13)) level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
+        else if (this.rng.chance(0.02)) {
+          // рідкісний сюрприз: тимчасове підсилення
+          level.effects.spawnPickup(z.x + 1, z.z, this.rng.pick(['speed', 'rage', 'bubble', 'magnet']));
+        }
+        // 🪬 шаман на остаточній смерті: 15% лишає тотем безсмертя
+        if (z.type === 'shaman' && this.rng.chance(0.15)) level.effects.spawnPickup(z.x, z.z, 'totem');
       }
-      // 🪬 шаман на остаточній смерті: 15% лишає тотем безсмертя
-      if (z.type === 'shaman' && this.rng.chance(0.15)) level.effects.spawnPickup(z.x, z.z, 'totem');
     }
     // 🤖💥 зомбі-робот: при смерті ВИБУХАЄ й б'є гравців по площі (радіус 6м, 157 шкоди)
     if (z.type === 'robot') {

@@ -78,6 +78,22 @@ const buffs = await page.evaluate(() => {
 });
 check(Object.values(buffs).every((n) => n === 0), 'бафи в Нокауті не застосовуються', JSON.stringify(buffs));
 
+const dropTypes = await page.evaluate(() => {
+  const g = window.__game;
+  const oldRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    for (const z of [...g.level.zombies.list]) {
+      if (z.knockout && z.state !== 'dead') z.damage(99999, null, false);
+    }
+  } finally {
+    Math.random = oldRandom;
+  }
+  return [...new Set(g.level.effects.coins.map((c) => c.type))].sort();
+});
+check(dropTypes.every((t) => t === 'coin'),
+  'з Нокаут-зомбі падають тільки монети, без гранат, аптечок, набоїв і бафів', JSON.stringify(dropTypes));
+
 console.log('▸ Перемога дає 12% шанс на посох');
 const rewardStaff = await page.evaluate(() => {
   const g = window.__game;
