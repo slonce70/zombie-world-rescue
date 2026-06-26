@@ -789,6 +789,9 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 /* 📣 тач-кнопка командних пінгів: показуємо ЛИШЕ у кооп-рівні (клас .avail з hud.js) */
 #tb-ping { display: none; }
 #tb-ping.avail { display: block; }
+#tb-shop { display: none; }
+body.touch-mode.in-level:not(.storm-mode) #tb-shop { display: block; }
+body.storm-mode .shop-key-hint { display: none; }
 /* ✋ кнопка взаємодії: коли поряд є об'єкт (вежа/мегабокс/самокат/барикада) — пульсуюча жовта рамка.
    #tb-interact завжди видима, тож НЕ чіпаємо display — лише підсвітка. */
 #tb-interact.avail {

@@ -237,6 +237,7 @@ export const EN = {
 "Аптечка": "Medkit",
 "+50 здоров’я зараз": "+50 health now",
 "Припаси": "Supplies",
+"Ресурси": "Resources",
 "Патрони": "Ammo",
 "Набої для всієї зброї": "Bullets for every weapon",
 "Граната": "Grenade",

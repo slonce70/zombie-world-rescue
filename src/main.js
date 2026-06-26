@@ -61,7 +61,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 126;
+const APP_VERSION = 127;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -683,6 +683,7 @@ class Game {
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
+    if (show) document.body.classList.remove('storm-mode');
     // ховаємо тултип країни при виході з глобуса, щоб «звільнено…» не лишався над рівнем
     if (!show) { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; }
     if (show) {
@@ -1250,6 +1251,7 @@ class Game {
   async _buildLevel(countryId, opts = {}) {
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
     const isStorm = !!opts.storm;
+    document.body.classList.toggle('storm-mode', isStorm);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
