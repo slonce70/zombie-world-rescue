@@ -526,6 +526,7 @@ export const EN = {
 "Військовий": "Military",
 "Купи в магазині за кристали": "Buy in the shop for crystals",
 "Чарівник": "Wizard",
+"Качок": "Muscle Hero",
 "Нічний мисливець": "Night Hunter",
 "Шторм, хвиля 12": "Storm, wave 12",
 "Громовідвід": "Lightning Rod",

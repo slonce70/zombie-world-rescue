@@ -2248,6 +2248,7 @@ export const HERO_SKINS = {
   super: { name: t('Супергерой'), icon: '🦸', desc: t('Плащ майорить! (з Мегабокса)') },
   military: { name: t('Військовий'), icon: '🪖', desc: t('Купи в магазині за кристали') },
   wizard: { name: t('Чарівник'), icon: '🧙', desc: t('Купи в магазині за кристали') },
+  muscle: { name: t('Качок'), icon: '💪', desc: t('Купи в магазині за кристали') },
   hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
   thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
@@ -2608,6 +2609,28 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       const wandStar = sphere(0.045, goldM, 6, 5);
       wandStar.position.set(0.0, -0.56, -0.02);
       rig.parts.armR.add(wand, wandStar);
+      return rig;
+    },
+    muscle() {
+      const rig = makeHumanoid({
+        scale: 1.04, skin: 0xffc08f, shirt: 0xe9f2ff, pants: 0x2356a3, shoes: 0x20242e,
+        armR: 0.095, armL: 0.095, legR: 0.095, legL: 0.095, belly: 1.08,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.1, cast: 'all',
+      });
+      const blueM = toonMat(0x2356a3);
+      const goldM = toonMat(0xffd23f, 0xd19918, 0.45);
+      const chest = box(0.32, 0.18, 0.04, blueM);
+      chest.position.set(0, 0.38, -0.27);
+      rig.parts.torso.add(chest);
+      const medal = sphere(0.07, goldM, 8, 6);
+      medal.position.set(0, 0.34, -0.3);
+      rig.parts.torso.add(medal);
+      for (const side of [-1, 1]) {
+        const band = cylinder(0.1, 0.1, 0.055, blueM, 10);
+        band.position.y = -0.32;
+        rig.parts[side < 0 ? 'armL' : 'armR'].add(band);
+      }
       return rig;
     },
     // 🛡️ Лицар: сталеві лати, шолом із плюмажем, золотий хрест — за зірковий шлях 30

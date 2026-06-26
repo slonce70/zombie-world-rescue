@@ -41,6 +41,7 @@ const buy = await page.evaluate(async () => {
   const item = SHOP_ITEMS.find((i) => i.id === 'frogskin');
   const military = SHOP_ITEMS.find((i) => i.id === 'militaryskin');
   const wizard = SHOP_ITEMS.find((i) => i.id === 'wizardskin');
+  const muscle = SHOP_ITEMS.find((i) => i.id === 'muscleskin');
   g.save.crystals = 14;
   const coins0 = g.save.coins;
   g.test.shopBuy('frogskin');
@@ -63,15 +64,27 @@ const buy = await page.evaluate(async () => {
   const wizardBought = { crystals: g.save.crystals, owned: g.save.skins.includes('wizard'), active: g.save.activeSkin };
   let wizardBuilt = false;
   try { wizardBuilt = !!makeHero('wizard', g.save.hero).group; } catch (e) { wizardBuilt = false; }
+  g.save.crystals = 19;
+  g.test.shopBuy('muscleskin');
+  const muscleDenied = { crystals: g.save.crystals, owned: g.save.skins.includes('muscle') };
+  g.save.crystals = 20;
+  g.test.shopBuy('muscleskin');
+  const muscleBought = { crystals: g.save.crystals, owned: g.save.skins.includes('muscle'), active: g.save.activeSkin };
+  let muscleBuilt = false;
+  try { muscleBuilt = makeHero('muscle', g.save.hero).heroSkin === 'muscle'; } catch (e) { muscleBuilt = false; }
   return {
     item: item && { crystalPrice: item.crystalPrice, skin: item.skin, max: item.max },
     military: HERO_SKINS.military && military && { name: HERO_SKINS.military.name, crystalPrice: military.crystalPrice, skin: military.skin, max: military.max },
     wizard: HERO_SKINS.wizard && wizard && { name: HERO_SKINS.wizard.name, crystalPrice: wizard.crystalPrice, skin: wizard.skin, max: wizard.max },
+    muscle: HERO_SKINS.muscle && muscle && { name: HERO_SKINS.muscle.name, crystalPrice: muscle.crystalPrice, skin: muscle.skin, max: muscle.max },
     militaryBought,
     militaryBuilt,
     wizardDenied,
     wizardBought,
     wizardBuilt,
+    muscleDenied,
+    muscleBought,
+    muscleBuilt,
     coins0,
     denied,
     bought,
@@ -84,6 +97,8 @@ check(buy.military && buy.military.crystalPrice === 15 && buy.military.skin === 
   'військовий скін є в магазині за 15 кристалів', JSON.stringify(buy.military));
 check(buy.wizard && buy.wizard.crystalPrice === 25 && buy.wizard.skin === 'wizard' && buy.wizard.max === 1,
   'скін Чарівник є в магазині за 25 кристалів', JSON.stringify(buy.wizard));
+check(buy.muscle && buy.muscle.crystalPrice === 20 && buy.muscle.skin === 'muscle' && buy.muscle.max === 1,
+  'скін Качок є в магазині за 20 кристалів', JSON.stringify(buy.muscle));
 check(buy.denied.crystals === 14 && !buy.denied.owned, '14 кристалів недостатньо для покупки', JSON.stringify(buy.denied));
 check(buy.bought.crystals === 0 && buy.bought.coins === buy.coins0 && buy.bought.owned && buy.bought.active === 'frog',
   '15 кристалів купують скін без списання монет і одягають його', JSON.stringify(buy.bought));
@@ -96,6 +111,11 @@ check(buy.wizardDenied.crystals === 24 && !buy.wizardDenied.owned,
 check(buy.wizardBought.crystals === 0 && buy.wizardBought.owned && buy.wizardBought.active === 'wizard',
   '25 кристалів купують Чарівника і одягають його', JSON.stringify(buy.wizardBought));
 check(buy.wizardBuilt, 'makeHero("wizard") будується без помилок');
+check(buy.muscleDenied.crystals === 19 && !buy.muscleDenied.owned,
+  '19 кристалів недостатньо для Качка', JSON.stringify(buy.muscleDenied));
+check(buy.muscleBought.crystals === 0 && buy.muscleBought.owned && buy.muscleBought.active === 'muscle',
+  '20 кристалів купують Качка і одягають його', JSON.stringify(buy.muscleBought));
+check(buy.muscleBuilt, 'makeHero("muscle") використовує окремий builder Качка');
 
 console.log('▸ Обмін кристалів на монети');
 const exchange = await page.evaluate(async () => {
