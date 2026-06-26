@@ -29,8 +29,9 @@ const shop = await page.evaluate(() => {
   const hyper = clickTab('Гіперзаряди') || [];
   const skins = clickTab('Скіни') || [];
   const resources = clickTab('Ресурси') || [];
+  const supplies = clickTab('Припаси') || [];
   g.shop.close();
-  return { tabs, hyper, skins, resources };
+  return { tabs, hyper, skins, resources, supplies };
 });
 
 check(shop.tabs.includes('Гіперзаряди'), `є вкладка «Гіперзаряди»: ${shop.tabs.join(', ')}`);
@@ -40,8 +41,10 @@ check(shop.hyper.includes('turret-hyper') && shop.hyper.includes('stunammo-hyper
   `гіперзаряди окремо від гаджетів: ${shop.hyper.join(', ')}`);
 check(shop.skins.includes('goldskin') && shop.skins.includes('militaryskin') && !shop.skins.includes('vest'),
   `скіни окремо від спорядження: ${shop.skins.join(', ')}`);
-check(shop.resources.includes('coins500') && !shop.resources.includes('medkit'),
+check(shop.resources.includes('coins500') && shop.resources.includes('coins1000') && !shop.resources.includes('medkit'),
   `ресурси окремо від припасів: ${shop.resources.join(', ')}`);
+check(!shop.supplies.includes('coins1000'),
+  `1000 монет не у припасах: ${shop.supplies.join(', ')}`);
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
