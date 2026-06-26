@@ -4,7 +4,7 @@ import { t, keyHint, interactKey, translateHtml, getLang, setLang, LANGS, LANG_N
 import { Input } from './input.js';
 import { AudioMan } from './audio.js';
 import { World } from './world.js';
-import { Player } from './player.js';
+import { Player, WEAPONS, WEAPON_SLOTS } from './player.js';
 import { Zombies } from './zombies.js';
 import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js';
 import { Effects } from './effects.js';
@@ -62,7 +62,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 135;
+const APP_VERSION = 136;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -390,6 +390,7 @@ class Game {
   _newSave() {
     return {
       coins: NEW_SAVE_COINS, crystals: 0, upgrades: {}, liberated: {}, weapons: [], records: {},
+      weaponLoadout: ['pistol'],
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
@@ -478,6 +479,7 @@ class Game {
         out.diffStar = Math.round(out.diffStar);
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
+        if (!Array.isArray(out.weaponLoadout)) out.weaponLoadout = null;
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
         if (!out.records || typeof out.records !== 'object') out.records = {};
         if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
@@ -510,6 +512,51 @@ class Game {
       }
     }
     if (this.cloud) this.cloud.schedulePush();
+  }
+
+  _ownedWeapons() {
+    return new Set(['pistol', ...(this.save.weapons || []).filter((id) => WEAPONS[id])]);
+  }
+
+  _weaponLoadout() {
+    const owned = this._ownedWeapons();
+    const hasLoadout = Array.isArray(this.save.weaponLoadout);
+    const raw = hasLoadout ? this.save.weaponLoadout : [...owned];
+    const out = ['pistol'];
+    for (const id of raw) {
+      if (id !== 'pistol' && owned.has(id) && !out.includes(id) && out.length < 7) out.push(id);
+    }
+    if (!hasLoadout) {
+      for (const id of WEAPON_SLOTS) {
+        if (owned.has(id) && !out.includes(id) && out.length < Math.min(7, owned.size)) out.push(id);
+      }
+    }
+    this.save.weaponLoadout = out;
+    return out;
+  }
+
+  _toggleLoadoutWeapon(id) {
+    const owned = this._ownedWeapons();
+    if (!owned.has(id)) return;
+    const loadout = this._weaponLoadout();
+    if (id === 'pistol') {
+      this.audio.denied();
+      this.hud.toast(t('Пістолет завжди з тобою'));
+      return;
+    }
+    const idx = loadout.indexOf(id);
+    if (idx >= 0) loadout.splice(idx, 1);
+    else if (loadout.length >= 7) {
+      this.audio.denied();
+      this.hud.toast(t('Можна взяти максимум 7 зброй'));
+      return;
+    } else {
+      loadout.push(id);
+    }
+    this.save.weaponLoadout = loadout;
+    this.saveGame();
+    this.audio.purchase();
+    this.renderWardrobe();
   }
 
   _adaptiveResolutionEnabled() {
@@ -860,6 +907,7 @@ class Game {
       </div>`;
     const tabs = [
       ['skins', t('Скіни')],
+      ['weapon', t('Зброя')],
       ['gadget', t('Гаджети')],
       ['dance', t('Танці')],
       ['pet', t('Улюбленці')],
@@ -875,6 +923,22 @@ class Game {
       skinsHtml += card(id, meta, save.skins.includes(id), save.activeSkin === id, 'skin');
     }
     skinsHtml += '</div>';
+    const loadout = this._weaponLoadout();
+    const ownedWeapons = this._ownedWeapons();
+    let weaponHtml = t('<div class="ward-section">Зброя — максимум 7 із 10</div><div class="ward-grid">');
+    for (const id of WEAPON_SLOTS) {
+      const meta = WEAPONS[id];
+      const owned = ownedWeapons.has(id);
+      const selected = loadout.includes(id);
+      const meta2 = {
+        icon: meta.icon,
+        name: meta.name,
+        desc: id === 'pistol' ? t('Базова зброя') : t('Спершу відкрий цю зброю'),
+        stat: selected ? t('У наборі') : owned && loadout.length >= 7 ? t('Ліміт 7') : '',
+      };
+      weaponHtml += card(id, meta2, owned, selected, 'weapon');
+    }
+    weaponHtml += '</div>';
     let heroHtml = t('<div class="ward-section">🎨 Створи свого героя</div><div class="ward-grid">');
     heroHtml += card('custom', HERO_SKINS.custom, save.skins.includes('custom'), save.activeSkin === 'custom', 'skin');
     heroHtml += '</div>';
@@ -941,7 +1005,7 @@ class Game {
     }
     tracerHtml += '</div>';
     let html = `<div class="ward-tabs">${tabs.map(([id, label]) => `<button class="shop-tab ward-tab ${this._wardrobeTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
-    html += pane('skins', skinsHtml) + pane('gadget', gadgetHtml) + pane('dance', danceHtml) + pane('pet', petHtml) + pane('tower', towerHtml) + pane('tracer', tracerHtml) + pane('hero', heroHtml);
+    html += pane('skins', skinsHtml) + pane('weapon', weaponHtml) + pane('gadget', gadgetHtml) + pane('dance', danceHtml) + pane('pet', petHtml) + pane('tower', towerHtml) + pane('tracer', tracerHtml) + pane('hero', heroHtml);
     const root = document.getElementById('wardrobe-content');
     this._stopHeroPreview(); // прибрати старий рендер перед перемальовкою
     root.innerHTML = html;
@@ -969,6 +1033,7 @@ class Game {
           save.activeSkin = id;
           this._wardrobeTab = id === 'custom' ? 'hero' : 'skins';
         }
+        else if (kind === 'weapon') { this._toggleLoadoutWeapon(id); return; }
         else if (kind === 'dance') save.activeDance = id;
         else if (kind === 'gadget') save.activeGadget = id;
         else if (kind === 'pet') { save.activePet = id; this.spawnPet(); }
@@ -1373,10 +1438,11 @@ class Game {
       level.player.grenades = 0;
       level.player._applyView();
     } else {
-      for (const w of this.save.weapons) level.player.giveWeapon(w, false);
-      if (this.save.weapons.includes('bazooka')) level.player.addRockets(2);
+      const loadout = this._weaponLoadout();
+      for (const w of loadout) level.player.giveWeapon(w, false);
+      if (loadout.includes('bazooka')) level.player.addRockets(2);
       // 🔋 паливні зброї (v46): на старті рівня — повний балон у кожної наявної
-      for (const w of this.save.weapons) level.player.refillFuel(w);
+      for (const w of loadout) level.player.refillFuel(w);
     }
 
     level.zombies = new Zombies(level, this.seed + 2);
@@ -1783,9 +1849,15 @@ class Game {
       this.hud.toast(t('🪙 Така зброя в тебе вже є — тримай +300 монет!'));
       return;
     }
-    this.level.player.giveWeapon(id);
     this.level.player.refillFuel(id); // 🔋 нова паливна зброя — повний балон
     this.save.weapons.push(id);
+    const loadout = this._weaponLoadout();
+    if (loadout.includes(id) || loadout.length < 7) {
+      if (!loadout.includes(id)) this.save.weaponLoadout.push(id);
+      this.level.player.giveWeapon(id);
+    } else {
+      this.hud.toast(t('🔓 Зброю відкрито! Додай її в Гардеробі — максимум 7.'));
+    }
     this.saveGame();
   }
 
@@ -2079,6 +2151,7 @@ class Game {
     let rewardTitle = t('🪙 +100 монет');
     if (roll < KNOCKOUT_STAFF_CHANCE && !this.save.weapons.includes('staff')) {
       this.save.weapons.push('staff');
+      this._weaponLoadout();
       level.player.giveWeapon('staff');
       rewardTitle = t('🪄 Випав Посох!');
       this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('З ящика випав Посох!'), 4.5);
@@ -2155,7 +2228,8 @@ class Game {
     // після наступного завантаження, якщо у наборі не випала місія «зачистка складу»)
     if (country.weaponReward && !this.save.weapons.includes(country.weaponReward)) {
       this.save.weapons.push(country.weaponReward);
-      if (this.level.player) this.level.player.giveWeapon(country.weaponReward, false);
+      const loadout = this._weaponLoadout();
+      if (this.level.player && loadout.includes(country.weaponReward)) this.level.player.giveWeapon(country.weaponReward, false);
       if (country.weaponRewardToast) {
         this.hud.toast(typeof country.weaponRewardToast === 'function' ? country.weaponRewardToast() : country.weaponRewardToast);
       }
