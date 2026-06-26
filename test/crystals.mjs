@@ -124,7 +124,7 @@ const exchange = await page.evaluate(async () => {
   const item = SHOP_ITEMS.find((i) => i.id === 'coins500');
   const item1000 = SHOP_ITEMS.find((i) => i.id === 'coins1000');
   const item5100 = SHOP_ITEMS.find((i) => i.id === 'coins5100');
-  const itemXp = SHOP_ITEMS.find((i) => i.id === 'passxp25');
+  const itemXp = SHOP_ITEMS.find((i) => i.id === 'passxp100');
   g.save.coins = 50;
   g.save.crystals = 9;
   g.test.shopBuy('coins500');
@@ -152,10 +152,10 @@ const exchange = await page.evaluate(async () => {
   g.save.coins = 50;
   g.save.xp = 0;
   g.save.crystals = 9;
-  g.test.shopBuy('passxp25');
+  g.test.shopBuy('passxp100');
   const deniedXp = { xp: g.save.xp, coins: g.save.coins, crystals: g.save.crystals };
   g.save.crystals = 10;
-  g.test.shopBuy('passxp25');
+  g.test.shopBuy('passxp100');
   const boughtXp = { xp: g.save.xp, coins: g.save.coins, crystals: g.save.crystals, level: g.progress.level };
   return {
     item: item && { crystalPrice: item.crystalPrice, coinBundle: item.coinBundle, max: item.max },
@@ -179,8 +179,8 @@ check(exchange.item1000 && exchange.item1000.crystalPrice === 21 && exchange.ite
   '1000 монет є в магазині за 21 кристал', JSON.stringify(exchange.item1000));
 check(exchange.item5100 && exchange.item5100.crystalPrice === 100 && exchange.item5100.coinBundle === 5100 && exchange.item5100.max === Infinity,
   '5100 монет є в магазині за 100 кристалів', JSON.stringify(exchange.item5100));
-check(exchange.itemXp && exchange.itemXp.crystalPrice === 10 && exchange.itemXp.passXp === 25 && exchange.itemXp.max === Infinity,
-  '25 XP Зоряного шляху є в магазині за 10 кристалів', JSON.stringify(exchange.itemXp));
+check(exchange.itemXp && exchange.itemXp.crystalPrice === 10 && exchange.itemXp.passXp === 100 && exchange.itemXp.max === Infinity,
+  '100 XP Зоряного шляху є в магазині за 10 кристалів', JSON.stringify(exchange.itemXp));
 check(exchange.denied.coins === 50 && exchange.denied.crystals === 9,
   '9 кристалів недостатньо для обміну', JSON.stringify(exchange.denied));
 check(exchange.bought.coins === 550 && exchange.bought.crystals === 0,
@@ -196,9 +196,9 @@ check(exchange.denied5100.coins === 50 && exchange.denied5100.crystals === 99,
 check(exchange.bought5100.coins === 5150 && exchange.bought5100.crystals === 0,
   '100 кристалів купують 5100 монет', JSON.stringify(exchange.bought5100));
 check(exchange.deniedXp.xp === 0 && exchange.deniedXp.coins === 50 && exchange.deniedXp.crystals === 9,
-  '9 кристалів недостатньо для 25 XP', JSON.stringify(exchange.deniedXp));
-check(exchange.boughtXp.xp === 25 && exchange.boughtXp.coins === 50 && exchange.boughtXp.crystals === 0 && exchange.boughtXp.level === 1,
-  '10 кристалів купують 25 XP Зоряного шляху', JSON.stringify(exchange.boughtXp));
+  '9 кристалів недостатньо для 100 XP', JSON.stringify(exchange.deniedXp));
+check(exchange.boughtXp.xp === 100 && exchange.boughtXp.coins === 150 && exchange.boughtXp.crystals === 0 && exchange.boughtXp.level === 2,
+  '10 кристалів купують 100 XP і відкривають нагороду 2 рівня', JSON.stringify(exchange.boughtXp));
 
 console.log('');
 if (errors.length) {

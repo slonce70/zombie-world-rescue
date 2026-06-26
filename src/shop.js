@@ -11,7 +11,7 @@ export const SHOP_ITEMS = [
   { id: 'coins500', icon: '💰', name: t('500 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 10, coinBundle: 500, max: Infinity, cat: t('Ресурси') },
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
-  { id: 'passxp25', icon: '⭐', name: t('25 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 10, passXp: 25, max: Infinity, cat: t('Ресурси') },
+  { id: 'passxp100', icon: '⭐', name: t('100 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 10, passXp: 100, max: Infinity, cat: t('Ресурси') },
   { id: 'starterpack', icon: '🎒', name: t('Стартовий набір'), desc: t('+2 гранати, +1 ракета для базуки, +30 патронів'), price: 500, crystalPrice: 10, max: Infinity, cat: t('Набори') },
   { id: 'propack', icon: '🏆', name: t('Профі набір'), desc: t('Золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'), price: 3500, crystalPrice: 35, max: Infinity, cat: t('Набори') },
   { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
@@ -289,7 +289,7 @@ export class Shop {
         save.coins += item.coinBundle;
         game.hud.toast(t('💰 +{n} монет', { n: item.coinBundle }));
         break;
-      case 'passxp25':
+      case 'passxp100':
         game.progress.addXp(item.passXp);
         game.hud.toast(t('⭐ +{n} XP Зоряного шляху', { n: item.passXp }));
         break;

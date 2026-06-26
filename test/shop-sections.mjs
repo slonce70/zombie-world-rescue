@@ -44,7 +44,7 @@ check(shop.hyper.includes('turret-hyper') && shop.hyper.includes('stunammo-hyper
   `гіперзаряди окремо від гаджетів: ${shop.hyper.join(', ')}`);
 check(shop.skins.includes('goldskin') && shop.skins.includes('militaryskin') && shop.skins.includes('wizardskin') && shop.skins.includes('muscleskin') && !shop.skins.includes('vest'),
   `скіни окремо від спорядження: ${shop.skins.join(', ')}`);
-check(shop.resources.includes('coins500') && shop.resources.includes('coins1000') && shop.resources.includes('coins5100') && shop.resources.includes('passxp25') && !shop.resources.includes('medkit'),
+check(shop.resources.includes('coins500') && shop.resources.includes('coins1000') && shop.resources.includes('coins5100') && shop.resources.includes('passxp100') && !shop.resources.includes('medkit'),
   `ресурси окремо від припасів: ${shop.resources.join(', ')}`);
 check(shop.packs.includes('starterpack') && !shop.packs.includes('grenade'),
   `набори окремо від припасів: ${shop.packs.join(', ')}`);
