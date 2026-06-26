@@ -40,9 +40,9 @@ export const SHOP_ITEMS = [
   // 🏅 золотий скін для гаджета-башти (камʼяний дається за Францію — не в магазині)
   { id: 'tower_gold', icon: TOWER_SKINS.gold.icon, name: TOWER_SKINS.gold.name, desc: t('Золотий скін для гаджета-башти'), price: 2344, max: 1, cat: t('Гаджети й друзі'), towerSkin: 'gold' },
   // --- зброя ---
-  { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 250, max: 1, cat: t('Зброя'), weapon: true },
-  { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 350, max: 1, cat: t('Зброя'), weapon: true },
-  { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 500, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'smg', icon: '🌀', name: t('Швидкостріл'), desc: () => t('Дуже швидка черга ({k})', { k: keyHint('кнопка 🔁', 'клавіша 4') }), price: 2500, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'magnum', icon: '🤠', name: t('Магнум'), desc: () => t('Могутній револьвер ({k})', { k: keyHint('кнопка 🔁', 'клавіша 5') }), price: 2500, max: 1, cat: t('Зброя'), weapon: true },
+  { id: 'sniper', icon: '🎯', name: t('Снайперка'), desc: () => t('Пробиває 3 зомбі наскрізь ({k})', { k: keyHint('кнопка 🔁', 'клавіша 6') }), price: 2500, max: 1, cat: t('Зброя'), weapon: true },
   // 🔥 Вогнемет (рівень 25) і 🔫 Лазер (рівень 28) — нагороди за ЗІРКОВИЙ РІВЕНЬ, у магазині їх НЕМАЄ.
   // --- скіни героя ---
   { id: 'frogskin', icon: HERO_SKINS.frog.icon, name: HERO_SKINS.frog.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 15, max: 1, cat: t('Скіни'), skin: 'frog' },

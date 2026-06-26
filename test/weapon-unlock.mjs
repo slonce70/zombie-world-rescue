@@ -39,11 +39,14 @@ const shop = await page.evaluate(async () => {
     hasFlame: ids.includes('flamethrower'),
     hasLaser: ids.includes('laser'),
     keepsSmg: ids.includes('smg') && ids.includes('magnum') && ids.includes('sniper'),
+    weaponPrices: Object.fromEntries(mod.SHOP_ITEMS.filter((i) => i.weapon).map((i) => [i.id, i.price])),
   };
 });
 check(!shop.hasFlame, 'вогнемета НЕМАЄ в магазині', shop.hasFlame);
 check(!shop.hasLaser, 'лазера НЕМАЄ в магазині', shop.hasLaser);
 check(shop.keepsSmg, 'smg/magnum/sniper лишилися в магазині');
+check(Object.values(shop.weaponPrices).every((price) => price === 2500),
+  'усі зброї в магазині коштують 2500 монет', JSON.stringify(shop.weaponPrices));
 
 // ===== (б) catch-up за зірковий рівень =====
 console.log('▸ Catch-up зброї за зірковий рівень');

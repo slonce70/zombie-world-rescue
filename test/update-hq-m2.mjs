@@ -52,7 +52,7 @@ await page.evaluate(() => window.__game.shop.buy('vest')); // 1 → 2 (=max)
 check((await save()).goal === null, 'F42: ціль очищається коли товар вичерпано (2/2)');
 // одноразовий товар (max:1) очищає ціль одразу — поведінка незмінна
 await page.evaluate(() => {
-  window.__game.save.coins = 1000; window.__game.save.goal = 'sniper'; window.__game.shop.buy('sniper');
+  window.__game.save.coins = 2500; window.__game.save.goal = 'sniper'; window.__game.shop.buy('sniper');
 });
 check((await save()).goal === null, 'F42: одноразовий товар (sniper) очищає ціль одразу');
 // persist
