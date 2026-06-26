@@ -64,6 +64,67 @@ check(pack.deniedCrystals.coins === 500 && pack.deniedCrystals.crystals === 9 &&
 check(pack.bought.coins === 0 && pack.bought.crystals === 0 && pack.bought.grenades === 2 && pack.bought.rockets === 1 && pack.bought.ammo === 30,
   'купівля додає 2 гранати, 1 ракету і 30 патронів', JSON.stringify(pack.bought));
 
+console.log('▸ Профі набір');
+const pro = await page.evaluate(async () => {
+  const { SHOP_ITEMS } = await import('/src/shop.js');
+  const g = window.__game;
+  const item = SHOP_ITEMS.find((i) => i.id === 'propack');
+  g.shop.open();
+  const tab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Набори');
+  if (tab) tab.click();
+  const card = document.querySelector('.shop-item[data-id="propack"]');
+  const p = g.level.player;
+  p.grenades = 0;
+  p.ammo.bazooka.reserve = 0;
+  p.ammo.rifle.reserve = 0;
+  g.save.skins = ['classic', 'custom'];
+  g.save.activeSkin = 'classic';
+  g.save.xp = 0;
+  g.save.coins = 3499;
+  g.save.crystals = 35;
+  g.test.shopBuy('propack');
+  const deniedCoins = { coins: g.save.coins, crystals: g.save.crystals, grenades: p.grenades, xp: g.save.xp, skins: [...g.save.skins] };
+  g.save.coins = 3500;
+  g.save.crystals = 34;
+  g.test.shopBuy('propack');
+  const deniedCrystals = { coins: g.save.coins, crystals: g.save.crystals, grenades: p.grenades, xp: g.save.xp, skins: [...g.save.skins] };
+  g.save.coins = 3500;
+  g.save.crystals = 35;
+  g.test.shopBuy('propack');
+  const bought = {
+    coins: g.save.coins,
+    crystals: g.save.crystals,
+    grenades: p.grenades,
+    rockets: p.ammo.bazooka.reserve,
+    ammo: p.ammo.rifle.reserve,
+    xp: g.save.xp,
+    skins: [...g.save.skins],
+    activeSkin: g.save.activeSkin,
+  };
+  g.shop.close();
+  return {
+    item: item && { name: item.name, cat: item.cat, price: item.price, crystalPrice: item.crystalPrice, max: item.max },
+    card: card && { price: card.querySelector('.shop-price')?.textContent.trim(), desc: card.querySelector('.shop-desc')?.textContent.trim() },
+    deniedCoins,
+    deniedCrystals,
+    bought,
+  };
+});
+
+check(pro.item && pro.item.name === 'Профі набір' && pro.item.cat === 'Набори',
+  'профі набір є у вкладці «Набори»', JSON.stringify(pro.item));
+check(pro.item && pro.item.price === 3500 && pro.item.crystalPrice === 35 && pro.item.max === Infinity,
+  'профі набір коштує 3500 монет і 35 кристалів', JSON.stringify(pro.item));
+check(pro.card && /3500/.test(pro.card.price) && /35/.test(pro.card.price) && pro.card.desc.includes('250 XP'),
+  'картка профі набору показує ціну і склад', JSON.stringify(pro.card));
+check(pro.deniedCoins.coins === 3499 && pro.deniedCoins.crystals === 35 && pro.deniedCoins.grenades === 0 && pro.deniedCoins.xp === 0 && !pro.deniedCoins.skins.includes('gold'),
+  '3499 монет недостатньо для профі набору', JSON.stringify(pro.deniedCoins));
+check(pro.deniedCrystals.coins === 3500 && pro.deniedCrystals.crystals === 34 && pro.deniedCrystals.grenades === 0 && pro.deniedCrystals.xp === 0 && !pro.deniedCrystals.skins.includes('gold'),
+  '34 кристалів недостатньо для профі набору', JSON.stringify(pro.deniedCrystals));
+check(pro.bought.coins === 100 && pro.bought.crystals === 0 && pro.bought.grenades === 5 && pro.bought.rockets === 3
+  && pro.bought.ammo === 90 && pro.bought.xp === 250 && pro.bought.skins.includes('gold') && pro.bought.activeSkin === 'gold',
+  'купівля профі набору дає золотий скін, 5 гранат, 3 ракети, 250 XP і 90 патронів', JSON.stringify(pro.bought));
+
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
   for (const e of errors.slice(0, 10)) console.log('  ', e);
