@@ -239,6 +239,7 @@ export const EN = {
 "Припаси": "Supplies",
 "Ресурси": "Resources",
 "1000 монет": "1000 coins",
+"5100 монет": "5100 coins",
 "Патрони": "Ammo",
 "Набої для всієї зброї": "Bullets for every weapon",
 "Граната": "Grenade",

@@ -10,6 +10,7 @@ export const SHOP_ITEMS = [
   { id: 'armorplate', icon: '🛡️', name: t('Бронепластина'), desc: t('+40 броні зараз'), price: 80, max: Infinity, cat: t('Припаси') },
   { id: 'coins500', icon: '💰', name: t('500 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 10, coinBundle: 500, max: Infinity, cat: t('Ресурси') },
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
+  { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -254,6 +255,7 @@ export class Shop {
       case 'armorplate': player.addArmor(40); break;
       case 'coins500':
       case 'coins1000':
+      case 'coins5100':
         save.coins += item.coinBundle;
         game.hud.toast(t('💰 +{n} монет', { n: item.coinBundle }));
         break;
