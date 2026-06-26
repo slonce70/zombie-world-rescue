@@ -52,6 +52,7 @@ const started = await page.evaluate(() => {
   return {
     roomSize: g.level.knockout.roomSize,
     alive: g.level.zombies.list.filter((z) => z.state !== 'dead' && z.knockout).length,
+    types: [...new Set(g.level.zombies.list.filter((z) => z.knockout).map((z) => z.type))],
     weapons: [...g.level.player.weapons],
     cur: g.level.player.cur,
     grenades: g.level.player.grenades,
@@ -63,11 +64,19 @@ const started = await page.evaluate(() => {
 });
 check(started.roomSize === 33, 'кімната має розмір 33x33 метри', JSON.stringify(started));
 check(started.alive === 10, 'у кімнаті стартують 10 зомбі', JSON.stringify(started));
+check(started.types.length >= 4, 'у Нокауті є різні типи зомбі', JSON.stringify(started.types));
 check(started.weapons.length === 1 && started.weapons[0] === 'pistol' && started.cur === 'pistol' && started.grenades === 0,
   'гравець стартує тільки з пістолетом без гранат', JSON.stringify(started));
 check(!started.shopOpen, 'магазин у Нокауті не відкривається', JSON.stringify(started));
 check(started.gadgetUsed === false && started.afterGadget === started.beforeGadget,
   'гаджети у Нокауті не використовуються', JSON.stringify(started));
+
+const buffs = await page.evaluate(() => {
+  const g = window.__game;
+  for (const type of ['speed', 'rage', 'bubble', 'magnet']) g.level.effects.onPickup(type);
+  return { ...g.level.player.buffs };
+});
+check(Object.values(buffs).every((n) => n === 0), 'бафи в Нокауті не застосовуються', JSON.stringify(buffs));
 
 console.log('▸ Перемога дає 12% шанс на посох');
 const rewardStaff = await page.evaluate(() => {

@@ -34,7 +34,7 @@ export class KnockoutMode {
     return [
       { icon: '🥊', title: t('НОКАУТ'), done: false },
       { icon: '🧟', title: t('Зомбі лишилось: {n}/{t}', { n: left, t: this.target }), done: left <= 0 },
-      { icon: '🔫', title: t('Тільки пістолет. Без магазину й гаджетів.'), done: false },
+      { icon: '🔫', title: t('Тільки пістолет. Без магазину, гаджетів і бафів.'), done: false },
     ];
   }
 
@@ -85,7 +85,7 @@ export class KnockoutMode {
   }
 
   _spawnZombies() {
-    const types = ['walker', 'walker', 'runner', 'walker', 'walker', 'runner', 'walker', 'walker', 'runner', 'walker'];
+    const types = ['walker', 'runner', 'imp', 'headphones', 'snowman', 'spitter', 'walker', 'runner', 'imp', 'gunner'];
     for (let i = 0; i < this.target; i++) {
       const a = (i / this.target) * Math.PI * 2;
       const r = 7 + (i % 3) * 2.2;

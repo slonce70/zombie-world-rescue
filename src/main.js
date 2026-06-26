@@ -62,7 +62,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 136;
+const APP_VERSION = 137;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1562,6 +1562,11 @@ class Game {
         this.audio.powerup();
         this.hud.toast(t('🪬 Тотем безсмертя!'));
       } else if (BUFF_INFO[type]) {
+        if (level.knockout) {
+          this.audio.denied();
+          this.hud.toast(t('У Нокауті бафи вимкнені'));
+          return;
+        }
         level.player.buffs[type] = BUFF_INFO[type].dur;
         this.audio.powerup();
         this.hud.toast(BUFF_INFO[type].msg);
