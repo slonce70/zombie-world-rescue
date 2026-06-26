@@ -85,7 +85,24 @@ check(rewardStaff.victoryShown && rewardStaff.hasStaff && rewardStaff.playerHasS
   'roll 0.11 видає посох у сейв і гравцю', JSON.stringify(rewardStaff));
 check(rewardStaff.title.includes('НОКАУТ'), 'екран перемоги підписаний як Нокаут', JSON.stringify(rewardStaff));
 
-console.log('▸ Якщо посох не випав, дається компенсація монетами');
+console.log('▸ Якщо посох не випав, ящик найчастіше дає кристали');
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  await g.startKnockout();
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
+const rewardCrystals = await page.evaluate(() => {
+  const g = window.__game;
+  const crystals0 = g.save.crystals || 0;
+  g.test.knockoutForce(0.13);
+  g.test.finishKnockout();
+  return { crystals0, crystals: g.save.crystals || 0, hasStaff: g.save.weapons.includes('staff') };
+});
+check(rewardCrystals.crystals - rewardCrystals.crystals0 === 5 && rewardCrystals.hasStaff,
+  'roll 0.13 дає +5 кристалів і не забирає вже відкритий посох', JSON.stringify(rewardCrystals));
+
+console.log('▸ Рідкісний залишок ящика дає монети');
 await page.evaluate(async () => {
   const g = window.__game;
   g.endLevel();
@@ -95,12 +112,12 @@ await page.waitForFunction(() => window.__game.state === 'level' && window.__gam
 const rewardCoins = await page.evaluate(() => {
   const g = window.__game;
   const coins0 = g.save.coins;
-  g.test.knockoutForce(0.13);
+  g.test.knockoutForce(0.99);
   g.test.finishKnockout();
   return { coins0, coins: g.save.coins, hasStaff: g.save.weapons.includes('staff') };
 });
 check(rewardCoins.coins - rewardCoins.coins0 === 100 && rewardCoins.hasStaff,
-  'roll 0.13 дає +100 монет і не забирає вже відкритий посох', JSON.stringify(rewardCoins));
+  'roll 0.99 дає +100 монет', JSON.stringify(rewardCoins));
 
 const staffMeta = await page.evaluate(async () => {
   const { WEAPONS } = await import('/src/player.js');

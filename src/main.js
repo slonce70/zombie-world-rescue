@@ -62,7 +62,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 134;
+const APP_VERSION = 135;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2082,6 +2082,10 @@ class Game {
       level.player.giveWeapon('staff');
       rewardTitle = t('🪄 Випав Посох!');
       this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('З ящика випав Посох!'), 4.5);
+    } else if (roll < 0.98) {
+      this.save.crystals = (this.save.crystals || 0) + 5;
+      rewardTitle = t('💎 +5 кристалів');
+      this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+5 кристалів з ящика'), 4.5);
     } else {
       level.addCoins(100);
       this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+100 монет з ящика'), 4.5);
