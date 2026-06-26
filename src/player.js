@@ -998,6 +998,7 @@ export class Player {
 
   takeDamage(amt, fromX, fromZ) {
     if (this.respawnProtect > 0 || this.health <= 0) return;
+    if (this.level.playground) return;
     // 🛡 бульбашка: повна невразливість, поки діє баф
     if (this.buffs.bubble > 0) {
       this.level.bus.emit('bubbleBlock');

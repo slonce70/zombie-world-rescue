@@ -728,6 +728,11 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .ward-stat { color: var(--accent); font-weight: 900; font-size: 12px; margin-top: 4px; }
 .ward-tag { font-size: 12px; font-weight: 700; color: #9fb8d4; margin-top: 3px; }
 .ward-card.equipped .ward-tag { color: #58c14c; }
+.ward-try {
+  margin-top: 7px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--ui-border);
+  background: rgba(255,210,63,.16); color: var(--accent); font: inherit; font-size: 12px; font-weight: 900; cursor: pointer;
+}
+.ward-try:hover { border-color: var(--accent); background: rgba(255,210,63,.28); }
 .hero-swatch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
 .hero-swatch-lbl { color: #9fb8d4; font-weight: 800; font-size: 13px; min-width: 72px; margin-right: 6px; }
 .hero-swatch { width: 40px; height: 40px; border-radius: 9px; border: 2px solid rgba(255,255,255,.3); margin: 3px; cursor: pointer; transition: all .14s; padding: 0; }

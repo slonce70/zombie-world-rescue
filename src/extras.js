@@ -539,7 +539,7 @@ export class Gadgets {
     level.scene.add(this.shieldMesh);
   }
 
-  get active() { return this.level.game.save.activeGadget; }
+  get active() { return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget; }
 
   update(dt, input, allowControl) {
     const level = this.level;
@@ -756,7 +756,7 @@ export class Gadgets {
       ok = level.mirror ? this._requestMeteor() : this._callMeteor();
     }
     if (ok) {
-      this.cd = GADGETS[id].cd;
+      this.cd = level.playground ? 0 : GADGETS[id].cd;
       level.bus.emit('gadgetUsed', id);
     }
     return ok;

@@ -117,6 +117,7 @@ export class HUD {
     const save = this.game && this.game.save;
     if (!save || !save.hints) return;
     if (save.hints[key]) return;
+    if (this.game.level && this.game.level.playground) return;
     save.hints[key] = 1;
     if (this.game.saveGame) this.game.saveGame();
     this.banner(title, sub, 4.5);
@@ -269,7 +270,7 @@ export class HUD {
 
     // чип активного гаджета (F) з перезарядкою
     const gadgets = level.gadgets;
-    const activeG = this.game.save.activeGadget;
+    const activeG = gadgets ? gadgets.active : this.game.save.activeGadget;
     let gHtml = '';
     if (activeG && gadgets) {
       const icon = GADGETS[activeG] ? GADGETS[activeG].icon : '';
