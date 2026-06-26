@@ -44,10 +44,49 @@ check(res.owned && res.active === 'gold' && res.firstCost === 2500 && res.second
   'покупка додає скін назавжди, одягає його і не списує вдруге', JSON.stringify(res));
 check(res.built, 'makeHero("gold") будується без помилок');
 
+console.log('▸ Скін Чарівник');
+const wizard = await page.evaluate(async () => {
+  const { HERO_SKINS, makeHero } = await import('/src/characters.js');
+  const { SHOP_ITEMS } = await import('/src/shop.js');
+  const item = SHOP_ITEMS.find((i) => i.id === 'wizardskin');
+  const g = window.__game;
+  g.save.crystals = 25;
+  const before = g.save.crystals;
+  g.test.shopBuy('wizardskin');
+  const afterFirst = g.save.crystals;
+  g.test.shopBuy('wizardskin');
+  const afterSecond = g.save.crystals;
+  let built = false, looksWizard = false;
+  try {
+    const rig = makeHero('wizard', g.save.hero);
+    built = !!rig.group;
+    looksWizard = rig.heroSkin === 'wizard';
+  } catch (e) { built = false; }
+  return {
+    meta: HERO_SKINS.wizard && item && { price: item.price, crystalPrice: item.crystalPrice, skin: item.skin, max: item.max, cat: item.cat },
+    owned: g.save.skins.includes('wizard'),
+    active: g.save.activeSkin,
+    firstCost: before - afterFirst,
+    secondCost: afterFirst - afterSecond,
+    built,
+    looksWizard,
+  };
+});
+check(wizard.meta && wizard.meta.price === 0 && wizard.meta.crystalPrice === 25 && wizard.meta.skin === 'wizard' && wizard.meta.max === 1,
+  'скін Чарівник є в магазині за 25 кристалів', JSON.stringify(wizard.meta));
+check(wizard.owned && wizard.active === 'wizard' && wizard.firstCost === 25 && wizard.secondCost === 0,
+  'покупка додає Чарівника назавжди, одягає його і не списує вдруге', JSON.stringify(wizard));
+check(wizard.built && wizard.looksWizard, 'makeHero("wizard") використовує окремий builder Чарівника, не fallback', JSON.stringify(wizard));
+
 await page.goto(`${BASE}/?test&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
-const persisted = await page.evaluate(() => ({ owned: window.__game.save.skins.includes('gold'), active: window.__game.save.activeSkin }));
-check(persisted.owned && persisted.active === 'gold', 'золотий скін лишається після перезавантаження', JSON.stringify(persisted));
+const persisted = await page.evaluate(() => ({
+  gold: window.__game.save.skins.includes('gold'),
+  wizard: window.__game.save.skins.includes('wizard'),
+  active: window.__game.save.activeSkin,
+}));
+check(persisted.gold && persisted.wizard && persisted.active === 'wizard',
+  'куплені скіни лишаються після перезавантаження, активний Чарівник', JSON.stringify(persisted));
 
 console.log('');
 if (errors.length) {

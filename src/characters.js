@@ -2247,6 +2247,7 @@ export const HERO_SKINS = {
   frog: { name: t('Жабеня'), icon: '🐸', desc: t('Ква проти зомбі (з Мегабокса)') },
   super: { name: t('Супергерой'), icon: '🦸', desc: t('Плащ майорить! (з Мегабокса)') },
   military: { name: t('Військовий'), icon: '🪖', desc: t('Купи в магазині за кристали') },
+  wizard: { name: t('Чарівник'), icon: '🧙', desc: t('Купи в магазині за кристали') },
   hunter: { name: t('Нічний мисливець'), icon: '🌙', desc: t('Шторм, хвиля 12') },
   thunder: { name: t('Громовідвід'), icon: '⚡', desc: t('Шторм, хвиля 16') },
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
@@ -2579,6 +2580,36 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       rig.parts.torso.add(vest);
       return rig;
     },
+    wizard() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd9b8, shirt: 0x5a2a8a, pants: 0x3b1f5f, shoes: 0x24143a,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x7a3a5a,
+        brow: -0.08, cast: 'all', sleeves: 'shirt',
+      });
+      const robeM = toonMat(0x5a2a8a);
+      const goldM = toonMat(0xffd23f, 0xd19918, 0.45);
+      const hat = cone(0.24, 0.48, robeM, 12);
+      hat.position.y = 0.52;
+      hat.rotation.x = -0.12;
+      const brim = cylinder(0.3, 0.32, 0.05, robeM, 14);
+      brim.position.y = 0.26;
+      rig.parts.head.add(hat, brim);
+      const star = cylinder(0.06, 0.06, 0.025, goldM, 5);
+      star.rotation.x = Math.PI / 2;
+      star.position.set(0, 0.4, -0.27);
+      rig.parts.torso.add(star);
+      const cape = box(0.5, 0.78, 0.045, toonMat(0x3b1f5f));
+      cape.position.set(0, 0.08, 0.28);
+      cape.rotation.x = -0.1;
+      rig.parts.torso.add(cape);
+      const wand = cylinder(0.018, 0.018, 0.42, toonMat(0x6d4a2f), 8);
+      wand.position.set(0.05, -0.34, -0.02);
+      wand.rotation.z = -0.25;
+      const wandStar = sphere(0.045, goldM, 6, 5);
+      wandStar.position.set(0.0, -0.56, -0.02);
+      rig.parts.armR.add(wand, wandStar);
+      return rig;
+    },
     // 🛡️ Лицар: сталеві лати, шолом із плюмажем, золотий хрест — за зірковий шлях 30
     knight() {
       const rig = makeHumanoid({
@@ -2636,6 +2667,7 @@ export function makeHero(skinId = 'classic', heroColors = null) {
     },
   };
   const rig = (builders[skinId] || builders.classic)();
+  rig.heroSkin = builders[skinId] ? skinId : 'classic';
   // спільне для всіх скінів: рюкзачок (крім астронавта — у нього ранець) і пояс
   if (skinId !== 'astro' && skinId !== 'custom') {
     const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
