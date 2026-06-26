@@ -94,7 +94,39 @@ const dropTypes = await page.evaluate(() => {
 check(dropTypes.every((t) => t === 'coin'),
   'з Нокаут-зомбі падають тільки монети, без гранат, аптечок, набоїв і бафів', JSON.stringify(dropTypes));
 
+console.log('▸ Поразка в Нокауті не дає респавн');
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  await g.startKnockout();
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
+const noRespawn = await page.evaluate(async () => {
+  const g = window.__game;
+  const p = g.level.player;
+  p.respawnProtect = 0;
+  p.health = 1;
+  p.takeDamage(999, p.pos.x + 1, p.pos.z);
+  const diedAt = p.health;
+  await new Promise((resolve) => setTimeout(resolve, 4300));
+  return {
+    diedAt,
+    health: p.health,
+    deathT: g.deathT,
+    title: document.querySelector('#overlay-arena-end h1').textContent,
+    shown: document.getElementById('overlay-arena-end').classList.contains('show'),
+  };
+});
+check(noRespawn.diedAt === 0 && noRespawn.health === 0 && noRespawn.deathT < 0 && noRespawn.shown && noRespawn.title.includes('ПРОГРАНО'),
+  'після смерті Нокаут завершується поразкою без респавну', JSON.stringify(noRespawn));
+
 console.log('▸ Перемога дає 12% шанс на посох');
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  await g.startKnockout();
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
 const rewardStaff = await page.evaluate(() => {
   const g = window.__game;
   g.test.knockoutForce(0.11);

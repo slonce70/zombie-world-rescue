@@ -62,7 +62,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 138;
+const APP_VERSION = 139;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1951,6 +1951,10 @@ class Game {
       this._endStormRun();
       return;
     }
+    if (this.level.knockout) {
+      this._endKnockoutRun(false);
+      return;
+    }
     const coop = !!this.level.net;
     // кооп: лежиш 20с — друг може підняти; соло — швидкий респавн
     this.deathT = coop ? 20 : 3.5;
@@ -2094,6 +2098,7 @@ class Game {
     if (res.completed) this.audio.victory();
     else this.audio.defeat();
     this.input.exitLock();
+    if (retryBtn) retryBtn.textContent = t('👑 Ще раз!');
     this._lastEndMode = 'arena';
     // рекорд: лише ПОВНІ проходження, менший час кращий
     let isRecord = false;
@@ -2134,45 +2139,55 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
-  _endKnockoutRun() {
+  _endKnockoutRun(won = true) {
     const level = this.level;
     if (!level || !level.knockout || level.knockout.over) return;
+    level.knockout.completed = !!won;
     const res = level.knockout.results();
     level.knockout.over = true;
-    level.bossDefeated = true;
+    level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
     this._hideOverlay('overlay-death');
-    this.audio.victory();
+    if (won) this.audio.victory();
+    else this.audio.defeat();
     this.audio.setMode(null);
     this.input.exitLock();
-    this.progress.addXp(80);
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('🥊 Ще раз!');
+    }
 
     let roll = Math.random();
     if (this._knockoutForce !== undefined) {
       roll = this._knockoutForce;
       this._knockoutForce = undefined;
     }
-    let rewardTitle = t('🪙 +100 монет');
-    if (roll < KNOCKOUT_STAFF_CHANCE && !this.save.weapons.includes('staff')) {
-      this.save.weapons.push('staff');
-      this._weaponLoadout();
-      level.player.giveWeapon('staff');
-      rewardTitle = t('🪄 Випав Посох!');
-      this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('З ящика випав Посох!'), 4.5);
-    } else if (roll < 0.98) {
-      this.save.crystals = (this.save.crystals || 0) + 5;
-      rewardTitle = t('💎 +5 кристалів');
-      this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+5 кристалів з ящика'), 4.5);
-    } else {
-      level.addCoins(100);
-      this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+100 монет з ящика'), 4.5);
+    let rewardTitle = t('Без нагороди');
+    if (won) {
+      this.progress.addXp(80);
+      rewardTitle = t('🪙 +100 монет');
+      if (roll < KNOCKOUT_STAFF_CHANCE && !this.save.weapons.includes('staff')) {
+        this.save.weapons.push('staff');
+        this._weaponLoadout();
+        level.player.giveWeapon('staff');
+        rewardTitle = t('🪄 Випав Посох!');
+        this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('З ящика випав Посох!'), 4.5);
+      } else if (roll < 0.98) {
+        this.save.crystals = (this.save.crystals || 0) + 5;
+        rewardTitle = t('💎 +5 кристалів');
+        this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+5 кристалів з ящика'), 4.5);
+      } else {
+        level.addCoins(100);
+        this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+100 монет з ящика'), 4.5);
+      }
+      this.saveGame();
     }
-    this.saveGame();
     this._lastEndMode = 'knockout';
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
-    document.querySelector('#overlay-arena-end h1').textContent = t('🥊 НОКАУТ ПРОЙДЕНО!');
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🥊 НОКАУТ ПРОЙДЕНО!') : t('💀 НОКАУТ ПРОГРАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.knockout.target}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
