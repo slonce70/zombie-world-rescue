@@ -539,7 +539,10 @@ export class Gadgets {
     level.scene.add(this.shieldMesh);
   }
 
-  get active() { return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget; }
+  get active() {
+    if (this.level.noGadgets) return null;
+    return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget;
+  }
 
   update(dt, input, allowControl) {
     const level = this.level;
@@ -637,6 +640,11 @@ export class Gadgets {
   use() {
     const level = this.level;
     const game = level.game;
+    if (level.noGadgets) {
+      level.bus.emit('toast', t('У Нокауті гаджети вимкнені'));
+      game.audio.denied();
+      return false;
+    }
     const id = this.active;
     if (!id) {
       level.bus.emit('toast', t('🧰 Обери гаджет у Гардеробі на глобусі!'));

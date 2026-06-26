@@ -12,6 +12,7 @@ export const WEAPONS = {
   smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, infinite: false, reserve: 160, cap: 320 },
   magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 36, cap: 90 },
   sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
+  staff: { name: 'Посох', icon: '🪄', dmg: 95, rpm: 55, mag: 1, spread: 0.002, auto: false, reloadT: 3.0, recoil: 0.04, infinite: true, pierce: 2 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
   // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.
@@ -24,8 +25,8 @@ export const WEAPONS = {
   //   dps 120 у впор, падає до ~0 на краю (range 8). Тип шкоди «вогонь» — гак для v47.
   flamethrower: { name: 'Вогнемет', icon: '🔥', dmg: 0, dps: 120, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 2.5, recoil: 0, infinite: false, continuous: true, flame: true, range: 8, coneCos: 0.82, fuelMax: 5.0 },
 };
-export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
-const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower' };
+export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff'];
+const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower', Digit0: 'staff' };
 
 export class Player {
   constructor(level) {

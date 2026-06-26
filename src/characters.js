@@ -2910,6 +2910,26 @@ export function makeGunMesh(kind) {
     grip2.position.set(0, -0.07, -0.2);
     g.add(tank, tankCap, body, pipe, nozzle, pilot, grip, grip2);
     muzzle.position.set(0, 0.02, -0.58);
+  } else if (kind === 'staff') {
+    const woodM = toonMat(0x6d4a2f);
+    const goldM = toonMat(0xffd23f, 0xd19918, 0.35);
+    const crystalM = toonMat(0x8fd7ff, 0x4fb8ff, 0.75);
+    const shaft = cylinder(0.025, 0.025, 0.75, woodM, 10);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.set(0, 0.02, -0.2);
+    const ring1 = cylinder(0.035, 0.035, 0.035, goldM, 10);
+    ring1.rotation.x = Math.PI / 2;
+    ring1.position.set(0, 0.02, -0.5);
+    const ring2 = cylinder(0.035, 0.035, 0.035, goldM, 10);
+    ring2.rotation.x = Math.PI / 2;
+    ring2.position.set(0, 0.02, 0.12);
+    const gem = sphere(0.075, crystalM, 12, 8);
+    gem.position.set(0, 0.02, -0.62);
+    const grip = box(0.05, 0.12, 0.06, woodM);
+    grip.position.set(0, -0.1, 0.06);
+    grip.rotation.x = -0.25;
+    g.add(shaft, ring1, ring2, gem, grip);
+    muzzle.position.set(0, 0.02, -0.72);
   } else if (kind === 'bazooka') {
     const oliveM = toonMat(0x6b7a4a);
     const tube = cylinder(0.075, 0.075, 0.85, oliveM, 12);
@@ -2979,7 +2999,7 @@ export function makeFPArms(gunKind) {
   const handR = sphere(0.06, skinM, 10, 8);
   handR.position.set(0.005, -0.09, 0.05);
   // ліва рука підтримує цівку
-  const longGun = ['rifle', 'shotgun', 'smg', 'sniper', 'bazooka'].includes(gunKind);
+  const longGun = ['rifle', 'shotgun', 'smg', 'sniper', 'bazooka', 'staff'].includes(gunKind);
   const armL = capsule(0.055, 0.28, sleeveM);
   armL.rotation.x = Math.PI / 2 - 0.25;
   armL.rotation.z = 0.5;

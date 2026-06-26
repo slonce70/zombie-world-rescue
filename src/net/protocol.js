@@ -36,6 +36,6 @@ export function packZombieState(z, moving) {
 }
 
 // індекси зброї для компактної передачі
-export const WEAPON_IDX = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower'];
+export const WEAPON_IDX = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff'];
 export const weaponToIdx = (w) => Math.max(0, WEAPON_IDX.indexOf(w));
 export const idxToWeapon = (i) => WEAPON_IDX[i] || 'pistol';
