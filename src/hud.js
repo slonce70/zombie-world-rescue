@@ -277,6 +277,10 @@ export class HUD {
       gHtml = gadgets.cd > 0
         ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}${t('с')}</span>`
         : `${icon} ${t('ГОТОВО (F)')}`;
+      const ch = level.gadgetChallenge;
+      if (ch && ch.gadget === activeG) {
+        gHtml += `<br><span class="none">${ch.title}: ${ch.done ? t('ГОТОВО') : `${ch.progress}/${ch.target}`}</span>`;
+      }
     }
     if (this._lastGadgetHtml !== gHtml) {
       this.el.gadgetChips.innerHTML = gHtml;

@@ -63,6 +63,7 @@ export const EN = {
 "Скіни": "Skins",
 "Гаджети": "Gadgets",
 "🧪 Полігон гаджетів": "🧪 Gadget playground",
+"Тренування майстра гаджетів": "Gadget master training",
 "Спробувати": "Try",
 "Спробувати гаджети": "Try gadgets",
 "🧪 ПОЛІГОН ГАДЖЕТІВ": "🧪 GADGET PLAYGROUND",

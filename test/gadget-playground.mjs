@@ -95,6 +95,33 @@ check(JSON.stringify(started.selected) === JSON.stringify(started.ids),
 check(started.saveOwned.length === 1 && started.saveOwned[0] === 'heal' && started.saveActive === 'heal',
   'save gadgetsOwned/activeGadget не змінено під час вибору', JSON.stringify(started));
 
+const challenge = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.playgroundSelectGadget('shield');
+  g.hud.update(0);
+  const start = { ...g.level.gadgetChallenge, hud: document.querySelector('#gadget-chips')?.textContent.trim() || '' };
+  g.test.gadgetCdReset();
+  g.test.useGadget();
+  g.test.useGadget();
+  g.hud.update(0);
+  const mid = { ...g.level.gadgetChallenge, hud: document.querySelector('#gadget-chips')?.textContent.trim() || '' };
+  g.test.useGadget();
+  g.hud.update(0);
+  const done = { ...g.level.gadgetChallenge, hud: document.querySelector('#gadget-chips')?.textContent.trim() || '' };
+  g.test.playgroundSelectGadget('meteor');
+  g.hud.update(0);
+  const reset = { ...g.level.gadgetChallenge, hud: document.querySelector('#gadget-chips')?.textContent.trim() || '' };
+  return { start, mid, done, reset };
+});
+check(challenge.start.title && challenge.start.progress === 0 && challenge.start.target === 3 && /0\/3/.test(challenge.start.hud),
+  'challenge стартує у HUD з 0/3', JSON.stringify(challenge.start));
+check(challenge.mid.progress === 2 && !challenge.mid.done && /2\/3/.test(challenge.mid.hud),
+  'challenge рахує використання поточного гаджета', JSON.stringify(challenge.mid));
+check(challenge.done.progress === 3 && challenge.done.done && /ГОТОВО/.test(challenge.done.hud),
+  'challenge завершується після target', JSON.stringify(challenge.done));
+check(challenge.reset.progress === 0 && challenge.reset.target === 3 && !challenge.reset.done && /0\/3/.test(challenge.reset.hud),
+  'challenge скидається при виборі іншого гаджета', JSON.stringify(challenge.reset));
+
 const practice = await page.evaluate((saveKey) => {
   const g = window.__game;
   g.test.playgroundSelectGadget('shield');

@@ -61,7 +61,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 124;
+const APP_VERSION = 125;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1128,6 +1128,17 @@ class Game {
     this.startLevel('UKR', { playground: true, gadget: gadgetId });
   }
 
+  _startGadgetChallenge(level, id) {
+    if (!level.playground || !id) return;
+    level.gadgetChallenge = {
+      gadget: id,
+      title: t('Тренування майстра гаджетів'),
+      progress: 0,
+      target: 3,
+      done: false,
+    };
+  }
+
   startStorm(countryId = null) {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('⛈️🤝 У коопі Шторм запускається з лобі кімнати — обери режим «Шторм»!'));
@@ -1344,6 +1355,7 @@ class Game {
     level.megabox = (isGuest || isArena || isPlayground) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
+    this._startGadgetChallenge(level, level.playgroundGadget);
     level.pet = this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
@@ -1513,7 +1525,16 @@ class Game {
       if (z.type === 'boss' && !level.storm) { this.quests.onEvent('boss'); this.chapter.onEvent('boss'); this.save.stats.bosses++; }
     });
     level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); this.chapter.onEvent('mission'); } });
-    level.bus.on('gadgetUsed', () => { if (!level.playground) this.chapter.onEvent('gadget'); });
+    level.bus.on('gadgetUsed', (id) => {
+      if (!level.playground) {
+        this.chapter.onEvent('gadget');
+        return;
+      }
+      const ch = level.gadgetChallenge;
+      if (!ch || ch.gadget !== id || ch.done) return;
+      ch.progress = Math.min(ch.target, ch.progress + 1);
+      ch.done = ch.progress >= ch.target;
+    });
     level.bus.on('hitmarker', (crit) => { if (!level.playground && crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; } });
     level.bus.on('shieldBroken', () => { if (!level.playground) this.quests.onEvent('shield'); });
     level.bus.on('megaboxOpened', () => {
@@ -2363,7 +2384,10 @@ class Game {
         stormBest: { ...g.save.stormBest },
       }),
       playgroundSelectGadget: (id) => {
-        if (g.level && g.level.playground && GADGETS[id]) g.level.playgroundGadget = id;
+        if (g.level && g.level.playground && GADGETS[id]) {
+          g.level.playgroundGadget = id;
+          g._startGadgetChallenge(g.level, id);
+        }
       },
       setLevelTime: (t) => { g.level.stats.time = t; },
       teleport: (x, z) => {
