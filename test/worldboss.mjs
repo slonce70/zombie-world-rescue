@@ -37,6 +37,22 @@ for (const m of modelInfo) {
     `модель ${m.style} створюється саме як новий стиль`, JSON.stringify(m));
 }
 
+console.log('▸ Світові боси: конфіг');
+const cfgInfo = await page.evaluate(async () => {
+  const mod = await import('/src/worldboss.js');
+  return {
+    ids: mod.WORLD_BOSSES.map((b) => b.id),
+    unlocks: Object.fromEntries(mod.WORLD_BOSSES.map((b) => [b.id, b.unlockCountries])),
+    rewards: Object.fromEntries(mod.WORLD_BOSSES.map((b) => [b.id, b.reward])),
+  };
+});
+check(JSON.stringify(cfgInfo.ids) === JSON.stringify(['radiation', 'ice', 'titan']),
+  'є рівно три світові боси у правильному порядку', JSON.stringify(cfgInfo.ids));
+check(cfgInfo.unlocks.radiation === 4 && cfgInfo.unlocks.ice === 8 && cfgInfo.unlocks.titan === 12,
+  'відкриття босів: 4 / 8 / 12 країн', JSON.stringify(cfgInfo.unlocks));
+check(cfgInfo.rewards.titan.crystals === 25 && cfgInfo.rewards.titan.xp === 900,
+  'нагорода Титана задана в конфігу', JSON.stringify(cfgInfo.rewards.titan));
+
 await browser.close();
 if (errors.length) {
   console.error(errors.join('\n'));
