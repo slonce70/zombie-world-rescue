@@ -24,6 +24,10 @@ import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE } from './kn
 import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import {
+  WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
+  worldBossUnlocked,
+} from './worldboss.js';
+import {
   HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, setAnim, updateRig,
 } from './characters.js';
@@ -398,7 +402,7 @@ class Game {
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
-      gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {},
+      gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {}, worldBosses: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
@@ -435,6 +439,7 @@ class Game {
         if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
         if (!Array.isArray(out.gadgetHypers)) out.gadgetHypers = [];
         if (!out.megaQuests || typeof out.megaQuests !== 'object' || Array.isArray(out.megaQuests)) out.megaQuests = {};
+        if (!out.worldBosses || typeof out.worldBosses !== 'object' || Array.isArray(out.worldBosses)) out.worldBosses = {};
         // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
         if (out.gadgets) {
           if (out.gadgets.tramp > 0 && !out.gadgetsOwned.includes('tramp')) out.gadgetsOwned.push('tramp');
@@ -793,6 +798,12 @@ class Game {
         desc: libN < 2 ? t('Відкриється після двох звільнених країн') : t('Усі {n} босів поспіль на час. Час — у Лігу!', { n: CAMPAIGN_ORDER.length }),
       },
       {
+        id: 'worldboss', icon: '🌋', name: t('СВІТОВІ БОСИ'), locked: libN < WORLD_BOSS_MIN_COUNTRIES,
+        desc: libN < WORLD_BOSS_MIN_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: WORLD_BOSS_MIN_COUNTRIES })
+          : t('Великі боси з окремими механіками і разовими нагородами.'),
+      },
+      {
         id: 'knockout', icon: '🥊', name: t('НОКАУТ'), locked: this.progress.level < KNOCKOUT_UNLOCK_LEVEL,
         desc: this.progress.level < KNOCKOUT_UNLOCK_LEVEL
           ? t('Відкриється на {n} рівні Зоряного шляху', { n: KNOCKOUT_UNLOCK_LEVEL })
@@ -849,6 +860,26 @@ class Game {
         } else if (mode === 'arena') {
           this._hideOverlay('overlay-solo');
           this.startArena();
+        } else if (mode === 'worldboss') {
+          root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
+          cRoot.style.display = '';
+          cRoot.innerHTML = t('<div class="solo-cty-title">Якого світового боса викликаємо?</div>')
+            + WORLD_BOSSES.map((b) => {
+              const ok = worldBossUnlocked(b.id, libN);
+              const done = !!(this.save.worldBosses && this.save.worldBosses[b.id]);
+              const label = ok
+                ? `${b.icon} ${b.shortName()}${done ? ' ✅' : ''}`
+                : `${b.icon} ${b.shortName()} 🔒 ${b.unlockCountries}`;
+              return `<button class="btn solo-cty ${ok ? '' : 'locked'}" data-id="${b.id}">${label}</button>`;
+            }).join('');
+          cRoot.querySelectorAll('.solo-cty').forEach((b) => {
+            b.addEventListener('click', () => {
+              if (b.classList.contains('locked')) { this.audio.denied(); return; }
+              this.audio.click();
+              this._hideOverlay('overlay-solo');
+              this.startWorldBoss(b.dataset.id);
+            });
+          });
         } else if (mode === 'knockout') {
           this._hideOverlay('overlay-solo');
           this.startKnockout();
@@ -1290,6 +1321,29 @@ class Game {
     this.startLevel('UKR', { arena: true });
   }
 
+  // ---------- 🌋 Світові боси ----------
+  startWorldBoss(id) {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('🌋🤝 Світові боси поки доступні тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const cfg = WORLD_BOSS_BY_ID[id];
+    const lib = Object.keys(this.save.liberated || {}).length;
+    if (!cfg) {
+      this.audio.denied();
+      this.hud.toast(t('🌋 Такого світового боса немає.'));
+      return;
+    }
+    if (!worldBossUnlocked(id, lib)) {
+      this.audio.denied();
+      this.hud.toast(t('🌋 {b} відкриється після {n} звільнених країн!', { b: cfg.shortName(), n: cfg.unlockCountries }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { worldBoss: id });
+  }
+
   // ---------- 🥊 Нокаут ----------
   startKnockout() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -1416,13 +1470,17 @@ class Game {
     const isKnockout = !!opts.knockout;
     const isDefense = !!opts.defense;
     const isPvp = !!opts.pvp;
-    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp);
+    const worldBossId = opts.worldBoss || null;
+    const isWorldBoss = !!worldBossId;
+    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isWorldBoss);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = isPvp
+    document.getElementById('ll-title').textContent = isWorldBoss
+      ? t('🌋 СВІТОВИЙ БОС')
+      : isPvp
       ? t('⚔️ ПВП')
       : isDefense
       ? t('🛡️ ОБОРОНА')
@@ -1455,6 +1513,7 @@ class Game {
      *   knockout — тільки в режимі Нокаут (isKnockout); інакше — undefined.
      *   defense  — тільки в режимі Оборона (isDefense); інакше — undefined.
      *   pvp      — тільки в режимі ПВП (isPvp); інакше — undefined.
+     *   worldBoss — тільки в режимі Світового боса; інакше — undefined.
      *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
      *
      * Правило: перед доступом до режимо-умовних полів завжди перевіряй наявність (level.storm?.foo).
@@ -1479,7 +1538,7 @@ class Game {
       playground: isPlayground,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
       noGadgets: isKnockout || isDefense || isPvp,
-      noShop: isStorm || isKnockout || isDefense || isPvp,
+      noShop: isStorm || isKnockout || isDefense || isPvp || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp,
       noPickups: isPvp,
       noZombiePickups: isKnockout || isDefense || isPvp,
@@ -1489,7 +1548,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isWorldBoss && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
     level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -1543,6 +1602,9 @@ class Game {
     } else if (isPvp) {
       level.pvp = new PvpMode(level);
       level.missions = level.pvp;
+    } else if (isWorldBoss) {
+      level.worldBoss = new WorldBossMode(level, worldBossId);
+      level.missions = level.worldBoss;
     } else if (isArena) {
       // 👑 арена: тільки боси, чиста мапа
       level.bossRush = new BossRush(level);
@@ -1558,7 +1620,7 @@ class Game {
       level.missions = new DynamicMissions(level);
     }
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
@@ -1789,7 +1851,7 @@ class Game {
       }
     });
     level.bus.on('bossStart', () => {
-      document.getElementById('boss-name').textContent = country.boss.name;
+      document.getElementById('boss-name').textContent = level.worldBoss ? level.worldBoss.cfg.name() : country.boss.name;
     });
 
     // прогріваємо шейдери, поки висить екран завантаження — без фризу на старті
@@ -1824,9 +1886,9 @@ class Game {
       level.net.attach(coop.spec);
     }
 
-    if (isArena || isKnockout || isDefense || isPvp) {
+    if (isArena || isKnockout || isDefense || isPvp || isWorldBoss) {
       const a = level.world.layout.arena;
-      const z = isKnockout ? a.z : isPvp ? a.z + 4 : isDefense ? a.z + 8 : a.z + 12;
+      const z = isWorldBoss ? a.z + 16 : isKnockout ? a.z : isPvp ? a.z + 4 : isDefense ? a.z + 8 : a.z + 12;
       const gy = level.world.groundH(a.x, z);
       level.player.pos.set(a.x, gy, z);
     }
@@ -1853,8 +1915,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.pvp ? t('⚔️ ПВП') : level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.pvp ? t('Посох проти зомбі на 250 HP. У тебе 50 HP.') : level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? t('⚔️ ПВП') : level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? t('Посох проти зомбі на 250 HP. У тебе 50 HP.') : level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2774,7 +2836,16 @@ class Game {
           outside: g.level.storm.isOutside(), over: g.level.storm.over,
           phase: g.level.storm.phase,
         } : null,
+        worldBoss: g.level && g.level.worldBoss ? {
+          id: g.level.worldBoss.id,
+          over: g.level.worldBoss.over,
+          bossHp: g.level.zombies.boss ? g.level.zombies.boss.hp : null,
+          shield: !!(g.level.zombies.boss && g.level.zombies.boss.worldBossShield),
+          coreOpen: !!(g.level.zombies.boss && g.level.zombies.boss.worldBossCoreOpen),
+          hazards: g.level.worldBoss.hazards.length,
+        } : null,
         stormBest: { ...g.save.stormBest },
+        worldBosses: { ...(g.save.worldBosses || {}) },
       }),
       playgroundSelectGadget: (id) => {
         if (g.level && g.level.playground && GADGETS[id]) {
@@ -2887,6 +2958,10 @@ class Game {
       startPvp: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true };
         return g.startPvp();
+      },
+      startWorldBoss: (id) => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
+        return g.startWorldBoss(id);
       },
       knockoutForce: (roll) => { g._knockoutForce = roll; },
       pvpForce: (roll) => { g._pvpForce = roll; },

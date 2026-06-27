@@ -102,6 +102,51 @@ check(lifecycleInfo.afterLaterOver.spawnN === 1 && lifecycleInfo.afterLaterOver.
   'over=true після спавну теж блокує update', JSON.stringify(lifecycleInfo));
 check(lifecycleInfo.removed > 0, 'dispose прибирає кімнату режиму зі сцени', JSON.stringify(lifecycleInfo));
 
+console.log('▸ Світові боси: меню і старт');
+const menuInfo = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.liberated = { UKR: true, POL: true, DEU: true };
+  g.renderSoloMenu();
+  const locked = document.querySelector('.solo-mode[data-mode="worldboss"]');
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
+  g.renderSoloMenu();
+  const open = document.querySelector('.solo-mode[data-mode="worldboss"]');
+  return {
+    locked: locked?.classList.contains('locked') || false,
+    open: !!open && !open.classList.contains('locked'),
+    text: open?.textContent || '',
+  };
+});
+check(menuInfo.locked && menuInfo.open && menuInfo.text.includes('СВІТОВІ БОСИ'),
+  'меню світових босів закрите до 4 країн і відкрите після 4', JSON.stringify(menuInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
+  return g.test.startWorldBoss('radiation');
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.worldBoss, null, { timeout: 30000 });
+await page.waitForFunction(() => !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+const startInfo = await page.evaluate(() => {
+  const g = window.__game;
+  return {
+    id: g.level.worldBoss.id,
+    noShop: g.level.noShop,
+    noGadgets: g.level.noGadgets,
+    bossStyle: g.level.zombies.boss?.bossStyle,
+    hp: g.level.zombies.boss?.maxHp,
+    megabox: !!g.level.megabox,
+    playerWeapons: g.level.player.weapons,
+    worldBossState: g.test.state().worldBoss,
+  };
+});
+check(startInfo.id === 'radiation' && startInfo.noShop && !startInfo.noGadgets,
+  'світовий бос стартує як спецрежим: магазин вимкнений, гаджети доступні', JSON.stringify(startInfo));
+check(startInfo.bossStyle === 'radiation' && startInfo.hp === 9000 && !startInfo.megabox,
+  'Радіаційний бос має нову модель, HP і без мегабокса', JSON.stringify(startInfo));
+check(startInfo.playerWeapons.includes('pistol') && startInfo.worldBossState?.id === 'radiation',
+  'звичайний лоадаут гравця лишається доступним і test API бачить worldBoss', JSON.stringify(startInfo.playerWeapons));
+
 await browser.close();
 if (errors.length) {
   console.error(errors.join('\n'));
