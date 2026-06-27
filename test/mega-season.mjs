@@ -142,6 +142,30 @@ check(countryHook.q.done && countryHook.q.progress === 8 && countryHook.crystals
   && countryHook.xp >= 500 && countryHook.hypers.includes('clone'),
   '_showVictory просуває country мега-квест', JSON.stringify(countryHook));
 
+const countryReplay = await page.evaluate(() => {
+  const g = window.__game;
+  g.victoryShown = false;
+  g.save.megaQuests = null;
+  g.quests.ensureMegaQuests();
+  g.save.megaQuests.countries8.progress = 7;
+  g.save.megaQuests.countries8.done = false;
+  g.save.crystals = 0;
+  g.save.xp = 0;
+  g.save.gadgetHypers = [];
+  g.save.liberated = { ...(g.save.liberated || {}), UKR: true };
+  g.level.country = { ...g.level.country, id: 'UKR', name: 'Україна', coinReward: 0 };
+  g._showVictory();
+  return {
+    q: { ...g.save.megaQuests.countries8 },
+    crystals: g.save.crystals,
+    xp: g.save.xp,
+    hypers: [...g.save.gadgetHypers],
+  };
+});
+check(countryReplay.q.progress === 7 && !countryReplay.q.done && countryReplay.crystals === 0
+  && !countryReplay.hypers.includes('clone'),
+  'реплей вже звільненої країни не просуває countries8', JSON.stringify(countryReplay));
+
 const ui = await page.evaluate(() => {
   const g = window.__game;
   g.renderQuestsPanel();

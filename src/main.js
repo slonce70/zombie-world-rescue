@@ -2440,6 +2440,7 @@ class Game {
     this.deathT = -1;
     this._hideOverlay('overlay-death');
     const country = this.level.country;
+    const wasLiberated = !!this.save.liberated[country.id];
     this.save.liberated[country.id] = true;
     // 🎁 нагорода-зброя країни видається ОДРАЗУ в момент перемоги (раніше з'являлась лише
     // після наступного завантаження, якщо у наборі не випала місія «зачистка складу»)
@@ -2478,7 +2479,7 @@ class Game {
       }
     }
     this.progress.addXp(XP_VALUES.country);
-    this.quests.onEvent('country');
+    if (!wasLiberated) this.quests.onEvent('country');
     this.saveGame();
     if (this.level.net && this.level.net.authority) this.level.netEv('vict');
     this.globe.setLiberated();
