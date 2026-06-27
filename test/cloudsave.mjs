@@ -105,6 +105,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.gadgetHyper = saveHasProgress({ ...fresh, gadgetHypers: ['meteor'] }) === true;
     out.pet = saveHasProgress({ ...fresh, pets: ['dog'], activePet: 'dog' }) === true;
     out.towerSkin = saveHasProgress({ ...fresh, towerSkins: ['default', 'gold'], activeTowerSkin: 'gold' }) === true;
+    out.worldBoss = saveHasProgress({ ...fresh, worldBosses: { radiation: true } }) === true;
     out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
     out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
     return out;
@@ -125,6 +126,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('гіперзаряд гаджета → прогрес=true', res.gadgetHyper);
   check('куплений улюбленець → прогрес=true', res.pet);
   check('куплений скін башти → прогрес=true', res.towerSkin);
+  check('переможений світовий бос → прогрес=true', res.worldBoss);
   check('прогрес глави → прогрес=true', res.chapter);
   await ctxU.close();
 }
