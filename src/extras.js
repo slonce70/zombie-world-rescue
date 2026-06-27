@@ -641,7 +641,7 @@ export class Gadgets {
     const level = this.level;
     const game = level.game;
     if (level.noGadgets) {
-      level.bus.emit('toast', t('У Нокауті гаджети вимкнені'));
+      level.bus.emit('toast', t('У цьому режимі гаджети вимкнені'));
       game.audio.denied();
       return false;
     }

@@ -42,10 +42,12 @@ try {
     modes: document.querySelectorAll('.solo-mode').length,
     stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
     arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
+    knockoutLocked: document.querySelector('.solo-mode[data-mode="knockout"]').classList.contains('locked'),
+    defenseLocked: document.querySelector('.solo-mode[data-mode="defense"]').classList.contains('locked'),
     campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
   }));
-  check('3 режими; Шторм і Арена замкнені, Кампанія відкрита',
-    fresh.modes === 3 && fresh.stormLocked && fresh.arenaLocked && !fresh.campLocked, JSON.stringify(fresh));
+  check('5 режимів; спецрежими замкнені, Кампанія відкрита',
+    fresh.modes === 5 && fresh.stormLocked && fresh.arenaLocked && fresh.knockoutLocked && fresh.defenseLocked && !fresh.campLocked, JSON.stringify(fresh));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
   await page.click('.solo-mode[data-mode="campaign"]');

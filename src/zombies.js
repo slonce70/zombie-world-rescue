@@ -655,7 +655,7 @@ export class Zombies {
       for (let i = 0; i < n; i++) {
         level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
       }
-      if (!level.knockout) {
+      if (!level.noZombiePickups) {
         if (this.boss) {
           // під час бою з босом міньйони гарантовано дають патрони
           level.effects.spawnPickup(z.x - 1, z.z, 'ammo');

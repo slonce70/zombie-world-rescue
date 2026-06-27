@@ -21,6 +21,7 @@ import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE } from './knockout.js';
+import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import {
   HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, setAnim, updateRig,
@@ -62,7 +63,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 146;
+const APP_VERSION = 147;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -301,6 +302,7 @@ class Game {
       const mode = this._lastEndMode;
       this.endLevel();
       if (mode === 'knockout') this.startKnockout();
+      else if (mode === 'defense') this.startDefense();
       else this.startArena();
     });
     document.getElementById('btn-arena-globe').addEventListener('click', () => {
@@ -793,6 +795,12 @@ class Game {
           ? t('Відкриється на {n} рівні Зоряного шляху', { n: KNOCKOUT_UNLOCK_LEVEL })
           : t('Кімната 33×33, 10 зомбі, тільки пістолет. Перемога може дати Посох!'),
       },
+      {
+        id: 'defense', icon: '🛡️', name: t('ОБОРОНА'), locked: libN < DEFENSE_UNLOCK_COUNTRIES,
+        desc: libN < DEFENSE_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: DEFENSE_UNLOCK_COUNTRIES })
+          : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
+      },
     ];
     const root = document.getElementById('solo-modes');
     root.innerHTML = modes.map((m) => `
@@ -835,6 +843,9 @@ class Game {
         } else if (mode === 'knockout') {
           this._hideOverlay('overlay-solo');
           this.startKnockout();
+        } else if (mode === 'defense') {
+          this._hideOverlay('overlay-solo');
+          this.startDefense();
         } else {
           // шторм: обери звільнену країну (у кожної — своя таблиця Ліги)
           root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
@@ -1272,6 +1283,23 @@ class Game {
     return this.startLevel('UKR', { knockout: true });
   }
 
+  // ---------- 🛡️ Оборона ----------
+  startDefense() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('🛡️🤝 Оборона поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = Object.keys(this.save.liberated || {}).length;
+    if (lib < DEFENSE_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('🛡️ Оборона відкриється після {n} звільнених країн!', { n: DEFENSE_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { defense: true });
+  }
+
   // ---------- автооновлення ----------
   // Браузер (особливо відновлена стара вкладка) може тримати застарілу збірку.
   // Періодично звіряємо version.json із сервера і перезавантажуємось на глобусі.
@@ -1346,13 +1374,16 @@ class Game {
     const isStorm = !!opts.storm;
     document.body.classList.toggle('storm-mode', isStorm);
     const isKnockout = !!opts.knockout;
-    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout);
+    const isDefense = !!opts.defense;
+    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = isKnockout
+    document.getElementById('ll-title').textContent = isDefense
+      ? t('🛡️ ОБОРОНА')
+      : isKnockout
       ? t('🥊 НОКАУТ')
       : isArena
       ? t('👑 АРЕНА БОСІВ')
@@ -1379,6 +1410,7 @@ class Game {
      *   storm    — тільки в режимі Шторм (isStorm); інакше — undefined.
      *   bossRush — тільки в режимі Арени (isArena); інакше — undefined.
      *   knockout — тільки в режимі Нокаут (isKnockout); інакше — undefined.
+     *   defense  — тільки в режимі Оборона (isDefense); інакше — undefined.
      *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
      *
      * Правило: перед доступом до режимо-умовних полів завжди перевіряй наявність (level.storm?.foo).
@@ -1402,13 +1434,16 @@ class Game {
       runIndex: coop && coop.spec ? coop.spec.runIndex : undefined,
       playground: isPlayground,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
-      noGadgets: isKnockout,
+      noGadgets: isKnockout || isDefense,
+      noShop: isStorm || isKnockout || isDefense,
+      noBuffs: isKnockout || isDefense,
+      noZombiePickups: isKnockout || isDefense,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
     level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -1431,10 +1466,10 @@ class Game {
     // спорядження: бронежилет, шолом, кросівки (видно на герої)
     level.player.applyGear(u);
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
-    // зброя, здобута в попередніх країнах. У Нокауті навмисно лишається тільки пістолет.
-    if (isKnockout) {
-      level.player.weapons = ['pistol'];
-      level.player.cur = 'pistol';
+    // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
+    if (isKnockout || isDefense) {
+      level.player.weapons = isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       level.player._applyView();
     } else {
@@ -1449,6 +1484,9 @@ class Game {
     if (isKnockout) {
       level.knockout = new KnockoutMode(level);
       level.missions = level.knockout;
+    } else if (isDefense) {
+      level.defense = new DefenseMode(level);
+      level.missions = level.defense;
     } else if (isArena) {
       // 👑 арена: тільки боси, чиста мапа
       level.bossRush = new BossRush(level);
@@ -1464,7 +1502,7 @@ class Game {
       level.missions = new DynamicMissions(level);
     }
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
@@ -1472,7 +1510,7 @@ class Game {
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isArena && !isKnockout && !isGuest && !isPlayground) {
+    if (!isStorm && !isArena && !isKnockout && !isDefense && !isGuest && !isPlayground) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -1484,7 +1522,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of ((isGuest || isArena || isKnockout || isPlayground) ? [] : level.world.lootSpots)) {
+    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPlayground) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -1493,7 +1531,7 @@ class Game {
         level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
       }
     }
-    if (!isGuest && !isKnockout) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+    if (!isGuest && !isKnockout && !isDefense) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
 
     // приколи карти: бочки, м'яч, тварини, аеродроп
     const fun = country.map.fun || {};
@@ -1516,7 +1554,7 @@ class Game {
       if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
       return 'grenade';
     };
-    if (isKnockout) level.effects.airdropT = Infinity;
+    if (isKnockout || isDefense) level.effects.airdropT = Infinity;
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
@@ -1562,9 +1600,9 @@ class Game {
         this.audio.powerup();
         this.hud.toast(t('🪬 Тотем безсмертя!'));
       } else if (BUFF_INFO[type]) {
-        if (level.knockout) {
+        if (level.noBuffs) {
           this.audio.denied();
-          this.hud.toast(t('У Нокауті бафи вимкнені'));
+          this.hud.toast(t('У цьому режимі бафи вимкнені'));
           return;
         }
         level.player.buffs[type] = BUFF_INFO[type].dur;
@@ -1638,18 +1676,18 @@ class Game {
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
       this.quests.onEvent('kill', { weapon: level.player.cur });
-      if (!level.knockout) this.chapter.onEvent('kill');
+      if (!level.knockout && !level.defense) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
       if (z.type === 'boss' && !level.storm) {
         this.quests.onEvent('boss');
-        if (!level.knockout) this.chapter.onEvent('boss');
+        if (!level.knockout && !level.defense) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
     });
-    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout) this.chapter.onEvent('mission'); } });
+    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
-        if (!level.knockout) this.chapter.onEvent('gadget');
+        if (!level.knockout && !level.defense) this.chapter.onEvent('gadget');
         return;
       }
       const ch = level.gadgetChallenge;
@@ -1668,7 +1706,7 @@ class Game {
     level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
     level.bus.on('zombieKilled', (z) => {
-      if (level.playground || level.knockout) return;
+      if (level.playground || level.knockout || level.defense) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
@@ -1720,14 +1758,15 @@ class Game {
       level.net.attach(coop.spec);
     }
 
-    if (isArena || isKnockout) {
+    if (isArena || isKnockout || isDefense) {
       const a = level.world.layout.arena;
-      const gy = level.world.groundH(a.x, a.z + 12);
-      level.player.pos.set(a.x, gy, isKnockout ? a.z : a.z + 12);
+      const z = isKnockout ? a.z : isDefense ? a.z + 8 : a.z + 12;
+      const gy = level.world.groundH(a.x, z);
+      level.player.pos.set(a.x, gy, z);
     }
 
     this.level = level;
-    if (this.chapter && !level.playground && !level.knockout) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.playground && !level.knockout && !level.defense) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
@@ -1748,8 +1787,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -1953,6 +1992,10 @@ class Game {
     }
     if (this.level.knockout) {
       this._endKnockoutRun(false);
+      return;
+    }
+    if (this.level.defense) {
+      this._endDefenseRun(false);
       return;
     }
     const coop = !!this.level.net;
@@ -2195,6 +2238,42 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
+  _endDefenseRun(won = true) {
+    const level = this.level;
+    if (!level || !level.defense || level.defense.over) return;
+    level.defense.completed = !!won;
+    const res = level.defense.results();
+    level.defense.over = true;
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('🛡️ Ще раз!');
+    }
+    if (won) {
+      this.progress.addXp(100);
+      level.addCoins(150);
+      this.saveGame();
+    }
+    this._lastEndMode = 'defense';
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🛡️ ОБОРОНА ВИСТОЯЛА!') : t('💀 ВЕЖУ ЗРУЙНОВАНО');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('HP вежі')}</span><span class="stat-val">${res.towerHp} / ${level.defense.towerMaxHp}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`;
+    this._showOverlay('overlay-arena-end');
+  }
+
   _onBossDied() {
     if (this.level && this.level.bossRush) {
       this.level.bossRush.onBossDied();
@@ -2414,11 +2493,11 @@ class Game {
         this.level.zombies.update(simDt);
         this.level.missions.update(simDt, this.input, allowControl);
         // іграшки: самокати, мегабокс, гаджети, песик
-        if (!this.level.knockout) this.level.vehicles.update(simDt, this.input, allowControl);
+        if (!this.level.noGadgets) this.level.vehicles.update(simDt, this.input, allowControl);
         if (this.level.megabox && !this.level.megabox.done) {
           this.level.megabox.update(simDt, this.input, allowControl);
         }
-        if (!this.level.knockout) this.level.gadgets.update(simDt, this.input, allowControl);
+        if (!this.level.noGadgets) this.level.gadgets.update(simDt, this.input, allowControl);
         if (this.level.net) this._updateRevive(simDt, allowControl);
         if (this.level.pet) this.level.pet.update(simDt);
         this.level.world.update(simDt, this.level.player.pos);
@@ -2680,6 +2759,10 @@ class Game {
       startStorm: (c) => g.startStorm(c),
       startArena: () => g.startArena(),
       startKnockout: () => g.startKnockout(),
+      startDefense: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
+        return g.startDefense();
+      },
       knockoutForce: (roll) => { g._knockoutForce = roll; },
       finishKnockout: () => {
         for (const zb of [...g.level.zombies.list]) {

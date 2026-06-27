@@ -88,11 +88,11 @@ export class Shop {
 
   open() {
     if (!this.game.level) return;
-    if (this.game.level.storm || this.game.level.knockout) {
+    if (this.game.level.noShop) {
       this.isOpen = false;
       this.el.classList.remove('show');
       this.game.audio.denied();
-      this.game.hud.toast(this.game.level.knockout ? t('У Нокауті магазину немає') : t('У Штормі магазину немає'));
+      this.game.hud.toast(t('У цьому режимі магазину немає'));
       return;
     }
     this.isOpen = true;
@@ -200,9 +200,9 @@ export class Shop {
 
   buy(id) {
     const game = this.game;
-    if (game.level && (game.level.storm || game.level.knockout)) {
+    if (game.level && game.level.noShop) {
       game.audio.denied();
-      game.hud.toast(game.level.knockout ? t('У Нокауті магазину немає') : t('У Штормі магазину немає'));
+      game.hud.toast(t('У цьому режимі магазину немає'));
       return;
     }
     const save = game.save;
