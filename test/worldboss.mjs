@@ -44,6 +44,12 @@ const cfgInfo = await page.evaluate(async () => {
     ids: mod.WORLD_BOSSES.map((b) => b.id),
     unlocks: Object.fromEntries(mod.WORLD_BOSSES.map((b) => [b.id, b.unlockCountries])),
     rewards: Object.fromEntries(mod.WORLD_BOSSES.map((b) => [b.id, b.reward])),
+    helpers: {
+      rad3: mod.worldBossUnlocked('radiation', 3),
+      rad4: mod.worldBossUnlocked('radiation', 4),
+      next7: mod.nextWorldBoss(7)?.id,
+      next12: mod.nextWorldBoss(12),
+    },
   };
 });
 check(JSON.stringify(cfgInfo.ids) === JSON.stringify(['radiation', 'ice', 'titan']),
@@ -52,6 +58,8 @@ check(cfgInfo.unlocks.radiation === 4 && cfgInfo.unlocks.ice === 8 && cfgInfo.un
   'відкриття босів: 4 / 8 / 12 країн', JSON.stringify(cfgInfo.unlocks));
 check(cfgInfo.rewards.titan.crystals === 25 && cfgInfo.rewards.titan.xp === 900,
   'нагорода Титана задана в конфігу', JSON.stringify(cfgInfo.rewards.titan));
+check(!cfgInfo.helpers.rad3 && cfgInfo.helpers.rad4 && cfgInfo.helpers.next7 === 'ice' && cfgInfo.helpers.next12 === null,
+  'хелпери відкриття і наступного боса працюють', JSON.stringify(cfgInfo.helpers));
 
 await browser.close();
 if (errors.length) {

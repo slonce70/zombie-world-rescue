@@ -71,6 +71,7 @@ export class WorldBossMode {
     this.bossUnlocked = true;
     this.allDone = false;
     this.hazards = [];
+    this.roomMeshes = [];
     this._hazardT = 1.2;
     this._shieldT = 4.0;
     this._coreT = 3.0;
@@ -80,7 +81,7 @@ export class WorldBossMode {
     this.cz = a.z;
     this._half = this.roomSize / 2;
     this._buildRoom();
-    this._spawnBoss();
+    this._spawned = false;
   }
 
   get(id) { void id; return null; }
@@ -105,6 +106,11 @@ export class WorldBossMode {
   }
 
   update(dt = 0.016) {
+    if (!this._spawned) {
+      this._spawned = true;
+      this._spawnBoss();
+    }
+    if (this.over) return;
     this._clampActor(this.level.player);
     if (this.boss && this.boss.state !== 'dead') this._clampZombie(this.boss);
     if (this.id === 'radiation') this._updateRadiation(dt);
@@ -136,6 +142,11 @@ export class WorldBossMode {
       disposeObject(h.mesh);
     }
     this.hazards = [];
+    for (const mesh of this.roomMeshes) {
+      this.level.scene.remove(mesh);
+      disposeObject(mesh);
+    }
+    this.roomMeshes = [];
   }
 
   _buildRoom() {
@@ -147,6 +158,7 @@ export class WorldBossMode {
     floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
     floor.receiveShadow = true;
     level.scene.add(floor);
+    this.roomMeshes.push(floor);
     const mkWall = (x, z, sx, sz) => {
       const y = level.world.groundH(x, z) + 1.4;
       const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.8, sz), wallM);
@@ -156,6 +168,7 @@ export class WorldBossMode {
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.12, sz + 0.03), railM);
       stripe.position.set(x, y + 0.25, z);
       level.scene.add(wall, stripe);
+      this.roomMeshes.push(wall, stripe);
     };
     mkWall(cx, cz - h, this.roomSize, 0.35);
     mkWall(cx, cz + h, this.roomSize, 0.35);
