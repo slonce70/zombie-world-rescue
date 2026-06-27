@@ -183,6 +183,63 @@ await page.evaluate(() => {
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.worldBoss && window.__game.level?.zombies?.boss, null, { timeout: 30000 });
 
+console.log('▸ Світові боси: механіки');
+const radiationInfo = await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 420; i++) g.level.worldBoss.update(1 / 60);
+  return {
+    hazards: g.level.worldBoss.hazards.length,
+    hpBefore: g.level.player.health,
+  };
+});
+check(radiationInfo.hazards > 0, 'Бос Радіації створює токсичні зони', JSON.stringify(radiationInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.test.startWorldBoss('ice');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'ice' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+const iceInfo = await page.evaluate(() => {
+  const g = window.__game;
+  const b = g.level.zombies.boss;
+  b.worldBossShield = true;
+  const hp0 = b.hp;
+  b.damage(100, null, false);
+  const shielded = hp0 - b.hp;
+  b.worldBossShield = false;
+  const hp1 = b.hp;
+  b.damage(100, null, false);
+  const open = hp1 - b.hp;
+  return { shielded, open };
+});
+check(iceInfo.shielded < iceInfo.open && iceInfo.shielded === 25,
+  'крижаний щит зменшує шкоду до 25%', JSON.stringify(iceInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.test.startWorldBoss('titan');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'titan' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+const titanInfo = await page.evaluate(() => {
+  const g = window.__game;
+  const b = g.level.zombies.boss;
+  b.worldBossCoreClosed = true;
+  b.worldBossCoreOpen = false;
+  const hp0 = b.hp;
+  b.damage(100, null, false);
+  const closed = hp0 - b.hp;
+  b.worldBossCoreClosed = false;
+  b.worldBossCoreOpen = true;
+  const hp1 = b.hp;
+  b.damage(100, null, false);
+  const open = hp1 - b.hp;
+  return { closed, open };
+});
+check(titanInfo.closed === 35 && titanInfo.open === 140,
+  'ядро Титана: 35% шкоди закрите, 140% відкрите', JSON.stringify(titanInfo));
+
 await browser.close();
 if (errors.length) {
   console.error(errors.join('\n'));
