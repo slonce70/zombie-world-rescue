@@ -652,8 +652,10 @@ export class Zombies {
     if (z.type !== 'boss') {
       const coins = z.stats.coins;
       const n = z.type === 'tank' || z.type === 'shield' || z.type === 'wizard' ? 3 : z.type === 'runner' ? 2 : 1;
-      for (let i = 0; i < n; i++) {
-        level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
+      if (!level.noCoinDrops) {
+        for (let i = 0; i < n; i++) {
+          level.effects.spawnCoin(z.x + this.rng.range(-0.6, 0.6), z.z + this.rng.range(-0.6, 0.6), Math.ceil(coins / n));
+        }
       }
       if (!level.noZombiePickups) {
         if (this.boss) {
