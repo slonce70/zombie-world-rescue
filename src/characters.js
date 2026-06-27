@@ -1587,6 +1587,21 @@ const BOSS_SPECS = {
     skin: 0xc08a5a, shirt: 0x2f6b4a, pants: 0x8a2f2f, shoes: 0x5a3a22,
     eyeWhite: 0xffe9b8, pupilColor: 0x3a2a1a, browColor: 0x4a2e1c,
   },
+  // 🌍 Світовий бос: заражений реактором мутант
+  radiation: {
+    skin: 0x78c957, shirt: 0x263b26, pants: 0x31422e, shoes: 0x222820,
+    eyeWhite: 0xd6ff5a, pupilColor: 0x0b3614, browColor: 0x13351a,
+  },
+  // 🌍 Світовий бос: крижаний командир
+  iceGeneral: {
+    skin: 0xa8e8ff, shirt: 0x244a7a, pants: 0x1f304f, shoes: 0x17243c,
+    eyeWhite: 0xf0fbff, pupilColor: 0x0f4a9e, browColor: 0x224a66,
+  },
+  // 🌍 Світовий бос: важкий механічний титан
+  mechTitan: {
+    skin: 0x9aa3ad, shirt: 0x3b4656, pants: 0x252d38, shoes: 0x171d25,
+    eyeWhite: 0xffd24a, pupilColor: 0xff3a1e, browColor: 0x151a22,
+  },
 };
 
 export function makeBoss(style = 'king') {
@@ -1958,6 +1973,122 @@ export function makeBoss(style = 'king') {
       pad.position.set(0.4 * side, 1.56, 0);
       rig.body.add(pad);
     }
+  } else if (style === 'radiation') {
+    const toxicM = toonMat(0x79ff4d, 0x39ff18, 0.9);
+    const darkM = toonMat(0x1f2a22);
+    const metalM = toonMat(0x56636a, 0x1a2226, 0.15);
+    const mask = box(0.36, 0.18, 0.12, darkM);
+    mask.position.set(0, 0.03, -0.28);
+    rig.parts.head.add(mask);
+    for (const side of [-1, 1]) {
+      const filter = cylinder(0.06, 0.07, 0.14, metalM, 8);
+      filter.position.set(side * 0.17, -0.02, -0.34);
+      filter.rotation.x = Math.PI / 2;
+      rig.parts.head.add(filter);
+      const eye = sphere(0.08, toxicM, 10, 8);
+      eye.position.set(side * 0.1, 0.2, -0.24);
+      rig.parts.head.add(eye);
+    }
+    const tankM = toonMat(0x5d6f62, 0x39ff18, 0.15);
+    const tank = cylinder(0.18, 0.18, 0.62, tankM, 12);
+    tank.position.set(0, 0.22, 0.5);
+    tank.rotation.x = Math.PI / 2;
+    rig.parts.torso.add(tank);
+    const symbol = new THREE.Group();
+    const disk = cylinder(0.16, 0.16, 0.035, toxicM, 18);
+    disk.rotation.x = Math.PI / 2;
+    symbol.add(disk);
+    for (let i = 0; i < 3; i++) {
+      const blade = box(0.06, 0.2, 0.03, darkM);
+      blade.position.y = 0.08;
+      blade.rotation.z = i * 2.094;
+      symbol.add(blade);
+    }
+    symbol.position.set(0, 0.38, -0.48);
+    rig.parts.torso.add(symbol);
+    for (const side of [-1, 1]) {
+      const claw = cone(0.08, 0.22, toxicM, 6);
+      claw.position.set(0, -0.72, -0.04);
+      claw.rotation.x = Math.PI;
+      rig.parts[side < 0 ? 'armL' : 'armR'].add(claw);
+    }
+  } else if (style === 'iceGeneral') {
+    const iceM = toonMat(0xcdf6ff, 0x80ddff, 0.65);
+    const blueM = toonMat(0x2f6fb0, 0x163a78, 0.2);
+    const silverM = toonMat(0xb8d4e8, 0x6dbce8, 0.18);
+    const helm = sphere(0.34, silverM, 16, 12);
+    helm.position.y = 0.2;
+    helm.scale.set(1.05, 0.86, 1.05);
+    rig.parts.head.add(helm);
+    for (const side of [-1, 1]) {
+      const horn = cone(0.08, 0.42, iceM, 7);
+      horn.position.set(side * 0.24, 0.34, -0.02);
+      horn.rotation.z = side * -0.95;
+      horn.rotation.x = -0.25;
+      rig.parts.head.add(horn);
+    }
+    const crest = box(0.12, 0.5, 0.12, iceM);
+    crest.position.set(0, 0.55, 0.08);
+    crest.rotation.x = 0.35;
+    rig.parts.head.add(crest);
+    const breast = box(0.68, 0.58, 0.14, blueM);
+    breast.position.set(0, 0.35, -0.43);
+    rig.parts.torso.add(breast);
+    for (let i = -2; i <= 2; i++) {
+      const shard = cone(0.055, 0.28, iceM, 6);
+      shard.position.set(i * 0.13, 0.78 - Math.abs(i) * 0.04, -0.4);
+      rig.parts.torso.add(shard);
+    }
+    const sword = box(0.09, 1.05, 0.04, iceM);
+    sword.position.set(0, -0.86, -0.02);
+    const guard = box(0.28, 0.06, 0.08, silverM);
+    guard.position.set(0, -0.4, 0);
+    rig.parts.armR.add(sword, guard);
+    const shield = cylinder(0.26, 0.26, 0.08, iceM, 6);
+    shield.rotation.x = Math.PI / 2;
+    shield.position.set(0, -0.48, -0.2);
+    rig.parts.armL.add(shield);
+  } else if (style === 'mechTitan') {
+    const steelM = toonMat(0x687482, 0x202a34, 0.16);
+    const darkM = toonMat(0x202832);
+    const warnM = toonMat(0xffc933, 0xff8a00, 0.35);
+    const coreM = toonMat(0xff4a2a, 0xff1e00, 0.9);
+    rig.parts.torso.scale.set(1.18, 1.08, 1.18);
+    const visor = box(0.38, 0.11, 0.05, coreM);
+    visor.position.set(0, 0.17, -0.29);
+    rig.parts.head.add(visor);
+    const jaw = box(0.34, 0.14, 0.12, darkM);
+    jaw.position.set(0, -0.06, -0.25);
+    rig.parts.head.add(jaw);
+    for (const side of [-1, 1]) {
+      const antenna = cylinder(0.025, 0.025, 0.42, steelM, 6);
+      antenna.position.set(side * 0.19, 0.46, 0.02);
+      antenna.rotation.z = side * -0.32;
+      rig.parts.head.add(antenna);
+      const shoulder = box(0.34, 0.22, 0.34, steelM);
+      shoulder.position.set(0.5 * side, 1.58, 0);
+      rig.body.add(shoulder);
+    }
+    const chest = box(0.74, 0.62, 0.2, steelM);
+    chest.position.set(0, 0.34, -0.42);
+    rig.parts.torso.add(chest);
+    const core = cylinder(0.16, 0.16, 0.06, coreM, 18);
+    core.rotation.x = Math.PI / 2;
+    core.position.set(0, 0.34, -0.55);
+    rig.parts.torso.add(core);
+    for (const x of [-0.23, 0.23]) {
+      const stripe = box(0.09, 0.54, 0.035, warnM);
+      stripe.position.set(x, 0.34, -0.58);
+      stripe.rotation.z = x < 0 ? -0.24 : 0.24;
+      rig.parts.torso.add(stripe);
+    }
+    const cannon = cylinder(0.11, 0.13, 0.7, darkM, 10);
+    cannon.position.set(0, -0.56, -0.08);
+    cannon.rotation.x = Math.PI / 2;
+    rig.parts.armR.add(cannon);
+    const fist = box(0.28, 0.22, 0.28, steelM);
+    fist.position.set(0, -0.72, -0.02);
+    rig.parts.armL.add(fist);
   } else {
     // корона: золота / льодяна / залізна
     const crownM = style === 'frost'
