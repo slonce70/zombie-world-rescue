@@ -711,9 +711,11 @@ export class Zombies {
     if (z.type === 'boss') {
       this.boss = null;
       // фонтан монет за боса
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(1, 4), z.z + Math.sin(a) * this.rng.range(1, 4), 25);
+      if (!z.worldBoss) {
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(1, 4), z.z + Math.sin(a) * this.rng.range(1, 4), 25);
+        }
       }
       level.bus.emit('bossDied', z);
     }

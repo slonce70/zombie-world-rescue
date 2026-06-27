@@ -300,16 +300,33 @@ await page.evaluate(() => {
   g.test.startWorldBoss('radiation');
 });
 await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'radiation' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
-await page.evaluate(() => window.__game.level.zombies.boss.damage(99999, null, false));
+await page.evaluate(() => {
+  const g = window.__game;
+  window.__worldBossReplayCoinNids = new Set(g.level.effects.coins.map((c) => c.nid));
+  g.level.zombies.boss.damage(99999, null, false);
+});
 await page.waitForFunction(() => document.getElementById('overlay-arena-end').classList.contains('show'), null, { timeout: 30000 });
-const replayInfo = await page.evaluate(() => ({
-  coins: window.__game.save.coins,
-  crystals: window.__game.save.crystals,
-  xp: window.__game.save.xp,
-  stats: document.getElementById('arena-stats').textContent,
-}));
+const replayInfo = await page.evaluate(() => {
+  const g = window.__game;
+  const before = window.__worldBossReplayCoinNids || new Set();
+  const drops = g.level.effects.coins.filter((c) => c.type === 'coin' && !before.has(c.nid));
+  for (const c of [...drops]) {
+    g.test.teleport(c.mesh.position.x, c.mesh.position.z);
+    for (let i = 0; i < 5; i++) g.level.effects.update(1 / 60);
+    if (g.level.effects.coins.includes(c)) g.level.effects.collectCoinNow(c);
+  }
+  for (let i = 0; i < 10; i++) g.level.effects.update(1 / 60);
+  return {
+    coins: g.save.coins,
+    crystals: g.save.crystals,
+    xp: g.save.xp,
+    droppedCoins: drops.length,
+    remainingDrops: g.level.effects.coins.filter((c) => c.type === 'coin').length,
+    stats: document.getElementById('arena-stats').textContent,
+  };
+});
 check(replayInfo.coins === afterFirstReward.coins && replayInfo.crystals === afterFirstReward.crystals && replayInfo.xp === afterFirstReward.xp && replayInfo.stats.includes('вже отримано'),
-  'повтор не дублює разову нагороду: монети, кристали і XP', JSON.stringify(replayInfo));
+  'повтор не дублює разову нагороду навіть після збору дропів: монети, кристали і XP', JSON.stringify(replayInfo));
 
 await page.evaluate(() => {
   const g = window.__game;
