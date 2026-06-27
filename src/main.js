@@ -1802,7 +1802,7 @@ class Game {
         ? 0
         : z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill;
       if (killXp) this.progress.addXp(killXp);
-      this.quests.onEvent('kill', { weapon: level.player.cur });
+      if (!(level.worldBoss && z.type === 'boss')) this.quests.onEvent('kill', { weapon: level.player.cur });
       if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
       if (z.type === 'boss' && !level.storm && !level.worldBoss) {
