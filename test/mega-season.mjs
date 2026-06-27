@@ -170,6 +170,10 @@ const enMegaText = await page.evaluate(() => {
 check(enMegaText.includes('Mega') || enMegaText.includes('MEGA:'),
   'мега-квести можуть відрендеритись англійською', enMegaText.slice(0, 160));
 
+const stateShape = await page.evaluate(() => window.__game.test.state().megaQuests);
+check(Array.isArray(stateShape) && stateShape.length === 6 && stateShape.some((q) => q.id === 'countries8'),
+  'debug state містить megaQuests для тестів і майбутнього QA', JSON.stringify(stateShape));
+
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
   for (const e of errors.slice(0, 10)) console.log('  ', e);

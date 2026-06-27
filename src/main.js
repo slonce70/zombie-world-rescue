@@ -2756,6 +2756,7 @@ class Game {
         rideSpeed: g.level ? g.level.player.rideSpeed : 0,
         megaPity: g.save.megaPity,
         quests: g.quests.list.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
+        megaQuests: g.quests.megaList.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
         megabox: g.level && g.level.megabox ? { x: g.level.megabox.x, z: g.level.megabox.z, opened: g.level.megabox.opened } : null,
         pet: g.level ? !!g.level.pet : false,
         activePet: g.save.activePet || null,

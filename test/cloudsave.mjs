@@ -106,7 +106,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.pet = saveHasProgress({ ...fresh, pets: ['dog'], activePet: 'dog' }) === true;
     out.towerSkin = saveHasProgress({ ...fresh, towerSkins: ['default', 'gold'], activeTowerSkin: 'gold' }) === true;
     out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
-    out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { damage10000: { progress: 1, done: false } } }) === true;
+    out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
     return out;
   });
   check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
