@@ -198,6 +198,56 @@ const MEGA_QUESTS = [
       label: () => t('⚡ Гіперзаряд Відновлення · 💎 10 · ⭐ 250 XP'),
     },
   },
+  {
+    id: 'kills500', icon: '🧟', ev: 'kill', target: 500,
+    title: () => t('МЕГА: переможи {n} зомбі', { n: 500 }),
+    reward: {
+      hypers: ['shield'],
+      crystals: 8,
+      xp: 250,
+      label: () => t('🛡️ Гіперзаряд Щита · 💎 8 · ⭐ 250 XP'),
+    },
+  },
+  {
+    id: 'headshots150', icon: '🎯', ev: 'headshot', target: 150,
+    title: () => t('МЕГА: влучи в голову {n} разів', { n: 150 }),
+    reward: {
+      hypers: ['stunammo'],
+      crystals: 10,
+      xp: 300,
+      label: () => t('💫 Гіперзаряд Оглушливих куль · 💎 10 · ⭐ 300 XP'),
+    },
+  },
+  {
+    id: 'bosses10', icon: '👑', ev: 'boss', target: 10,
+    title: () => t('МЕГА: переможи {n} босів', { n: 10 }),
+    reward: {
+      hypers: ['turret'],
+      crystals: 15,
+      xp: 400,
+      label: () => t('🤖 Гіперзаряд Турелі · 💎 15 · ⭐ 400 XP'),
+    },
+  },
+  {
+    id: 'megabox10', icon: '🎁', ev: 'megabox', target: 10,
+    title: () => t('МЕГА: відкрий {n} мегабоксів', { n: 10 }),
+    reward: {
+      hypers: ['goldapple'],
+      crystals: 12,
+      xp: 350,
+      label: () => t('🍏 Гіперзаряд Золотого яблука · 💎 12 · ⭐ 350 XP'),
+    },
+  },
+  {
+    id: 'countries8', icon: '🌍', ev: 'country', target: 8,
+    title: () => t('МЕГА: звільни {n} країн', { n: 8 }),
+    reward: {
+      hypers: ['clone'],
+      crystals: 20,
+      xp: 500,
+      label: () => t('👥 Гіперзаряд Клона · 💎 20 · ⭐ 500 XP'),
+    },
+  },
 ];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
