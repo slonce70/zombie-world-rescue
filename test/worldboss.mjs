@@ -61,6 +61,40 @@ check(cfgInfo.rewards.titan.crystals === 25 && cfgInfo.rewards.titan.xp === 900,
 check(!cfgInfo.helpers.rad3 && cfgInfo.helpers.rad4 && cfgInfo.helpers.next7 === 'ice' && cfgInfo.helpers.next12 === null,
   'хелпери відкриття і наступного боса працюють', JSON.stringify(cfgInfo.helpers));
 
+console.log('▸ Світові боси: життєвий цикл');
+const lifecycleInfo = await page.evaluate(async () => {
+  const mod = await import('/src/worldboss.js');
+  const added = [];
+  let bossStart = 0;
+  let spawnN = 0;
+  const level = {
+    world: { layout: { arena: { x: 0, z: 0 } }, groundH: () => 0 },
+    scene: { add: (...items) => added.push(...items), remove: () => {} },
+    zombies: { spawn: () => { spawnN++; return { hp: 1, maxHp: 1, state: 'chase', x: 0, z: 0, y: 0, stats: {} }; } },
+    player: { pos: { x: 0, z: 0 }, vel: { x: 0, z: 0 }, health: 100, takeDamage: () => {} },
+    stats: { time: 0, kills: 0 },
+    effects: { ring: () => {} },
+    bus: { emit: (ev) => { if (ev === 'bossStart') bossStart++; } },
+    game: { hud: { banner: () => {}, toast: () => {} }, _endWorldBossRun: () => {} },
+  };
+  const mode = new mod.WorldBossMode(level, 'radiation');
+  const before = { spawnN, bossStart, added: added.length };
+  mode.over = true;
+  mode.update(0.1);
+  const afterOver = { spawnN, bossStart };
+  mode.over = false;
+  mode.update(0.1);
+  const afterFirstTick = { spawnN, bossStart, hasBoss: !!mode.boss };
+  mode.dispose();
+  return { before, afterOver, afterFirstTick };
+});
+check(lifecycleInfo.before.spawnN === 0 && lifecycleInfo.before.bossStart === 0,
+  'конструктор не спавнить боса і не шле bossStart', JSON.stringify(lifecycleInfo));
+check(lifecycleInfo.afterOver.spawnN === 0 && lifecycleInfo.afterOver.bossStart === 0,
+  'over=true блокує перший update без спавну', JSON.stringify(lifecycleInfo));
+check(lifecycleInfo.afterFirstTick.spawnN === 1 && lifecycleInfo.afterFirstTick.bossStart === 1 && lifecycleInfo.afterFirstTick.hasBoss,
+  'перший нормальний update спавнить боса один раз', JSON.stringify(lifecycleInfo));
+
 await browser.close();
 if (errors.length) {
   console.error(errors.join('\n'));

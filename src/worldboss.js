@@ -106,11 +106,11 @@ export class WorldBossMode {
   }
 
   update(dt = 0.016) {
+    if (this.over) return;
     if (!this._spawned) {
       this._spawned = true;
       this._spawnBoss();
     }
-    if (this.over) return;
     this._clampActor(this.level.player);
     if (this.boss && this.boss.state !== 'dead') this._clampZombie(this.boss);
     if (this.id === 'radiation') this._updateRadiation(dt);
