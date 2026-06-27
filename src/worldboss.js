@@ -67,7 +67,7 @@ export class WorldBossMode {
     this.prompt = null;
     this.missions = [];
     this.civilians = [];
-    this.bossStarted = true;
+    this.bossStarted = false;
     this.bossUnlocked = true;
     this.allDone = false;
     this.hazards = [];
@@ -190,6 +190,7 @@ export class WorldBossMode {
     boss.state = 'chase';
     this.level.zombies.boss = boss;
     this.boss = boss;
+    this.bossStarted = true;
     this.level.bus.emit('bossStart');
     this.level.game.hud.banner(this.cfg.name(), this.cfg.mechanic(), 4.2);
   }

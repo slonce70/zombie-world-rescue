@@ -65,11 +65,12 @@ console.log('▸ Світові боси: життєвий цикл');
 const lifecycleInfo = await page.evaluate(async () => {
   const mod = await import('/src/worldboss.js');
   const added = [];
+  const removed = [];
   let bossStart = 0;
   let spawnN = 0;
   const level = {
     world: { layout: { arena: { x: 0, z: 0 } }, groundH: () => 0 },
-    scene: { add: (...items) => added.push(...items), remove: () => {} },
+    scene: { add: (...items) => added.push(...items), remove: (...items) => removed.push(...items) },
     zombies: { spawn: () => { spawnN++; return { hp: 1, maxHp: 1, state: 'chase', x: 0, z: 0, y: 0, stats: {} }; } },
     player: { pos: { x: 0, z: 0 }, vel: { x: 0, z: 0 }, health: 100, takeDamage: () => {} },
     stats: { time: 0, kills: 0 },
@@ -78,22 +79,28 @@ const lifecycleInfo = await page.evaluate(async () => {
     game: { hud: { banner: () => {}, toast: () => {} }, _endWorldBossRun: () => {} },
   };
   const mode = new mod.WorldBossMode(level, 'radiation');
-  const before = { spawnN, bossStart, added: added.length };
+  const before = { spawnN, bossStart, added: added.length, bossStarted: mode.bossStarted };
   mode.over = true;
   mode.update(0.1);
   const afterOver = { spawnN, bossStart };
   mode.over = false;
   mode.update(0.1);
-  const afterFirstTick = { spawnN, bossStart, hasBoss: !!mode.boss };
+  const afterFirstTick = { spawnN, bossStart, hasBoss: !!mode.boss, bossStarted: mode.bossStarted };
+  mode.over = true;
+  mode.update(0.1);
+  const afterLaterOver = { spawnN, bossStart };
   mode.dispose();
-  return { before, afterOver, afterFirstTick };
+  return { before, afterOver, afterFirstTick, afterLaterOver, removed: removed.length };
 });
-check(lifecycleInfo.before.spawnN === 0 && lifecycleInfo.before.bossStart === 0,
+check(lifecycleInfo.before.spawnN === 0 && lifecycleInfo.before.bossStart === 0 && !lifecycleInfo.before.bossStarted,
   'конструктор не спавнить боса і не шле bossStart', JSON.stringify(lifecycleInfo));
 check(lifecycleInfo.afterOver.spawnN === 0 && lifecycleInfo.afterOver.bossStart === 0,
   'over=true блокує перший update без спавну', JSON.stringify(lifecycleInfo));
-check(lifecycleInfo.afterFirstTick.spawnN === 1 && lifecycleInfo.afterFirstTick.bossStart === 1 && lifecycleInfo.afterFirstTick.hasBoss,
-  'перший нормальний update спавнить боса один раз', JSON.stringify(lifecycleInfo));
+check(lifecycleInfo.afterFirstTick.spawnN === 1 && lifecycleInfo.afterFirstTick.bossStart === 1 && lifecycleInfo.afterFirstTick.hasBoss && lifecycleInfo.afterFirstTick.bossStarted,
+  'перший нормальний update спавнить боса один раз і bossStarted стає true', JSON.stringify(lifecycleInfo));
+check(lifecycleInfo.afterLaterOver.spawnN === 1 && lifecycleInfo.afterLaterOver.bossStart === 1,
+  'over=true після спавну теж блокує update', JSON.stringify(lifecycleInfo));
+check(lifecycleInfo.removed > 0, 'dispose прибирає кімнату режиму зі сцени', JSON.stringify(lifecycleInfo));
 
 await browser.close();
 if (errors.length) {
