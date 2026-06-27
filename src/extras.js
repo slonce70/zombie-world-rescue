@@ -669,10 +669,11 @@ export class Gadgets {
         game.audio.denied();
         return false;
       }
-      p.heal(50);
+      const hp = (game.save.gadgetHypers || []).includes('heal') ? 100 : 50;
+      p.heal(hp);
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
-      level.bus.emit('toast', t('💚 +50 здоров\'я!'));
+      level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: hp }));
       ok = true;
     } else if (id === 'tramp') {
       if (level.mirror) ok = this._requestPlace('tramp', 2.1);
