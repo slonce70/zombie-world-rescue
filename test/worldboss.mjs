@@ -211,10 +211,14 @@ const iceInfo = await page.evaluate(() => {
   const hp1 = b.hp;
   b.damage(100, null, false);
   const open = hp1 - b.hp;
-  return { shielded, open };
+  const hp2 = b.hp;
+  b.worldBossShield = true;
+  b.damage(0.2, null, false);
+  const fractional = hp2 - b.hp;
+  return { shielded, open, fractional };
 });
-check(iceInfo.shielded === 25 && iceInfo.open === 100,
-  'крижаний щит зменшує шкоду до 25%, без щита шкода повна', JSON.stringify(iceInfo));
+check(iceInfo.shielded === 25 && iceInfo.open === 100 && Math.abs(iceInfo.fractional - 0.05) < 0.001,
+  'крижаний щит зменшує шкоду до 25%, без щита шкода повна, дрібна шкода не округлюється', JSON.stringify(iceInfo));
 
 await page.evaluate(() => {
   const g = window.__game;

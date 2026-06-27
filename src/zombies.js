@@ -506,9 +506,9 @@ export class Zombies {
     if (z.state === 'dead') return;
     if (z.type === 'robot') this.level.bus.emit('robotMet'); // 🎓 перша зустріч з роботом → разовий банер
     const fire = !!(opts && opts.fire);
-    if (z.worldBossShield) amt = Math.max(1, Math.round(amt * 0.25));
-    if (z.worldBossCoreClosed) amt = Math.max(1, Math.round(amt * 0.35));
-    if (z.worldBossCoreOpen) amt = Math.max(1, Math.round(amt * 1.4));
+    if (z.worldBossShield) amt *= 0.25;
+    if (z.worldBossCoreClosed) amt *= 0.35;
+    if (z.worldBossCoreOpen) amt *= 1.4;
     // 🛡 щит: фронтальні влучання та вибухи приймає на себе щит
     if (z.shieldHp > 0) {
       const fx = -Math.sin(z.rig.group.rotation.y);
