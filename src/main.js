@@ -910,7 +910,7 @@ class Game {
       const pct = Math.round((q.progress / q.target) * 100);
       html += `<div class="quest-row ${q.done ? 'done' : ''}">
         <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
-        <div class="quest-reward">${q.reward || t('🪙 120 монет · ⭐ 40 XP')}</div>
+        <div class="quest-reward">${q.rewardText || t('🪙 120 монет · ⭐ 40 XP')}</div>
         <div class="quest-bar"><div style="width:${pct}%"></div></div>
         <div class="quest-prog">${q.progress} / ${q.target}</div>
       </div>`;

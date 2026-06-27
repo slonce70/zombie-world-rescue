@@ -67,7 +67,7 @@ check(res.mid.crystals === 0 && res.mid.xp === 0 && !res.mid.hypers.includes('he
 check(res.done.q && res.done.q.progress === 10000 && res.done.q.done,
   'на 10000 шкоди мега-квест виконано', JSON.stringify(res.done));
 check(res.done.crystals === 10 && res.done.xp === 250 && res.done.hypers.includes('heal'),
-  'нагорода: heal hypercharge, 10 кристалів, 250 XP', JSON.stringify(res.done));
+  'нагорода damage10000: heal hypercharge, 10 кристалів, 250 XP', JSON.stringify(res.done));
 check(res.after.crystals === 10 && res.after.xp === 250 && res.after.hypers.filter((x) => x === 'heal').length === 1,
   'після виконання нагорода не дублюється', JSON.stringify(res.after));
 check(res.html.includes('МЕГА') && res.html.includes('10000') && res.html.includes('250 XP'),

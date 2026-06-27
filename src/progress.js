@@ -191,7 +191,12 @@ const MEGA_QUESTS = [
   {
     id: 'damage10000', icon: '⚡', ev: 'damage', target: 10000,
     title: () => t('МЕГА: нанеси {n} шкоди', { n: 10000 }),
-    reward: () => t('⚡ Гіперзаряд Відновлення · 💎 10 · ⭐ 250 XP'),
+    reward: {
+      hypers: ['heal'],
+      crystals: 10,
+      xp: 250,
+      label: () => t('⚡ Гіперзаряд Відновлення · 💎 10 · ⭐ 250 XP'),
+    },
   },
 ];
 const WEAPON_NAMES = {
@@ -287,7 +292,13 @@ export class DailyQuests {
     this.ensureMegaQuests();
     return MEGA_QUESTS.map((def) => {
       const q = this.game.save.megaQuests[def.id];
-      return { ...def, title: def.title(), reward: def.reward(), progress: q.progress, done: q.done };
+      return {
+        ...def,
+        title: def.title(),
+        rewardText: def.reward.label(),
+        progress: q.progress,
+        done: q.done,
+      };
     });
   }
 
@@ -337,12 +348,15 @@ export class DailyQuests {
 
   _rewardMega(q) {
     const game = this.game;
+    const reward = q.reward || {};
     if (!Array.isArray(game.save.gadgetHypers)) game.save.gadgetHypers = [];
-    if (!game.save.gadgetHypers.includes('heal')) game.save.gadgetHypers.push('heal');
-    game.save.crystals = (game.save.crystals || 0) + 10;
+    for (const id of reward.hypers || []) {
+      if (!game.save.gadgetHypers.includes(id)) game.save.gadgetHypers.push(id);
+    }
+    game.save.crystals = (game.save.crystals || 0) + (reward.crystals || 0);
     game.audio.questDone();
-    game.hud.toast(t('⚡ Мега-квест виконано: {q}! 💚 гіпер-відновлення, 💎 10, ⭐ 250 XP', { q: q.title }));
-    game.hud.banner(t('⚡ МЕГА-КВЕСТ!'), q.reward, 4.4);
-    game.progress.addXp(250);
+    game.hud.toast(t('⚡ Мега-квест виконано: {q}! {r}', { q: q.title, r: q.rewardText }));
+    game.hud.banner(t('⚡ МЕГА-КВЕСТ!'), q.rewardText, 4.4);
+    game.progress.addXp(reward.xp || 0);
   }
 }
