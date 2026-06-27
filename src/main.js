@@ -2468,6 +2468,7 @@ class Game {
       }
     }
     this.progress.addXp(XP_VALUES.country);
+    this.quests.onEvent('country');
     this.saveGame();
     if (this.level.net && this.level.net.authority) this.level.netEv('vict');
     this.globe.setLiberated();
