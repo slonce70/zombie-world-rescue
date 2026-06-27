@@ -309,6 +309,7 @@ class Game {
       if (mode === 'knockout') this.startKnockout();
       else if (mode === 'defense') this.startDefense();
       else if (mode === 'pvp') this.startPvp();
+      else if (mode === 'worldboss') this.startWorldBoss(this._lastWorldBossId || 'radiation');
       else this.startArena();
     });
     document.getElementById('btn-arena-globe').addEventListener('click', () => {
@@ -1799,11 +1800,11 @@ class Game {
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
       this.quests.onEvent('kill', { weapon: level.player.cur });
-      if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('kill');
+      if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
-      if (z.type === 'boss' && !level.storm) {
+      if (z.type === 'boss' && !level.storm && !level.worldBoss) {
         this.quests.onEvent('boss');
-        if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('boss');
+        if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
     });
@@ -1812,10 +1813,10 @@ class Game {
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this.quests.onEvent('damage', { n: Math.round(n) });
     });
-    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('mission'); } });
+    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
-        if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('gadget');
+        if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('gadget');
         return;
       }
       const ch = level.gadgetChallenge;
@@ -1834,7 +1835,7 @@ class Game {
     level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
     level.bus.on('zombieKilled', (z) => {
-      if (level.playground || level.knockout || level.defense || level.pvp) return;
+      if (level.playground || level.knockout || level.defense || level.pvp || level.worldBoss) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
@@ -1894,7 +1895,7 @@ class Game {
     }
 
     this.level = level;
-    if (this.chapter && !level.playground && !level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
@@ -2475,8 +2476,41 @@ class Game {
     else this.audio.defeat();
     this.audio.setMode(null);
     this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('🌋 Ще раз!');
+    }
+
+    let rewardTitle = t('Нагороду вже отримано');
+    const firstClear = won && !(this.save.worldBosses && this.save.worldBosses[mode.id]);
+    if (firstClear) {
+      this.save.worldBosses = this.save.worldBosses || {};
+      this.save.worldBosses[mode.id] = true;
+      this.save.coins += mode.cfg.reward.coins;
+      this.save.crystals = (this.save.crystals || 0) + mode.cfg.reward.crystals;
+      this.progress.addXp(mode.cfg.reward.xp);
+      rewardTitle = t('🪙 +{c} · 💎 +{k} · ⭐ +{x} XP', {
+        c: mode.cfg.reward.coins,
+        k: mode.cfg.reward.crystals,
+        x: mode.cfg.reward.xp,
+      });
+      this.saveGame();
+    }
+
     this._lastEndMode = 'worldboss';
     this._lastWorldBossId = mode.id;
+    const res = mode.results();
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🌋 СВІТОВОГО БОСА ПЕРЕМОЖЕНО!') : t('💀 БОС СИЛЬНІШИЙ ЦЬОГО РАЗУ');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">${mode.cfg.icon}</span><span class="stat-name">${t('Бос')}</span><span class="stat-val">${mode.cfg.shortName()}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
+      <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${won ? rewardTitle : t('Без нагороди')}</span></div>`;
+    this._showOverlay('overlay-arena-end');
   }
 
   _onBossDied() {

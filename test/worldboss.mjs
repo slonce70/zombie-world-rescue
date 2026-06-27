@@ -173,8 +173,8 @@ const deathRouteInfo = await page.evaluate(() => {
 });
 check(deathRouteInfo.over && deathRouteInfo.ended && deathRouteInfo.lastEndMode === 'worldboss',
   'смерть світового боса завершує worldBoss, а не кампанію', JSON.stringify(deathRouteInfo));
-check(!deathRouteInfo.scheduledCampaignVictory && !deathRouteInfo.showVictoryCalled && !deathRouteInfo.worldBosses.radiation,
-  'worldBoss death не запускає country victory і не видає нагороду в Task 3', JSON.stringify(deathRouteInfo));
+check(!deathRouteInfo.scheduledCampaignVictory && !deathRouteInfo.showVictoryCalled,
+  'worldBoss death не запускає country victory', JSON.stringify(deathRouteInfo));
 
 await page.evaluate(() => {
   const g = window.__game;
@@ -243,6 +243,68 @@ const titanInfo = await page.evaluate(() => {
 });
 check(titanInfo.closed === 35 && titanInfo.open === 140,
   'ядро Титана: 35% шкоди закрите, 140% відкрите', JSON.stringify(titanInfo));
+
+console.log('▸ Світові боси: перемога, нагорода, смерть');
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.save.worldBosses = {};
+  g.save.coins = 100;
+  g.save.crystals = 0;
+  g.save.xp = 0;
+  g.save.megaQuests = { damage10000: { progress: 10000, done: true } };
+  g.test.startWorldBoss('radiation');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'radiation' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+await page.evaluate(() => {
+  const g = window.__game;
+  g.level.zombies.boss.damage(99999, null, false);
+});
+await page.waitForFunction(() => document.getElementById('overlay-arena-end').classList.contains('show'), null, { timeout: 30000 });
+const winInfo = await page.evaluate(() => ({
+  title: document.querySelector('#overlay-arena-end h1').textContent,
+  stats: document.getElementById('arena-stats').textContent,
+  coins: window.__game.save.coins,
+  crystals: window.__game.save.crystals,
+  xp: window.__game.save.xp,
+  done: window.__game.save.worldBosses.radiation,
+  last: window.__game._lastEndMode,
+}));
+check(winInfo.title.includes('БОСА ПЕРЕМОЖЕНО') && winInfo.done && winInfo.last === 'worldboss',
+  'перемога світового боса показує результат і записує clear', JSON.stringify(winInfo));
+check(winInfo.coins >= 900 && winInfo.crystals === 10 && winInfo.xp >= 450,
+  'перша перемога дає монети, кристали і XP', JSON.stringify(winInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.test.startWorldBoss('radiation');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'radiation' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+await page.evaluate(() => window.__game.level.zombies.boss.damage(99999, null, false));
+await page.waitForFunction(() => document.getElementById('overlay-arena-end').classList.contains('show'), null, { timeout: 30000 });
+const replayInfo = await page.evaluate(() => ({
+  crystals: window.__game.save.crystals,
+  stats: document.getElementById('arena-stats').textContent,
+}));
+check(replayInfo.crystals === 10 && replayInfo.stats.includes('вже отримано'),
+  'повтор не дублює разову нагороду', JSON.stringify(replayInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.test.startWorldBoss('ice');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'ice' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+await page.evaluate(() => window.__game.level.player.takeDamage(9999, 0, 0));
+await page.waitForFunction(() => document.getElementById('overlay-arena-end').classList.contains('show'), null, { timeout: 30000 });
+const loseInfo = await page.evaluate(() => ({
+  title: document.querySelector('#overlay-arena-end h1').textContent,
+  state: window.__game.state,
+  deathT: window.__game.deathT,
+}));
+check(loseInfo.title.includes('БОС СИЛЬНІШИЙ') && loseInfo.deathT === -1,
+  'смерть у світовому босі завершує забіг без респавну', JSON.stringify(loseInfo));
 
 await browser.close();
 if (errors.length) {
