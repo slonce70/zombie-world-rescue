@@ -709,6 +709,21 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .quest-bar { height: 10px; background: rgba(0,0,0,.5); border-radius: 6px; overflow: hidden; margin-top: 8px; }
 .quest-bar div { height: 100%; background: linear-gradient(90deg, #6fd86f, #3cba4d); border-radius: 6px; }
 .quest-prog { color: #9fb8d4; font-weight: 700; font-size: 13px; margin-top: 4px; }
+.quest-section-title {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0;
+  margin: 6px 2px 0;
+  opacity: .92;
+}
+.quest-row.mega {
+  border-color: rgba(255, 210, 82, .45);
+  background: rgba(255, 210, 82, .08);
+}
+.quest-row.mega .quest-bar div {
+  background: linear-gradient(90deg, #ffd252, #ff8f3d);
+}
 
 /* гардероб */
 .ward-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }

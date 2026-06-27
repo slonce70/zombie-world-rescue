@@ -57,6 +57,8 @@ export const EN = {
 "<div class=\"solo-cty-title\">Яку країну рятуємо?</div>": "<div class=\"solo-cty-title\">Which country are we saving?</div>",
 "⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆": "⭐ Level {lvl} — MAX! You're a star! 🏆",
 "⭐ Рівень {lvl} · до наступного: {a}/{b} XP": "⭐ Level {lvl} · next: {a}/{b} XP",
+"Мега-квести": "Mega Quests",
+"Щоденні": "Daily",
 "🪙 120 монет · ⭐ 40 XP": "🪙 120 coins · ⭐ 40 XP",
 "МЕГА: нанеси {n} шкоди": "MEGA: deal {n} damage",
 "⚡ Гіперзаряд Відновлення · 💎 10 · ⭐ 250 XP": "⚡ Heal Hypercharge · 💎 10 · ⭐ 250 XP",

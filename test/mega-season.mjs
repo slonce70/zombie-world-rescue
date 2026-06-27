@@ -142,6 +142,24 @@ check(countryHook.q.done && countryHook.q.progress === 8 && countryHook.crystals
   && countryHook.xp >= 500 && countryHook.hypers.includes('clone'),
   '_showVictory просуває country мега-квест', JSON.stringify(countryHook));
 
+const ui = await page.evaluate(() => {
+  const g = window.__game;
+  g.renderQuestsPanel();
+  return {
+    text: document.getElementById('quest-list').textContent,
+    megaRows: document.querySelectorAll('#quest-list .quest-row.mega').length,
+    headers: [...document.querySelectorAll('#quest-list .quest-section-title')].map((x) => x.textContent),
+  };
+});
+check(ui.headers.some((x) => x.includes('Мега-квести')),
+  'у панелі є секція Мега-квести', JSON.stringify(ui.headers));
+check(ui.headers.some((x) => x.includes('Щоденні')),
+  'у панелі є секція Щоденні', JSON.stringify(ui.headers));
+check(ui.megaRows === 6,
+  'усі 6 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
+check(ui.text.indexOf('Мега-квести') < ui.text.indexOf('Щоденні'),
+  'мега-квести показані перед щоденними', ui.text);
+
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
   for (const e of errors.slice(0, 10)) console.log('  ', e);
