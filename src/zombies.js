@@ -528,7 +528,9 @@ export class Zombies {
           return; // урон вогнем по анти-вогонь щиту — поглинається без шкоди щиту
         }
         z.shieldFire = z.shieldFire || fire; // маркер: щит уже отримував вогняний урон
+        const dealt = Math.min(amt, z.shieldHp);
         z.shieldHp -= amt;
+        if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
         this._aggro(z);
         for (const o of this.list) {
           if (o.groupId === z.groupId && o.groupId >= 0 && o.state !== 'dead'
@@ -567,7 +569,9 @@ export class Zombies {
     }
     // 🦾 нагрудник броньовика: ловить усе, КРІМ влучань у голову
     if (z.chestHp > 0 && !headshot) {
+      const dealt = Math.min(amt, z.chestHp);
       z.chestHp -= amt;
+      if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
       this._aggro(z);
       for (const o of this.list) {
         if (o.groupId === z.groupId && o.groupId >= 0 && o.state !== 'dead'
@@ -598,7 +602,9 @@ export class Zombies {
       }
       return;
     }
+    const dealt = Math.min(amt, z.hp);
     z.hp -= amt;
+    if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
     this._aggro(z);
     // розбудити сусідів по групі (тільки поблизу — не весь склад одразу)
     for (const o of this.list) {

@@ -39,6 +39,7 @@ export function saveHasProgress(s) {
     || Object.keys(s.upgrades || {}).length > 0             // куплені прокачування
     || Object.keys(s.bestiary || {}).length > 0             // бачені вороги
     || (s.chapter && (s.chapter.done || Object.keys(s.chapter.p || {}).length > 0))
+    || Object.values(s.megaQuests || {}).some((q) => q && ((q.progress | 0) > 0 || q.done))
     || (s.medals || []).length > 0                          // медалі
     || (s.stats && (s.stats.killed | 0) > 0)               // хоч одне вбивство в статистиці
     || !!s.goal                                             // поставлена ціль

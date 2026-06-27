@@ -64,7 +64,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 149;
+const APP_VERSION = 150;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -398,7 +398,7 @@ class Game {
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       hero: { ...DEFAULT_HERO },
-      gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, stormBest: {},
+      gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
@@ -434,6 +434,7 @@ class Game {
         // вкладені об'єкти і списки могли прийти зі старого сейва неповними
         if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
         if (!Array.isArray(out.gadgetHypers)) out.gadgetHypers = [];
+        if (!out.megaQuests || typeof out.megaQuests !== 'object' || Array.isArray(out.megaQuests)) out.megaQuests = {};
         // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
         if (out.gadgets) {
           if (out.gadgets.tramp > 0 && !out.gadgetsOwned.includes('tramp')) out.gadgetsOwned.push('tramp');
@@ -747,7 +748,7 @@ class Game {
       const passBadge = document.getElementById('pass-badge');
       passBadge.textContent = `⭐${this.progress.level}`;
       passBadge.classList.add('show');
-      const qLeft = this.quests.list.filter((q) => !q.done).length;
+      const qLeft = this.quests.pendingCount;
       const qBadge = document.getElementById('quest-badge');
       qBadge.textContent = qLeft;
       qBadge.classList.toggle('show', qLeft > 0);
@@ -903,12 +904,13 @@ class Game {
 
   renderQuestsPanel() {
     this.quests.ensureToday();
+    this.quests.ensureMegaQuests();
     let html = '';
-    for (const q of this.quests.list) {
+    for (const q of [...this.quests.megaList, ...this.quests.list]) {
       const pct = Math.round((q.progress / q.target) * 100);
       html += `<div class="quest-row ${q.done ? 'done' : ''}">
         <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
-        <div class="quest-reward">${t('🪙 120 монет · ⭐ 40 XP')}</div>
+        <div class="quest-reward">${q.reward || t('🪙 120 монет · ⭐ 40 XP')}</div>
         <div class="quest-bar"><div style="width:${pct}%"></div></div>
         <div class="quest-prog">${q.progress} / ${q.target}</div>
       </div>`;
@@ -1732,6 +1734,11 @@ class Game {
         if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
+    });
+    level.bus.on('zombieDamaged', (n, z) => {
+      if (level.playground) return;
+      if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
+      this.quests.onEvent('damage', { n: Math.round(n) });
     });
     level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {

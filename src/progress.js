@@ -187,6 +187,13 @@ const QUEST_POOL = [
   { id: 'horde', icon: '🌊', target: 2, title: (n) => t('Відбий {n} орди', { n }), ev: 'horde' },
 ];
 const QUEST_REWARD_COINS = 120;
+const MEGA_QUESTS = [
+  {
+    id: 'damage10000', icon: '⚡', ev: 'damage', target: 10000,
+    title: () => t('МЕГА: нанеси {n} шкоди', { n: 10000 }),
+    reward: () => t('⚡ Гіперзаряд Відновлення · 💎 10 · ⭐ 250 XP'),
+  },
+];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
   smg: t('швидкостріла'), magnum: t('магнума'), sniper: t('снайперки'), bazooka: t('базуки'),
@@ -263,11 +270,37 @@ export class DailyQuests {
     return (this.game.save.quests && this.game.save.quests.list) || [];
   }
 
+  ensureMegaQuests() {
+    const save = this.game.save;
+    if (!save.megaQuests || typeof save.megaQuests !== 'object' || Array.isArray(save.megaQuests)) save.megaQuests = {};
+    for (const def of MEGA_QUESTS) {
+      const q = save.megaQuests[def.id];
+      if (!q || typeof q !== 'object') save.megaQuests[def.id] = { progress: 0, done: false };
+      else {
+        q.progress = Math.max(0, Math.min(def.target, q.progress | 0));
+        q.done = !!q.done || q.progress >= def.target;
+      }
+    }
+  }
+
+  get megaList() {
+    this.ensureMegaQuests();
+    return MEGA_QUESTS.map((def) => {
+      const q = this.game.save.megaQuests[def.id];
+      return { ...def, title: def.title(), reward: def.reward(), progress: q.progress, done: q.done };
+    });
+  }
+
+  get pendingCount() {
+    return this.list.filter((q) => !q.done).length + this.megaList.filter((q) => !q.done).length;
+  }
+
   get doneCount() { return this.list.filter((q) => q.done).length; }
 
   // подія з гри: просуваємо відповідні завдання
   onEvent(ev, data = {}) {
     this.ensureToday();
+    this.ensureMegaQuests();
     let changed = false;
     for (const q of this.list) {
       if (q.done || q.ev !== ev) continue;
@@ -280,6 +313,17 @@ export class DailyQuests {
         this._reward(q);
       }
     }
+    for (const q of this.megaList) {
+      const state = this.game.save.megaQuests[q.id];
+      if (state.done || q.ev !== ev) continue;
+      state.progress += (data.n || 1);
+      changed = true;
+      if (state.progress >= q.target) {
+        state.progress = q.target;
+        state.done = true;
+        this._rewardMega(q);
+      }
+    }
     if (changed) this.game.saveGame();
   }
 
@@ -289,5 +333,16 @@ export class DailyQuests {
     game.audio.questDone();
     game.hud.toast(t('📅 Завдання виконано: {i} {q}! +{c} монет, +40 ⭐', { i: q.icon, q: q.title, c: QUEST_REWARD_COINS }));
     game.progress.addXp(40);
+  }
+
+  _rewardMega(q) {
+    const game = this.game;
+    if (!Array.isArray(game.save.gadgetHypers)) game.save.gadgetHypers = [];
+    if (!game.save.gadgetHypers.includes('heal')) game.save.gadgetHypers.push('heal');
+    game.save.crystals = (game.save.crystals || 0) + 10;
+    game.audio.questDone();
+    game.hud.toast(t('⚡ Мега-квест виконано: {q}! 💚 гіпер-відновлення, 💎 10, ⭐ 250 XP', { q: q.title }));
+    game.hud.banner(t('⚡ МЕГА-КВЕСТ!'), q.reward, 4.4);
+    game.progress.addXp(250);
   }
 }
