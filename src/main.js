@@ -2052,6 +2052,7 @@ class Game {
     if (this.level) {
       // standalone-ресурси Effects (оригінал tracerMat, гео монет/снарядів/гранат) обхід сцени
       // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
+      if (this.level.worldBoss && this.level.worldBoss.dispose) this.level.worldBoss.dispose();
       if (this.level.effects && this.level.effects.dispose) this.level.effects.dispose();
       // звільняємо ресурси сцени — але НЕ спільні кешовані (matCache/geoCache/gradMap/bakedMat
       // із characters.js): вони живуть на весь сеанс і переюзаються наступними рівнями.
@@ -2128,6 +2129,10 @@ class Game {
     }
     if (this.level.pvp) {
       this._endPvpRun(false);
+      return;
+    }
+    if (this.level.worldBoss) {
+      this._endWorldBossRun(false);
       return;
     }
     const coop = !!this.level.net;
@@ -2454,9 +2459,33 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
+  _endWorldBossRun(won = true) {
+    const level = this.level;
+    if (!level || !level.worldBoss) return;
+    const mode = level.worldBoss;
+    if (mode._ended) return;
+    mode._ended = true;
+    mode.completed = !!won;
+    mode.over = true;
+    level.bossDefeated = !!won;
+    this.victoryShown = !!won;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    this._lastEndMode = 'worldboss';
+    this._lastWorldBossId = mode.id;
+  }
+
   _onBossDied() {
     if (this.level && this.level.bossRush) {
       this.level.bossRush.onBossDied();
+      return;
+    }
+    if (this.level && this.level.worldBoss) {
+      this.level.worldBoss.onBossDied();
       return;
     }
     if (this.level && this.level.storm) {

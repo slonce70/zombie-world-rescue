@@ -147,6 +147,42 @@ check(startInfo.bossStyle === 'radiation' && startInfo.hp === 9000 && !startInfo
 check(startInfo.playerWeapons.includes('pistol') && startInfo.worldBossState?.id === 'radiation',
   'звичайний лоадаут гравця лишається доступним і test API бачить worldBoss', JSON.stringify(startInfo.playerWeapons));
 
+const deathRouteInfo = await page.evaluate(() => {
+  const g = window.__game;
+  let scheduledCampaignVictory = false;
+  let showVictoryCalled = false;
+  const oldTimeout = window.setTimeout;
+  const oldShowVictory = g._showVictory.bind(g);
+  window.setTimeout = (fn, ms, ...args) => {
+    if (ms === 2400) scheduledCampaignVictory = true;
+    return 0;
+  };
+  g._showVictory = () => { showVictoryCalled = true; };
+  g._onBossDied();
+  window.setTimeout = oldTimeout;
+  g._showVictory = oldShowVictory;
+  return {
+    over: !!g.level.worldBoss.over,
+    ended: !!g.level.worldBoss._ended,
+    victoryShown: g.victoryShown,
+    lastEndMode: g._lastEndMode,
+    scheduledCampaignVictory,
+    showVictoryCalled,
+    worldBosses: { ...(g.save.worldBosses || {}) },
+  };
+});
+check(deathRouteInfo.over && deathRouteInfo.ended && deathRouteInfo.lastEndMode === 'worldboss',
+  'смерть світового боса завершує worldBoss, а не кампанію', JSON.stringify(deathRouteInfo));
+check(!deathRouteInfo.scheduledCampaignVictory && !deathRouteInfo.showVictoryCalled && !deathRouteInfo.worldBosses.radiation,
+  'worldBoss death не запускає country victory і не видає нагороду в Task 3', JSON.stringify(deathRouteInfo));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.test.startWorldBoss('radiation');
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.worldBoss && window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+
 await browser.close();
 if (errors.length) {
   console.error(errors.join('\n'));
