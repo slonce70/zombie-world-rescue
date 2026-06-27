@@ -160,6 +160,16 @@ check(ui.megaRows === 6,
 check(ui.text.indexOf('Мега-квести') < ui.text.indexOf('Щоденні'),
   'мега-квести показані перед щоденними', ui.text);
 
+await page.evaluate(() => localStorage.setItem('zr-lang', 'en'));
+await page.reload({ waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+const enMegaText = await page.evaluate(() => {
+  window.__game.renderQuestsPanel();
+  return document.getElementById('quest-list')?.textContent || '';
+});
+check(enMegaText.includes('Mega') || enMegaText.includes('MEGA:'),
+  'мега-квести можуть відрендеритись англійською', enMegaText.slice(0, 160));
+
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
   for (const e of errors.slice(0, 10)) console.log('  ', e);
