@@ -213,8 +213,8 @@ const iceInfo = await page.evaluate(() => {
   const open = hp1 - b.hp;
   return { shielded, open };
 });
-check(iceInfo.shielded < iceInfo.open && iceInfo.shielded === 25,
-  'крижаний щит зменшує шкоду до 25%', JSON.stringify(iceInfo));
+check(iceInfo.shielded === 25 && iceInfo.open === 100,
+  'крижаний щит зменшує шкоду до 25%, без щита шкода повна', JSON.stringify(iceInfo));
 
 await page.evaluate(() => {
   const g = window.__game;
