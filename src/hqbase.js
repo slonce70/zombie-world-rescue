@@ -1,4 +1,4 @@
-// 🏠 Живий Штаб Рятівника: маленька 3D-сцена-вітрина, куди дитина заходить зі Штабу.
+// 🏠 База Рятівника: маленька 3D-сцена-вітрина, куди дитина заходить зі Штабу.
 // Read-only: показує героя, трофеї звільнених країн, відкритий бестіарій і безпечні
 // тренувальні мішені. Жодного UGC/чату/мережі/нової економії (див. план living-rescue-hq).
 import * as THREE from 'three';
@@ -229,12 +229,36 @@ export class LivingHQ {
     if (!ui) {
       ui = document.createElement('div');
       ui.id = 'hqbase-ui';
-      ui.innerHTML = `<button id="btn-hqbase-exit" class="btn">🌍 ${t('На глобус')}</button><div class="hqbase-counter">🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b></div>`;
+      ui.innerHTML = `<div class="hqbase-actions">
+        <button id="btn-hqbase-exit" class="btn">🌍 ${t('На глобус')}</button>
+        <button id="btn-hqbase-panel" class="btn">🏠 ${t('База')}</button>
+        <button id="btn-hqbase-wardrobe" class="btn">🎒 ${t('Гардероб')}</button>
+      </div><div class="hqbase-counter">
+        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> · 📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> · 🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b>
+      </div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
+      document.getElementById('btn-hqbase-panel').addEventListener('click', () => {
+        this.game.exitHQBase();
+        this.game.hq.render();
+        this.game._showOverlay('overlay-hq');
+      });
+      document.getElementById('btn-hqbase-wardrobe').addEventListener('click', () => {
+        this.game.exitHQBase();
+        this.game.renderWardrobe();
+        this.game._showOverlay('overlay-wardrobe');
+      });
     }
     ui.style.display = '';
     const c = document.getElementById('hqbase-hit-count');
     if (c) c.textContent = '0';
+    const saved = this.game.save.liberated || {};
+    const bestiary = this.game.save.bestiary || {};
+    const countries = Object.keys(saved).filter((id) => saved[id]).length;
+    const beasts = Object.keys(bestiary).filter((id) => bestiary[id] > 0).length;
+    const cc = document.getElementById('hqbase-country-count');
+    const bc = document.getElementById('hqbase-beast-count');
+    if (cc) cc.textContent = String(countries);
+    if (bc) bc.textContent = String(beasts);
   }
 }

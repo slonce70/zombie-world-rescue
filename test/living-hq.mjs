@@ -27,17 +27,22 @@ await page.evaluate(() => {
 });
 
 await page.click('#btn-menu');
+check(await page.textContent('#btn-hq').then((s) => /База|Base|База/.test(s || '')), 'кнопка меню називає це базою');
 await page.click('#btn-hq');
 await page.waitForSelector('#overlay-hq.show', { timeout: 10000 });
 
-console.log('▸ Вхід у Живий Штаб');
-check(!!await page.$('#btn-hqbase'), 'кнопка входу в Живий Штаб існує');
-check(await page.textContent('#btn-hqbase').then((s) => /Живий Штаб|Living HQ|Живой Штаб/.test(s || '')), 'кнопка має зрозумілий текст');
+console.log('▸ Вхід у Базу');
+check(!!await page.$('#btn-hqbase'), 'кнопка входу в Базу існує');
+check(await page.textContent('#btn-hqbase').then((s) => /Баз|Base/.test(s || '')), 'кнопка має зрозумілий текст бази');
 
 await page.click('#btn-hqbase');
 await page.waitForFunction(() => window.__game && window.__game.state === 'hqbase', null, { timeout: 10000 });
 check(await page.evaluate(() => window.__game.state) === 'hqbase', 'клік входить у state=hqbase');
 check(!!await page.$('#hqbase-ui'), 'UI Живого Штабу показано');
+check(await page.textContent('#hqbase-ui').then((s) => /Країни.*3|Countries.*3|Страны.*3/.test(s || '')), 'UI бази показує кількість врятованих країн');
+check(await page.textContent('#hqbase-ui').then((s) => /Бестіарій.*3|Bestiary.*3|Бестиарий.*3/.test(s || '')), 'UI бази показує відкритий бестіарій');
+check(!!await page.$('#btn-hqbase-wardrobe'), 'у базі є швидка кнопка Гардероба');
+check(!!await page.$('#btn-hqbase-panel'), 'у базі є швидка кнопка панелі бази');
 
 console.log('▸ 3D-сцена і трофеї з сейва');
 const st = await page.evaluate(() => window.__game.hqbase.debugState());
