@@ -1798,7 +1798,10 @@ class Game {
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
       if (z.golden) this.save.stats.golden++;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
-      this.progress.addXp(z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill);
+      const killXp = level.worldBoss && z.type === 'boss'
+        ? 0
+        : z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill;
+      if (killXp) this.progress.addXp(killXp);
       this.quests.onEvent('kill', { weapon: level.player.cur });
       if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');

@@ -244,6 +244,24 @@ const titanInfo = await page.evaluate(() => {
 check(titanInfo.closed === 35 && titanInfo.open === 140,
   'ядро Титана: 35% шкоди закрите, 140% відкрите', JSON.stringify(titanInfo));
 
+console.log('▸ Світові боси: мега-квест шкоди');
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.save.megaQuests = null;
+  g.quests.ensureMegaQuests();
+  g.test.startWorldBoss('radiation');
+});
+await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'radiation' && !!window.__game.level?.zombies?.boss, null, { timeout: 30000 });
+const megaDamageInfo = await page.evaluate(() => {
+  const g = window.__game;
+  g.level.zombies.boss.damage(123, null, false);
+  const q = g.quests.megaList.find((x) => x.id === 'damage10000');
+  return { progress: q?.progress || 0, done: !!q?.done };
+});
+check(megaDamageInfo.progress >= 123 && !megaDamageInfo.done,
+  'шкода по світовому босу рахується в мега-квест шкоди', JSON.stringify(megaDamageInfo));
+
 console.log('▸ Світові боси: перемога, нагорода, смерть');
 await page.evaluate(() => {
   const g = window.__game;
@@ -274,6 +292,7 @@ check(winInfo.title.includes('БОСА ПЕРЕМОЖЕНО') && winInfo.done &&
   'перемога світового боса показує результат і записує clear', JSON.stringify(winInfo));
 check(winInfo.coins >= 900 && winInfo.crystals === 10 && winInfo.xp >= 450,
   'перша перемога дає монети, кристали і XP', JSON.stringify(winInfo));
+const afterFirstReward = { coins: winInfo.coins, crystals: winInfo.crystals, xp: winInfo.xp };
 
 await page.evaluate(() => {
   const g = window.__game;
@@ -284,11 +303,13 @@ await page.waitForFunction(() => window.__game.level?.worldBoss?.id === 'radiati
 await page.evaluate(() => window.__game.level.zombies.boss.damage(99999, null, false));
 await page.waitForFunction(() => document.getElementById('overlay-arena-end').classList.contains('show'), null, { timeout: 30000 });
 const replayInfo = await page.evaluate(() => ({
+  coins: window.__game.save.coins,
   crystals: window.__game.save.crystals,
+  xp: window.__game.save.xp,
   stats: document.getElementById('arena-stats').textContent,
 }));
-check(replayInfo.crystals === 10 && replayInfo.stats.includes('вже отримано'),
-  'повтор не дублює разову нагороду', JSON.stringify(replayInfo));
+check(replayInfo.coins === afterFirstReward.coins && replayInfo.crystals === afterFirstReward.crystals && replayInfo.xp === afterFirstReward.xp && replayInfo.stats.includes('вже отримано'),
+  'повтор не дублює разову нагороду: монети, кристали і XP', JSON.stringify(replayInfo));
 
 await page.evaluate(() => {
   const g = window.__game;
