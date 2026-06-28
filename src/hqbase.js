@@ -380,16 +380,28 @@ export class LivingHQ {
       ui.innerHTML = `<div class="hqbase-actions">
         <button id="btn-hqbase-exit" class="btn">🌍 ${t('На глобус')}</button>
         <button id="btn-hqbase-panel" class="btn">🏠 ${t('База')}</button>
+        <button id="btn-hqbase-quests" class="btn">📅 ${t('Квести')}</button>
         <button id="btn-hqbase-wardrobe" class="btn">🎒 ${t('Гардероб')}</button>
       </div><div class="hqbase-counter">
-        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> · 📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> · 🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b> · 💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b>
-      </div>`;
+        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> ·
+        📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> ·
+        🌋 ${t('Боси')}: <b id="hqbase-worldboss-count">0</b> ·
+        👕 ${t('Скіни')}: <b id="hqbase-skin-count">0</b> ·
+        🏆 ${t('Зал')}: <b id="hqbase-hall-count">0</b> ·
+        🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b> ·
+        💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b>
+      </div><div id="hqbase-mega-list" class="hqbase-mini"></div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
       document.getElementById('btn-hqbase-panel').addEventListener('click', () => {
         this.game.exitHQBase();
         this.game.hq.render();
         this.game._showOverlay('overlay-hq');
+      });
+      document.getElementById('btn-hqbase-quests').addEventListener('click', () => {
+        this.game.exitHQBase();
+        this.game.renderQuestsPanel();
+        this.game._showOverlay('overlay-quests');
       });
       document.getElementById('btn-hqbase-wardrobe').addEventListener('click', () => {
         this.game.exitHQBase();
@@ -398,17 +410,38 @@ export class LivingHQ {
       });
     }
     ui.style.display = '';
-    const c = document.getElementById('hqbase-hit-count');
-    if (c) c.textContent = '0';
+    const hit = document.getElementById('hqbase-hit-count');
+    if (hit) hit.textContent = '0';
     const dmg = document.getElementById('hqbase-damage-count');
     if (dmg) dmg.textContent = '0';
-    const saved = this.game.save.liberated || {};
-    const bestiary = this.game.save.bestiary || {};
+    const save = this.game.save;
+    const saved = save.liberated || {};
+    const bestiary = save.bestiary || {};
     const countries = Object.keys(saved).filter((id) => saved[id]).length;
     const beasts = Object.keys(bestiary).filter((id) => bestiary[id] > 0).length;
+    const worldBosses = Object.keys(save.worldBosses || {}).filter((id) => save.worldBosses[id]).length;
+    const skins = (save.skins || []).filter((id) => HERO_SKINS[id]).length;
+    const hall = 4;
     const cc = document.getElementById('hqbase-country-count');
     const bc = document.getElementById('hqbase-beast-count');
+    const wc = document.getElementById('hqbase-worldboss-count');
+    const sc = document.getElementById('hqbase-skin-count');
+    const hc = document.getElementById('hqbase-hall-count');
     if (cc) cc.textContent = String(countries);
     if (bc) bc.textContent = String(beasts);
+    if (wc) wc.textContent = String(worldBosses);
+    if (sc) sc.textContent = String(skins);
+    if (hc) hc.textContent = String(hall);
+
+    this.game.quests.ensureMegaQuests();
+    const mini = document.getElementById('hqbase-mega-list');
+    if (mini) {
+      mini.innerHTML = this.game.quests.megaList.slice(0, 3).map((q) => {
+        const pct = Math.round((q.progress / q.target) * 100);
+        return `<div class="hqbase-mini-row ${q.done ? 'done' : ''}">
+          <span>${q.icon} ${q.title}</span><b>${pct}%</b>
+        </div>`;
+      }).join('');
+    }
   }
 }

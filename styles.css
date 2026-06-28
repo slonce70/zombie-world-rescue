@@ -1213,17 +1213,44 @@ body.touch-mode #touch-coach.show { display: block; }
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
   z-index: 20;
+  max-width: 720px;
+  pointer-events: auto;
 }
 .hqbase-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.hqbase-actions .btn { min-height: 38px; }
 .hqbase-counter {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, .45);
+  background: rgba(0, 0, 0, .48);
   color: #fff;
   font-weight: 800;
-  text-align: center;
+  line-height: 1.55;
+}
+.hqbase-mini {
+  margin-top: 8px;
+  display: grid;
+  gap: 5px;
+  max-width: 560px;
+}
+.hqbase-mini-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .42);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+.hqbase-mini-row.done { background: rgba(76, 193, 88, .48); }
+@media (max-width: 640px) {
+  #hqbase-ui { max-width: none; }
+  .hqbase-counter { font-size: 12px; }
+  .hqbase-mini-row { font-size: 11px; }
 }
 
 /* 🎲 Драфт «Прокачка» — великі тап-картки, кольори за тегом */
