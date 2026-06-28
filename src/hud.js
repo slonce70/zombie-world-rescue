@@ -127,6 +127,7 @@ export class HUD {
     this.el.bannerTitle.textContent = title;
     this.el.bannerSub.textContent = sub;
     this.el.banner.classList.add('show');
+    document.body.classList.add('banner-active');
     this.bannerT = dur;
   }
 
@@ -354,7 +355,10 @@ export class HUD {
     // банер
     if (this.bannerT > 0) {
       this.bannerT -= dt;
-      if (this.bannerT <= 0) this.el.banner.classList.remove('show');
+      if (this.bannerT <= 0) {
+        this.el.banner.classList.remove('show');
+        document.body.classList.remove('banner-active');
+      }
     }
 
     // віньєтка

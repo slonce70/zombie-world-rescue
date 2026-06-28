@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 163;
+const APP_VERSION = 164;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -328,12 +328,16 @@ class Game {
     });
 
     // 🌐 перемикач мови: uk → en → ru (перезавантаження застосовує все одразу)
-    const langBtn = document.getElementById('btn-lang');
-    langBtn.textContent = `🌐 ${LANG_NAMES[getLang()]}`;
-    langBtn.addEventListener('click', () => {
-      this.audio.click();
-      setLang(LANGS[(LANGS.indexOf(getLang()) + 1) % LANGS.length]);
-    });
+    const wireLangBtn = (langBtn) => {
+      if (!langBtn) return;
+      langBtn.textContent = `🌐 ${LANG_NAMES[getLang()]}`;
+      langBtn.addEventListener('click', () => {
+        this.audio.click();
+        setLang(LANGS[(LANGS.indexOf(getLang()) + 1) % LANGS.length]);
+      });
+    };
+    wireLangBtn(document.getElementById('btn-lang'));
+    wireLangBtn(document.getElementById('btn-lang-globe'));
 
     // перемикач якості
     document.getElementById('btn-quality').addEventListener('click', () => {
@@ -722,7 +726,8 @@ class Game {
       const open = isCountryOpen(lib, id);
       const playable = liberated || open;
       const badge = liberated ? '✅' : (open ? '🔴' : '🔒');
-      const item = document.createElement('div');
+      const item = document.createElement('button');
+      item.type = 'button';
       item.className = 'country-item' + (playable ? '' : ' locked');
       item.dataset.id = id;
       item.innerHTML = `<span class="ci-flag">${c.flag}</span><span class="ci-name">${c.name}</span><span class="ci-badge">${badge}</span>`;
@@ -745,7 +750,7 @@ class Game {
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
-    if (show) document.body.classList.remove('storm-mode', 'no-shop-mode');
+    if (show) document.body.classList.remove('storm-mode', 'no-shop-mode', 'banner-active');
     // ховаємо тултип країни при виході з глобуса, щоб «звільнено…» не лишався над рівнем
     if (!show) { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; }
     if (show) {
@@ -838,12 +843,12 @@ class Game {
     ];
     const root = document.getElementById('solo-modes');
     root.innerHTML = modes.map((m) => `
-      <div class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
+      <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
         <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}</div>
         <div class="sm-desc">${m.desc}</div></div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
-      </div>`).join('');
+      </button>`).join('');
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';

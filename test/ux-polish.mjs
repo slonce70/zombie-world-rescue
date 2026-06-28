@@ -1,0 +1,111 @@
+import { chromium } from 'playwright';
+
+const BASE = 'http://localhost:8741';
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+let failed = 0;
+const check = (ok, msg, extra = '') => {
+  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
+  if (!ok) failed++;
+};
+
+async function waitFor(page, fn, timeoutMs, label) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    if (await fn()) return true;
+    await page.waitForTimeout(200);
+  }
+  console.log(`  ⚠️ Таймаут: ${label}`);
+  return false;
+}
+
+console.log('▸ UX polish: portrait globe remains playable');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&touch`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
+  30000, 'globe');
+  const state = await page.evaluate(() => {
+    const hint = document.getElementById('rotate-hint');
+    const solo = document.getElementById('btn-solo');
+    return {
+      hintDisplay: getComputedStyle(hint).display,
+      hintPointerEvents: getComputedStyle(hint).pointerEvents,
+      soloTopElement: document.elementFromPoint(
+        solo.getBoundingClientRect().left + solo.getBoundingClientRect().width / 2,
+        solo.getBoundingClientRect().top + solo.getBoundingClientRect().height / 2
+      )?.id,
+    };
+  });
+  check(state.hintDisplay === 'none', 'портретна підказка не блокує глобус до старту рівня', JSON.stringify(state));
+  check(state.soloTopElement === 'btn-solo', 'кнопка ГРАТИ доступна для тапа у портреті', JSON.stringify(state));
+  await ctx.close();
+}
+
+console.log('▸ UX polish: clickable menu items are native buttons');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
+  30000, 'globe');
+  await page.click('#btn-solo');
+  await page.click('.solo-mode[data-mode="campaign"]');
+  const menu = await page.evaluate(() => ({
+    soloModesAreButtons: [...document.querySelectorAll('.solo-mode')].every((el) => el.tagName === 'BUTTON'),
+    countriesAreButtons: [...document.querySelectorAll('#country-list .country-item')].every((el) => el.tagName === 'BUTTON'),
+    countryCount: document.querySelectorAll('#country-list .country-item').length,
+  }));
+  check(menu.soloModesAreButtons, 'режими у меню ГРАТИ є <button>', JSON.stringify(menu));
+  check(menu.countryCount >= 6 && menu.countriesAreButtons, 'країни кампанії є <button>', JSON.stringify(menu));
+  await ctx.close();
+}
+
+console.log('▸ UX polish: mobile banner does not cover the live waypoint');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 844, height: 390 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&country=UKR&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
+  30000, 'level');
+  await page.waitForTimeout(800);
+  await page.tap('body', { position: { x: 420, y: 350 } }).catch(() => {});
+  await page.waitForTimeout(400);
+  const overlap = await page.evaluate(() => {
+    const banner = document.getElementById('banner');
+    const wp = document.getElementById('waypoint');
+    const br = banner.getBoundingClientRect();
+    const wr = wp.getBoundingClientRect();
+    const visible = (el) => {
+      const cs = getComputedStyle(el);
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity || 1) > 0.05;
+    };
+    const intersects = visible(banner) && visible(wp)
+      && br.left < wr.right && br.right > wr.left && br.top < wr.bottom && br.bottom > wr.top;
+    return { intersects, bannerVisible: visible(banner), waypointVisible: visible(wp), br, wr };
+  });
+  check(!overlap.intersects, 'банер не перекриває waypoint на mobile landscape', JSON.stringify(overlap));
+  await ctx.close();
+}
+
+console.log(failed === 0 ? '🎉 UX POLISH OK' : `💥 UX POLISH FAILURES: ${failed}`);
+await browser.close();
+process.exit(failed === 0 ? 0 : 1);

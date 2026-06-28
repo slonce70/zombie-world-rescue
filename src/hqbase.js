@@ -407,13 +407,12 @@ export class LivingHQ {
         <button id="btn-hqbase-quests" class="btn">📅 ${t('Квести')}</button>
         <button id="btn-hqbase-wardrobe" class="btn">🎒 ${t('Гардероб')}</button>
       </div><div class="hqbase-counter">
-        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> ·
-        📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> ·
-        🌋 ${t('Боси')}: <b id="hqbase-worldboss-count">0</b> ·
-        👕 ${t('Скіни')}: <b id="hqbase-skin-count">0</b> ·
-        🏆 ${t('Зал')}: <b id="hqbase-hall-count">0</b> ·
-        🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b> ·
-        💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b>
+        <span>🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b></span>
+        <span>📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b></span>
+        <span>👕 ${t('Скіни')}: <b id="hqbase-skin-count">0</b></span>
+        <span>🏆 ${t('Зал')}: <b id="hqbase-hall-count">0</b></span>
+        <span>🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b></span>
+        <span>💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b></span>
       </div><div id="hqbase-mega-list" class="hqbase-mini"></div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
@@ -443,19 +442,15 @@ export class LivingHQ {
     const bestiary = save.bestiary || {};
     const countries = Object.keys(saved).filter((id) => saved[id]).length;
     const beasts = Object.keys(bestiary).filter((id) => bestiary[id] > 0).length;
-    const worldBosses = Object.keys(save.worldBosses || {}).filter((id) => save.worldBosses[id]).length;
     const skins = (save.skins || []).filter((id) => HERO_SKINS[id]).length;
-    const hall = 4;
     const cc = document.getElementById('hqbase-country-count');
     const bc = document.getElementById('hqbase-beast-count');
-    const wc = document.getElementById('hqbase-worldboss-count');
     const sc = document.getElementById('hqbase-skin-count');
     const hc = document.getElementById('hqbase-hall-count');
     if (cc) cc.textContent = String(countries);
     if (bc) bc.textContent = String(beasts);
-    if (wc) wc.textContent = String(worldBosses);
     if (sc) sc.textContent = String(skins);
-    if (hc) hc.textContent = String(hall);
+    if (hc) hc.textContent = '4';
 
     this.game.quests.ensureMegaQuests();
     const mini = document.getElementById('hqbase-mega-list');

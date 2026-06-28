@@ -411,6 +411,7 @@ body.touch-mode #horde-counter { top: 108px; font-size: 14px; padding: 5px 14px;
 body.touch-mode #combo { top: 46%; font-size: 26px; }
 body.touch-mode #xp-chip { display: none; }
 body.touch-mode #waypoint { font-size: 13px; }
+body.touch-mode.banner-active #waypoint.show { display: none; }
 .tb {
   width: 50px; height: 50px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
   background: rgba(18, 30, 46, 0.55); font-size: 21px; cursor: pointer;
@@ -607,6 +608,7 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
   display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
   background: rgba(28, 44, 66, 0.9); border: 2px solid var(--ui-border);
   border-radius: 14px; padding: 8px 12px; cursor: pointer; font-weight: 800;
+  font-family: var(--font); font-size: inherit; appearance: none;
   color: #fff; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.35);
   transition: transform .12s, border-color .12s;
 }
@@ -633,6 +635,11 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 }
 .globe-act:hover { border-color: var(--accent); transform: translateY(-2px); }
 .globe-act.locked { opacity: 0.55; }
+.globe-lang-btn {
+  position: absolute; right: calc(14px + env(safe-area-inset-right));
+  top: calc(14px + env(safe-area-inset-top)); z-index: 12;
+  pointer-events: auto; font-size: 14px; padding: 10px 14px;
+}
 .act-badge {
   display: none; min-width: 20px; height: 20px; border-radius: 10px; margin-left: 4px;
   background: #ff5d5d; color: #fff; font-size: 12px; line-height: 20px; padding: 0 5px;
@@ -846,7 +853,7 @@ body.no-shop-mode .shop-key-hint { display: none; }
 /* портрет на телефоні І планшеті (до 1024px) — HUD розрахований на ландшафт,
    тож просимо повернути пристрій. Ландшафт планшета (ширина > висота) не зачіпається. */
 @media (orientation: portrait) and (max-width: 1024px) {
-  body.touch-mode #rotate-hint { display: flex; }
+  body.touch-mode.in-level #rotate-hint { display: flex; }
 }
 
 /* ⌨️→📱 На телефоні клавіатурні підказки зайві — ховаємо, показуємо легенду дотику */
@@ -1095,6 +1102,7 @@ body.touch-mode #touch-coach.show { display: block; }
   display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer;
   background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px; padding: 12px 16px; transition: border-color .15s, transform .15s;
+  width: 100%; font-family: var(--font); color: inherit; appearance: none;
 }
 .solo-mode:hover { border-color: var(--accent); transform: translateY(-2px); }
 .solo-mode.sel { border-color: var(--accent); background: rgba(255, 210, 63, 0.1); }
@@ -1127,9 +1135,15 @@ body.touch-mode #touch-coach.show { display: block; }
 
 @media (max-width: 900px) {
   .globe-menu-btn { font-size: 14px; padding: 8px 12px; }
+  .globe-lang-btn { font-size: 13px; padding: 8px 10px; }
   .globe-play { font-size: 15px; padding: 11px 20px; }
   .country-item { padding: 7px 10px; }
   .country-item .ci-name { font-size: 13px; }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  .globe-top { padding-top: 58px; }
+  #globe-ui h1 { line-height: 1.06; }
 }
 
 /* короткий ландшафт (телефон боком): тісно по висоті — підтискаємо все */
@@ -1227,7 +1241,12 @@ body.touch-mode #touch-coach.show { display: block; }
   background: rgba(0, 0, 0, .48);
   color: #fff;
   font-weight: 800;
-  line-height: 1.55;
+  line-height: 1.35;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: min(100%, 560px);
 }
 .hqbase-mini {
   margin-top: 8px;
