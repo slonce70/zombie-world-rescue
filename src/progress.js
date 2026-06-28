@@ -257,6 +257,14 @@ const MEGA_QUESTS = [
       label: () => t('👥 Гіперзаряд Клона · 💎 20 · ⭐ 500 XP'),
     },
   },
+  {
+    id: 'gadget30', icon: '🧰', ev: 'gadget', target: 30,
+    title: () => t('МЕГА: використай гаджет {n} разів', { n: 30 }),
+    reward: {
+      crystals: 30,
+      label: () => t('💎 30 кристалів'),
+    },
+  },
 ];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),

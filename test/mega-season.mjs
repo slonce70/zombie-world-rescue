@@ -29,19 +29,22 @@ const meta = await page.evaluate(() => {
   };
 });
 
-const expectedIds = ['damage10000', 'heal1000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8'];
+const expectedIds = ['damage10000', 'heal1000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8', 'gadget30'];
 check(expectedIds.every((id) => meta.ids.includes(id)) && meta.ids.length === expectedIds.length,
-  'є 7 мега-квестів сезону', JSON.stringify(meta.ids));
+  'є 8 мега-квестів сезону', JSON.stringify(meta.ids));
 check(meta.targets.damage10000 === 10000 && meta.targets.kills500 === 500 && meta.targets.headshots150 === 150,
   'цілі шкоди, перемог і хедшотів правильні', JSON.stringify(meta.targets));
 check(meta.targets.heal1000 === 1000,
   'ціль мега-квесту лікування правильна', JSON.stringify(meta.targets));
 check(meta.targets.bosses10 === 10 && meta.targets.megabox10 === 10 && meta.targets.countries8 === 8,
   'цілі босів, мегабоксів і країн правильні', JSON.stringify(meta.targets));
+check(meta.targets.gadget30 === 30,
+  'ціль gadget30 правильна', JSON.stringify(meta.targets));
 check((meta.rewards.heal1000 || '').includes('500') && (meta.rewards.heal1000 || '').includes('300 XP')
-  && meta.rewards.kills500.includes('Щит') && meta.rewards.countries8.includes('Клон'),
+  && meta.rewards.kills500.includes('Щит') && meta.rewards.countries8.includes('Клон')
+  && (meta.rewards.gadget30 || '').includes('30') && !(meta.rewards.gadget30 || '').includes('XP'),
   'нагороди показують конкретні гіперзаряди', JSON.stringify(meta.rewards));
-check(meta.pending >= meta.dailyCount + 7,
+check(meta.pending >= meta.dailyCount + 8,
   'бейдж квестів рахує щоденні і мега-квести', JSON.stringify({ pending: meta.pending, dailyCount: meta.dailyCount }));
 
 const rewards = await page.evaluate(() => {
@@ -133,7 +136,29 @@ const rewards = await page.evaluate(() => {
     xp: g.save.xp,
   };
 
-  return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry };
+  drive('gadget', 29);
+  const beforeGadgetDone = {
+    q: { ...g.save.megaQuests.gadget30 },
+    crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+  drive('gadget', 1);
+  const afterGadgetDone = {
+    q: { ...g.save.megaQuests.gadget30 },
+    crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+  drive('gadget', 1);
+  const afterDuplicateGadget = {
+    q: { ...g.save.megaQuests.gadget30 },
+    crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+
+  return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry, beforeGadgetDone, afterGadgetDone, afterDuplicateGadget };
 });
 
 check(rewards.beforeKillDone.q.progress === 499 && !rewards.beforeKillDone.q.done
@@ -162,6 +187,14 @@ check(rewards.afterCountries.q.done && rewards.afterCountries.hypers.includes('c
 check(rewards.afterDuplicateCountry.crystals === 55 && rewards.afterDuplicateCountry.xp === 1800
   && rewards.afterDuplicateCountry.hypers.filter((x) => x === 'clone').length === 1,
   'countries8 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateCountry));
+check(rewards.beforeGadgetDone.q.progress === 29 && !rewards.beforeGadgetDone.q.done
+  && rewards.beforeGadgetDone.crystals === 55 && rewards.beforeGadgetDone.xp === 1800,
+  'gadget30 не видає нагороду на 29/30', JSON.stringify(rewards.beforeGadgetDone));
+check(rewards.afterGadgetDone.q.done && rewards.afterGadgetDone.crystals === 85
+  && rewards.afterGadgetDone.coins === rewards.beforeGadgetDone.coins && rewards.afterGadgetDone.xp === 1800,
+  'gadget30 видає тільки 30 crystals', JSON.stringify(rewards.afterGadgetDone));
+check(rewards.afterDuplicateGadget.crystals === 85 && rewards.afterDuplicateGadget.xp === 1800,
+  'gadget30 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateGadget));
 
 const healHook = await page.evaluate(() => {
   const g = window.__game;
@@ -230,6 +263,37 @@ check(countryReplay.q.progress === 7 && !countryReplay.q.done && countryReplay.c
   && !countryReplay.hypers.includes('clone'),
   'реплей вже звільненої країни не просуває countries8', JSON.stringify(countryReplay));
 
+const gadgetHook = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.megaQuests = null;
+  g.quests.ensureMegaQuests();
+  g.save.crystals = 0;
+  g.save.coins = 0;
+  g.save.xp = 0;
+  g.save.gadgetsOwned = ['shield'];
+  g.save.activeGadget = 'shield';
+  g.level.playground = false;
+  g.level.knockout = false;
+  g.level.defense = false;
+  g.level.pvp = false;
+  g.level.worldBoss = false;
+  g.test.gadgetCdReset();
+  const used = g.test.useGadget();
+  const afterUse = { ...g.save.megaQuests.gadget30 };
+  const cooldownUsed = g.test.useGadget();
+  const afterCooldown = { ...g.save.megaQuests.gadget30 };
+  g.level.playground = true;
+  g.level.bus.emit('gadgetUsed', 'shield');
+  const afterPlayground = { ...g.save.megaQuests.gadget30 };
+  return { used, cooldownUsed, afterUse, afterCooldown, afterPlayground };
+});
+check(gadgetHook.used && gadgetHook.afterUse.progress === 1,
+  'успішне використання гаджета просуває gadget30', JSON.stringify(gadgetHook));
+check(!gadgetHook.cooldownUsed && gadgetHook.afterCooldown.progress === 1,
+  'натискання на cooldown не просуває gadget30', JSON.stringify(gadgetHook));
+check(gadgetHook.afterPlayground.progress === 1,
+  'gadgetUsed у полігоні не просуває gadget30', JSON.stringify(gadgetHook));
+
 const ui = await page.evaluate(() => {
   const g = window.__game;
   g.renderQuestsPanel();
@@ -243,8 +307,8 @@ check(ui.headers.some((x) => x.includes('Мега-квести')),
   'у панелі є секція Мега-квести', JSON.stringify(ui.headers));
 check(ui.headers.some((x) => x.includes('Щоденні')),
   'у панелі є секція Щоденні', JSON.stringify(ui.headers));
-check(ui.megaRows === 7,
-  'усі 7 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
+check(ui.megaRows === 8,
+  'усі 8 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
 check(ui.text.indexOf('Мега-квести') < ui.text.indexOf('Щоденні'),
   'мега-квести показані перед щоденними', ui.text);
 
@@ -259,7 +323,7 @@ check(enMegaText.includes('Mega') || enMegaText.includes('MEGA:'),
   'мега-квести можуть відрендеритись англійською', enMegaText.slice(0, 160));
 
 const stateShape = await page.evaluate(() => window.__game.test.state().megaQuests);
-check(Array.isArray(stateShape) && stateShape.length === 7 && stateShape.some((q) => q.id === 'heal1000'),
+check(Array.isArray(stateShape) && stateShape.length === 8 && stateShape.some((q) => q.id === 'gadget30'),
   'debug state містить megaQuests для тестів і майбутнього QA', JSON.stringify(stateShape));
 
 if (errors.length) {

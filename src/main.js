@@ -68,7 +68,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 154;
+const APP_VERSION = 155;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1819,6 +1819,7 @@ class Game {
     level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
+        this.quests.onEvent('gadget');
         if (!level.knockout && !level.defense && !level.pvp && !level.worldBoss) this.chapter.onEvent('gadget');
         return;
       }
