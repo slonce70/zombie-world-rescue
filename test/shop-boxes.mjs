@@ -27,46 +27,73 @@ const res = await page.evaluate(async () => {
   const boxItems = [...document.querySelectorAll('.shop-item')].map((i) => i.dataset.id);
   g.shop.close();
 
-  const buyWithRoll = (roll) => {
+  const buyWithRoll = (id, roll) => {
     const old = Math.random;
     Math.random = () => roll;
     const before = { coins: g.save.coins, crystals: g.save.crystals || 0, skins: [...g.save.skins], active: g.save.activeSkin };
-    try { g.test.shopBuy('bigbox'); } finally { Math.random = old; }
+    try { g.test.shopBuy(id); } finally { Math.random = old; }
     return { before, after: { coins: g.save.coins, crystals: g.save.crystals || 0, skins: [...g.save.skins], active: g.save.activeSkin } };
   };
 
   g.save.coins = 50;
   g.save.crystals = 9;
-  const denied = buyWithRoll(0.1);
+  const denied = buyWithRoll('bigbox', 0.1);
   g.save.coins = 50;
   g.save.crystals = 10;
-  const coins = buyWithRoll(0.64);
+  const coins = buyWithRoll('bigbox', 0.64);
   g.save.coins = 50;
   g.save.crystals = 10;
-  const crystals = buyWithRoll(0.91);
+  const crystals = buyWithRoll('bigbox', 0.91);
   g.save.coins = 50;
   g.save.crystals = 10;
-  const skin = buyWithRoll(0.99);
+  const skin = buyWithRoll('bigbox', 0.99);
 
-  let built = false, looksSilver = false;
+  g.save.coins = 50;
+  g.save.crystals = 4;
+  const smallDenied = buyWithRoll('smallbox', 0.1);
+  g.save.coins = 50;
+  g.save.crystals = 5;
+  const smallCoins = buyWithRoll('smallbox', 0.79);
+  g.save.coins = 50;
+  g.save.crystals = 5;
+  const smallCrystals = buyWithRoll('smallbox', 0.94);
+  g.save.coins = 50;
+  g.save.crystals = 5;
+  const smallSkin = buyWithRoll('smallbox', 0.99);
+
+  let built = false, looksSilver = false, medicBuilt = false, looksMedic = false;
   try {
     const rig = makeHero('silver', g.save.hero);
     built = !!rig.group;
     looksSilver = rig.heroSkin === 'silver';
   } catch (e) { built = false; }
+  try {
+    const rig = makeHero('medic', g.save.hero);
+    medicBuilt = !!rig.group;
+    looksMedic = rig.heroSkin === 'medic';
+  } catch (e) { medicBuilt = false; }
 
   const item = SHOP_ITEMS.find((i) => i.id === 'bigbox');
+  const smallItem = SHOP_ITEMS.find((i) => i.id === 'smallbox');
   return {
     tabs,
     boxItems,
     item: item && { crystalPrice: item.crystalPrice, max: item.max, cat: item.cat },
+    smallItem: smallItem && { crystalPrice: smallItem.crystalPrice, max: smallItem.max, cat: smallItem.cat },
     silverMeta: HERO_SKINS.silver,
+    medicMeta: HERO_SKINS.medic,
     denied,
     coins,
     crystals,
     skin,
+    smallDenied,
+    smallCoins,
+    smallCrystals,
+    smallSkin,
     built,
     looksSilver,
+    medicBuilt,
+    looksMedic,
   };
 });
 
@@ -82,6 +109,18 @@ check(res.crystals.after.crystals === 15 && res.crystals.after.coins === 50,
 check(res.skin.after.crystals === 0 && res.skin.after.skins.includes('silver') && res.skin.after.active === 'silver',
   'roll 0.99 дає срібний скін і одягає його', JSON.stringify(res.skin));
 check(res.silverMeta && res.built && res.looksSilver, 'срібний скін має метадані і будується без fallback', JSON.stringify({ meta: res.silverMeta, built: res.built, looksSilver: res.looksSilver }));
+check(res.boxItems.includes('smallbox'), 'є маленький бокс у розділі «Бокси»', JSON.stringify(res.boxItems));
+check(res.smallItem && res.smallItem.crystalPrice === 5 && res.smallItem.max === Infinity && res.smallItem.cat === 'Бокси',
+  'маленький бокс коштує 5 кристалів і купується повторно', JSON.stringify(res.smallItem));
+check(res.smallDenied.after.crystals === 4 && res.smallDenied.after.coins === 50,
+  '4 кристалів недостатньо для маленького бокса', JSON.stringify(res.smallDenied));
+check(res.smallCoins.after.crystals === 0 && res.smallCoins.after.coins === 100,
+  'маленький бокс roll 0.79 дає 50 монет', JSON.stringify(res.smallCoins));
+check(res.smallCrystals.after.crystals === 5 && res.smallCrystals.after.coins === 50,
+  'маленький бокс roll 0.94 дає 5 кристалів після ціни бокса', JSON.stringify(res.smallCrystals));
+check(res.smallSkin.after.crystals === 0 && res.smallSkin.after.skins.includes('medic') && res.smallSkin.after.active === 'medic',
+  'маленький бокс roll 0.99 дає скін Медик і одягає його', JSON.stringify(res.smallSkin));
+check(res.medicMeta && res.medicBuilt && res.looksMedic, 'скін Медик має метадані і будується без fallback', JSON.stringify({ meta: res.medicMeta, built: res.medicBuilt, looksMedic: res.looksMedic }));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

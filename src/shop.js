@@ -16,6 +16,7 @@ export const SHOP_ITEMS = [
   { id: 'propack', icon: '🏆', name: t('Профі набір'), desc: t('Золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'), price: 3500, crystalPrice: 35, max: Infinity, cat: t('Набори') },
   { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
   { id: 'bigbox', icon: '📦', name: t('Великий бокс'), desc: t('65%: 200 монет · 27%: 15 кристалів · 8%: срібний скін'), price: 0, crystalPrice: 10, max: Infinity, cat: t('Бокси') },
+  { id: 'smallbox', icon: '🎁', name: t('Маленький бокс'), desc: t('80%: 50 монет · 15%: 5 кристалів · 5%: скін Медик'), price: 0, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -298,6 +299,21 @@ export class Shop {
           if (!save.skins.includes('silver')) save.skins.push('silver');
           save.activeSkin = 'silver';
           game.hud.toast(t('📦 Великий бокс: срібний скін!'));
+        }
+        break;
+      }
+      case 'smallbox': {
+        const roll = Math.random();
+        if (roll < 0.8) {
+          save.coins += 50;
+          game.hud.toast(t('🎁 Маленький бокс: +50 монет'));
+        } else if (roll < 0.95) {
+          save.crystals = (save.crystals || 0) + 5;
+          game.hud.toast(t('🎁 Маленький бокс: +5 кристалів'));
+        } else {
+          if (!save.skins.includes('medic')) save.skins.push('medic');
+          save.activeSkin = 'medic';
+          game.hud.toast(t('🎁 Маленький бокс: скін Медик!'));
         }
         break;
       }
