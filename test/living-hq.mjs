@@ -69,11 +69,18 @@ check(st.hasHero === true, 'манекен героя створено з пот
 const canvasOk = await page.evaluate(() => { const c = document.getElementById('game-canvas'); return !!c && c.width > 0 && c.height > 0; });
 check(canvasOk, 'canvas живий після входу');
 
-console.log('▸ Тренувальна мішень');
-const before = await page.evaluate(() => window.__game.hqbase.debugState().hitCount);
+console.log('▸ Тренувальна арена і манекени шкоди');
+const beforeTarget = await page.evaluate(() => window.__game.hqbase.debugState().hitCount);
 await page.evaluate(() => window.__game.hqbase.hitFirstTarget());
-const after = await page.evaluate(() => window.__game.hqbase.debugState().hitCount);
-check(after === before + 1, `мішень реагує (${before} → ${after})`);
+const afterTarget = await page.evaluate(() => window.__game.hqbase.debugState().hitCount);
+check(afterTarget === beforeTarget + 1, `мішень реагує (${beforeTarget} → ${afterTarget})`);
+
+const beforeDummy = await page.evaluate(() => window.__game.hqbase.debugState());
+await page.evaluate(() => window.__game.hqbase.hitFirstDummy());
+const afterDummy = await page.evaluate(() => window.__game.hqbase.debugState());
+check(beforeDummy.dummyCount >= 3, `манекени створено (${beforeDummy.dummyCount})`);
+check(afterDummy.damageTotal === beforeDummy.damageTotal + 25, `манекен рахує шкоду (${beforeDummy.damageTotal} → ${afterDummy.damageTotal})`);
+check(await page.textContent('#hqbase-ui').then((s) => /Шкода.*25|Damage.*25|Урон.*25/.test(s || '')), 'UI бази показує шкоду по манекенах');
 
 console.log('▸ Вихід (кнопка + Escape) і чистка');
 await page.click('#btn-hqbase-exit');

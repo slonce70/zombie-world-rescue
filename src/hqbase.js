@@ -31,6 +31,7 @@ export class LivingHQ {
   enter() {
     this.ready = true;
     this.hitCount = 0;
+    this.damageTotal = 0;
     this._ensureUi();
     this.build();
     this.onResize();
@@ -79,6 +80,7 @@ export class LivingHQ {
     this._addSkinCollection();
     this._addHallOfFame();
     this._addTrainingTargets();
+    this._addDamageDummies();
   }
 
   _addWall(x, z, color) {
@@ -240,8 +242,34 @@ export class LivingHQ {
     }
   }
 
+  _addDamageDummies() {
+    this.dummies = [];
+    for (let i = 0; i < 3; i++) {
+      const x = -2 + i * 2;
+      const body = this._addBox(x, 1.05, 6.1, 0.55, 1.5, 0.32, 0x6f8fb8, {
+        isHqTarget: true,
+        isHqDummy: true,
+        hp: 100,
+        maxHp: 100,
+      });
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 16, 10),
+        new THREE.MeshLambertMaterial({ color: 0xffc9a3 })
+      );
+      head.position.set(x, 2.0, 6.1);
+      head.userData.isHqDummyHead = true;
+      body.add(head);
+      this.targets.push(body);
+      this.dummies.push(body);
+    }
+  }
+
   hitFirstTarget() {
     if (this.targets && this.targets[0]) this._hitTarget(this.targets[0]);
+  }
+
+  hitFirstDummy() {
+    if (this.dummies && this.dummies[0]) this._hitTarget(this.dummies[0]);
   }
 
   _pickTarget(e) {
@@ -255,6 +283,10 @@ export class LivingHQ {
   }
 
   _hitTarget(target) {
+    if (target.userData.isHqDummy) {
+      this._hitDummy(target);
+      return;
+    }
     this.hitCount++;
     target.material.color.setHex(0xffd45a);
     target.scale.setScalar(1.18);
@@ -264,6 +296,19 @@ export class LivingHQ {
     if (ui) ui.textContent = String(this.hitCount);
   }
 
+  _hitDummy(dummy) {
+    const dmg = 25;
+    this.damageTotal += dmg;
+    dummy.userData.hp = Math.max(0, (dummy.userData.hp || dummy.userData.maxHp || 100) - dmg);
+    dummy.material.color.setHex(dummy.userData.hp <= 0 ? 0xffd45a : 0xf05a5a);
+    dummy.scale.setScalar(1.08);
+    dummy.userData.flash = 0.25;
+    if (dummy.userData.hp <= 0) dummy.userData.hp = dummy.userData.maxHp || 100;
+    if (this.game.audio && this.game.audio.click) this.game.audio.click();
+    const ui = document.getElementById('hqbase-damage-count');
+    if (ui) ui.textContent = String(this.damageTotal);
+  }
+
   update(dt) {
     if (!this.ready) return;
     this.scene.rotation.y += dt * 0.03;
@@ -271,7 +316,7 @@ export class LivingHQ {
       if (target.userData.flash > 0) {
         target.userData.flash -= dt;
         if (target.userData.flash <= 0) {
-          target.material.color.setHex(0xf05a5a);
+          target.material.color.setHex(target.userData.isHqDummy ? 0x6f8fb8 : 0xf05a5a);
           target.scale.setScalar(1);
         }
       }
@@ -337,7 +382,7 @@ export class LivingHQ {
         <button id="btn-hqbase-panel" class="btn">🏠 ${t('База')}</button>
         <button id="btn-hqbase-wardrobe" class="btn">🎒 ${t('Гардероб')}</button>
       </div><div class="hqbase-counter">
-        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> · 📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> · 🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b>
+        🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b> · 📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b> · 🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b> · 💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b>
       </div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
@@ -355,6 +400,8 @@ export class LivingHQ {
     ui.style.display = '';
     const c = document.getElementById('hqbase-hit-count');
     if (c) c.textContent = '0';
+    const dmg = document.getElementById('hqbase-damage-count');
+    if (dmg) dmg.textContent = '0';
     const saved = this.game.save.liberated || {};
     const bestiary = this.game.save.bestiary || {};
     const countries = Object.keys(saved).filter((id) => saved[id]).length;
