@@ -436,6 +436,7 @@ export const GADGETS = {
   teleport: { name: t('Телепортація'), icon: '🪄', cd: 45, price: 1000, desc: t('Миттєвий стрибок уперед — вирвись із натовпу') },
   // 🍎 Золоте яблуко: +20 тимчасового HP на 5с (бонус-макс, згасає сам), перезарядка 45с
   goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
+  dash: { name: t('Ривок'), icon: '🏃', cd: 30, price: 1000, desc: t('Короткий ривок уперед і 1с невразливості') },
   // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
   meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 250 шкоди по площі 7×7 м') },
 };
@@ -772,6 +773,23 @@ export class Gadgets {
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0xffd23f, 16, { speed: 2.5, up: 3, life: 0.9 });
       level.bus.emit('toast', t('🍎 Золоте яблуко: +{n} здоров\'я на 5с!', { n: hp }));
+      ok = true;
+    } else if (id === 'dash') {
+      const dist = 8;
+      const tx = p.pos.x - Math.sin(p.yaw) * dist;
+      const tz = p.pos.z - Math.cos(p.yaw) * dist;
+      const solved = level.world.collide(tx, tz, 0.45, p.pos.y);
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0xffd23f, 14, { speed: 4, up: 2.5, life: 0.45 });
+      p.watchtower = null;
+      p.pos.x = solved.x;
+      p.pos.z = solved.z;
+      p.pos.y = Math.max(level.world.groundH(solved.x, solved.z), level.world.floorAt(solved.x, solved.z, p.pos.y));
+      p.vel.set(0, 0, 0);
+      p.onGround = true;
+      p.respawnProtect = Math.max(p.respawnProtect, 1);
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0xffd23f, 14, { speed: 4, up: 2.5, life: 0.45 });
+      level.audio.powerup();
+      level.bus.emit('toast', t('🏃 Ривок! 1с невразливості'));
       ok = true;
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму
