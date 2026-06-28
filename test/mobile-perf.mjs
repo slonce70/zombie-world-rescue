@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 
 const BASE = 'http://localhost:8741';
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
@@ -8,6 +9,69 @@ const check = (ok, msg, extra = '') => {
   console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
   if (!ok) failed++;
 };
+
+function pngSkySample(path) {
+  const png = readFileSync(path);
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const bitDepth = png[24];
+  const colorType = png[25];
+  if (bitDepth !== 8 || ![2, 6].includes(colorType)) {
+    throw new Error(`Unsupported PNG format bitDepth=${bitDepth} colorType=${colorType}`);
+  }
+
+  const bytesPerPixel = colorType === 6 ? 4 : 3;
+  const stride = width * bytesPerPixel;
+  let offset = 8;
+  const idat = [];
+  while (offset < png.length) {
+    const len = png.readUInt32BE(offset);
+    const type = png.subarray(offset + 4, offset + 8).toString('ascii');
+    if (type === 'IDAT') idat.push(png.subarray(offset + 8, offset + 8 + len));
+    offset += 12 + len;
+  }
+
+  const raw = inflateSync(Buffer.concat(idat));
+  const rows = Array.from({ length: height }, () => Buffer.alloc(stride));
+  let pos = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[pos++];
+    const row = raw.subarray(pos, pos + stride);
+    pos += stride;
+    const out = rows[y];
+    const prev = y > 0 ? rows[y - 1] : null;
+    for (let x = 0; x < stride; x++) {
+      const left = x >= bytesPerPixel ? out[x - bytesPerPixel] : 0;
+      const up = prev ? prev[x] : 0;
+      const upLeft = prev && x >= bytesPerPixel ? prev[x - bytesPerPixel] : 0;
+      let value;
+      if (filter === 0) value = row[x];
+      else if (filter === 1) value = row[x] + left;
+      else if (filter === 2) value = row[x] + up;
+      else if (filter === 3) value = row[x] + Math.floor((left + up) / 2);
+      else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        value = row[x] + (pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft);
+      } else {
+        throw new Error(`Unsupported PNG filter=${filter}`);
+      }
+      out[x] = value & 255;
+    }
+  }
+
+  const y = Math.min(24, height - 1);
+  const samples = [];
+  const step = Math.max(1, Math.floor(width / 20));
+  for (let x = Math.floor(width / 4); x < Math.floor(width * 3 / 4); x += step) {
+    const idx = x * bytesPerPixel;
+    samples.push([rows[y][idx], rows[y][idx + 1], rows[y][idx + 2]]);
+  }
+  const avg = [0, 1, 2].map((i) => samples.reduce((sum, p) => sum + p[i], 0) / samples.length);
+  return { avg, width, height };
+}
 
 const ctx = await browser.newContext({
   viewport: { width: 844, height: 390 },
@@ -39,15 +103,7 @@ const metrics = await page.evaluate(() => {
 });
 const shotPath = '/tmp/zwr-mobile-perf-sky.png';
 await page.screenshot({ path: shotPath, fullPage: false });
-const sky = JSON.parse(execFileSync('python3', ['-c', `
-import json
-from PIL import Image
-im = Image.open('${shotPath}').convert('RGB')
-w, _ = im.size
-pts = [im.getpixel((x, 24)) for x in range(w//4, w*3//4, max(1, w//20))]
-avg = tuple(sum(p[i] for p in pts) / len(pts) for i in range(3))
-print(json.dumps({'avg': avg}))
-`], { encoding: 'utf8' }));
+const sky = pngSkySample(shotPath);
 
 console.log('▸ Mobile perf metrics', JSON.stringify(metrics));
 console.log('▸ Mobile sky sample', JSON.stringify(sky));
