@@ -44,6 +44,7 @@ const suite = [
   ['node', ['test/flows.mjs'], { SLOW: process.env.RELEASE_FLOWS_SLOW || process.env.SLOW || '4' }],
   ['node', ['test/i18n.mjs']],
   ['node', ['test/update-mobile.mjs']],
+  ['node', ['test/mobile-perf.mjs']],
   ['node', ['test/visual-polish.mjs']],
   ['node', ['test/living-hq.mjs']],
   ['node', ['test/mega-season.mjs']],

@@ -1885,7 +1885,9 @@ export class World {
     this.sunBaseX = b.sunPos[0];
     this.sunBaseY = b.sunPos[1];
     this.sunBaseZ = b.sunPos[2];
-    this.scene.fog = new THREE.Fog(b.fogColor, b.fogNear, b.fogFar);
+    this.fogFar = Math.min(b.fogFar, this.quality.fogFar || b.fogFar);
+    this.fogNear = Math.min(b.fogNear, this.fogFar * 0.58);
+    this.scene.fog = new THREE.Fog(b.fogColor, this.fogNear, this.fogFar);
     // 🌙 база для циклу день/ніч
     this.nightK = 0;
     this._dayFog = new THREE.Color(b.fogColor);
@@ -1912,7 +1914,8 @@ export class World {
     }
     // туман густішає і синішає
     this.scene.fog.color.copy(this._dayFog).lerp(this._nightFog, k);
-    this.scene.fog.far = b.fogFar * (1 - k * 0.3);
+    this.scene.fog.near = this.fogNear * (1 - k * 0.2);
+    this.scene.fog.far = this.fogFar * (1 - k * 0.3);
     // сонячний диск ховається, місяць і зорі виходять
     if (this.sunDiscs) for (const d of this.sunDiscs) d.material.opacity = d.userData.baseOp * (1 - k);
     if (this.moon) this.moon.material.opacity = k * 0.95;
@@ -1935,7 +1938,12 @@ export class World {
   }
 
   _buildSky() {
-    const geo = new THREE.SphereGeometry(750, 24, 16);
+    const skyR = this.quality.skyRadius || 750;
+    const skyK = skyR / 750;
+    const skyGroup = new THREE.Group();
+    this.scene.add(skyGroup);
+    this.skyGroup = skyGroup;
+    const geo = new THREE.SphereGeometry(skyR, 24, 16);
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -1958,26 +1966,26 @@ export class World {
         }`,
     });
     const sky = new THREE.Mesh(geo, mat);
-    this.scene.add(sky);
+    skyGroup.add(sky);
     this.sky = sky;
     this._skyNightTop = new THREE.Color(0x0a1226);
     this._skyNightHor = new THREE.Color(0x1d2a4a);
     this._skyNightBot = new THREE.Color(0x0d1422);
     // сонячний диск
     const sunDisc = new THREE.Mesh(
-      new THREE.CircleGeometry(38, 24),
+      new THREE.CircleGeometry(38 * skyK, 24),
       new THREE.MeshBasicMaterial({ color: this.biome.sunDisc, fog: false, transparent: true, opacity: 0.95 })
     );
-    sunDisc.position.set(this.biome.sunDiscPos[0], this.biome.sunDiscPos[1], this.biome.sunDiscPos[2]);
+    sunDisc.position.set(this.biome.sunDiscPos[0] * skyK, this.biome.sunDiscPos[1] * skyK, this.biome.sunDiscPos[2] * skyK);
     sunDisc.lookAt(0, 0, 0);
-    this.scene.add(sunDisc);
+    skyGroup.add(sunDisc);
     const glow = new THREE.Mesh(
-      new THREE.CircleGeometry(70, 24),
+      new THREE.CircleGeometry(70 * skyK, 24),
       new THREE.MeshBasicMaterial({ color: this.biome.sunDisc, fog: false, transparent: true, opacity: 0.25 })
     );
     glow.position.copy(sunDisc.position).multiplyScalar(0.995);
     glow.lookAt(0, 0, 0);
-    this.scene.add(glow);
+    skyGroup.add(glow);
     sunDisc.userData.baseOp = 0.95;
     glow.userData.baseOp = 0.25;
     this.sunDiscs = [sunDisc, glow];
@@ -1985,20 +1993,20 @@ export class World {
     // 🌙 місяць (з кратерами) — на протилежному боці неба, вдень прозорий
     const mp = this.biome.sunDiscPos;
     const moon = new THREE.Mesh(
-      new THREE.CircleGeometry(26, 22),
+      new THREE.CircleGeometry(26 * skyK, 22),
       new THREE.MeshBasicMaterial({ color: 0xeef2ff, fog: false, transparent: true, opacity: 0 })
     );
-    moon.position.set(-mp[0] * 0.9, Math.max(mp[1], 280), -mp[2] * 0.9);
+    moon.position.set(-mp[0] * 0.9 * skyK, Math.max(mp[1], 280) * skyK, -mp[2] * 0.9 * skyK);
     moon.lookAt(0, 0, 0);
-    this.scene.add(moon);
+    skyGroup.add(moon);
     this.moon = moon;
     const mGlow = new THREE.Mesh(
-      new THREE.CircleGeometry(46, 22),
+      new THREE.CircleGeometry(46 * skyK, 22),
       new THREE.MeshBasicMaterial({ color: 0xbcd0ff, fog: false, transparent: true, opacity: 0 })
     );
     mGlow.position.copy(moon.position).multiplyScalar(1.002);
     mGlow.lookAt(0, 0, 0);
-    this.scene.add(mGlow);
+    skyGroup.add(mGlow);
     this.moonGlow = mGlow;
 
     // ✨ зорі: жменя точок по куполу
@@ -2008,7 +2016,7 @@ export class World {
     for (let i = 0; i < starN; i++) {
       const a = srng.range(0, Math.PI * 2);
       const elev = Math.asin(srng.range(0.08, 0.98));
-      const R = 720;
+      const R = skyR * 0.96;
       starPos[i * 3] = Math.cos(a) * Math.cos(elev) * R;
       starPos[i * 3 + 1] = Math.sin(elev) * R;
       starPos[i * 3 + 2] = Math.sin(a) * Math.cos(elev) * R;
@@ -2018,7 +2026,7 @@ export class World {
     const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
       color: 0xfff8e0, size: 2.4, sizeAttenuation: false, fog: false, transparent: true, opacity: 0,
     }));
-    this.scene.add(stars);
+    skyGroup.add(stars);
     this.stars = stars;
   }
 
@@ -3793,6 +3801,7 @@ export class World {
 
   update(dt, playerPos) {
     this.time += dt;
+    if (this.skyGroup && playerPos) this.skyGroup.position.set(playerPos.x, 0, playerPos.z);
     // хмари
     for (const c of this.clouds) {
       c.g.position.x += c.speed * dt;

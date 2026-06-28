@@ -38,7 +38,7 @@ export class Player {
     this.world = world;
     this.L = world.layout;
 
-    this.camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.08, 1200);
+    this.camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.08, world.quality.cameraFar || 1200);
     scene.add(this.camera);
 
     const gy = world.groundH(this.L.SPAWN.x, this.L.SPAWN.z);

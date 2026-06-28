@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 169;
+const APP_VERSION = 170;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -681,11 +681,11 @@ class Game {
   _qualityWorldOpts() {
     const q = this.save.quality || 'auto';
     // Явний вибір користувача поважаємо як є.
-    if (q === 'fast') return { shadow: 1024, snow: 160, lights: false };
+    if (q === 'fast') return { shadow: 1024, snow: 160, lights: false, cameraFar: 220, fogFar: 200, skyRadius: 180 };
     if (q === 'high') return { shadow: 2048, snow: 380, lights: true };
     // 'auto': на слабкому/тач-пристрої — проміжний профіль (легші тіні, без зайвих світел);
     // на потужному ПК — повна якість, як було.
-    if (this._isWeakDevice()) return { shadow: 1024, snow: 220, lights: false };
+    if (this._isWeakDevice()) return { shadow: 1024, snow: 220, lights: false, cameraFar: 220, fogFar: 200, skyRadius: 180 };
     return { shadow: 2048, snow: 380, lights: true };
   }
 
