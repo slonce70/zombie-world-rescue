@@ -53,6 +53,15 @@ check(heroEn.run === 'Run' && heroEn.cape === 'Cape'
   'en: hero editor labels translated', JSON.stringify(heroEn));
 check(![heroEn.run, heroEn.cape, ...heroEn.subs].some((s) => ['Біг', 'Плащ', '🎩 Шапка', '😀 Обличчя'].includes(s)),
   'en: hero editor labels are not Ukrainian', JSON.stringify(heroEn));
+await page.evaluate(() => {
+  const g = window.__game;
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
+  g.save.skins = ['classic', 'custom', 'gold'];
+  g.hqbase.enter();
+});
+const enBase = await page.textContent('#hqbase-ui');
+check(/Quests/.test(enBase) && /Skins/.test(enBase) && /Damage/.test(enBase), 'en: Base 2.0 UI translated', enBase);
+await page.evaluate(() => window.__game.hqbase.exit());
 // игровой уровень на английском: названия миссий
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
@@ -86,6 +95,15 @@ check(heroRu.run === 'Бег' && heroRu.cape === 'Плащ'
   'ru: hero editor labels translated', JSON.stringify(heroRu));
 check(![heroRu.run, heroRu.cape, ...heroRu.subs].some((s) => ['Біг', '🎩 Шапка', '😀 Обличчя'].includes(s)),
   'ru: hero editor labels are not Ukrainian', JSON.stringify(heroRu));
+await page.evaluate(() => {
+  const g = window.__game;
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
+  g.save.skins = ['classic', 'custom', 'gold'];
+  g.hqbase.enter();
+});
+const ruBase = await page.textContent('#hqbase-ui');
+check(/Квесты/.test(ruBase) && /Скины/.test(ruBase) && /Урон/.test(ruBase), 'ru: Base 2.0 UI translated', ruBase);
+await page.evaluate(() => window.__game.hqbase.exit());
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
 const mRu = await page.evaluate(() => window.__game.level.missions.getHudList().map((m) => m.title));
