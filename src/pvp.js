@@ -2,14 +2,39 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 
 export const PVP_UNLOCK_COUNTRIES = 10;
+export const OVERLOADED_PVP_UNLOCK_COUNTRIES = 8;
 export const PVP_ROOM_SIZE = 30;
 export const PVP_ZOMBIE_HP = 250;
 export const PVP_ZOMBIE_DMG = 10;
 
+const PVP_CONFIGS = {
+  normal: {
+    title: 'ПВП',
+    roomSize: PVP_ROOM_SIZE,
+    zombieType: 'walker',
+    zombieHp: PVP_ZOMBIE_HP,
+    zombieDmg: PVP_ZOMBIE_DMG,
+    zombieZ: -8,
+  },
+  overloaded: {
+    title: 'Перегружене ПВП',
+    roomSize: 35,
+    zombieType: 'robot',
+    zombieHp: 3000,
+    zombieDmg: 300,
+    zombieZ: -10,
+    zombieShield: 1000,
+    zombieShieldCd: 45,
+    zombieRanged: { min: 7, max: 32, hold: 13, cd: 2.5, projSpeed: 26, dmg: 350, size: 0.32, color: 0xffd24a },
+  },
+};
+
 export class PvpMode {
-  constructor(level) {
+  constructor(level, variant = 'normal') {
     this.level = level;
-    this.roomSize = PVP_ROOM_SIZE;
+    this.variant = PVP_CONFIGS[variant] ? variant : 'normal';
+    this.cfg = PVP_CONFIGS[this.variant];
+    this.roomSize = this.cfg.roomSize;
     this.target = 1;
     this.completed = false;
     this.over = false;
@@ -31,9 +56,11 @@ export class PvpMode {
 
   getHudList() {
     return [
-      { icon: '⚔️', title: t('ПВП'), done: false },
+      { icon: '⚔️', title: t(this.cfg.title), done: false },
       { icon: '🧟', title: t('Зомбі: {n} HP', { n: Math.max(0, Math.ceil(this.zombie?.hp || 0)) }), done: this.remaining() <= 0 },
-      { icon: '🪄', title: t('Тільки посох. 50 HP. Без магазину, гаджетів і пікапів.'), done: false },
+      { icon: this.variant === 'overloaded' ? '💣' : '🪄', title: this.variant === 'overloaded'
+        ? t('Гармата і меч. Щит 1000 HP. Без магазину й пікапів.')
+        : t('Тільки посох. 50 HP. Без магазину, гаджетів і пікапів.'), done: false },
     ];
   }
 
@@ -84,14 +111,20 @@ export class PvpMode {
   }
 
   _spawnZombie() {
-    const zb = this.level.zombies.spawn('walker', this.cx, this.cz - 8, {
+    const zb = this.level.zombies.spawn(this.cfg.zombieType, this.cx, this.cz + this.cfg.zombieZ, {
       noLeash: true,
       anchor: { x: this.cx, z: this.cz, r: this._half - 2 },
     });
     zb.pvp = true;
-    zb.maxHp = PVP_ZOMBIE_HP;
-    zb.hp = PVP_ZOMBIE_HP;
-    zb.stats = { ...zb.stats, hp: PVP_ZOMBIE_HP, dmg: PVP_ZOMBIE_DMG, coins: 0 };
+    zb.maxHp = this.cfg.zombieHp;
+    zb.hp = this.cfg.zombieHp;
+    zb.stats = { ...zb.stats, hp: this.cfg.zombieHp, dmg: this.cfg.zombieDmg, coins: 0 };
+    if (this.cfg.zombieRanged) zb.ranged = { ...this.cfg.zombieRanged };
+    if (this.cfg.zombieShield) {
+      zb.shieldHp = zb.shieldMax = this.cfg.zombieShield;
+      zb.stats.shieldHp = this.cfg.zombieShield;
+      zb.pvpShieldCd = this.cfg.zombieShieldCd || 8;
+    }
     zb.aggroed = true;
     zb.state = 'chase';
     this.zombie = zb;

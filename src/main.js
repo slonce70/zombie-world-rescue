@@ -22,7 +22,7 @@ import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE } from './knockout.js';
 import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
-import { PvpMode, PVP_UNLOCK_COUNTRIES } from './pvp.js';
+import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
   worldBossUnlocked,
@@ -817,6 +817,12 @@ class Game {
           : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
       },
       {
+        id: 'overloaded-pvp', icon: '💣', name: t('Перегружене ПВП'), locked: libN < OVERLOADED_PVP_UNLOCK_COUNTRIES,
+        desc: libN < OVERLOADED_PVP_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES })
+          : t('Дуель 35×35: гармата, меч і щити проти зомбі 3000 HP.'),
+      },
+      {
         id: 'pvp', icon: '⚔️', name: t('ПВП'), locked: libN < PVP_UNLOCK_COUNTRIES,
         desc: libN < PVP_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: PVP_UNLOCK_COUNTRIES })
@@ -887,6 +893,9 @@ class Game {
         } else if (mode === 'defense') {
           this._hideOverlay('overlay-solo');
           this.startDefense();
+        } else if (mode === 'overloaded-pvp') {
+          this._hideOverlay('overlay-solo');
+          this.startOverloadedPvp();
         } else if (mode === 'pvp') {
           this._hideOverlay('overlay-solo');
           this.startPvp();
@@ -1402,6 +1411,22 @@ class Game {
     return this.startLevel('UKR', { pvp: true });
   }
 
+  startOverloadedPvp() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('💣🤝 Перегружене ПВП поки доступне тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < OVERLOADED_PVP_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('💣 Перегружене ПВП відкриється після {n} звільнених країн!', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { pvp: 'overloaded' });
+  }
+
   // ---------- автооновлення ----------
   // Браузер (особливо відновлена стара вкладка) може тримати застарілу збірку.
   // Періодично звіряємо version.json із сервера і перезавантажуємось на глобусі.
@@ -1478,6 +1503,7 @@ class Game {
     const isKnockout = !!opts.knockout;
     const isDefense = !!opts.defense;
     const isPvp = !!opts.pvp;
+    const pvpVariant = opts.pvp === 'overloaded' ? 'overloaded' : 'normal';
     const worldBossId = opts.worldBoss || null;
     const isWorldBoss = !!worldBossId;
     document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isWorldBoss);
@@ -1489,7 +1515,7 @@ class Game {
     document.getElementById('ll-title').textContent = isWorldBoss
       ? t('🌋 СВІТОВИЙ БОС')
       : isPvp
-      ? t('⚔️ ПВП')
+      ? (pvpVariant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП'))
       : isDefense
       ? t('🛡️ ОБОРОНА')
       : isKnockout
@@ -1546,6 +1572,7 @@ class Game {
       playground: isPlayground,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
       noGadgets: isKnockout || isDefense || isPvp,
+      modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: isStorm || isKnockout || isDefense || isPvp || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp,
       noPickups: isPvp,
@@ -1581,12 +1608,12 @@ class Game {
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
     if (isKnockout || isDefense || isPvp) {
-      level.player.weapons = isPvp ? ['staff'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
-      level.player.cur = isPvp ? 'staff' : isDefense ? 'rifle' : 'pistol';
+      level.player.weapons = isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       if (isPvp) {
-        level.player.maxHealth = 50;
-        level.player.health = 50;
+        level.player.maxHealth = pvpVariant === 'overloaded' ? 2500 : 50;
+        level.player.health = level.player.maxHealth;
         level.player.maxArmor = 0;
         level.player.armor = 0;
         level.player.damageMult = 1;
@@ -1608,7 +1635,7 @@ class Game {
       level.defense = new DefenseMode(level);
       level.missions = level.defense;
     } else if (isPvp) {
-      level.pvp = new PvpMode(level);
+      level.pvp = new PvpMode(level, pvpVariant);
       level.missions = level.pvp;
     } else if (isWorldBoss) {
       level.worldBoss = new WorldBossMode(level, worldBossId);
@@ -1928,8 +1955,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? t('⚔️ ПВП') : level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? t('Посох проти зомбі на 250 HP. У тебе 50 HP.') : level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2754,7 +2781,7 @@ class Game {
         if (this.level.megabox && !this.level.megabox.done) {
           this.level.megabox.update(simDt, this.input, allowControl);
         }
-        if (!this.level.noGadgets) this.level.gadgets.update(simDt, this.input, allowControl);
+        if (!this.level.noGadgets || this.level.modeShield) this.level.gadgets.update(simDt, this.input, allowControl);
         if (this.level.net) this._updateRevive(simDt, allowControl);
         if (this.level.pet) this.level.pet.update(simDt);
         this.level.world.update(simDt, this.level.player.pos);
@@ -3034,6 +3061,11 @@ class Game {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true };
         return g.startPvp();
       },
+      startOverloadedPvp: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
+        return g.startOverloadedPvp();
+      },
+      weapon: (id) => WEAPONS[id] || null,
       startWorldBoss: (id) => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
         return g.startWorldBoss(id);

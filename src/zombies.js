@@ -560,7 +560,7 @@ export class Zombies {
           z.shieldObj = null;
           // 🧙 чарівник: щит зламано → ре-каст через ~5с; 🤖 робот → новий щит-гаджет через ~8с
           if (z.type === 'wizard') z.shieldRecastCd = 5;
-          else if (z.type === 'robot') z.shieldRecastCd = 8;
+          else if (z.type === 'robot') z.shieldRecastCd = z.pvpShieldCd || 8;
           level.effects.burst(sparkPos, 0x7d8aa0, 14, { speed: 4.5, up: 4, life: 0.7, size: 1.3 });
           level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.5);
           level.audio.shieldBreak();

@@ -540,6 +540,7 @@ export class Gadgets {
   }
 
   get active() {
+    if (this.level.modeShield) return 'shield';
     if (this.level.noGadgets) return null;
     return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget;
   }
@@ -640,6 +641,18 @@ export class Gadgets {
   use() {
     const level = this.level;
     const game = level.game;
+    if (level.modeShield) {
+      if (this.cd > 0) {
+        level.bus.emit('toast', t('🛡️ Ще {n}с перезарядки…', { n: Math.ceil(this.cd) }));
+        game.audio.denied();
+        return false;
+      }
+      level.player.gadgetShield = level.modeShield.hp;
+      this.cd = level.modeShield.cd;
+      level.audio.powerup();
+      level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине {n} шкоди!', { n: level.modeShield.hp }));
+      return true;
+    }
     if (level.noGadgets) {
       level.bus.emit('toast', t('У цьому режимі гаджети вимкнені'));
       game.audio.denied();

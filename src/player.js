@@ -13,6 +13,8 @@ export const WEAPONS = {
   magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 36, cap: 90 },
   sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
   staff: { name: 'Посох', icon: '🪄', dmg: 95, rpm: 55, mag: 1, spread: 0.002, auto: false, reloadT: 3.0, recoil: 0.04, infinite: true, pierce: 2 },
+  cannon: { name: 'Гармата', icon: '💣', dmg: 350, rpm: 24, mag: 1, spread: 0.002, auto: false, reloadT: 2.5, recoil: 0.09, infinite: true },
+  sword: { name: 'Меч', icon: '🗡️', dmg: 300, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.04, infinite: true, melee: true, range: 3.0 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
   // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.
@@ -26,6 +28,7 @@ export const WEAPONS = {
   flamethrower: { name: 'Вогнемет', icon: '🔥', dmg: 0, dps: 120, rpm: 0, mag: 0, spread: 0, auto: true, reloadT: 2.5, recoil: 0, infinite: false, continuous: true, flame: true, range: 8, coneCos: 0.82, fuelMax: 5.0 },
 };
 export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff'];
+const ALL_WEAPON_IDS = Object.keys(WEAPONS);
 const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower', Digit0: 'staff' };
 
 export class Player {
@@ -79,7 +82,7 @@ export class Player {
     this.ammo = {};
     // 🔋 паливо паливних зброй (v46): секунди безперервної дії, що лишились. Старт — повний балон.
     this.fuel = {};
-    for (const w of WEAPON_SLOTS) {
+    for (const w of ALL_WEAPON_IDS) {
       this.ammo[w] = { mag: WEAPONS[w].mag, reserve: WEAPONS[w].infinite ? Infinity : WEAPONS[w].reserve };
       if (WEAPONS[w].continuous) this.fuel[w] = WEAPONS[w].fuelMax;
     }
@@ -96,7 +99,7 @@ export class Player {
     this.rig = makeHero((level.game && level.game.save.activeSkin) || 'classic', level.game && level.game.save.hero);
     scene.add(this.rig.group);
     this.tpGuns = {};
-    for (const w of WEAPON_SLOTS) {
+    for (const w of ALL_WEAPON_IDS) {
       const gun = makeGunMesh(w);
       bakeGroupMeshes(gun.group, { outline: 0.012 }); // контур + 1 draw call
       gun.group.rotation.x = -Math.PI / 2; // у руці: ствол уздовж -Y руки
@@ -111,7 +114,7 @@ export class Player {
     this.weaponRoot = new THREE.Group();
     this.camera.add(this.weaponRoot);
     this.fpArms = {};
-    for (const w of WEAPON_SLOTS) {
+    for (const w of ALL_WEAPON_IDS) {
       const arms = makeFPArms(w);
       arms.group.visible = false;
       this.weaponRoot.add(arms.group);
@@ -162,7 +165,7 @@ export class Player {
 
   _applyView() {
     this.rig.group.visible = !this.firstPerson;
-    for (const w of WEAPON_SLOTS) {
+    for (const w of ALL_WEAPON_IDS) {
       this.fpArms[w].group.visible = this.firstPerson && w === this.cur;
       this.tpGuns[w].group.visible = !this.firstPerson && w === this.cur;
     }
@@ -706,6 +709,23 @@ export class Player {
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
     level.effects.muzzleFlash(this._muzzlePos);
+
+    if (w.melee) {
+      const origin = this._shootOrigin.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
+      const dir = this.forwardVec(this._shootDir).normalize();
+      const hit = level.zombies ? level.zombies.hitTest(origin, dir, w.range || 3) : null;
+      if (hit) {
+        if (level.mirror) level.net.shotReport(this.cur, hit.point, [[hit.zombie.nid, Math.round(w.dmg * dmgMult), 0]], [], [], false);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(w.dmg * dmgMult, dir, false); }
+        level.effects.burst(hit.point, 0x86d14e, 8, { speed: 2.4, life: 0.4 });
+        level.effects.damageNumber(hit.point, w.dmg * dmgMult, false);
+        level.audio.hit(false);
+        level.stats.shotsHit++;
+        level.bus.emit('hitmarker', false, this.cur);
+      }
+      this._applyRecoil(w);
+      return;
+    }
 
     // кооп: гість збирає влучання і шле хосту одним повідомленням
     const netHits = [];
