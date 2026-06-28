@@ -199,6 +199,15 @@ const MEGA_QUESTS = [
     },
   },
   {
+    id: 'heal1000', icon: '💚', ev: 'heal', target: 1000,
+    title: () => t('МЕГА: віднови {n} HP', { n: 1000 }),
+    reward: {
+      coins: 500,
+      xp: 300,
+      label: () => t('🪙 500 монет · ⭐ 300 XP'),
+    },
+  },
+  {
     id: 'kills500', icon: '🧟', ev: 'kill', target: 500,
     title: () => t('МЕГА: переможи {n} зомбі', { n: 500 }),
     reward: {
@@ -403,6 +412,7 @@ export class DailyQuests {
     for (const id of reward.hypers || []) {
       if (!game.save.gadgetHypers.includes(id)) game.save.gadgetHypers.push(id);
     }
+    game.save.coins = (game.save.coins || 0) + (reward.coins || 0);
     game.save.crystals = (game.save.crystals || 0) + (reward.crystals || 0);
     game.audio.questDone();
     game.hud.toast(t('⚡ Мега-квест виконано: {q}! {r}', { q: q.title, r: q.rewardText }));

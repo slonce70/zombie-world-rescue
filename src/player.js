@@ -1048,7 +1048,18 @@ export class Player {
   heal(amt) {
     if (this.health <= 0) return false;
     if (this.health >= this.maxHealth) return false;
+    const before = this.health;
     this.health = Math.min(this.maxHealth, this.health + amt);
+    const healed = this.health - before;
+    const game = this.level && this.level.game;
+    if (healed > 0 && game && game.quests && !this.level.playground) {
+      this._questHealAcc = (this._questHealAcc || 0) + healed;
+      const whole = Math.floor(this._questHealAcc);
+      if (whole > 0) {
+        this._questHealAcc -= whole;
+        game.quests.onEvent('heal', { n: whole });
+      }
+    }
     return true;
   }
 

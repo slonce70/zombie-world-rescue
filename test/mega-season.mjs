@@ -29,22 +29,26 @@ const meta = await page.evaluate(() => {
   };
 });
 
-const expectedIds = ['damage10000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8'];
+const expectedIds = ['damage10000', 'heal1000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8'];
 check(expectedIds.every((id) => meta.ids.includes(id)) && meta.ids.length === expectedIds.length,
-  'є 6 мега-квестів сезону', JSON.stringify(meta.ids));
+  'є 7 мега-квестів сезону', JSON.stringify(meta.ids));
 check(meta.targets.damage10000 === 10000 && meta.targets.kills500 === 500 && meta.targets.headshots150 === 150,
   'цілі шкоди, перемог і хедшотів правильні', JSON.stringify(meta.targets));
+check(meta.targets.heal1000 === 1000,
+  'ціль мега-квесту лікування правильна', JSON.stringify(meta.targets));
 check(meta.targets.bosses10 === 10 && meta.targets.megabox10 === 10 && meta.targets.countries8 === 8,
   'цілі босів, мегабоксів і країн правильні', JSON.stringify(meta.targets));
-check(meta.rewards.kills500.includes('Щит') && meta.rewards.countries8.includes('Клон'),
+check((meta.rewards.heal1000 || '').includes('500') && (meta.rewards.heal1000 || '').includes('300 XP')
+  && meta.rewards.kills500.includes('Щит') && meta.rewards.countries8.includes('Клон'),
   'нагороди показують конкретні гіперзаряди', JSON.stringify(meta.rewards));
-check(meta.pending >= meta.dailyCount + 6,
+check(meta.pending >= meta.dailyCount + 7,
   'бейдж квестів рахує щоденні і мега-квести', JSON.stringify({ pending: meta.pending, dailyCount: meta.dailyCount }));
 
 const rewards = await page.evaluate(() => {
   const g = window.__game;
   g.save.xp = 0;
   g.save.crystals = 0;
+  g.save.coins = 0;
   g.save.gadgetHypers = [];
   g.save.megaQuests = null;
   g.quests.ensureMegaQuests();
@@ -56,6 +60,7 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.kills500 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
   drive('kill', 1);
@@ -63,6 +68,32 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.kills500 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+
+  drive('heal', 999);
+  const beforeHealDone = {
+    q: { ...g.save.megaQuests.heal1000 },
+    hypers: [...g.save.gadgetHypers],
+    crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+  drive('heal', 1);
+  const afterHealDone = {
+    q: { ...g.save.megaQuests.heal1000 },
+    hypers: [...g.save.gadgetHypers],
+    crystals: g.save.crystals,
+    coins: g.save.coins,
+    xp: g.save.xp,
+  };
+  drive('heal', 50);
+  const afterDuplicateHeal = {
+    q: { ...g.save.megaQuests.heal1000 },
+    hypers: [...g.save.gadgetHypers],
+    crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
 
@@ -71,6 +102,7 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.bosses10 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
 
@@ -79,6 +111,7 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.megabox10 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
 
@@ -87,6 +120,7 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.countries8 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
 
@@ -95,10 +129,11 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.countries8 },
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
+    coins: g.save.coins,
     xp: g.save.xp,
   };
 
-  return { beforeKillDone, afterKillDone, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry };
+  return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry };
 });
 
 check(rewards.beforeKillDone.q.progress === 499 && !rewards.beforeKillDone.q.done
@@ -107,18 +142,47 @@ check(rewards.beforeKillDone.q.progress === 499 && !rewards.beforeKillDone.q.don
 check(rewards.afterKillDone.q.done && rewards.afterKillDone.hypers.includes('shield')
   && rewards.afterKillDone.crystals === 8 && rewards.afterKillDone.xp === 250,
   'kills500 видає shield hyper, 8 crystals, 250 XP', JSON.stringify(rewards.afterKillDone));
+check(rewards.beforeHealDone.q.progress === 999 && !rewards.beforeHealDone.q.done
+  && rewards.beforeHealDone.coins === rewards.afterKillDone.coins && rewards.beforeHealDone.xp === 250,
+  'heal1000 не видає нагороду на 999/1000', JSON.stringify(rewards.beforeHealDone));
+check(rewards.afterHealDone.q.done && rewards.afterHealDone.coins - rewards.beforeHealDone.coins === 500
+  && rewards.afterHealDone.xp === 550 && rewards.afterHealDone.crystals === 8,
+  'heal1000 видає 500 монет і 300 XP', JSON.stringify(rewards.afterHealDone));
+check(rewards.afterDuplicateHeal.coins === rewards.afterHealDone.coins && rewards.afterDuplicateHeal.xp === 550,
+  'heal1000 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateHeal));
 check(rewards.afterBosses.q.done && rewards.afterBosses.hypers.includes('turret')
-  && rewards.afterBosses.crystals === 23 && rewards.afterBosses.xp === 650,
+  && rewards.afterBosses.crystals === 23 && rewards.afterBosses.xp === 950,
   'bosses10 додає turret hyper, 15 crystals, 400 XP', JSON.stringify(rewards.afterBosses));
 check(rewards.afterMegaboxes.q.done && rewards.afterMegaboxes.hypers.includes('goldapple')
-  && rewards.afterMegaboxes.crystals === 35 && rewards.afterMegaboxes.xp === 1000,
+  && rewards.afterMegaboxes.crystals === 35 && rewards.afterMegaboxes.xp === 1300,
   'megabox10 додає goldapple hyper, 12 crystals, 350 XP', JSON.stringify(rewards.afterMegaboxes));
 check(rewards.afterCountries.q.done && rewards.afterCountries.hypers.includes('clone')
-  && rewards.afterCountries.crystals === 55 && rewards.afterCountries.xp === 1500,
+  && rewards.afterCountries.crystals === 55 && rewards.afterCountries.xp === 1800,
   'countries8 додає clone hyper, 20 crystals, 500 XP', JSON.stringify(rewards.afterCountries));
-check(rewards.afterDuplicateCountry.crystals === 55 && rewards.afterDuplicateCountry.xp === 1500
+check(rewards.afterDuplicateCountry.crystals === 55 && rewards.afterDuplicateCountry.xp === 1800
   && rewards.afterDuplicateCountry.hypers.filter((x) => x === 'clone').length === 1,
   'countries8 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateCountry));
+
+const healHook = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.megaQuests = null;
+  g.save.coins = 0;
+  const xp0 = g.progress._xpToCap;
+  g.save.xp = xp0;
+  g.quests.ensureMegaQuests();
+  const p = g.level.player;
+  p.maxHealth = 1200;
+  p.health = 200;
+  p.heal(1000);
+  p.heal(100);
+  return {
+    q: { ...g.save.megaQuests.heal1000 },
+    coins: g.save.coins,
+    xpGain: g.save.xp - xp0,
+  };
+});
+check(healHook.q.done && healHook.q.progress === 1000 && healHook.coins === 500 && healHook.xpGain === 300,
+  'Player.heal просуває heal1000 тільки на фактично відновлені HP', JSON.stringify(healHook));
 
 const countryHook = await page.evaluate(() => {
   const g = window.__game;
@@ -179,8 +243,8 @@ check(ui.headers.some((x) => x.includes('Мега-квести')),
   'у панелі є секція Мега-квести', JSON.stringify(ui.headers));
 check(ui.headers.some((x) => x.includes('Щоденні')),
   'у панелі є секція Щоденні', JSON.stringify(ui.headers));
-check(ui.megaRows === 6,
-  'усі 6 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
+check(ui.megaRows === 7,
+  'усі 7 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
 check(ui.text.indexOf('Мега-квести') < ui.text.indexOf('Щоденні'),
   'мега-квести показані перед щоденними', ui.text);
 
@@ -195,7 +259,7 @@ check(enMegaText.includes('Mega') || enMegaText.includes('MEGA:'),
   'мега-квести можуть відрендеритись англійською', enMegaText.slice(0, 160));
 
 const stateShape = await page.evaluate(() => window.__game.test.state().megaQuests);
-check(Array.isArray(stateShape) && stateShape.length === 6 && stateShape.some((q) => q.id === 'countries8'),
+check(Array.isArray(stateShape) && stateShape.length === 7 && stateShape.some((q) => q.id === 'heal1000'),
   'debug state містить megaQuests для тестів і майбутнього QA', JSON.stringify(stateShape));
 
 if (errors.length) {
