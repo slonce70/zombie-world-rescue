@@ -3116,6 +3116,28 @@ export function makeGunMesh(kind) {
     grip.rotation.x = -0.25;
     g.add(shaft, ring1, ring2, gem, grip);
     muzzle.position.set(0, 0.02, -0.72);
+  } else if (kind === 'sword') {
+    const bladeM = toonMat(0xc9d0d8, 0xffffff, 0.25);
+    const goldM = toonMat(0xffd23f, 0xd19918, 0.35);
+    const gripM = toonMat(0x3a2422);
+    const blade = box(0.055, 0.026, 0.68, bladeM);
+    blade.position.set(0, 0.035, -0.34);
+    const tip = cone(0.045, 0.12, bladeM, 4);
+    tip.rotation.x = -Math.PI / 2;
+    tip.rotation.z = Math.PI / 4;
+    tip.position.set(0, 0.035, -0.74);
+    const guard = box(0.24, 0.045, 0.045, goldM);
+    guard.position.set(0, 0.02, 0.04);
+    const grip = box(0.055, 0.12, 0.18, gripM);
+    grip.position.set(0, -0.06, 0.18);
+    grip.rotation.x = -0.18;
+    const pommel = sphere(0.045, goldM, 8, 6);
+    pommel.position.set(0, -0.08, 0.3);
+    const marker = new THREE.Object3D();
+    marker.name = 'sword-blade';
+    marker.position.copy(blade.position);
+    g.add(blade, tip, guard, grip, pommel, marker);
+    muzzle.position.set(0, 0.035, -0.78);
   } else if (kind === 'bazooka') {
     const oliveM = toonMat(0x6b7a4a);
     const tube = cylinder(0.075, 0.075, 0.85, oliveM, 12);

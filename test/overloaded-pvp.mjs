@@ -72,6 +72,10 @@ const started = await page.evaluate(() => {
     cur: p.cur,
     cannon: window.__game.test.weapon('cannon'),
     sword: window.__game.test.weapon('sword'),
+    swordModel: {
+      fp: !!(p.fpArms.sword && p.fpArms.sword.group.getObjectByName('sword-blade')),
+      tp: !!(p.tpGuns.sword && p.tpGuns.sword.group.getObjectByName('sword-blade')),
+    },
     shopOpen: g.shop.isOpen,
     shield0,
     shieldAfterUse: p.gadgetShield,
@@ -98,6 +102,8 @@ check(JSON.stringify(started.weapons) === JSON.stringify(['cannon', 'sword']) &&
   'гравець має рівно гармату і меч, активна гармата', JSON.stringify(started));
 check(started.cannon && started.cannon.dmg === 350 && started.cannon.reloadT === 2.5 && started.sword && started.sword.dmg === 300,
   'параметри зброї відповідають режиму', JSON.stringify(started));
+check(started.swordModel.fp && started.swordModel.tp,
+  'меч має видиму модель у руках, а не fallback-пістолет', JSON.stringify(started.swordModel));
 check(!started.shopOpen && started.noShop && started.noPickups && started.noGadgets,
   'магазин, пікапи і загальні гаджети вимкнені', JSON.stringify(started));
 check(started.used === true && started.usedAgain === false && started.shield0 === 0 && started.shieldAfterUse === 1000 && Math.ceil(started.gadgetCd) === 45,
