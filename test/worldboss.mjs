@@ -69,7 +69,7 @@ const lifecycleInfo = await page.evaluate(async () => {
   let bossStart = 0;
   let spawnN = 0;
   const level = {
-    world: { layout: { arena: { x: 0, z: 0 } }, groundH: () => 0 },
+    world: { layout: { arena: { x: 0, z: 0 } }, groundH: () => 0, floors: [] },
     scene: { add: (...items) => added.push(...items), remove: (...items) => removed.push(...items) },
     zombies: { spawn: () => { spawnN++; return { hp: 1, maxHp: 1, state: 'chase', x: 0, z: 0, y: 0, stats: {} }; } },
     player: { pos: { x: 0, z: 0 }, vel: { x: 0, z: 0 }, health: 100, takeDamage: () => {} },
@@ -146,6 +146,36 @@ check(startInfo.bossStyle === 'radiation' && startInfo.hp === 9000 && !startInfo
   'Радіаційний бос має нову модель, HP і без мегабокса', JSON.stringify(startInfo));
 check(startInfo.playerWeapons.includes('pistol') && startInfo.worldBossState?.id === 'radiation',
   'звичайний лоадаут гравця лишається доступним і test API бачить worldBoss', JSON.stringify(startInfo.playerWeapons));
+
+const floorInfo = await page.evaluate(() => {
+  const g = window.__game;
+  const wb = g.level.worldBoss;
+  const p = g.level.player;
+  const b = g.level.zombies.boss;
+  const fallbackFloorY = g.level.world.groundH(wb.cx, wb.cz);
+  const floorY = typeof wb.floorY === 'number' ? wb.floorY : fallbackFloorY;
+  p.pos.set(wb.cx + 8, floorY - 20, wb.cz + 8);
+  p.vel.set(0, -7, 0);
+  b.x = wb.cx + 3;
+  b.z = wb.cz + 3;
+  b.y = floorY - 20;
+  if (b.rig && b.rig.group) b.rig.group.position.set(b.x, b.y, b.z);
+  wb.update(0.2);
+  return {
+    hasFloorY: typeof wb.floorY === 'number',
+    floorY,
+    playerY: p.pos.y,
+    playerVy: p.vel.y,
+    bossY: b.y,
+    bossGroupY: b.rig && b.rig.group ? b.rig.group.position.y : null,
+  };
+});
+check(floorInfo.hasFloorY
+  && Math.abs(floorInfo.playerY - floorInfo.floorY) < 0.05
+  && floorInfo.playerVy === 0
+  && Math.abs(floorInfo.bossY - floorInfo.floorY) < 0.05
+  && Math.abs(floorInfo.bossGroupY - floorInfo.floorY) < 0.05,
+  'кімната світового боса має фізичну підлогу без провалювання', JSON.stringify(floorInfo));
 
 const deathRouteInfo = await page.evaluate(() => {
   const g = window.__game;

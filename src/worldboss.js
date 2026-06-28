@@ -80,6 +80,7 @@ export class WorldBossMode {
     this.cx = a.x;
     this.cz = a.z;
     this._half = this.roomSize / 2;
+    this.floorY = this._calcFloorY();
     this._buildRoom();
     this._spawned = false;
   }
@@ -113,6 +114,9 @@ export class WorldBossMode {
     }
     this._clampActor(this.level.player);
     if (this.boss && this.boss.state !== 'dead') this._clampZombie(this.boss);
+    for (const z of this.level.zombies.list || []) {
+      if (z.worldBossMinion && z.state !== 'dead') this._clampZombie(z);
+    }
     if (this.id === 'radiation') this._updateRadiation(dt);
     if (this.id === 'ice') this._updateIce(dt);
     if (this.id === 'titan') this._updateTitan(dt);
@@ -147,6 +151,11 @@ export class WorldBossMode {
       disposeObject(mesh);
     }
     this.roomMeshes = [];
+    if (this._floorEntry) {
+      const i = this.level.world.floors.indexOf(this._floorEntry);
+      if (i >= 0) this.level.world.floors.splice(i, 1);
+      this._floorEntry = null;
+    }
   }
 
   _buildRoom() {
@@ -154,19 +163,20 @@ export class WorldBossMode {
     const wallM = new THREE.MeshStandardMaterial({ color: 0x242833, roughness: 0.85, metalness: 0.05 });
     const railM = new THREE.MeshStandardMaterial({ color: this.cfg.color, roughness: 0.35, metalness: 0.15, emissive: this.cfg.color, emissiveIntensity: 0.12 });
     const floorM = new THREE.MeshStandardMaterial({ color: 0x303848, roughness: 0.9 });
+    this._floorEntry = { x: cx, z: cz, ry: 0, w: this.roomSize - 1, d: this.roomSize - 1, top: this.floorY };
+    level.world.floors.push(this._floorEntry);
     const floor = new THREE.Mesh(new THREE.BoxGeometry(this.roomSize, 0.18, this.roomSize), floorM);
-    floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
+    floor.position.set(cx, this.floorY - 0.08, cz);
     floor.receiveShadow = true;
     level.scene.add(floor);
     this.roomMeshes.push(floor);
     const mkWall = (x, z, sx, sz) => {
-      const y = level.world.groundH(x, z) + 1.4;
       const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.8, sz), wallM);
-      wall.position.set(x, y, z);
+      wall.position.set(x, this.floorY + 1.4, z);
       wall.castShadow = true;
       wall.receiveShadow = true;
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.12, sz + 0.03), railM);
-      stripe.position.set(x, y + 0.25, z);
+      stripe.position.set(x, this.floorY + 1.65, z);
       level.scene.add(wall, stripe);
       this.roomMeshes.push(wall, stripe);
     };
@@ -174,6 +184,17 @@ export class WorldBossMode {
     mkWall(cx, cz + h, this.roomSize, 0.35);
     mkWall(cx - h, cz, 0.35, this.roomSize);
     mkWall(cx + h, cz, 0.35, this.roomSize);
+  }
+
+  _calcFloorY() {
+    let y = -Infinity;
+    const h = this._half - 1;
+    for (const ox of [-h, -h * 0.5, 0, h * 0.5, h]) {
+      for (const oz of [-h, -h * 0.5, 0, h * 0.5, h]) {
+        y = Math.max(y, this.level.world.groundH(this.cx + ox, this.cz + oz));
+      }
+    }
+    return y + 0.08;
   }
 
   _spawnBoss() {
@@ -190,6 +211,7 @@ export class WorldBossMode {
     boss.state = 'chase';
     this.level.zombies.boss = boss;
     this.boss = boss;
+    this._clampZombie(boss);
     this.bossStarted = true;
     this.level.bus.emit('bossStart');
     this.level.game.hud.banner(this.cfg.name(), this.cfg.mechanic(), 4.2);
@@ -240,12 +262,13 @@ export class WorldBossMode {
         z.worldBossMinion = true;
         z.aggroed = true;
         z.state = 'chase';
+        this._clampZombie(z);
       }
     }
   }
 
   _addHazard(x, z, r, life, dps, color) {
-    const y = this.level.world.groundH(x, z) + 0.08;
+    const y = this.floorY + 0.08;
     const mesh = new THREE.Mesh(
       new THREE.RingGeometry(r * 0.65, r, 32),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
@@ -283,10 +306,17 @@ export class WorldBossMode {
     const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
     if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
     if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
+    if (p.pos.y < this.floorY) {
+      p.pos.y = this.floorY;
+      if (p.vel.y < 0) p.vel.y = 0;
+      p.onGround = true;
+    }
   }
 
   _clampZombie(z) {
     z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
     z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
+    z.y = this.floorY;
+    if (z.rig && z.rig.group) z.rig.group.position.y = this.floorY;
   }
 }
