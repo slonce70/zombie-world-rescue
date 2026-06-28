@@ -30,9 +30,20 @@ const res = await page.evaluate(async () => {
   const buyWithRoll = (id, roll) => {
     const old = Math.random;
     Math.random = () => roll;
-    const before = { coins: g.save.coins, crystals: g.save.crystals || 0, skins: [...g.save.skins], active: g.save.activeSkin };
+    const before = {
+      coins: g.save.coins, crystals: g.save.crystals || 0,
+      skins: [...g.save.skins], active: g.save.activeSkin,
+      hypers: [...(g.save.gadgetHypers || [])],
+    };
     try { g.test.shopBuy(id); } finally { Math.random = old; }
-    return { before, after: { coins: g.save.coins, crystals: g.save.crystals || 0, skins: [...g.save.skins], active: g.save.activeSkin } };
+    return {
+      before,
+      after: {
+        coins: g.save.coins, crystals: g.save.crystals || 0,
+        skins: [...g.save.skins], active: g.save.activeSkin,
+        hypers: [...(g.save.gadgetHypers || [])],
+      },
+    };
   };
 
   g.save.coins = 50;
@@ -61,6 +72,24 @@ const res = await page.evaluate(async () => {
   g.save.crystals = 5;
   const smallSkin = buyWithRoll('smallbox', 0.99);
 
+  g.save.coins = 499;
+  g.save.crystals = 5;
+  g.save.gadgetHypers = [];
+  const mediumDeniedCoins = buyWithRoll('mediumbox', 0.1);
+  g.save.coins = 500;
+  g.save.crystals = 4;
+  const mediumDeniedCrystals = buyWithRoll('mediumbox', 0.1);
+  g.save.coins = 500;
+  g.save.crystals = 5;
+  const mediumCoins = buyWithRoll('mediumbox', 0.59);
+  g.save.coins = 500;
+  g.save.crystals = 5;
+  const mediumCrystals = buyWithRoll('mediumbox', 0.98);
+  g.save.coins = 500;
+  g.save.crystals = 5;
+  g.save.gadgetHypers = [];
+  const mediumHyper = buyWithRoll('mediumbox', 0.995);
+
   let built = false, looksSilver = false, medicBuilt = false, looksMedic = false;
   try {
     const rig = makeHero('silver', g.save.hero);
@@ -75,11 +104,13 @@ const res = await page.evaluate(async () => {
 
   const item = SHOP_ITEMS.find((i) => i.id === 'bigbox');
   const smallItem = SHOP_ITEMS.find((i) => i.id === 'smallbox');
+  const mediumItem = SHOP_ITEMS.find((i) => i.id === 'mediumbox');
   return {
     tabs,
     boxItems,
     item: item && { crystalPrice: item.crystalPrice, max: item.max, cat: item.cat },
     smallItem: smallItem && { crystalPrice: smallItem.crystalPrice, max: smallItem.max, cat: smallItem.cat },
+    mediumItem: mediumItem && { price: mediumItem.price, crystalPrice: mediumItem.crystalPrice, max: mediumItem.max, cat: mediumItem.cat },
     silverMeta: HERO_SKINS.silver,
     medicMeta: HERO_SKINS.medic,
     denied,
@@ -90,6 +121,11 @@ const res = await page.evaluate(async () => {
     smallCoins,
     smallCrystals,
     smallSkin,
+    mediumDeniedCoins,
+    mediumDeniedCrystals,
+    mediumCoins,
+    mediumCrystals,
+    mediumHyper,
     built,
     looksSilver,
     medicBuilt,
@@ -121,6 +157,19 @@ check(res.smallCrystals.after.crystals === 5 && res.smallCrystals.after.coins ==
 check(res.smallSkin.after.crystals === 0 && res.smallSkin.after.skins.includes('medic') && res.smallSkin.after.active === 'medic',
   'маленький бокс roll 0.99 дає скін Медик і одягає його', JSON.stringify(res.smallSkin));
 check(res.medicMeta && res.medicBuilt && res.looksMedic, 'скін Медик має метадані і будується без fallback', JSON.stringify({ meta: res.medicMeta, built: res.medicBuilt, looksMedic: res.looksMedic }));
+check(res.boxItems.includes('mediumbox'), 'є середній бокс у розділі «Бокси»', JSON.stringify(res.boxItems));
+check(res.mediumItem && res.mediumItem.price === 500 && res.mediumItem.crystalPrice === 5 && res.mediumItem.max === Infinity && res.mediumItem.cat === 'Бокси',
+  'середній бокс коштує 500 монет і 5 кристалів та купується повторно', JSON.stringify(res.mediumItem));
+check(res.mediumDeniedCoins.after.coins === 499 && res.mediumDeniedCoins.after.crystals === 5,
+  '499 монет недостатньо для середнього бокса', JSON.stringify(res.mediumDeniedCoins));
+check(res.mediumDeniedCrystals.after.coins === 500 && res.mediumDeniedCrystals.after.crystals === 4,
+  '4 кристалів недостатньо для середнього бокса', JSON.stringify(res.mediumDeniedCrystals));
+check(res.mediumCoins.after.coins === 100 && res.mediumCoins.after.crystals === 0,
+  'середній бокс roll 0.59 дає 100 монет після ціни бокса', JSON.stringify(res.mediumCoins));
+check(res.mediumCrystals.after.coins === 0 && res.mediumCrystals.after.crystals === 10,
+  'середній бокс roll 0.98 дає 10 кристалів після ціни бокса', JSON.stringify(res.mediumCrystals));
+check(res.mediumHyper.after.coins === 0 && res.mediumHyper.after.crystals === 0 && res.mediumHyper.after.hypers.length === 1,
+  'середній бокс roll 0.995 дає один гіперзаряд', JSON.stringify(res.mediumHyper));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

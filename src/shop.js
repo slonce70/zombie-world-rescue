@@ -17,6 +17,7 @@ export const SHOP_ITEMS = [
   { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
   { id: 'bigbox', icon: '📦', name: t('Великий бокс'), desc: t('65%: 200 монет · 27%: 15 кристалів · 8%: срібний скін'), price: 0, crystalPrice: 10, max: Infinity, cat: t('Бокси') },
   { id: 'smallbox', icon: '🎁', name: t('Маленький бокс'), desc: t('80%: 50 монет · 15%: 5 кристалів · 5%: скін Медик'), price: 0, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
+  { id: 'mediumbox', icon: '🧰', name: t('Середній бокс'), desc: t('60%: 100 монет · 39%: 10 кристалів · 1%: гіперзаряд'), price: 500, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -314,6 +315,23 @@ export class Shop {
           if (!save.skins.includes('medic')) save.skins.push('medic');
           save.activeSkin = 'medic';
           game.hud.toast(t('🎁 Маленький бокс: скін Медик!'));
+        }
+        break;
+      }
+      case 'mediumbox': {
+        const roll = Math.random();
+        if (roll < 0.6) {
+          save.coins += 100;
+          game.hud.toast(t('🧰 Середній бокс: +100 монет'));
+        } else if (roll < 0.99) {
+          save.crystals = (save.crystals || 0) + 10;
+          game.hud.toast(t('🧰 Середній бокс: +10 кристалів'));
+        } else {
+          if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
+          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor'].filter((h) => !save.gadgetHypers.includes(h));
+          const hyper = pool[Math.floor(Math.random() * pool.length)];
+          if (hyper) save.gadgetHypers.push(hyper);
+          game.hud.toast(t('🧰 Середній бокс: гіперзаряд!'));
         }
         break;
       }
