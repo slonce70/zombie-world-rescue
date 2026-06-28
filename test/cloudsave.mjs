@@ -19,18 +19,20 @@ const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);
 const NAVIGATION_RACE_RE = /Execution context was destroyed|navigation|Cannot find context|Frame was detached/i;
 
-async function evaluateAcrossReloads(page, fn, timeout = T(25000)) {
+async function evaluateAcrossReloads(page, fn, timeout = T(25000), ready = (value) => value != null) {
   const deadline = Date.now() + timeout;
   let lastErr = null;
   while (Date.now() < deadline) {
     try {
-      return await page.evaluate(fn);
+      const value = await page.evaluate(fn);
+      if (ready(value)) return value;
+      lastErr = new Error('page value is not ready yet');
     } catch (e) {
       lastErr = e;
       if (!NAVIGATION_RACE_RE.test(String(e?.message || e))) throw e;
-      await page.waitForLoadState('domcontentloaded', { timeout: 1000 }).catch(() => {});
-      await sleep(T(100));
     }
+    await page.waitForLoadState('domcontentloaded', { timeout: 1000 }).catch(() => {});
+    await sleep(T(100));
   }
   throw lastErr || new Error('page.evaluate did not finish before timeout');
 }
@@ -222,11 +224,15 @@ await B.waitForFunction(({ codeCid }) => {
     && g.save.liberated.UKR
     && g.save.cid === codeCid);
 }, { codeCid: cidA }, { timeout: T(25000), polling: 300 });
-const restored = await evaluateAcrossReloads(B, () => ({
-  coins: window.__game.save.coins,
-  ukr: !!window.__game.save.liberated.UKR,
-  cid: window.__game.save.cid,
-}));
+const restored = await evaluateAcrossReloads(B, () => {
+  const g = window.__game;
+  if (!g || !g.save) return null;
+  return {
+    coins: g.save.coins,
+    ukr: !!g.save.liberated.UKR,
+    cid: g.save.cid,
+  };
+}, T(25000), (v) => v && v.coins === 7777 && v.ukr && v.cid === cidA);
 check('Б відновив монети і країну', restored.coins === 7777 && restored.ukr);
 check('Б успадкував cid (далі синхрон той самий)', restored.cid === cidA);
 
@@ -244,7 +250,10 @@ await C.waitForFunction(
   () => window.__game && window.__game.save && window.__game.save.coins === 7777,
   null, { timeout: T(25000) }
 ).catch(() => null);
-const cCoins = await evaluateAcrossReloads(C, () => window.__game.save.coins);
+const cCoins = await evaluateAcrossReloads(C, () => {
+  const g = window.__game;
+  return g && g.save ? g.save.coins : null;
+}, T(25000), (v) => v === 7777);
 check('bootSync сам підтягнув хмарний прогрес', cCoins === 7777, `coins=${cCoins}`);
 
 // ---------- файл-копія (панель А досі відкрита) ----------
