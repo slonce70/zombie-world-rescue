@@ -38,6 +38,32 @@ check(menuLock.beforeExists && menuLock.beforeLocked, 'до 20 рівня реж
 check(menuLock.afterExists && !menuLock.afterLocked && menuLock.passLevel >= 20,
   'на 20 рівні режим у меню доступний', JSON.stringify(menuLock));
 
+console.log('▸ Перегружений Нокаут відкривається після 8 звільнених країн');
+const overloadedMenu = await page.evaluate(() => {
+  const g = window.__game;
+  const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
+  const eight = { ...seven, TUR: true };
+  g.save.liberated = seven;
+  g.renderSoloMenu();
+  const before = document.querySelector('.solo-mode[data-mode="overloaded-knockout"]');
+  g.save.liberated = eight;
+  g.renderSoloMenu();
+  const after = document.querySelector('.solo-mode[data-mode="overloaded-knockout"]');
+  const normal = document.querySelector('.solo-mode[data-mode="knockout"]');
+  return {
+    beforeExists: !!before,
+    beforeLocked: before && before.classList.contains('locked'),
+    afterExists: !!after,
+    afterLocked: after && after.classList.contains('locked'),
+    afterName: after && after.querySelector('.sm-name').textContent,
+    normalExists: !!normal,
+  };
+});
+check(overloadedMenu.beforeExists && overloadedMenu.beforeLocked,
+  'до 8 країн перегружений режим заблокований', JSON.stringify(overloadedMenu));
+check(overloadedMenu.afterExists && !overloadedMenu.afterLocked && /Перегружений нокаут/i.test(overloadedMenu.afterName) && overloadedMenu.normalExists,
+  'після 8 країн є окрема картка Перегружений нокаут', JSON.stringify(overloadedMenu));
+
 console.log('▸ Старт Нокауту: кімната, 10 зомбі, тільки пістолет');
 await page.evaluate(() => window.__game.test.startKnockout());
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
@@ -77,6 +103,42 @@ const buffs = await page.evaluate(() => {
   return { ...g.level.player.buffs };
 });
 check(Object.values(buffs).every((n) => n === 0), 'бафи в Нокауті не застосовуються', JSON.stringify(buffs));
+
+console.log('▸ Старт Перегруженого Нокауту: 20 зомбі і 150 HP');
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  await g.test.startOverloadedKnockout();
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
+const overloadedStarted = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.unlockGadget('shield');
+  const beforeGadget = g.level.player.gadgetShield;
+  const gadgetUsed = g.test.useGadget();
+  g.test.giveCoins(9999);
+  g.shop.open();
+  return {
+    variant: g.level.knockout.variant,
+    target: g.level.knockout.target,
+    alive: g.level.zombies.list.filter((z) => z.state !== 'dead' && z.knockout).length,
+    playerMaxHp: g.level.player.maxHealth,
+    playerHp: g.level.player.health,
+    weapons: [...g.level.player.weapons],
+    cur: g.level.player.cur,
+    shopOpen: g.shop.isOpen,
+    gadgetUsed,
+    beforeGadget,
+    afterGadget: g.level.player.gadgetShield,
+  };
+});
+check(overloadedStarted.variant === 'overloaded' && overloadedStarted.target === 20 && overloadedStarted.alive === 20,
+  'перегружений Нокаут стартує з 20 зомбі', JSON.stringify(overloadedStarted));
+check(overloadedStarted.playerMaxHp === 150 && overloadedStarted.playerHp === 150,
+  'у гравця 150 HP', JSON.stringify(overloadedStarted));
+check(overloadedStarted.weapons.length === 1 && overloadedStarted.weapons[0] === 'pistol' && overloadedStarted.cur === 'pistol'
+  && !overloadedStarted.shopOpen && !overloadedStarted.gadgetUsed && overloadedStarted.afterGadget === overloadedStarted.beforeGadget,
+  'правила Нокауту лишаються: пістолет, без магазину і гаджетів', JSON.stringify(overloadedStarted));
 
 const dropTypes = await page.evaluate(() => {
   const g = window.__game;

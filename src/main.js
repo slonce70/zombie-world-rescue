@@ -20,7 +20,7 @@ import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VAL
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
-import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE } from './knockout.js';
+import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE, OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES } from './knockout.js';
 import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import {
@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 164;
+const APP_VERSION = 165;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -817,6 +817,12 @@ class Game {
           : t('Кімната 33×33, 10 зомбі, тільки пістолет. Перемога може дати Посох!'),
       },
       {
+        id: 'overloaded-knockout', icon: '💥', name: t('Перегружений нокаут'), locked: libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES,
+        desc: libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES })
+          : t('Кімната 33×33, 20 зомбі, у тебе 150 HP і тільки пістолет.'),
+      },
+      {
         id: 'defense', icon: '🛡️', name: t('ОБОРОНА'), locked: libN < DEFENSE_UNLOCK_COUNTRIES,
         desc: libN < DEFENSE_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: DEFENSE_UNLOCK_COUNTRIES })
@@ -902,6 +908,9 @@ class Game {
         } else if (mode === 'knockout') {
           this._hideOverlay('overlay-solo');
           this.startKnockout();
+        } else if (mode === 'overloaded-knockout') {
+          this._hideOverlay('overlay-solo');
+          this.startOverloadedKnockout();
         } else if (mode === 'defense') {
           this._hideOverlay('overlay-solo');
           this.startDefense();
@@ -1392,6 +1401,22 @@ class Game {
     return this.startLevel('UKR', { knockout: true });
   }
 
+  startOverloadedKnockout() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('💥🤝 Перегружений нокаут поки доступний тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('💥 Перегружений нокаут відкриється після {n} звільнених країн!', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { knockout: 'overloaded' });
+  }
+
   // ---------- 🛡️ Оборона ----------
   startDefense() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -1532,6 +1557,8 @@ class Game {
     const isStorm = !!opts.storm;
     document.body.classList.toggle('storm-mode', isStorm);
     const isKnockout = !!opts.knockout;
+    const knockoutVariant = opts.knockout === 'overloaded' ? 'overloaded' : 'normal';
+    const isOverloadedKnockout = isKnockout && knockoutVariant === 'overloaded';
     const isDefense = !!opts.defense;
     const defenseVariant = opts.defense === 'overloaded' ? 'overloaded' : 'normal';
     const isOverloadedDefense = isDefense && defenseVariant === 'overloaded';
@@ -1552,7 +1579,7 @@ class Game {
       : isDefense
       ? (isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
-      ? t('🥊 НОКАУТ')
+      ? (isOverloadedKnockout ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ'))
       : isArena
       ? t('👑 АРЕНА БОСІВ')
       : isStorm
@@ -1655,6 +1682,11 @@ class Game {
         level.player.health = 250;
         level.player.maxArmor = 0;
         level.player.armor = 0;
+      } else if (isOverloadedKnockout) {
+        level.player.maxHealth = 150;
+        level.player.health = 150;
+        level.player.maxArmor = 0;
+        level.player.armor = 0;
       }
       level.player._applyView();
     } else {
@@ -1667,7 +1699,7 @@ class Game {
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isKnockout) {
-      level.knockout = new KnockoutMode(level);
+      level.knockout = new KnockoutMode(level, knockoutVariant);
       level.missions = level.knockout;
     } else if (isDefense) {
       level.defense = new DefenseMode(level, defenseVariant);
@@ -1993,8 +2025,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -3095,6 +3127,10 @@ class Game {
       startStorm: (c) => g.startStorm(c),
       startArena: () => g.startArena(),
       startKnockout: () => g.startKnockout(),
+      startOverloadedKnockout: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
+        return g.startOverloadedKnockout();
+      },
       startDefense: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
         return g.startDefense();

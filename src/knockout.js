@@ -2,15 +2,32 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 
 export const KNOCKOUT_UNLOCK_LEVEL = 20;
+export const OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES = 8;
 export const KNOCKOUT_ROOM_SIZE = 33;
-export const KNOCKOUT_ZOMBIES = 10;
 export const KNOCKOUT_STAFF_CHANCE = 0.12;
 
+const KNOCKOUT_CONFIGS = {
+  normal: {
+    title: 'НОКАУТ',
+    zombies: 10,
+    playerHp: null,
+    loadoutText: 'Тільки пістолет. Без магазину, гаджетів і бафів.',
+  },
+  overloaded: {
+    title: 'Перегружений нокаут',
+    zombies: 20,
+    playerHp: 150,
+    loadoutText: '20 зомбі, 150 HP, тільки пістолет. Без магазину, гаджетів і бафів.',
+  },
+};
+
 export class KnockoutMode {
-  constructor(level) {
+  constructor(level, variant = 'normal') {
     this.level = level;
+    this.variant = KNOCKOUT_CONFIGS[variant] ? variant : 'normal';
+    this.cfg = KNOCKOUT_CONFIGS[this.variant];
     this.roomSize = KNOCKOUT_ROOM_SIZE;
-    this.target = KNOCKOUT_ZOMBIES;
+    this.target = this.cfg.zombies;
     this.completed = false;
     this.over = false;
     this.prompt = null;
@@ -32,9 +49,9 @@ export class KnockoutMode {
   getHudList() {
     const left = this.remaining();
     return [
-      { icon: '🥊', title: t('НОКАУТ'), done: false },
+      { icon: '🥊', title: t(this.cfg.title), done: false },
       { icon: '🧟', title: t('Зомбі лишилось: {n}/{t}', { n: left, t: this.target }), done: left <= 0 },
-      { icon: '🔫', title: t('Тільки пістолет. Без магазину, гаджетів і бафів.'), done: false },
+      { icon: '🔫', title: t(this.cfg.loadoutText), done: false },
     ];
   }
 
