@@ -256,7 +256,7 @@ export class LivingHQ {
         new THREE.SphereGeometry(0.28, 16, 10),
         new THREE.MeshLambertMaterial({ color: 0xffc9a3 })
       );
-      head.position.set(x, 2.0, 6.1);
+      head.position.set(0, 0.95, 0);
       head.userData.isHqDummyHead = true;
       body.add(head);
       this.targets.push(body);

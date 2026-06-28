@@ -79,6 +79,10 @@ const beforeDummy = await page.evaluate(() => window.__game.hqbase.debugState())
 await page.evaluate(() => window.__game.hqbase.hitFirstDummy());
 const afterDummy = await page.evaluate(() => window.__game.hqbase.debugState());
 check(beforeDummy.dummyCount >= 3, `манекени створено (${beforeDummy.dummyCount})`);
+check(await page.evaluate(() => window.__game.hqbase.dummies.every((dummy) => {
+  const head = dummy.children.find((child) => child.userData?.isHqDummyHead);
+  return head && head.position.x === 0 && head.position.y === 0.95 && head.position.z === 0;
+})), 'голови манекенів стоять локально на тілах');
 check(afterDummy.damageTotal === beforeDummy.damageTotal + 25, `манекен рахує шкоду (${beforeDummy.damageTotal} → ${afterDummy.damageTotal})`);
 check(await page.textContent('#hqbase-ui').then((s) => /Шкода.*25|Damage.*25|Урон.*25/.test(s || '')), 'UI бази показує шкоду по манекенах');
 
