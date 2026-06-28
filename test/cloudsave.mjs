@@ -17,6 +17,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // CI під навантаженням (SLOW=4): relay-раунд-тріпи й перезавантаження повільніші — масштабуємо чекання
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);
+const NAVIGATION_RACE_RE = /Execution context was destroyed|navigation|Cannot find context|Frame was detached/i;
+
+async function evaluateAcrossReloads(page, fn, timeout = T(25000)) {
+  const deadline = Date.now() + timeout;
+  let lastErr = null;
+  while (Date.now() < deadline) {
+    try {
+      return await page.evaluate(fn);
+    } catch (e) {
+      lastErr = e;
+      if (!NAVIGATION_RACE_RE.test(String(e?.message || e))) throw e;
+      await page.waitForLoadState('domcontentloaded', { timeout: 1000 }).catch(() => {});
+      await sleep(T(100));
+    }
+  }
+  throw lastErr || new Error('page.evaluate did not finish before timeout');
+}
 
 const relay = await spawnRelay(RELAY_PORT);
 
@@ -205,7 +222,7 @@ await B.waitForFunction(({ codeCid }) => {
     && g.save.liberated.UKR
     && g.save.cid === codeCid);
 }, { codeCid: cidA }, { timeout: T(25000), polling: 300 });
-const restored = await B.evaluate(() => ({
+const restored = await evaluateAcrossReloads(B, () => ({
   coins: window.__game.save.coins,
   ukr: !!window.__game.save.liberated.UKR,
   cid: window.__game.save.cid,
@@ -227,7 +244,7 @@ await C.waitForFunction(
   () => window.__game && window.__game.save && window.__game.save.coins === 7777,
   null, { timeout: T(25000) }
 ).catch(() => null);
-const cCoins = await C.evaluate(() => window.__game.save.coins);
+const cCoins = await evaluateAcrossReloads(C, () => window.__game.save.coins);
 check('bootSync сам підтягнув хмарний прогрес', cCoins === 7777, `coins=${cCoins}`);
 
 // ---------- файл-копія (панель А досі відкрита) ----------
