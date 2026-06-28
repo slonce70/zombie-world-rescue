@@ -34,6 +34,8 @@ const suite = [
   ['node', ['test/sw-cache.mjs']],
   ['node', ['test/pwa-offline.mjs']],
   ['node', ['test/smoke.mjs']],
+  ['node', ['test/defense.mjs']],
+  ['node', ['test/overloaded-defense.mjs']],
   ['node', ['test/overloaded-pvp.mjs']],
   ['node', ['test/cloudsave.mjs'], { SLOW: process.env.RELEASE_CLOUDSAVE_SLOW || process.env.SLOW || '2' }],
   ['node', ['test/flows.mjs'], { SLOW: process.env.RELEASE_FLOWS_SLOW || process.env.SLOW || '4' }],

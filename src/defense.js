@@ -2,17 +2,44 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 
 export const DEFENSE_UNLOCK_COUNTRIES = 8;
+export const OVERLOADED_DEFENSE_UNLOCK_COUNTRIES = 8;
 export const DEFENSE_ROOM_SIZE = 120;
 export const DEFENSE_TOWER_HP = 250;
 export const DEFENSE_ZOMBIES = 20;
 
+const DEFENSE_CONFIGS = {
+  normal: {
+    title: 'ОБОРОНА',
+    towerHp: DEFENSE_TOWER_HP,
+    waveSizes: [DEFENSE_ZOMBIES],
+    towerDps: 6,
+    types: ['walker', 'runner', 'tank', 'shield', 'imp', 'spitter', 'walker', 'gunner'],
+    loadoutText: 'Пістолет і автомат. Без магазину, гаджетів і бафів.',
+  },
+  overloaded: {
+    title: 'Перегружена оборона',
+    towerHp: 500,
+    waveSizes: [7, 7, 6],
+    zombieHp: 234,
+    zombieDmg: 25,
+    towerDps: 25,
+    types: ['walker', 'runner', 'tank', 'imp', 'spitter', 'gunner', 'walker'],
+    loadoutText: '3 хвилі. Вежа 500 HP, у тебе 250 HP. Без магазину, гаджетів, бафів і пікапів.',
+  },
+};
+
 export class DefenseMode {
-  constructor(level) {
+  constructor(level, variant = 'normal') {
     this.level = level;
+    this.variant = DEFENSE_CONFIGS[variant] ? variant : 'normal';
+    this.cfg = DEFENSE_CONFIGS[this.variant];
     this.roomSize = DEFENSE_ROOM_SIZE;
-    this.target = DEFENSE_ZOMBIES;
-    this.towerMaxHp = DEFENSE_TOWER_HP;
-    this.towerHp = DEFENSE_TOWER_HP;
+    this.target = this.cfg.waveSizes.reduce((sum, n) => sum + n, 0);
+    this.towerMaxHp = this.cfg.towerHp;
+    this.towerHp = this.cfg.towerHp;
+    this.wave = 0;
+    this.waveTotal = this.cfg.waveSizes.length;
+    this.spawned = 0;
     this.completed = false;
     this.over = false;
     this.prompt = null;
@@ -32,13 +59,15 @@ export class DefenseMode {
   get(id) { void id; return null; }
 
   getHudList() {
-    const left = this.remaining();
-    return [
-      { icon: '🛡️', title: t('ОБОРОНА'), done: false },
+    const left = Math.max(0, this.target - Math.min(this.target, this.level.stats.kills));
+    const list = [
+      { icon: '🛡️', title: t(this.cfg.title), done: false },
       { icon: '🗼', title: t('Вежа: {n}/{t} HP', { n: Math.max(0, Math.ceil(this.towerHp)), t: this.towerMaxHp }), done: this.towerHp > 0 },
       { icon: '🧟', title: t('Зомбі лишилось: {n}/{t}', { n: left, t: this.target }), done: left <= 0 },
-      { icon: '🔫', title: t('Пістолет і автомат. Без магазину, гаджетів і бафів.'), done: false },
+      { icon: '🔫', title: t(this.cfg.loadoutText), done: false },
     ];
+    if (this.waveTotal > 1) list.splice(1, 0, { icon: '🌊', title: t('Хвиля {n}/{t}', { n: this.wave, t: this.waveTotal }), done: false });
+    return list;
   }
 
   getMarkers() {
@@ -68,13 +97,16 @@ export class DefenseMode {
         z.aggroed = false;
         z.state = 'wander';
       } else {
-        this.towerHp -= dt * 6;
+        this.towerHp -= dt * this.cfg.towerDps;
       }
     }
     if (!this.over && this.towerHp <= 0) this.level.game._endDefenseRun(false);
     if (!this.over && this.remaining() <= 0) {
-      this.completed = true;
-      this.level.game._endDefenseRun(true);
+      if (this.wave < this.waveTotal) this._spawnWave(this.wave);
+      else {
+        this.completed = true;
+        this.level.game._endDefenseRun(true);
+      }
     }
   }
 
@@ -115,20 +147,36 @@ export class DefenseMode {
   }
 
   _spawnZombies() {
-    const types = ['walker', 'runner', 'tank', 'shield', 'imp', 'spitter', 'walker', 'gunner'];
-    for (let i = 0; i < this.target; i++) {
-      const a = (i / this.target) * Math.PI * 2;
+    this._spawnWave(0);
+  }
+
+  _spawnWave(idx) {
+    const count = this.cfg.waveSizes[idx] || 0;
+    this.wave = idx + 1;
+    for (let i = 0; i < count; i++) {
+      const n = this.spawned + i;
+      const a = (i / count) * Math.PI * 2 + idx * 0.45;
       const r = this._half - 7 - (i % 4) * 3;
       const x = this.cx + Math.cos(a) * r;
       const z = this.cz + Math.sin(a) * r;
-      const zb = this.level.zombies.spawn(types[i % types.length], x, z, {
+      const zb = this.level.zombies.spawn(this.cfg.types[n % this.cfg.types.length], x, z, {
         noLeash: true,
         anchor: { x: this.cx, z: this.cz, r: this._half - 2 },
       });
+      this._tuneZombie(zb);
       zb.defense = true;
       zb.aggroed = false;
       zb.state = 'wander';
     }
+    this.spawned += count;
+  }
+
+  _tuneZombie(zb) {
+    if (!this.cfg.zombieHp) return;
+    zb.maxHp = this.cfg.zombieHp;
+    zb.hp = this.cfg.zombieHp;
+    zb.stats = { ...zb.stats, hp: this.cfg.zombieHp, dmg: this.cfg.zombieDmg, coins: 0 };
+    if (zb.ranged) zb.ranged = { ...zb.ranged, dmg: this.cfg.zombieDmg };
   }
 
   _clampActor(p) {

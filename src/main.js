@@ -21,7 +21,7 @@ import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE } from './knockout.js';
-import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
+import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 159;
+const APP_VERSION = 160;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -307,6 +307,7 @@ class Game {
       this.endLevel();
       if (mode === 'knockout') this.startKnockout();
       else if (mode === 'defense') this.startDefense();
+      else if (mode === 'overloaded-defense') this.startOverloadedDefense();
       else if (mode === 'pvp') this.startPvp();
       else if (mode === 'worldboss') this.startWorldBoss(this._lastWorldBossId || 'radiation');
       else this.startArena();
@@ -817,6 +818,12 @@ class Game {
           : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
       },
       {
+        id: 'overloaded-defense', icon: '🏰', name: t('Перегружена оборона'), locked: libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES,
+        desc: libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES })
+          : t('3 хвилі: вежа 500 HP, гравець 250 HP, зомбі 234 HP.'),
+      },
+      {
         id: 'overloaded-pvp', icon: '💣', name: t('Перегружене ПВП'), locked: libN < OVERLOADED_PVP_UNLOCK_COUNTRIES,
         desc: libN < OVERLOADED_PVP_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES })
@@ -893,6 +900,9 @@ class Game {
         } else if (mode === 'defense') {
           this._hideOverlay('overlay-solo');
           this.startDefense();
+        } else if (mode === 'overloaded-defense') {
+          this._hideOverlay('overlay-solo');
+          this.startOverloadedDefense();
         } else if (mode === 'overloaded-pvp') {
           this._hideOverlay('overlay-solo');
           this.startOverloadedPvp();
@@ -1394,6 +1404,22 @@ class Game {
     return this.startLevel('UKR', { defense: true });
   }
 
+  startOverloadedDefense() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('🏰🤝 Перегружена оборона поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('🏰 Перегружена оборона відкриється після {n} звільнених країн!', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { defense: 'overloaded' });
+  }
+
   // ---------- ⚔️ ПВП ----------
   startPvp() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -1502,6 +1528,8 @@ class Game {
     document.body.classList.toggle('storm-mode', isStorm);
     const isKnockout = !!opts.knockout;
     const isDefense = !!opts.defense;
+    const defenseVariant = opts.defense === 'overloaded' ? 'overloaded' : 'normal';
+    const isOverloadedDefense = isDefense && defenseVariant === 'overloaded';
     const isPvp = !!opts.pvp;
     const pvpVariant = opts.pvp === 'overloaded' ? 'overloaded' : 'normal';
     const worldBossId = opts.worldBoss || null;
@@ -1517,7 +1545,7 @@ class Game {
       : isPvp
       ? (pvpVariant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП'))
       : isDefense
-      ? t('🛡️ ОБОРОНА')
+      ? (isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
       ? t('🥊 НОКАУТ')
       : isArena
@@ -1575,9 +1603,9 @@ class Game {
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: isStorm || isKnockout || isDefense || isPvp || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp,
-      noPickups: isPvp,
+      noPickups: isPvp || isOverloadedDefense,
       noZombiePickups: isKnockout || isDefense || isPvp,
-      noCoinDrops: isPvp,
+      noCoinDrops: isPvp || isOverloadedDefense,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
@@ -1617,6 +1645,11 @@ class Game {
         level.player.maxArmor = 0;
         level.player.armor = 0;
         level.player.damageMult = 1;
+      } else if (isOverloadedDefense) {
+        level.player.maxHealth = 250;
+        level.player.health = 250;
+        level.player.maxArmor = 0;
+        level.player.armor = 0;
       }
       level.player._applyView();
     } else {
@@ -1632,7 +1665,7 @@ class Game {
       level.knockout = new KnockoutMode(level);
       level.missions = level.knockout;
     } else if (isDefense) {
-      level.defense = new DefenseMode(level);
+      level.defense = new DefenseMode(level, defenseVariant);
       level.missions = level.defense;
     } else if (isPvp) {
       level.pvp = new PvpMode(level, pvpVariant);
@@ -1955,8 +1988,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? t('🛡️ ОБОРОНА') : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? t('Захисти вежу: 250 HP, пістолет і автомат') : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? t('🥊 НОКАУТ') : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? t('10 зомбі, 1 пістолет, без магазину й гаджетів') : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2439,7 +2472,7 @@ class Game {
       level.addCoins(150);
       this.saveGame();
     }
-    this._lastEndMode = 'defense';
+    this._lastEndMode = level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
@@ -3060,6 +3093,10 @@ class Game {
       startDefense: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
         return g.startDefense();
+      },
+      startOverloadedDefense: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
+        return g.startOverloadedDefense();
       },
       startPvp: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true };
