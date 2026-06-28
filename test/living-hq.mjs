@@ -72,6 +72,7 @@ check(st.worldBossTrophies >= 2, `показано трофеї світових
 check(st.megaQuestRows >= 6, `показано дошку мега-квестів (${st.megaQuestRows})`);
 check(st.skinDisplays >= 5, `показано колекцію скінів (${st.skinDisplays})`);
 check(st.hallPlaques >= 4, `показано зал слави (${st.hallPlaques})`);
+check(st.hallTrophies >= 4, `зал слави має trophy-моделі, не box-заглушки (${st.hallTrophies})`);
 check(st.hasHero === true, 'манекен героя створено з поточного скіна');
 const canvasOk = await page.evaluate(() => { const c = document.getElementById('game-canvas'); return !!c && c.width > 0 && c.height > 0; });
 check(canvasOk, 'canvas живий після входу');

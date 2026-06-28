@@ -55,6 +55,8 @@ export class LivingHQ {
     this.scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 1.7);
     sun.position.set(8, 12, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
     this.scene.add(sun);
 
     const floor = new THREE.Mesh(
@@ -81,6 +83,9 @@ export class LivingHQ {
     this._addHallOfFame();
     this._addTrainingTargets();
     this._addDamageDummies();
+    this.scene.traverse((obj) => {
+      if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
+    });
   }
 
   _addWall(x, z, color) {
@@ -101,6 +106,36 @@ export class LivingHQ {
     Object.assign(mesh.userData, data);
     this.scene.add(mesh);
     return mesh;
+  }
+
+  _addTrophy(x, y, z, color, data = {}, s = 1) {
+    const trophy = new THREE.Group();
+    trophy.position.set(x, y, z);
+    Object.assign(trophy.userData, data);
+    const gold = new THREE.MeshLambertMaterial({ color });
+    const baseMat = new THREE.MeshLambertMaterial({ color: 0x2a2118 });
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.4 * s, 0.16 * s, 28), baseMat);
+    base.position.y = 0.08 * s;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * s, 0.12 * s, 0.28 * s, 20), gold);
+    stem.position.y = 0.3 * s;
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.34 * s, 0.2 * s, 0.42 * s, 32), gold);
+    cup.position.y = 0.64 * s;
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(0.28 * s, 0.035 * s, 8, 28), gold);
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.86 * s;
+
+    for (const side of [-1, 1]) {
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.14 * s, 0.025 * s, 8, 18), gold);
+      handle.position.set(side * 0.35 * s, 0.64 * s, 0);
+      handle.rotation.y = Math.PI / 2;
+      handle.scale.x = 0.7;
+      trophy.add(handle);
+    }
+
+    trophy.add(base, stem, cup, lip);
+    this.scene.add(trophy);
+    return trophy;
   }
 
   _addHeroMannequin() {
@@ -126,14 +161,10 @@ export class LivingHQ {
     CAMPAIGN_ORDER.forEach((id, i) => {
       if (!saved[id]) return;
       const c = COUNTRIES[id];
-      const trophy = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.22, 0.28, 0.55, 18),
-        new THREE.MeshLambertMaterial({ color: 0xffd45a })
-      );
-      trophy.position.set(-4.9, 0.8 + (i % 4) * 0.6, -3 + Math.floor(i / 4) * 1.8);
-      trophy.userData.kind = 'country';
-      trophy.userData.label = c ? c.name : id;
-      this.scene.add(trophy);
+      this._addTrophy(-4.9, 0.48 + (i % 4) * 0.6, -3 + Math.floor(i / 4) * 1.8, 0xffd45a, {
+        kind: 'country',
+        label: c ? c.name : id,
+      }, 0.48);
       this.countryTrophies++;
     });
 
@@ -157,15 +188,8 @@ export class LivingHQ {
     const done = this.game.save.worldBosses || {};
     WORLD_BOSSES.forEach((boss, i) => {
       if (!done[boss.id]) return;
-      const trophy = new THREE.Mesh(
-        new THREE.SphereGeometry(0.32, 18, 12),
-        new THREE.MeshLambertMaterial({ color: boss.id === 'radiation' ? 0x77d56c : boss.id === 'ice' ? 0xa8e8ff : 0xff5c5c })
-      );
-      trophy.position.set(-3 + i * 1.2, 1.05, -6.1);
-      trophy.userData.kind = 'world-boss-trophy';
-      trophy.userData.label = boss.id;
-      this.scene.add(trophy);
-      this._addBox(-3 + i * 1.2, 0.45, -6.1, 0.8, 0.25, 0.8, 0x3a2f22, { kind: 'world-boss-stand' });
+      const color = boss.id === 'radiation' ? 0x77d56c : boss.id === 'ice' ? 0xa8e8ff : 0xff5c5c;
+      this._addTrophy(-3 + i * 1.2, 0.35, -6.1, color, { kind: 'world-boss-trophy', label: boss.id }, 0.68);
       this.worldBossTrophies++;
     });
   }
@@ -214,9 +238,8 @@ export class LivingHQ {
     ];
     values.forEach(([id, n, color], i) => {
       const x = -4.5 + i * 1.0;
-      const h = 0.35 + Math.min(1.2, n / (id === 'kills' ? 100 : 10));
-      this._addBox(x, 0.25, 5.4, 0.65, 0.25, 0.65, 0x3a2f22, { kind: 'hall-stand', id });
-      this._addBox(x, 0.5 + h / 2, 5.4, 0.42, h, 0.42, color, { kind: 'hall-plaque', id, value: n });
+      const s = 0.72 + Math.min(0.45, n / (id === 'kills' ? 260 : 26));
+      this._addTrophy(x, 0.16, 5.4, color, { kind: 'hall-trophy', id, value: n }, s);
       this.hallPlaques++;
     });
   }
@@ -367,6 +390,7 @@ export class LivingHQ {
       megaQuestRows: this.megaQuestRows || 0,
       skinDisplays: this.skinDisplays || 0,
       hallPlaques: this.hallPlaques || 0,
+      hallTrophies: this.scene.children.filter((obj) => obj.userData?.kind === 'hall-trophy').length,
       dummyCount: (this.dummies || []).length,
       hasHero: !!this.hero,
     };
