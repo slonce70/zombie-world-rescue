@@ -56,6 +56,33 @@ const started = await page.evaluate(() => {
   const used = g.test.useGadget();
   const usedAgain = g.test.useGadget();
   const z = g.level.zombies.list.find((x) => x.pvp);
+  const meshBounds = (root) => {
+    root.updateWorldMatrix(true, true);
+    const Vec3 = p.pos.constructor;
+    const min = { x: Infinity, y: Infinity, z: Infinity };
+    const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+    root.traverse((o) => {
+      const a = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
+      if (!o.isMesh || !a) return;
+      const v = new Vec3();
+      for (let i = 0; i < a.count; i++) {
+        v.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld);
+        min.x = Math.min(min.x, v.x); min.y = Math.min(min.y, v.y); min.z = Math.min(min.z, v.z);
+        max.x = Math.max(max.x, v.x); max.y = Math.max(max.y, v.y); max.z = Math.max(max.z, v.z);
+      }
+    });
+    return {
+      x: +(max.x - min.x).toFixed(3),
+      y: +(max.y - min.y).toFixed(3),
+      z: +(max.z - min.z).toFixed(3),
+    };
+  };
+  const oldCur = p.cur;
+  p.cur = 'sword';
+  p._applyView();
+  const fpSwordShape = meshBounds(p.fpArms.sword.group);
+  p.cur = oldCur;
+  p._applyView();
   return {
     mode: g.level.pvp.variant,
     roomSize: g.level.pvp.roomSize,
@@ -75,6 +102,7 @@ const started = await page.evaluate(() => {
     swordModel: {
       fp: !!(p.fpArms.sword && p.fpArms.sword.group.getObjectByName('sword-blade')),
       tp: !!(p.tpGuns.sword && p.tpGuns.sword.group.getObjectByName('sword-blade')),
+      fpSwordShape,
     },
     shopOpen: g.shop.isOpen,
     shield0,
@@ -104,6 +132,8 @@ check(started.cannon && started.cannon.dmg === 350 && started.cannon.reloadT ===
   'параметри зброї відповідають режиму', JSON.stringify(started));
 check(started.swordModel.fp && started.swordModel.tp,
   'меч має видиму модель у руках, а не fallback-пістолет', JSON.stringify(started.swordModel));
+check(started.swordModel.fpSwordShape.y > started.swordModel.fpSwordShape.z * 0.7,
+  'меч у першій особі стоїть як меч, а не як ствол гармати', JSON.stringify(started.swordModel));
 check(!started.shopOpen && started.noShop && started.noPickups && started.noGadgets,
   'магазин, пікапи і загальні гаджети вимкнені', JSON.stringify(started));
 check(started.used === true && started.usedAgain === false && started.shield0 === 0 && started.shieldAfterUse === 1000 && Math.ceil(started.gadgetCd) === 45,

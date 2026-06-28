@@ -3118,15 +3118,18 @@ export function makeGunMesh(kind) {
     muzzle.position.set(0, 0.02, -0.72);
   } else if (kind === 'sword') {
     const bladeM = toonMat(0xc9d0d8, 0xffffff, 0.25);
+    const edgeM = toonMat(0xe8eef6, 0xffffff, 0.35);
     const goldM = toonMat(0xffd23f, 0xd19918, 0.35);
     const gripM = toonMat(0x3a2422);
-    const blade = box(0.055, 0.026, 0.68, bladeM);
+    const blade = box(0.075, 0.018, 0.68, bladeM);
     blade.position.set(0, 0.035, -0.34);
+    const ridge = box(0.018, 0.024, 0.52, edgeM);
+    ridge.position.set(0, 0.043, -0.34);
     const tip = cone(0.045, 0.12, bladeM, 4);
     tip.rotation.x = -Math.PI / 2;
     tip.rotation.z = Math.PI / 4;
     tip.position.set(0, 0.035, -0.74);
-    const guard = box(0.24, 0.045, 0.045, goldM);
+    const guard = box(0.32, 0.05, 0.045, goldM);
     guard.position.set(0, 0.02, 0.04);
     const grip = box(0.055, 0.12, 0.18, gripM);
     grip.position.set(0, -0.06, 0.18);
@@ -3136,7 +3139,7 @@ export function makeGunMesh(kind) {
     const marker = new THREE.Object3D();
     marker.name = 'sword-blade';
     marker.position.copy(blade.position);
-    g.add(blade, tip, guard, grip, pommel, marker);
+    g.add(blade, ridge, tip, guard, grip, pommel, marker);
     muzzle.position.set(0, 0.035, -0.78);
   } else if (kind === 'bazooka') {
     const oliveM = toonMat(0x6b7a4a);
@@ -3196,24 +3199,30 @@ export function makeFPArms(gunKind) {
   const g = new THREE.Group();
   const skinM = toonMat(0xffc9a3);
   const sleeveM = toonMat(0x2f80c3);
+  const sword = gunKind === 'sword';
   const gun = makeGunMesh(gunKind);
-  gun.group.position.set(0, 0, 0);
+  if (sword) {
+    gun.group.position.set(0.06, -0.04, 0.08);
+    gun.group.rotation.set(Math.PI / 2 - 0.22, 0.16, -0.52);
+  } else {
+    gun.group.position.set(0, 0, 0);
+  }
   g.add(gun.group);
   // права рука тримає руків'я
   const armR = capsule(0.055, 0.3, sleeveM);
-  armR.rotation.x = Math.PI / 2 - 0.45;
-  armR.rotation.z = -0.35;
-  armR.position.set(0.1, -0.18, 0.22);
+  armR.rotation.x = Math.PI / 2 - (sword ? 0.18 : 0.45);
+  armR.rotation.z = sword ? -0.68 : -0.35;
+  armR.position.set(sword ? 0.08 : 0.1, sword ? -0.22 : -0.18, 0.22);
   const handR = sphere(0.06, skinM, 10, 8);
-  handR.position.set(0.005, -0.09, 0.05);
+  handR.position.set(sword ? 0.03 : 0.005, -0.09, sword ? 0.1 : 0.05);
   // ліва рука підтримує цівку
   const longGun = ['rifle', 'shotgun', 'smg', 'sniper', 'bazooka', 'staff'].includes(gunKind);
   const armL = capsule(0.055, 0.28, sleeveM);
-  armL.rotation.x = Math.PI / 2 - 0.25;
-  armL.rotation.z = 0.5;
-  armL.position.set(-0.12, -0.2, longGun ? -0.1 : 0.1);
+  armL.rotation.x = Math.PI / 2 - (sword ? 0.05 : 0.25);
+  armL.rotation.z = sword ? 0.25 : 0.5;
+  armL.position.set(sword ? -0.18 : -0.12, sword ? -0.25 : -0.2, longGun ? -0.1 : 0.1);
   const handL = sphere(0.07, skinM, 10, 8);
-  handL.position.set(-0.025, -0.085, longGun ? -0.24 : 0.0);
+  handL.position.set(sword ? -0.06 : -0.025, -0.085, longGun ? -0.24 : 0.0);
   g.add(armR, handR, armL, handL);
   bakeGroupMeshes(g, { outline: 0.01 });
   return { group: g, muzzle: gun.muzzle };
