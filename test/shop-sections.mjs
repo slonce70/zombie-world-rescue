@@ -30,16 +30,18 @@ const shop = await page.evaluate(() => {
   const skins = clickTab('Скіни') || [];
   const resources = clickTab('Ресурси') || [];
   const packs = clickTab('Набори') || [];
+  const boxes = clickTab('Бокси') || [];
   const supplies = clickTab('Припаси') || [];
   const allItems = [...new Set(tabs.flatMap((tab) => clickTab(tab) || []))];
   g.shop.close();
-  return { tabs, hyper, skins, resources, packs, supplies, allItems };
+  return { tabs, hyper, skins, resources, packs, boxes, supplies, allItems };
 });
 
 check(shop.tabs.includes('Гіперзаряди'), `є вкладка «Гіперзаряди»: ${shop.tabs.join(', ')}`);
 check(shop.tabs.includes('Скіни'), `є вкладка «Скіни»: ${shop.tabs.join(', ')}`);
 check(shop.tabs.includes('Ресурси'), `є вкладка «Ресурси»: ${shop.tabs.join(', ')}`);
 check(shop.tabs.includes('Набори'), `є вкладка «Набори»: ${shop.tabs.join(', ')}`);
+check(shop.tabs.includes('Бокси'), `є вкладка «Бокси»: ${shop.tabs.join(', ')}`);
 check(shop.hyper.includes('heal-hyper') && shop.hyper.includes('turret-hyper') && shop.hyper.includes('stunammo-hyper') && !shop.hyper.includes('turret'),
   `гіперзаряди окремо від гаджетів: ${shop.hyper.join(', ')}`);
 check(shop.skins.includes('goldskin') && shop.skins.includes('militaryskin') && shop.skins.includes('wizardskin') && shop.skins.includes('muscleskin') && !shop.skins.includes('vest'),
@@ -48,6 +50,8 @@ check(shop.resources.includes('coins500') && shop.resources.includes('coins1000'
   `ресурси окремо від припасів: ${shop.resources.join(', ')}`);
 check(shop.packs.includes('starterpack') && !shop.packs.includes('grenade'),
   `набори окремо від припасів: ${shop.packs.join(', ')}`);
+check(shop.boxes.includes('bigbox') && !shop.boxes.includes('starterpack'),
+  `бокси окремо від наборів: ${shop.boxes.join(', ')}`);
 check(!shop.supplies.includes('coins1000'),
   `1000 монет не у припасах: ${shop.supplies.join(', ')}`);
 check(!shop.supplies.includes('medkit') && !shop.supplies.includes('ammo'),

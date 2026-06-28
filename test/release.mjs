@@ -34,6 +34,7 @@ const suite = [
   ['node', ['test/sw-cache.mjs']],
   ['node', ['test/pwa-offline.mjs']],
   ['node', ['test/smoke.mjs']],
+  ['node', ['test/shop-boxes.mjs']],
   ['node', ['test/knockout.mjs']],
   ['node', ['test/defense.mjs']],
   ['node', ['test/overloaded-defense.mjs']],

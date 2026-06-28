@@ -2385,6 +2385,7 @@ export const HERO_SKINS = {
   legend: { name: t('Легенда'), icon: '🏆', desc: t('Зоряний шлях, рівень 25') },
   knight: { name: t('Лицар'), icon: '🛡️', desc: t('Зоряний шлях, рівень 30') },
   gold: { name: t('Золотий герой'), icon: '✨', desc: t('Купи в магазині') },
+  silver: { name: t('Срібний герой'), icon: '🥈', desc: t('Випадає з великого бокса') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2789,6 +2790,18 @@ export function makeHero(skinId = 'classic', heroColors = null) {
         brow: -0.08, cast: 'all', sleeves: 'shirt',
       });
       const shine = toonMat(0xfff2a6, 0xffd23f, 0.55);
+      const medal = sphere(0.08, shine, 8, 6);
+      medal.position.set(0, 0.36, -0.26);
+      rig.parts.torso.add(medal);
+      return rig;
+    },
+    silver() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd9a8, shirt: 0xc9d4e2, pants: 0x7f8fa6, shoes: 0xe5edf7,
+        eyeL: 0.06, eyeR: 0.06, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.08, cast: 'all', sleeves: 'shirt',
+      });
+      const shine = toonMat(0xf2f7ff, 0xaab7c8, 0.45);
       const medal = sphere(0.08, shine, 8, 6);
       medal.position.set(0, 0.36, -0.26);
       rig.parts.torso.add(medal);
