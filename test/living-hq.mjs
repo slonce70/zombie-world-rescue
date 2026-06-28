@@ -16,13 +16,25 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 // засіюємо сейв, щоб трофеї/герой були з даних
 await page.evaluate(() => {
   const g = window.__game;
-  g.save.liberated = { UKR: true, POL: true, DEU: true };
+  g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true };
+  g.save.worldBosses = { radiation: true, ice: true };
   g.save.records = { UKR: 123456 };
   g.save.missionRuns = { UKR: 2, POL: 1 };
   g.save.bestiary = { walker: 4, boss: 1, ghost: 1 };
   g.save.stats.killed = 99;
+  g.save.stats.bosses = 7;
+  g.save.stats.megaboxes = 3;
+  g.save.stats.bestCombo = 12;
+  g.save.xp = 900;
+  g.save.skins = ['classic', 'custom', 'gold', 'wizard', 'military'];
   g.save.activeSkin = 'custom';
   g.save.hero = { shirt: 0xe14b4b, pants: 0x2d3436, skin: 0xffc9a3 };
+  g.save.megaQuests = {
+    damage10000: { progress: 10000, done: true },
+    kills500: { progress: 250, done: false },
+    headshots150: { progress: 15, done: false },
+  };
+  g.quests.ensureMegaQuests();
   g.saveGame();
 });
 
@@ -39,7 +51,7 @@ await page.click('#btn-hqbase');
 await page.waitForFunction(() => window.__game && window.__game.state === 'hqbase', null, { timeout: 10000 });
 check(await page.evaluate(() => window.__game.state) === 'hqbase', 'клік входить у state=hqbase');
 check(!!await page.$('#hqbase-ui'), 'UI Живого Штабу показано');
-check(await page.textContent('#hqbase-ui').then((s) => /Країни.*3|Countries.*3|Страны.*3/.test(s || '')), 'UI бази показує кількість врятованих країн');
+check(await page.textContent('#hqbase-ui').then((s) => /Країни.*5|Countries.*5|Страны.*5/.test(s || '')), 'UI бази показує кількість врятованих країн');
 check(await page.textContent('#hqbase-ui').then((s) => /Бестіарій.*3|Bestiary.*3|Бестиарий.*3/.test(s || '')), 'UI бази показує відкритий бестіарій');
 check(!!await page.$('#btn-hqbase-wardrobe'), 'у базі є швидка кнопка Гардероба');
 check(!!await page.$('#btn-hqbase-panel'), 'у базі є швидка кнопка панелі бази');
@@ -49,6 +61,10 @@ const st = await page.evaluate(() => window.__game.hqbase.debugState());
 check(st.children >= 12, `Живий Штаб має 3D-обʼєкти (${st.children})`);
 check(st.countryTrophies >= 3, `показано трофеї звільнених країн (${st.countryTrophies})`);
 check(st.beastTrophies >= 3, `показано відкритий бестіарій (${st.beastTrophies})`);
+check(st.worldBossTrophies >= 2, `показано трофеї світових босів (${st.worldBossTrophies})`);
+check(st.megaQuestRows >= 6, `показано дошку мега-квестів (${st.megaQuestRows})`);
+check(st.skinDisplays >= 5, `показано колекцію скінів (${st.skinDisplays})`);
+check(st.hallPlaques >= 4, `показано зал слави (${st.hallPlaques})`);
 check(st.hasHero === true, 'манекен героя створено з поточного скіна');
 const canvasOk = await page.evaluate(() => { const c = document.getElementById('game-canvas'); return !!c && c.width > 0 && c.height > 0; });
 check(canvasOk, 'canvas живий після входу');

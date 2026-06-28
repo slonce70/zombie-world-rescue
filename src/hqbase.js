@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
-import { makeHero } from './characters.js';
+import { makeHero, HERO_SKINS } from './characters.js';
+import { WORLD_BOSSES } from './worldboss.js';
 
 export class LivingHQ {
   constructor(game) {
@@ -16,6 +17,12 @@ export class LivingHQ {
     this.hitCount = 0;
     this.ready = false;
     this.targets = [];
+    this.dummies = [];
+    this.damageTotal = 0;
+    this.worldBossTrophies = 0;
+    this.megaQuestRows = 0;
+    this.skinDisplays = 0;
+    this.hallPlaques = 0;
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
     this._onPointerDown = (e) => this._pickTarget(e);
@@ -67,6 +74,10 @@ export class LivingHQ {
     this._addWall(5.5, 0, 0x6f8fb8);
     this._addHeroMannequin();
     this._addSaveTrophies();
+    this._addWorldBossTrophies();
+    this._addMegaQuestBoard();
+    this._addSkinCollection();
+    this._addHallOfFame();
     this._addTrainingTargets();
   }
 
@@ -77,6 +88,17 @@ export class LivingHQ {
     );
     wall.position.set(x, 1.5, z);
     this.scene.add(wall);
+  }
+
+  _addBox(x, y, z, sx, sy, sz, color, data = {}) {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(sx, sy, sz),
+      new THREE.MeshLambertMaterial({ color })
+    );
+    mesh.position.set(x, y, z);
+    Object.assign(mesh.userData, data);
+    this.scene.add(mesh);
+    return mesh;
   }
 
   _addHeroMannequin() {
@@ -125,6 +147,75 @@ export class LivingHQ {
       box.userData.label = id;
       this.scene.add(box);
       this.beastTrophies++;
+    });
+  }
+
+  _addWorldBossTrophies() {
+    this.worldBossTrophies = 0;
+    const done = this.game.save.worldBosses || {};
+    WORLD_BOSSES.forEach((boss, i) => {
+      if (!done[boss.id]) return;
+      const trophy = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32, 18, 12),
+        new THREE.MeshLambertMaterial({ color: boss.id === 'radiation' ? 0x77d56c : boss.id === 'ice' ? 0xa8e8ff : 0xff5c5c })
+      );
+      trophy.position.set(-3 + i * 1.2, 1.05, -6.1);
+      trophy.userData.kind = 'world-boss-trophy';
+      trophy.userData.label = boss.id;
+      this.scene.add(trophy);
+      this._addBox(-3 + i * 1.2, 0.45, -6.1, 0.8, 0.25, 0.8, 0x3a2f22, { kind: 'world-boss-stand' });
+      this.worldBossTrophies++;
+    });
+  }
+
+  _addMegaQuestBoard() {
+    this.megaQuestRows = 0;
+    this.game.quests.ensureMegaQuests();
+    const quests = this.game.quests.megaList;
+    this._addBox(0, 1.55, -6.8, 4.8, 2.1, 0.18, 0x20324d, { kind: 'mega-board' });
+    quests.forEach((q, i) => {
+      const y = 2.3 - i * 0.28;
+      const ratio = Math.max(0.04, Math.min(1, q.progress / q.target));
+      const rowColor = q.done ? 0x6fe06f : 0xf5c542;
+      this._addBox(-1.9, y, -6.65, 0.18, 0.14, 0.12, rowColor, { kind: 'mega-row-icon', id: q.id });
+      this._addBox(-0.55, y, -6.63, 2.2, 0.08, 0.08, 0x0b1422, { kind: 'mega-row-bg', id: q.id });
+      this._addBox(-1.65 + ratio * 1.1, y, -6.58, 2.2 * ratio, 0.08, 0.1, rowColor, { kind: 'mega-row-fill', id: q.id });
+      this.megaQuestRows++;
+    });
+  }
+
+  _addSkinCollection() {
+    this.skinDisplays = 0;
+    const owned = (this.game.save.skins || []).filter((id) => HERO_SKINS[id]).slice(0, 6);
+    owned.forEach((id, i) => {
+      const hero = makeHero(id, this.game.save.hero);
+      hero.group.position.set(3.1 + (i % 3) * 1.0, 0.18, -3.6 + Math.floor(i / 3) * 1.2);
+      hero.group.rotation.y = Math.PI * 0.78;
+      hero.group.scale.setScalar(0.48);
+      hero.group.userData.kind = 'skin-display';
+      hero.group.userData.skin = id;
+      this.scene.add(hero.group);
+      this._addBox(hero.group.position.x, 0.08, hero.group.position.z, 0.75, 0.16, 0.75, 0xffffff, { kind: 'skin-stand', skin: id });
+      this.skinDisplays++;
+    });
+  }
+
+  _addHallOfFame() {
+    this.hallPlaques = 0;
+    const s = this.game.save.stats || {};
+    const worldBossDone = Object.keys(this.game.save.worldBosses || {}).filter((id) => this.game.save.worldBosses[id]).length;
+    const values = [
+      ['kills', s.killed || 0, 0xf05a5a],
+      ['bosses', s.bosses || 0, 0xffd45a],
+      ['worldBosses', worldBossDone, 0x77d56c],
+      ['combo', s.bestCombo || 0, 0x8fd0ff],
+    ];
+    values.forEach(([id, n, color], i) => {
+      const x = -4.5 + i * 1.0;
+      const h = 0.35 + Math.min(1.2, n / (id === 'kills' ? 100 : 10));
+      this._addBox(x, 0.25, 5.4, 0.65, 0.25, 0.65, 0x3a2f22, { kind: 'hall-stand', id });
+      this._addBox(x, 0.5 + h / 2, 5.4, 0.42, h, 0.42, color, { kind: 'hall-plaque', id, value: n });
+      this.hallPlaques++;
     });
   }
 
@@ -198,8 +289,14 @@ export class LivingHQ {
   dispose() {
     this.hero = null;
     this.targets = [];
+    this.dummies = [];
     this.countryTrophies = 0;
     this.beastTrophies = 0;
+    this.worldBossTrophies = 0;
+    this.megaQuestRows = 0;
+    this.skinDisplays = 0;
+    this.hallPlaques = 0;
+    this.damageTotal = 0;
     this.scene.rotation.y = 0;
     for (const obj of [...this.scene.children]) {
       this.scene.remove(obj);
@@ -217,9 +314,15 @@ export class LivingHQ {
     return {
       ready: this.ready,
       hitCount: this.hitCount,
+      damageTotal: this.damageTotal,
       children: this.scene.children.length,
       countryTrophies: this.countryTrophies || 0,
       beastTrophies: this.beastTrophies || 0,
+      worldBossTrophies: this.worldBossTrophies || 0,
+      megaQuestRows: this.megaQuestRows || 0,
+      skinDisplays: this.skinDisplays || 0,
+      hallPlaques: this.hallPlaques || 0,
+      dummyCount: (this.dummies || []).length,
       hasHero: !!this.hero,
     };
   }
