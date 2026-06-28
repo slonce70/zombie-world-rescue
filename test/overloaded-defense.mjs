@@ -102,6 +102,49 @@ check(started.noGadgets && started.noShop && started.noBuffs && started.noPickup
   && Object.values(started.buffs).every((n) => n === 0),
   'бафи, пікапи і дроп із зомбі вимкнені', JSON.stringify(started));
 
+console.log('▸ Зомбі бʼють гравця, а підлога тримає акторів');
+const floorAndPlayerDamage = await page.evaluate(() => {
+  const g = window.__game;
+  const d = g.level.defense;
+  const p = g.level.player;
+  const z = g.level.zombies.list.find((x) => x.defense && x.state !== 'dead');
+  const fallbackFloorY = g.level.world.groundH(d.cx, d.cz);
+  const floorY = typeof d.floorY === 'number' ? d.floorY : fallbackFloorY;
+  p.respawnProtect = 0;
+  p.gadgetShield = 0;
+  p.armor = 0;
+  p.helmetMult = 1;
+  p.health = 250;
+  p.pos.set(d.cx + 12, floorY - 20, d.cz + 12);
+  p.vel.set(0, -6, 0);
+  z.x = p.pos.x + 1;
+  z.z = p.pos.z;
+  z.y = floorY - 20;
+  z.defenseHitCd = 0;
+  if (z.rig && z.rig.group) z.rig.group.position.set(z.x, z.y, z.z);
+  const beforeHp = p.health;
+  d.update(0.2);
+  return {
+    hasFloorY: typeof d.floorY === 'number',
+    floorY,
+    playerY: p.pos.y,
+    playerVy: p.vel.y,
+    zombieY: z.y,
+    zombieGroupY: z.rig && z.rig.group ? z.rig.group.position.y : null,
+    beforeHp,
+    afterHp: p.health,
+    damage: +(beforeHp - p.health).toFixed(1),
+  };
+});
+check(floorAndPlayerDamage.hasFloorY
+  && Math.abs(floorAndPlayerDamage.playerY - floorAndPlayerDamage.floorY) < 0.05
+  && floorAndPlayerDamage.playerVy === 0
+  && Math.abs(floorAndPlayerDamage.zombieY - floorAndPlayerDamage.floorY) < 0.05
+  && Math.abs(floorAndPlayerDamage.zombieGroupY - floorAndPlayerDamage.floorY) < 0.05,
+  'підлога Оборони є фізичною: гравець і зомбі не провалюються', JSON.stringify(floorAndPlayerDamage));
+check(floorAndPlayerDamage.damage >= 24.5 && floorAndPlayerDamage.damage <= 25.5,
+  'зомбі поруч із гравцем наносить свої 25 HP шкоди', JSON.stringify(floorAndPlayerDamage));
+
 console.log('▸ Хвилі і шкода по вежі');
 const towerDamage = await page.evaluate(() => {
   const g = window.__game;

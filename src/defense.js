@@ -52,6 +52,7 @@ export class DefenseMode {
     this.cx = a.x;
     this.cz = a.z;
     this._half = this.roomSize / 2;
+    this.floorY = this._calcFloorY();
     this._buildRoom();
     this._spawnZombies();
   }
@@ -99,6 +100,7 @@ export class DefenseMode {
       } else {
         this.towerHp -= dt * this.cfg.towerDps;
       }
+      this._damagePlayerIfClose(z, dt);
     }
     if (!this.over && this.towerHp <= 0) this.level.game._endDefenseRun(false);
     if (!this.over && this.remaining() <= 0) {
@@ -115,14 +117,14 @@ export class DefenseMode {
     const wallM = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.85, metalness: 0.05 });
     const floorM = new THREE.MeshStandardMaterial({ color: 0x4f8d5f, roughness: 0.9 });
     const towerM = new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.55, metalness: 0.15 });
+    level.world.floors.push({ x: cx, z: cz, ry: 0, w: this.roomSize - 1, d: this.roomSize - 1, top: this.floorY });
     const floor = new THREE.Mesh(new THREE.BoxGeometry(this.roomSize, 0.16, this.roomSize), floorM);
-    floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
+    floor.position.set(cx, this.floorY - 0.08, cz);
     floor.receiveShadow = true;
     level.scene.add(floor);
     const mkWall = (x, z, sx, sz) => {
-      const y = level.world.groundH(x, z) + 1.2;
       const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.4, sz), wallM);
-      wall.position.set(x, y, z);
+      wall.position.set(x, this.floorY + 1.2, z);
       wall.castShadow = true;
       wall.receiveShadow = true;
       level.scene.add(wall);
@@ -132,7 +134,6 @@ export class DefenseMode {
     mkWall(cx - h, cz, 0.45, this.roomSize);
     mkWall(cx + h, cz, 0.45, this.roomSize);
 
-    const baseY = level.world.groundH(cx, cz);
     const tower = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.15, 5, 18), towerM);
     body.position.y = 2.5;
@@ -141,9 +142,20 @@ export class DefenseMode {
     top.position.y = 5.7;
     top.castShadow = true;
     tower.add(body, top);
-    tower.position.set(cx, baseY, cz);
+    tower.position.set(cx, this.floorY, cz);
     level.scene.add(tower);
     this.tower = tower;
+  }
+
+  _calcFloorY() {
+    let y = -Infinity;
+    const h = this._half - 1;
+    for (const ox of [-h, -h * 0.5, 0, h * 0.5, h]) {
+      for (const oz of [-h, -h * 0.5, 0, h * 0.5, h]) {
+        y = Math.max(y, this.level.world.groundH(this.cx + ox, this.cz + oz));
+      }
+    }
+    return y + 0.08;
   }
 
   _spawnZombies() {
@@ -167,6 +179,7 @@ export class DefenseMode {
       zb.defense = true;
       zb.aggroed = false;
       zb.state = 'wander';
+      this._clampZombie(zb);
     }
     this.spawned += count;
   }
@@ -184,11 +197,28 @@ export class DefenseMode {
     const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
     if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
     if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
+    if (p.pos.y < this.floorY) {
+      p.pos.y = this.floorY;
+      if (p.vel.y < 0) p.vel.y = 0;
+      p.onGround = true;
+    }
   }
 
   _clampZombie(z) {
     z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
     z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
+    z.y = this.floorY;
+    if (z.rig && z.rig.group) z.rig.group.position.y = this.floorY;
+  }
+
+  _damagePlayerIfClose(z, dt) {
+    const p = this.level.player;
+    z.defenseHitCd = Math.max(0, (z.defenseHitCd || 0) - dt);
+    if (!p || p.health <= 0 || z.defenseHitCd > 0 || p.pos.y - this.floorY > 3) return;
+    const reach = (z.stats?.attackR || 1.8) * 1.25;
+    if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > reach) return;
+    z.defenseHitCd = 0.9;
+    p.takeDamage(z.stats?.dmg || 10, z.x, z.z);
   }
 
   results() {
