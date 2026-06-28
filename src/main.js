@@ -68,7 +68,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 155;
+const APP_VERSION = 156;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -938,14 +938,21 @@ class Game {
     this.quests.ensureToday();
     this.quests.ensureMegaQuests();
     let html = `<div class="quest-section-title">${t('Мега-квести')}</div>`;
-    for (const q of this.quests.megaList) {
-      const pct = Math.round((q.progress / q.target) * 100);
-      html += `<div class="quest-row mega ${q.done ? 'done' : ''}">
-        <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
-        <div class="quest-reward">${q.rewardText}</div>
-        <div class="quest-bar"><div style="width:${pct}%"></div></div>
-        <div class="quest-prog">${q.progress} / ${q.target}</div>
+    if (!this.quests.megaUnlocked) {
+      html += `<div class="quest-row locked">
+        <div class="quest-title">🔒 ${t('Мега-квести відкриються на {n} рівні Зоряного шляху', { n: this.quests.megaUnlockLevel })}</div>
+        <div class="quest-reward">${t('Поки прокачуй щоденні завдання і країни')}</div>
       </div>`;
+    } else {
+      for (const q of this.quests.megaList) {
+        const pct = Math.round((q.progress / q.target) * 100);
+        html += `<div class="quest-row mega ${q.done ? 'done' : ''}">
+          <div class="quest-title">${q.icon} ${q.title} ${q.done ? '✅' : ''}</div>
+          <div class="quest-reward">${q.rewardText}</div>
+          <div class="quest-bar"><div style="width:${pct}%"></div></div>
+          <div class="quest-prog">${q.progress} / ${q.target}</div>
+        </div>`;
+      }
     }
     html += `<div class="quest-section-title">${t('Щоденні')}</div>`;
     for (const q of this.quests.list) {

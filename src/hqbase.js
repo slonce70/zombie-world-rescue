@@ -173,7 +173,7 @@ export class LivingHQ {
   _addMegaQuestBoard() {
     this.megaQuestRows = 0;
     this.game.quests.ensureMegaQuests();
-    const quests = this.game.quests.megaList;
+    const quests = this.game.quests.megaUnlocked ? this.game.quests.megaList : [];
     this._addBox(0, 1.55, -6.8, 4.8, 2.1, 0.18, 0x20324d, { kind: 'mega-board' });
     quests.forEach((q, i) => {
       const y = 2.3 - i * 0.28;
@@ -436,6 +436,10 @@ export class LivingHQ {
     this.game.quests.ensureMegaQuests();
     const mini = document.getElementById('hqbase-mega-list');
     if (mini) {
+      if (!this.game.quests.megaUnlocked) {
+        mini.innerHTML = `<div class="hqbase-mini-row">🔒 ${t('Мега-квести з {n} рівня Зоряного шляху', { n: this.game.quests.megaUnlockLevel })}</div>`;
+        return;
+      }
       mini.innerHTML = this.game.quests.megaList.slice(0, 3).map((q) => {
         const pct = Math.round((q.progress / q.target) * 100);
         return `<div class="hqbase-mini-row ${q.done ? 'done' : ''}">

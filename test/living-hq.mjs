@@ -14,8 +14,11 @@ await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
 // засіюємо сейв, щоб трофеї/герой були з даних
-await page.evaluate(() => {
+await page.evaluate(async () => {
   const g = window.__game;
+  const { MEGA_QUEST_MIN_LEVEL, xpForLevel } = await import('/src/progress.js');
+  let megaXp = 0;
+  for (let n = 1; n < MEGA_QUEST_MIN_LEVEL; n++) megaXp += xpForLevel(n);
   g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true };
   g.save.worldBosses = { radiation: true, ice: true };
   g.save.records = { UKR: 123456 };
@@ -25,7 +28,7 @@ await page.evaluate(() => {
   g.save.stats.bosses = 7;
   g.save.stats.megaboxes = 3;
   g.save.stats.bestCombo = 12;
-  g.save.xp = 900;
+  g.save.xp = megaXp;
   g.save.skins = ['classic', 'custom', 'gold', 'wizard', 'military'];
   g.save.activeSkin = 'custom';
   g.save.hero = { shirt: 0xe14b4b, pants: 0x2d3436, skin: 0xffc9a3 };

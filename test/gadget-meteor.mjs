@@ -19,6 +19,7 @@ const meta = await page.evaluate(async () => {
   const { SHOP_ITEMS } = await import('/src/shop.js');
   const { PASS_REWARDS, PASS_MAX_LEVEL } = await import('/src/progress.js');
   const G = GADGETS.meteor; const r33 = PASS_REWARDS[33];
+  const r35 = PASS_REWARDS[35];
   const hyper = SHOP_ITEMS.find((i) => i.id === 'meteor-hyper');
   return {
     meta: G && { cd: G.cd, icon: G.icon },
@@ -26,14 +27,17 @@ const meta = await page.evaluate(async () => {
     hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper, needsGadget: hyper.needsGadget },
     cap: PASS_MAX_LEVEL,
     reward33: r33 && { type: r33.type, id: r33.id },
+    reward35: r35 && { type: r35.type, n: r35.n },
   };
 });
 check(meta.meta && meta.meta.cd === 45 && meta.meta.icon === '☄️', 'мета гаджета: 45с cd, ☄️', JSON.stringify(meta.meta));
-check(meta.cap === 33, 'Зоряний шлях продовжено до 33', String(meta.cap));
+check(meta.cap === 40, 'Зоряний шлях продовжено до 40', String(meta.cap));
 check(!meta.inShop, 'метеорит НЕ продається в магазині (лише нагорода шляху)');
 check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'meteor' && meta.hyper.needsGadget === 'meteor',
   'гіперзаряд метеорита коштує 5000 і потребує базовий метеорит', JSON.stringify(meta.hyper));
 check(meta.reward33 && meta.reward33.type === 'gadget' && meta.reward33.id === 'meteor', 'нагорода рівня 33 = гаджет «Метеорит»', JSON.stringify(meta.reward33));
+check(meta.reward35 && meta.reward35.type === 'crystals' && meta.reward35.n === 15,
+  'нагорода рівня 35 = 15 кристалів', JSON.stringify(meta.reward35));
 
 // 🎖️ розблокування: рівень 33 видає метеорит БЕЗКОШТОВНО (як лазер@28)
 const grant = await page.evaluate(() => {

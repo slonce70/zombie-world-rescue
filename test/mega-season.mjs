@@ -16,6 +16,52 @@ await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeou
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
 
 console.log('▸ Сезон мега-квестів');
+const unlock = await page.evaluate(async () => {
+  const { MEGA_QUEST_MIN_LEVEL, xpForLevel } = await import('/src/progress.js');
+  const xpToLevel = (level) => {
+    let xp = 0;
+    for (let n = 1; n < level; n++) xp += xpForLevel(n);
+    return xp;
+  };
+  const g = window.__game;
+  g.save.xp = xpToLevel(MEGA_QUEST_MIN_LEVEL) - 1;
+  g.save.megaQuests = null;
+  g.quests.ensureMegaQuests();
+  g.test.questEvent('gadget', { n: 30 });
+  g.renderQuestsPanel();
+  const before = {
+    level: g.progress.level,
+    pending: g.quests.pendingCount,
+    gadgetProgress: g.save.megaQuests.gadget30.progress,
+    rows: document.querySelectorAll('#quest-list .quest-row.mega').length,
+    text: document.getElementById('quest-list').textContent,
+  };
+  g.save.xp = xpToLevel(MEGA_QUEST_MIN_LEVEL);
+  g.renderQuestsPanel();
+  return {
+    min: MEGA_QUEST_MIN_LEVEL,
+    before,
+    after: {
+      level: g.progress.level,
+      pending: g.quests.pendingCount,
+      rows: document.querySelectorAll('#quest-list .quest-row.mega').length,
+      text: document.getElementById('quest-list').textContent,
+    },
+    xpBase: g.save.xp,
+  };
+});
+check(unlock.min === 32, 'мега-квести відкриваються з 32 рівня', JSON.stringify(unlock));
+check(unlock.before.level === 31 && unlock.before.rows === 0 && unlock.before.text.includes('32'),
+  'до 32 рівня мега-квести закриті в UI', JSON.stringify(unlock.before));
+check(unlock.before.gadgetProgress === 0,
+  'до 32 рівня події не просувають мега-квести', JSON.stringify(unlock.before));
+check(unlock.after.level === 32 && unlock.after.rows === 8,
+  'на 32 рівні мега-квести доступні в UI', JSON.stringify(unlock.after));
+await page.evaluate((xp) => {
+  window.__megaXpBase = xp;
+  window.__game.save.xp = xp;
+}, unlock.xpBase);
+
 const meta = await page.evaluate(() => {
   const g = window.__game;
   g.save.megaQuests = null;
@@ -49,7 +95,8 @@ check(meta.pending >= meta.dailyCount + 8,
 
 const rewards = await page.evaluate(() => {
   const g = window.__game;
-  g.save.xp = 0;
+  const xpBase = window.__megaXpBase;
+  g.save.xp = xpBase;
   g.save.crystals = 0;
   g.save.coins = 0;
   g.save.gadgetHypers = [];
@@ -64,7 +111,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
   drive('kill', 1);
   const afterKillDone = {
@@ -72,7 +119,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('heal', 999);
@@ -81,7 +128,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
   drive('heal', 1);
   const afterHealDone = {
@@ -89,7 +136,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
   drive('heal', 50);
   const afterDuplicateHeal = {
@@ -97,7 +144,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('boss', 10);
@@ -106,7 +153,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('megabox', 10);
@@ -115,7 +162,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('country', 8);
@@ -124,7 +171,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('country', 8);
@@ -133,7 +180,7 @@ const rewards = await page.evaluate(() => {
     hypers: [...g.save.gadgetHypers],
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   drive('gadget', 29);
@@ -141,21 +188,21 @@ const rewards = await page.evaluate(() => {
     q: { ...g.save.megaQuests.gadget30 },
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
   drive('gadget', 1);
   const afterGadgetDone = {
     q: { ...g.save.megaQuests.gadget30 },
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
   drive('gadget', 1);
   const afterDuplicateGadget = {
     q: { ...g.save.megaQuests.gadget30 },
     crystals: g.save.crystals,
     coins: g.save.coins,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
   };
 
   return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry, beforeGadgetDone, afterGadgetDone, afterDuplicateGadget };
@@ -219,19 +266,20 @@ check(healHook.q.done && healHook.q.progress === 1000 && healHook.coins === 500 
 
 const countryHook = await page.evaluate(() => {
   const g = window.__game;
+  const xpBase = window.__megaXpBase;
   g.save.megaQuests = null;
   g.quests.ensureMegaQuests();
   g.save.megaQuests.countries8.progress = 7;
   g.save.megaQuests.countries8.done = false;
   g.save.crystals = 0;
-  g.save.xp = 0;
+  g.save.xp = xpBase;
   g.save.gadgetHypers = [];
   g.level.country = { ...g.level.country, id: 'UKR', name: 'Україна', coinReward: 0 };
   g._showVictory();
   return {
     q: { ...g.save.megaQuests.countries8 },
     crystals: g.save.crystals,
-    xp: g.save.xp,
+    xp: g.save.xp - xpBase,
     hypers: [...g.save.gadgetHypers],
   };
 });
@@ -241,13 +289,14 @@ check(countryHook.q.done && countryHook.q.progress === 8 && countryHook.crystals
 
 const countryReplay = await page.evaluate(() => {
   const g = window.__game;
+  const xpBase = window.__megaXpBase;
   g.victoryShown = false;
   g.save.megaQuests = null;
   g.quests.ensureMegaQuests();
   g.save.megaQuests.countries8.progress = 7;
   g.save.megaQuests.countries8.done = false;
   g.save.crystals = 0;
-  g.save.xp = 0;
+  g.save.xp = xpBase;
   g.save.gadgetHypers = [];
   g.save.liberated = { ...(g.save.liberated || {}), UKR: true };
   g.level.country = { ...g.level.country, id: 'UKR', name: 'Україна', coinReward: 0 };
@@ -269,7 +318,7 @@ const gadgetHook = await page.evaluate(() => {
   g.quests.ensureMegaQuests();
   g.save.crystals = 0;
   g.save.coins = 0;
-  g.save.xp = 0;
+  g.save.xp = window.__megaXpBase;
   g.save.gadgetsOwned = ['shield'];
   g.save.activeGadget = 'shield';
   g.level.playground = false;

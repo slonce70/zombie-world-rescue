@@ -36,12 +36,20 @@ export const PASS_REWARDS = {
   28: { type: 'coins', n: 650, icon: '💰', name: t('650 монет') },
   29: { type: 'coins', n: 700, icon: '💰', name: t('700 монет') },
   30: { type: 'tracer', id: 'royal', icon: '👑', name: t('Королівські кулі + слава') },
-  // шлях продовжено до 33 — ФІНАЛ = гаджет «Метеорит» (інакше його не дістати)
+  // шлях продовжено до 40; метеорит лишається великим подарунком на 33
   31: { type: 'coins', n: 750, icon: '💰', name: t('750 монет') },
   32: { type: 'coins', n: 800, icon: '💰', name: t('800 монет') },
   33: { type: 'gadget', id: 'meteor', icon: '☄️', name: t('Гаджет «Метеорит»') },
+  34: { type: 'coins', n: 900, icon: '💰', name: t('900 монет') },
+  35: { type: 'crystals', n: 15, icon: '💎', name: t('15 кристалів') },
+  36: { type: 'coins', n: 1000, icon: '💰', name: t('1000 монет') },
+  37: { type: 'coins', n: 1100, icon: '💰', name: t('1100 монет') },
+  38: { type: 'coins', n: 1200, icon: '💰', name: t('1200 монет') },
+  39: { type: 'coins', n: 1300, icon: '💰', name: t('1300 монет') },
+  40: { type: 'coins', n: 1500, icon: '💰', name: t('1500 монет') },
 };
-export const PASS_MAX_LEVEL = 33;
+export const PASS_MAX_LEVEL = 40;
+export const MEGA_QUEST_MIN_LEVEL = 32;
 
 // скільки XP треба, щоб перейти з рівня n на n+1
 export function xpForLevel(n) { return 80 + 40 * (n - 1); }
@@ -147,6 +155,8 @@ export class Progress {
     let sub = t('Нагорода: {i} {n}', { i: r.icon, n: r.name });
     if (r.type === 'coins') {
       game.save.coins += r.n;
+    } else if (r.type === 'crystals') {
+      game.save.crystals = (game.save.crystals || 0) + r.n;
     } else if (r.type === 'gadget') {
       if (game.save.gadgetsOwned.includes(r.id)) {
         game.save.coins += 150;
@@ -369,8 +379,12 @@ export class DailyQuests {
     });
   }
 
+  get megaUnlocked() { return this.game.progress.level >= MEGA_QUEST_MIN_LEVEL; }
+
+  get megaUnlockLevel() { return MEGA_QUEST_MIN_LEVEL; }
+
   get pendingCount() {
-    return this.list.filter((q) => !q.done).length + this.megaList.filter((q) => !q.done).length;
+    return this.list.filter((q) => !q.done).length + (this.megaUnlocked ? this.megaList.filter((q) => !q.done).length : 0);
   }
 
   get doneCount() { return this.list.filter((q) => q.done).length; }
@@ -391,15 +405,17 @@ export class DailyQuests {
         this._reward(q);
       }
     }
-    for (const q of this.megaList) {
-      const state = this.game.save.megaQuests[q.id];
-      if (state.done || q.ev !== ev) continue;
-      state.progress += (data.n || 1);
-      changed = true;
-      if (state.progress >= q.target) {
-        state.progress = q.target;
-        state.done = true;
-        this._rewardMega(q);
+    if (this.megaUnlocked) {
+      for (const q of this.megaList) {
+        const state = this.game.save.megaQuests[q.id];
+        if (state.done || q.ev !== ev) continue;
+        state.progress += (data.n || 1);
+        changed = true;
+        if (state.progress >= q.target) {
+          state.progress = q.target;
+          state.done = true;
+          this._rewardMega(q);
+        }
       }
     }
     if (changed) this.game.saveGame();
