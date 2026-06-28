@@ -294,7 +294,7 @@ export class Effects {
       L.netEv('bm', Math.round(pos.x * 10) / 10, Math.round(pos.y * 10) / 10, Math.round(pos.z * 10) / 10,
         radius, (meta && meta.gid) || 0, (meta && meta.barrels) || 0);
     }
-    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg, (meta && meta.pid) || 1);
+    if (this.onExplosion) this.onExplosion(pos.x, pos.y, pos.z, radius, dmg, (meta && meta.pid) || 1, meta);
     // ланцюгова реакція бочок
     if (this.barrels) {
       for (const ob of this.barrels) {
@@ -574,7 +574,7 @@ export class Effects {
   }
 
   // 🚀 ракета базуки: летить прямо, вибухає від першого дотику
-  spawnRocket(from, dir, dmg, gid = null, pid = 1) {
+  spawnRocket(from, dir, dmg, gid = null, pid = 1, finalDamage = false) {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), toonMat(0x6b7a4a));
     body.rotation.x = Math.PI / 2;
@@ -590,7 +590,7 @@ export class Effects {
     this.scene.add(g);
     // traveled — пройдена дистанція: до зведення (~3 м) ракета не вибухає,
     // тож постріл у натовп упритул не рве гравця власним вибухом (F10).
-    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid, pid, traveled: 0 });
+    this.rockets.push({ mesh: g, v: dir.clone().multiplyScalar(30), dmg, life: 6, smokeT: 0, gid, pid, traveled: 0, finalDamage });
   }
 
   spawnGrenade(pos, vel, gid = null, pid = 1) {
@@ -1136,7 +1136,7 @@ export class Effects {
           rk.mesh.visible = false;
           if (rk.life <= 0) { this.scene.remove(rk.mesh); disposeObject(rk.mesh); this.rockets.splice(i, 1); }
         } else {
-          this._explodeAt(rp.clone(), 4.5, rk.dmg, { gid: rk.gid || 0, pid: rk.pid || 1 });
+          this._explodeAt(rp.clone(), 4.5, rk.dmg, { gid: rk.gid || 0, pid: rk.pid || 1, finalDamage: rk.finalDamage });
           this.scene.remove(rk.mesh);
           disposeObject(rk.mesh);
           this.rockets.splice(i, 1);

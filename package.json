@@ -6,6 +6,7 @@
     "serve": "python3 -m http.server 8741",
     "relay": "node relay/dev-relay.mjs",
     "test": "node test/smoke.mjs",
+    "test:release": "node test/release.mjs",
     "test:coop": "node test/coop.mjs"
   },
   "license": "ISC",

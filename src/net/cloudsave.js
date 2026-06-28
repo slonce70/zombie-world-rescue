@@ -7,7 +7,7 @@ import { apiBase } from './transport.js';
 import { ensureCid } from './league.js';
 
 const PUSH_DELAY_MS = 25_000;
-const SAVE_KEY = 'zr-save-v1'; // тримати в синхроні з main.js
+export const SAVE_KEY = 'zr-save-v1';
 
 // 🎨 Дефолтний герой і стартові монети — ЄДИНЕ ДЖЕРЕЛО для _newSave (main.js) і
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
@@ -18,6 +18,10 @@ export const DEFAULT_HERO = {
   hat: 'cap', face: 'smile', body: 'regular', hair: 'none', accessory: 'none', back: 'pack',
 };
 export const NEW_SAVE_COINS = 50;
+
+export const liberatedIds = (liberated = {}) => Object.keys(liberated || {}).filter((id) => !!liberated[id]);
+export const liberatedCount = (liberated = {}) => liberatedIds(liberated).length;
+export const hasLiberated = (liberated = {}, id) => !!(liberated && liberated[id]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
 // імпорту/claim (adopt + confirm-діалоги в saveui), і newest-wins у bootSync.
@@ -30,7 +34,7 @@ export function saveHasProgress(s) {
   const hero = s.hero && typeof s.hero === 'object' ? { ...DEFAULT_HERO, ...s.hero } : null;
   const heroChanged = s.hero && typeof s.hero === 'object'
     && Object.keys(DEFAULT_HERO).some((k) => hero[k] !== DEFAULT_HERO[k]);
-  return Object.keys(s.liberated || {}).length > 0
+  return liberatedCount(s.liberated) > 0
     || (s.xp | 0) > 0
     || Object.keys(s.missionRuns || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
@@ -53,7 +57,7 @@ export function saveHasProgress(s) {
     || (s.pets || []).length > 0                            // куплені улюбленці
     || (s.towerSkins || []).length > 1                      // куплені скіни башти
     || (s.diffStar | 0) > 1                                 // піднята складність
-    || (s.weapons || []).length > 0;                        // здобута/розблокована зброя
+    || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 
 export class CloudSave {

@@ -394,7 +394,7 @@ export class HostNet {
 
   spawnNetRocket(origin, dir, dmg, ownerPid = 1) {
     const gid = this.allocId();
-    this.level.effects.spawnRocket(origin, dir, dmg, gid, ownerPid);
+    this.level.effects.spawnRocket(origin, dir, dmg, gid, ownerPid, true);
     this.ev('rk', gid, r2(origin.x), r2(origin.y), r2(origin.z), r2(dir.x), r2(dir.y), r2(dir.z));
   }
 

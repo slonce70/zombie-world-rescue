@@ -75,7 +75,7 @@ await shot(page, '05-shooting');
 const s5 = await page.evaluate(() => window.__game.test.state());
 console.log('AFTER SHOT:', JSON.stringify({ shots: s5.stats.shotsFired, hits: s5.stats.shotsHit, kills: s5.stats.kills }));
 check(s5.stats.shotsFired > 0, `стрільба працює (пострілів: ${s5.stats.shotsFired})`);
-check(s5.fps >= 1, `цикл рендериться (fps=${s5.fps})`);
+check(s5.stats.time > s2.stats.time, `ігровий час іде (${s2.stats.time.toFixed(2)} → ${s5.stats.time.toFixed(2)}, fps=${s5.fps})`);
 
 console.log('FPS:', s5.fps);
 // мережевий шум (404/429 від опційних хмарних сервісів) — не привід валити смоук

@@ -38,7 +38,7 @@ import { RescueHQ } from './ui/hq.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter } from './chapter.js';
 import { submitScore } from './net/league.js';
-import { CloudSave, DEFAULT_HERO, NEW_SAVE_COINS } from './net/cloudsave.js';
+import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
 translateHtml(document.body);
@@ -66,9 +66,8 @@ window.addEventListener('unhandledrejection', (e) => {
   showCrash(r && (r.stack || r.message) || r);
 });
 
-const SAVE_KEY = 'zr-save-v1';
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 156;
+const APP_VERSION = 157;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -492,6 +491,7 @@ class Game {
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!Array.isArray(out.weaponLoadout)) out.weaponLoadout = null;
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
+        for (const id of Object.keys(out.liberated)) if (!out.liberated[id]) delete out.liberated[id];
         if (!out.records || typeof out.records !== 'object') out.records = {};
         if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
         if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
@@ -503,7 +503,7 @@ class Game {
     // міграція: зброя за вже звільнені країни (старі сейви без weapons).
     // Захищено формою (Array/object) — щоб ніколи не кинути виняток на завантаженні (інакше — вічний краш-екран).
     if (Array.isArray(out.weapons) && out.liberated && typeof out.liberated === 'object') {
-      for (const id of Object.keys(out.liberated)) {
+      for (const id of liberatedIds(out.liberated)) {
         const w = COUNTRIES[id] && COUNTRIES[id].weaponReward;
         if (w && !out.weapons.includes(w)) out.weapons.push(w);
       }
@@ -749,7 +749,7 @@ class Game {
     if (!show) { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; }
     if (show) {
       document.getElementById('liberated-count').textContent =
-        Object.keys(this.save.liberated).length;
+        liberatedCount(this.save.liberated);
       // бейджі: рівень пасса і незавершені завдання дня
       const passBadge = document.getElementById('pass-badge');
       passBadge.textContent = `⭐${this.progress.level}`;
@@ -784,7 +784,7 @@ class Game {
 
   // ---------- 🎮 меню «Грати» (соло-режими) ----------
   renderSoloMenu() {
-    const libN = Object.keys(this.save.liberated).length;
+    const libN = liberatedCount(this.save.liberated);
     const modes = [
       {
         id: 'campaign', icon: '🎯', name: t('КАМПАНІЯ'), locked: false,
@@ -895,7 +895,7 @@ class Game {
           root.querySelectorAll('.solo-mode').forEach((x) => x.classList.toggle('sel', x === el));
           cRoot.style.display = '';
           cRoot.innerHTML = t('<div class="solo-cty-title">Де переживати Шторм?</div>')
-            + CAMPAIGN_ORDER.filter((id) => this.save.liberated[id]).map((id) =>
+            + CAMPAIGN_ORDER.filter((id) => hasLiberated(this.save.liberated, id)).map((id) =>
               `<button class="btn solo-cty" data-id="${id}">${COUNTRIES[id].flag} ${COUNTRIES[id].name}</button>`).join('');
           cRoot.querySelectorAll('.solo-cty').forEach((b) => {
             b.addEventListener('click', () => {
@@ -1066,7 +1066,7 @@ class Game {
     }
     petHtml += '</div>';
     let towerHtml = t('<div class="ward-section">🗼 Скін башти (гаджет)</div><div class="ward-grid">');
-    const towerOwned = (id) => id === 'default' || (id === 'stone' && !!(save.liberated && save.liberated.FRA)) || save.towerSkins.includes(id);
+    const towerOwned = (id) => id === 'default' || (id === 'stone' && hasLiberated(save.liberated, 'FRA')) || save.towerSkins.includes(id);
     for (const [id, meta] of Object.entries(TOWER_SKINS)) {
       const meta2 = { icon: meta.icon, name: meta.name, desc: id === 'stone' ? t('Звільни Францію 🇫🇷') : id === 'gold' ? t('Купи в магазині') : t('Базова') };
       towerHtml += card(id, meta2, towerOwned(id), save.activeTowerSkin === id, 'tower');
@@ -1296,7 +1296,7 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = Object.keys(this.save.liberated);
+    const lib = liberatedIds(this.save.liberated);
     if (!lib.length) {
       this.audio.denied();
       this.hud.toast(t('⛈️ Шторм відкриється після звільнення першої країни!'));
@@ -1305,7 +1305,7 @@ class Game {
     // найсвіжіша звільнена країна кампанії
     if (!countryId) {
       for (let i = CAMPAIGN_ORDER.length - 1; i >= 0; i--) {
-        if (this.save.liberated[CAMPAIGN_ORDER[i]]) { countryId = CAMPAIGN_ORDER[i]; break; }
+        if (hasLiberated(this.save.liberated, CAMPAIGN_ORDER[i])) { countryId = CAMPAIGN_ORDER[i]; break; }
       }
     }
     this.audio.click();
@@ -1319,7 +1319,7 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = Object.keys(this.save.liberated).length;
+    const lib = liberatedCount(this.save.liberated);
     if (lib < 2) {
       this.audio.denied();
       this.hud.toast(t('👑 Арена босів відкриється після звільнення 2 країн!'));
@@ -1337,7 +1337,7 @@ class Game {
       return;
     }
     const cfg = WORLD_BOSS_BY_ID[id];
-    const lib = Object.keys(this.save.liberated || {}).length;
+    const lib = liberatedCount(this.save.liberated);
     if (!cfg) {
       this.audio.denied();
       this.hud.toast(t('🌋 Такого світового боса немає.'));
@@ -1375,7 +1375,7 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = Object.keys(this.save.liberated || {}).length;
+    const lib = liberatedCount(this.save.liberated);
     if (lib < DEFENSE_UNLOCK_COUNTRIES) {
       this.audio.denied();
       this.hud.toast(t('🛡️ Оборона відкриється після {n} звільнених країн!', { n: DEFENSE_UNLOCK_COUNTRIES }));
@@ -1392,7 +1392,7 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = Object.keys(this.save.liberated || {}).length;
+    const lib = liberatedCount(this.save.liberated);
     if (lib < PVP_UNLOCK_COUNTRIES) {
       this.audio.denied();
       this.hud.toast(t('⚔️ ПВП відкриється після {n} звільнених країн!', { n: PVP_UNLOCK_COUNTRIES }));
@@ -1556,7 +1556,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isWorldBoss && !coopActive && !!(this.save.liberated && this.save.liberated[countryId]);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -1747,7 +1747,7 @@ class Game {
     };
     // вибух (граната/бочка 135 за замовч., ракета базуки 220 — передається явно): шкода зомбі по радіусу.
     // ownerPid — хто підірвав (для чесного кіл-кредиту/комбо/квестів у коопі); 1 = локальний гравець/хост
-    level.effects.onExplosion = (x, y, z, r, baseDmg = 135, ownerPid = 1) => {
+    level.effects.onExplosion = (x, y, z, r, baseDmg = 135, ownerPid = 1, meta = null) => {
       // вибух трощить і барикади поблизу
       for (const w of [...level.gadgets.walls]) {
         if (Math.hypot(w.x - x, w.z - z) < r) level.gadgets.damageWall(w, baseDmg);
@@ -1757,7 +1757,8 @@ class Game {
         const d = Math.hypot(zb.x - x, zb.z - z);
         if (d < r) {
           const rage = level.player.buffs.rage > 0 ? 2 : 1;
-          const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * level.player.damageMult * rage);
+          const mult = meta && meta.finalDamage ? 1 : level.player.damageMult * rage;
+          const dmg = Math.round(baseDmg * (1 - (d / r) * 0.55) * mult);
           // вибух: не малюємо число, якщо щит або нагрудник повністю поглинає удар
           const absorbed = zb.shieldHp > 0 || (zb.chestHp > 0); // вибух не є headshot → chestHp завжди поглинає
           if (!absorbed) {
@@ -2860,7 +2861,7 @@ class Game {
         country: g.level ? g.level.countryId : null,
         grenades: g.level ? g.level.player.grenades : 0,
         combo: g.level ? g.level.combo.n : 0,
-        liberated: Object.keys(g.save.liberated),
+        liberated: liberatedIds(g.save.liberated),
         player: g.level ? {
           x: g.level.player.pos.x, y: g.level.player.pos.y, z: g.level.player.pos.z,
           health: g.level.player.health, weapons: g.level.player.weapons, cur: g.level.player.cur,

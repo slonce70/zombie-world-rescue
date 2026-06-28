@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v156';
+const CACHE = 'zr-cache-v157';
 
 const SHELL = [
   './',
@@ -23,6 +23,8 @@ const SHELL = [
   './src/effects.js',
   './src/hud.js',
   './src/shop.js',
+  './src/draft.js',
+  './src/runbuild.js',
   './src/globe.js',
   './src/utils.js',
   './src/countries.js',
@@ -35,12 +37,14 @@ const SHELL = [
   './src/knockout.js',
   './src/defense.js',
   './src/pvp.js',
+  './src/worldboss.js',
   './src/characters.js',
   './src/maps/ukraine.js',
   './src/maps/poland.js',
   './src/maps/germany.js',
   './src/maps/france.js',
   './src/maps/spain.js',
+  './src/maps/portugal.js',
   './src/maps/italy.js',
   './src/maps/turkey.js',
   './src/maps/egypt.js',
@@ -64,6 +68,7 @@ const SHELL = [
   './src/i18n.js',
   './src/i18n/en.js',
   './src/i18n/ru.js',
+  './worker/nick.mjs',
 ];
 
 self.addEventListener('install', (e) => {

@@ -29,6 +29,7 @@ txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
   coop: document.getElementById('btn-coop').textContent.trim(),
   ward: document.getElementById('btn-wardrobe').textContent.trim(),
+  fire: document.getElementById('tb-fire').getAttribute('aria-label'),
   htmlLang: document.documentElement.lang,
   shopName: window.__game.shop ? 'ok' : 'no',
 }));
@@ -36,6 +37,7 @@ check(txt.play.toUpperCase().includes('PLAY'), 'en: PLAY', txt.play);
 check(txt.play !== uk.play, 'en: play відрізняється від uk', txt.play);
 check(txt.coop.toUpperCase().includes('PLAY') && txt.coop.toUpperCase().includes('TOGETHER'), 'en: PLAY TOGETHER', txt.coop);
 check(txt.ward.toLowerCase().includes('wardrobe'), 'en: Wardrobe', txt.ward);
+check(txt.fire === 'Fire', 'en: touch fire aria-label', txt.fire);
 check(txt.htmlLang === 'en', 'en: html lang', txt.htmlLang);
 const heroEn = await page.evaluate(() => {
   const g = window.__game;

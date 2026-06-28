@@ -90,8 +90,8 @@ export function translateHtml(root = document.body) {
     if (!key || dict[key] === undefined) continue;
     n.nodeValue = raw.replace(key, dict[key]);
   }
-  for (const el of root.querySelectorAll('[placeholder], [title]')) {
-    for (const attr of ['placeholder', 'title']) {
+  for (const el of root.querySelectorAll('[placeholder], [title], [aria-label]')) {
+    for (const attr of ['placeholder', 'title', 'aria-label']) {
       const v = el.getAttribute(attr);
       if (v && dict[v] !== undefined) el.setAttribute(attr, dict[v]);
     }

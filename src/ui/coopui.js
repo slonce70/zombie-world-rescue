@@ -7,6 +7,7 @@ import { nickIsBad } from '../../worker/nick.mjs';
 import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
+import { liberatedCount, hasLiberated } from '../net/cloudsave.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = { campaign: '🎯', storm: '⛈️', arena: '👑' };
@@ -186,7 +187,7 @@ export class CoopUI {
 
   // ---------- публічність ----------
   _loadPublic() {
-    try { return localStorage.getItem(PUBLIC_KEY) !== '0'; } catch (e) { return true; }
+    try { return localStorage.getItem(PUBLIC_KEY) === '1'; } catch (e) { return false; }
   }
 
   _savePublic(on) {
@@ -459,9 +460,9 @@ export class CoopUI {
 
     // режим: кампанія чи шторм
     const save = this.game.save;
-    const anyLib = Object.keys(save.liberated || {}).length > 0;
+    const anyLib = liberatedCount(save.liberated) > 0;
     let mh = '';
-    const libCount = Object.keys(save.liberated || {}).length;
+    const libCount = liberatedCount(save.liberated);
     for (const [mid, label] of [['campaign', t('🎯 Кампанія')], ['storm', t('⛈️ Шторм')], ['arena', t('👑 Арена')]]) {
       const sel = s.mode === mid;
       const locked = isHost && ((mid === 'storm' && !anyLib) || (mid === 'arena' && libCount < 2));
@@ -474,8 +475,8 @@ export class CoopUI {
           this.game.audio.click();
           s.setMode(el.dataset.mode);
           // шторм лише на звільнених — перескакуємо, якщо поточна не пасує
-          if (s.mode === 'storm' && !save.liberated[s.countryId]) {
-            const lib = CAMPAIGN_ORDER.filter((c) => save.liberated[c]);
+          if (s.mode === 'storm' && !hasLiberated(save.liberated, s.countryId)) {
+            const lib = CAMPAIGN_ORDER.filter((c) => hasLiberated(save.liberated, c));
             if (lib.length) s.setCountry(lib[lib.length - 1]);
           }
           this._renderLobby();
@@ -492,7 +493,7 @@ export class CoopUI {
       const c = COUNTRIES[id];
       // у шторм-режимі грають лише ЗВІЛЬНЕНІ хостом країни
       const unlocked = s.mode === 'storm'
-        ? !!save.liberated[id]
+        ? hasLiberated(save.liberated, id)
         : isCountryOpen(save.liberated, id);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;

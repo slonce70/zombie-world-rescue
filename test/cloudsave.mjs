@@ -86,10 +86,21 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   await U.goto(`${BASE}/?test&fresh`);
   await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
   const res = await U.evaluate(async () => {
-    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS } = await import('/src/net/cloudsave.js');
+    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
     const fresh = window.__game._newSave();
     const out = {};
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
+    out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
+    out.pistolOnlyIsEmpty = saveHasProgress({ ...fresh, weapons: ['pistol'] }) === false;
+    out.rifleIsProgress = saveHasProgress({ ...fresh, weapons: ['rifle'] }) === true;
+    out.trueLiberatedIsProgress = saveHasProgress({ ...fresh, liberated: { UKR: true } }) === true;
+    out.truthyHelpers = JSON.stringify(liberatedIds({ UKR: false, POL: null, DEU: true })) === JSON.stringify(['DEU'])
+      && liberatedCount({ UKR: false, DEU: true }) === 1
+      && hasLiberated({ UKR: false, DEU: true }, 'DEU')
+      && !hasLiberated({ UKR: false, DEU: true }, 'UKR');
+    localStorage.setItem('zr-save-v1', JSON.stringify({ ...fresh, liberated: { UKR: false, POL: null, DEU: true }, weapons: ['pistol'] }));
+    const loaded = window.__game._loadSave();
+    out.loadSaveDropsFalseLiberated = JSON.stringify(loaded.liberated) === JSON.stringify({ DEU: true });
     out.legacyDefaultHero = saveHasProgress({ ...fresh, hero: { shirt: DEFAULT_HERO.shirt, pants: DEFAULT_HERO.pants, skin: DEFAULT_HERO.skin, shoes: DEFAULT_HERO.shoes, hatColor: DEFAULT_HERO.hatColor, hat: DEFAULT_HERO.hat, face: DEFAULT_HERO.face } }) === false;
     const hero = { ...fresh, hero: { ...DEFAULT_HERO, shirt: 0x123456 } };
     out.customHero = saveHasProgress(hero) === true;
@@ -111,6 +122,12 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     return out;
   });
   check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
+  check('liberated:false ≠ прогрес', res.falseLiberatedIsEmpty);
+  check('тільки pistol ≠ прогрес', res.pistolOnlyIsEmpty);
+  check('rifle → прогрес=true', res.rifleIsProgress);
+  check('liberated:true → прогрес=true', res.trueLiberatedIsProgress);
+  check('liberated helpers рахують тільки truthy', res.truthyHelpers);
+  check('_loadSave прибирає false/null liberated', res.loadSaveDropsFalseLiberated);
   check('legacy default hero без нових ключів ≠ прогрес', res.legacyDefaultHero);
   check('стартові 50 монет ≠ прогрес', res.startCoinsNotProgress);
   check('кастом-герой → прогрес=true', res.customHero);
