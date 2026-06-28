@@ -10,7 +10,7 @@ const check = (ok, msg, extra = '') => {
 
 page.on('pageerror', (e) => { console.log('PAGEERROR:', e.message); failed++; });
 
-await page.goto('http://[::1]:8741/index.html?test&parts-only', { waitUntil: 'commit', timeout: 60000 });
+await page.goto('http://localhost:8741/index.html?test&parts-only', { waitUntil: 'commit', timeout: 60000 });
 const res = await page.evaluate(async () => {
   const THREE = await import('/vendor/three.module.js');
   const {

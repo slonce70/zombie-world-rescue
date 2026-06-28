@@ -157,7 +157,7 @@ await page.screenshot({ path: 'shots/u3-bazooka.png' });
 
 // ============ 🛒 МАГАЗИН 2.0 ============
 console.log('▸ Магазин: зброя і спорядження');
-await page.evaluate(() => window.__game.test.giveCoins(3000));
+await page.evaluate(() => window.__game.test.giveCoins(10000));
 for (const id of ['smg', 'magnum', 'sniper', 'vest', 'helmet', 'sneakers']) {
   await page.evaluate((i) => window.__game.test.shopBuy(i), id);
 }

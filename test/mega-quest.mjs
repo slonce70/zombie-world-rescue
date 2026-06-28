@@ -14,11 +14,17 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+await page.evaluate(async () => {
+  const { MEGA_QUEST_MIN_LEVEL, xpForLevel } = await import('/src/progress.js');
+  let xp = 0;
+  for (let n = 1; n < MEGA_QUEST_MIN_LEVEL; n++) xp += xpForLevel(n);
+  window.__megaQuestXpBase = xp;
+});
 
 console.log('▸ Мега-квест: 10000 шкоди');
 const res = await page.evaluate(() => {
   const g = window.__game;
-  g.save.xp = 0;
+  g.save.xp = window.__megaQuestXpBase;
   g.save.crystals = 0;
   g.save.gadgetHypers = [];
   g.save.megaQuests = null;
@@ -33,7 +39,7 @@ const res = await page.evaluate(() => {
   const mid = {
     q: g.save.megaQuests && { ...g.save.megaQuests.damage10000 },
     crystals: g.save.crystals,
-    xp: g.save.xp,
+    xp: g.save.xp - window.__megaQuestXpBase,
     hypers: [...(g.save.gadgetHypers || [])],
   };
 
@@ -41,7 +47,7 @@ const res = await page.evaluate(() => {
   const done = {
     q: g.save.megaQuests && { ...g.save.megaQuests.damage10000 },
     crystals: g.save.crystals,
-    xp: g.save.xp,
+    xp: g.save.xp - window.__megaQuestXpBase,
     hypers: [...(g.save.gadgetHypers || [])],
   };
 
@@ -49,7 +55,7 @@ const res = await page.evaluate(() => {
   const after = {
     q: g.save.megaQuests && { ...g.save.megaQuests.damage10000 },
     crystals: g.save.crystals,
-    xp: g.save.xp,
+    xp: g.save.xp - window.__megaQuestXpBase,
     hypers: [...(g.save.gadgetHypers || [])],
   };
 
@@ -75,6 +81,7 @@ check(res.html.includes('МЕГА') && res.html.includes('10000') && res.html.in
 
 const capped = await page.evaluate(() => {
   const g = window.__game;
+  g.save.xp = window.__megaQuestXpBase;
   g.save.megaQuests = null;
   g.save.crystals = 0;
   g.save.gadgetHypers = [];

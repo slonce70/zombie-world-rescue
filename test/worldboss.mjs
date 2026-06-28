@@ -245,9 +245,13 @@ check(titanInfo.closed === 35 && titanInfo.open === 140,
   'ядро Титана: 35% шкоди закрите, 140% відкрите', JSON.stringify(titanInfo));
 
 console.log('▸ Світові боси: мега-квест шкоди');
-await page.evaluate(() => {
+await page.evaluate(async () => {
+  const { MEGA_QUEST_MIN_LEVEL, xpForLevel } = await import('/src/progress.js');
+  let xp = 0;
+  for (let n = 1; n < MEGA_QUEST_MIN_LEVEL; n++) xp += xpForLevel(n);
   const g = window.__game;
   g.endLevel();
+  g.save.xp = xp;
   g.save.megaQuests = null;
   g.quests.ensureMegaQuests();
   g.test.startWorldBoss('radiation');

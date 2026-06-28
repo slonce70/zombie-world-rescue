@@ -2611,6 +2611,10 @@ class Game {
     if (country.weaponReward && !this.save.weapons.includes(country.weaponReward)) {
       this.save.weapons.push(country.weaponReward);
       const loadout = this._weaponLoadout();
+      if (!loadout.includes(country.weaponReward) && loadout.length < 7) {
+        loadout.push(country.weaponReward);
+        this.save.weaponLoadout = loadout;
+      }
       if (this.level.player && loadout.includes(country.weaponReward)) this.level.player.giveWeapon(country.weaponReward, false);
       if (country.weaponRewardToast) {
         this.hud.toast(typeof country.weaponRewardToast === 'function' ? country.weaponRewardToast() : country.weaponRewardToast);

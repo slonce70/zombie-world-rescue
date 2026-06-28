@@ -42,13 +42,17 @@ try {
     modes: document.querySelectorAll('.solo-mode').length,
     stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
     arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
+    worldbossLocked: document.querySelector('.solo-mode[data-mode="worldboss"]').classList.contains('locked'),
     knockoutLocked: document.querySelector('.solo-mode[data-mode="knockout"]').classList.contains('locked'),
     defenseLocked: document.querySelector('.solo-mode[data-mode="defense"]').classList.contains('locked'),
+    overloadedLocked: document.querySelector('.solo-mode[data-mode="overloaded-pvp"]').classList.contains('locked'),
     pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
     campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
   }));
-  check('6 режимів; спецрежими замкнені, Кампанія відкрита',
-    fresh.modes === 6 && fresh.stormLocked && fresh.arenaLocked && fresh.knockoutLocked && fresh.defenseLocked && fresh.pvpLocked && !fresh.campLocked, JSON.stringify(fresh));
+  check('8 режимів; спецрежими замкнені, Кампанія відкрита',
+    fresh.modes === 8 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+      && fresh.knockoutLocked && fresh.defenseLocked && fresh.overloadedLocked && fresh.pvpLocked && !fresh.campLocked,
+    JSON.stringify(fresh));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
   await page.click('.solo-mode[data-mode="campaign"]');
