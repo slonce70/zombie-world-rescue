@@ -8,6 +8,20 @@ on:
   pull_request:
 
 jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Release gate (production browser/PWA suite)
+        run: npm run test:release
+
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
