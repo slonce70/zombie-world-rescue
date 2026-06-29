@@ -42,6 +42,7 @@ const suite = [
   ['node', ['test/overloaded-defense.mjs']],
   ['node', ['test/overloaded-pvp.mjs']],
   ['node', ['test/cloudsave.mjs'], { SLOW: process.env.RELEASE_CLOUDSAVE_SLOW || process.env.SLOW || '2' }],
+  ['node', ['test/save-migration.mjs']],
   ['node', ['test/flows.mjs'], { SLOW: process.env.RELEASE_FLOWS_SLOW || process.env.SLOW || '4' }],
   ['node', ['test/i18n.mjs']],
   ['node', ['test/update-mobile.mjs']],
