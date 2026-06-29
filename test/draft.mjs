@@ -1,7 +1,8 @@
 // Оверлей «Прокачка» паузить симуляцію і застосовує обрану картку (соло-Шторм).
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
@@ -65,4 +66,5 @@ check(picked.picks === 1, 'runBuild зафіксував 1 пік', picked.picks
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 2).join(' | '));
 console.log(fail === 0 ? '\n🎉 DRAFT OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
 await browser.close();
+closeServer();
 process.exit(fail ? 1 : 0);
