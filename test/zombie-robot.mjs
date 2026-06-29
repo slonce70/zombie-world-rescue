@@ -1,7 +1,9 @@
 // 🤖 Зомбі-робот (мех із пілотом): 1255 HP, меч 20 зблизька + гармата 10 здаля,
 // при смерті ВИБУХАЄ й б'є гравця 157 по площі (~6м).
 import { chromium } from 'playwright';
-const BASE = 'http://localhost:8741';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
 let failed = 0;
@@ -95,4 +97,5 @@ console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 ЗОМБІ-РОБОТ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);
