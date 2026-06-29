@@ -2389,6 +2389,11 @@ export const HERO_SKINS = {
   medic: { name: t('Медик'), icon: '💚', desc: t('Випадає з маленького бокса') },
   ghost: { name: t('Привид'), icon: '👻', desc: t('Випадає з Мегабокса') },
   samurai: { name: t('Самурай'), icon: '🎌', desc: t('Випадає з Мегабокса') },
+  cactus: { name: t('Кактус'), icon: '🌵', desc: t('Випадає зі скін-бокса') },
+  traveler: { name: t('Мандрівник'), icon: '🧳', desc: t('Випадає зі скін-бокса') },
+  rainbow: { name: t('Веселковий'), icon: '🌈', desc: t('Випадає зі скін-бокса') },
+  gardener: { name: t('Садівник'), icon: '🪴', desc: t('Випадає зі скін-бокса') },
+  zombie: { name: t('Зомбі'), icon: '🧟', desc: t('Випадає зі скін-бокса') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2858,6 +2863,96 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       const sash = box(0.56, 0.08, 0.07, gold);
       sash.position.set(0, 0.05, -0.27);
       rig.parts.torso.add(chest, sash);
+      return rig;
+    },
+    cactus() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0x79c66a, shirt: 0x2f9a55, pants: 0x236f3e, shoes: 0x1f4d2f,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x356b3d,
+        brow: -0.05, cast: 'all', sleeves: 'shirt',
+      });
+      const spikeM = toonMat(0xe7ffd2);
+      for (const [x, y, z] of [[0, 0.42, -0.02], [-0.22, 0.18, 0.02], [0.22, 0.18, 0.02]]) {
+        const spike = cone(0.035, 0.12, spikeM, 6);
+        spike.position.set(x, y, z);
+        rig.parts.head.add(spike);
+      }
+      for (const side of [-1, 1]) {
+        const thorn = cone(0.025, 0.09, spikeM, 6);
+        thorn.rotation.z = side * 0.7;
+        thorn.position.set(0.08 * side, -0.18, -0.02);
+        rig.parts[side < 0 ? 'armL' : 'armR'].add(thorn);
+      }
+      return rig;
+    },
+    traveler() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xf0bd8d, shirt: 0xd89a4a, pants: 0x315b82, shoes: 0x4a3322,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x7a3a2a,
+        brow: -0.08, cast: 'all', sleeves: 'shirt',
+      });
+      const hatM = toonMat(0xb77d35);
+      const hat = cylinder(0.24, 0.28, 0.08, hatM, 14);
+      hat.position.y = 0.28;
+      const brim = cylinder(0.34, 0.34, 0.035, hatM, 14);
+      brim.position.y = 0.22;
+      const pack = box(0.32, 0.42, 0.18, toonMat(0x6f8f4f));
+      pack.position.set(0, 0.36, 0.31);
+      rig.parts.head.add(hat, brim);
+      rig.parts.torso.add(pack);
+      return rig;
+    },
+    rainbow() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd0a6, shirt: 0xff5d5d, pants: 0x3a7bd5, shoes: 0x222733,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x8a4b3a,
+        brow: -0.05, cast: 'all',
+      });
+      [0xffd23f, 0x58c14c, 0x4fd8ff, 0xb15cff].forEach((c, i) => {
+        const stripe = box(0.46, 0.055, 0.035, toonMat(c));
+        stripe.position.set(0, 0.48 - i * 0.11, -0.27);
+        rig.parts.torso.add(stripe);
+      });
+      const halo = cylinder(0.23, 0.23, 0.025, toonMat(0xffd23f), 18);
+      halo.position.y = 0.35;
+      halo.rotation.x = Math.PI / 2;
+      rig.parts.head.add(halo);
+      return rig;
+    },
+    gardener() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xf2c39a, shirt: 0x7fcf6a, pants: 0x3d7d4a, shoes: 0x5b3b24,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x7a3a2a,
+        brow: -0.05, cast: 'all', sleeves: 'shirt',
+      });
+      const straw = toonMat(0xd8b45a);
+      const hat = cylinder(0.25, 0.29, 0.08, straw, 14);
+      hat.position.y = 0.28;
+      const brim = cylinder(0.36, 0.36, 0.035, straw, 14);
+      brim.position.y = 0.22;
+      const bib = box(0.3, 0.32, 0.04, toonMat(0x2f6f45));
+      bib.position.set(0, 0.32, -0.27);
+      const leaf = cone(0.06, 0.18, toonMat(0x58c14c), 8);
+      leaf.position.set(0.14, 0.46, -0.27);
+      leaf.rotation.z = -0.7;
+      rig.parts.head.add(hat, brim);
+      rig.parts.torso.add(bib, leaf);
+      return rig;
+    },
+    zombie() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0x8fbf8f, shirt: 0x6b6f7a, pants: 0x3e4a5a, shoes: 0x2a2f36,
+        eyeL: 0.055, eyeR: 0.04, eyeWhite: 0xd8ffd8, pupilColor: 0x334433,
+        mouth: 'crooked', mouthColor: 0x394a39, brow: 0.12, cast: 'all',
+      });
+      const tearM = toonMat(0x48505c);
+      const tear = box(0.22, 0.12, 0.035, tearM);
+      tear.position.set(-0.1, 0.28, -0.27);
+      tear.rotation.z = -0.25;
+      const patch = box(0.12, 0.16, 0.035, toonMat(0x7f4f4f));
+      patch.position.set(0.13, 0.1, -0.27);
+      patch.rotation.z = 0.2;
+      rig.parts.torso.add(tear, patch);
       return rig;
     },
     custom() {

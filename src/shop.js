@@ -3,6 +3,8 @@ import { GADGETS, TOWER_SKINS } from './extras.js';
 import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 
+export const SKINBOX_AVAILABLE_UNTIL = Date.UTC(2026, 6, 24, 23, 59, 59);
+
 export const SHOP_ITEMS = [
   // --- припаси ---
   { id: 'grenade', icon: '💣', name: t('Граната'), desc: () => t('+1 граната ({k})', { k: keyHint('кнопка 💣', 'G — кинути') }), price: 35, max: Infinity, cat: t('Припаси') },
@@ -19,6 +21,7 @@ export const SHOP_ITEMS = [
   { id: 'smallbox', icon: '🎁', name: t('Маленький бокс'), desc: t('80%: 50 монет · 15%: 5 кристалів · 5%: скін Медик'), price: 0, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   { id: 'mediumbox', icon: '🧰', name: t('Середній бокс'), desc: t('60%: 100 монет · 39%: 10 кристалів · 1%: гіперзаряд'), price: 500, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   { id: 'megabox', icon: '🦙', name: t('Мегабокс'), desc: t('60%: 350 монет · 20%: 20 кристалів · 10%: гаджет · 5%: скін Привид · 3%: гіперзаряд · 2%: скін Самурай'), price: 0, crystalPrice: 25, max: Infinity, cat: t('Бокси') },
+  { id: 'skinbox', icon: '🎟️', name: t('Скін-бокс'), desc: t('25 днів: 40% 50 монет · 40% 3 кристали · 10% Кактус · 4% Мандрівник · 3% Веселковий · 1% Садівник · 1% Зомбі'), price: 0, crystalPrice: 15, max: Infinity, cat: t('Бокси'), availableUntil: SKINBOX_AVAILABLE_UNTIL },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -71,12 +74,16 @@ export const SHOP_ITEMS = [
   { id: 'damage', icon: '💥', name: t('Шкода'), desc: t('+15% до шкоди'), price: 150, max: 3, cat: t('Прокачування') },
 ];
 
+function itemAvailable(item) {
+  return !item.availableUntil || Date.now() <= item.availableUntil;
+}
+
 // Поточна «Моя ціль»: товар, на який гравець збирає монети (або null).
 export function goalInfo(game) {
   const id = game.save && game.save.goal;
   if (!id) return null;
   const item = SHOP_ITEMS.find((i) => i.id === id);
-  if (!item) return null;
+  if (!item || !itemAvailable(item)) return null;
   const need = item.crystalPrice || item.price;
   const have = item.crystalPrice ? (game.save.crystals || 0) : (game.save.coins || 0);
   return { item, need, have, remaining: Math.max(0, need - have), done: have >= need };
@@ -160,8 +167,9 @@ export class Shop {
     const save = this.game.save;
     this.elCoins.textContent = `${save.coins} · 💎 ${save.crystals || 0}`;
     const hasBazooka = save.weapons.includes('bazooka');
+    const items = SHOP_ITEMS.filter(itemAvailable);
     // вкладки категорій
-    const cats = [...new Set(SHOP_ITEMS.map((i) => i.cat))];
+    const cats = [...new Set(items.map((i) => i.cat))];
     if (!cats.includes(this.activeTab)) this.activeTab = cats[0];
     const tabsEl = document.getElementById('shop-tabs');
     tabsEl.innerHTML = cats.map((c) =>
@@ -174,7 +182,7 @@ export class Shop {
       });
     });
     let html = '';
-    for (const item of SHOP_ITEMS) {
+    for (const item of items) {
       if (item.cat !== this.activeTab) continue;
       const count = this.getCount(item);
       const maxed = count >= item.max;
@@ -236,7 +244,7 @@ export class Shop {
     const save = game.save;
     const item = SHOP_ITEMS.find((i) => i.id === id);
     const player = game.level && game.level.player;
-    if (!item || !player) return;
+    if (!item || !player || !itemAvailable(item)) return;
     const count = this.getCount(item);
     const price = this.priceOf(item);
     if (count >= item.max || save.coins < price || (item.crystalPrice && (save.crystals || 0) < item.crystalPrice)
@@ -395,6 +403,27 @@ export class Shop {
           reward = '🎌 Скін Самурай';
         }
         this.showMegaboxReveal(reward);
+        break;
+      }
+      case 'skinbox': {
+        const roll = Math.random();
+        let skin = null;
+        if (roll < 0.4) {
+          save.coins += 50;
+          game.hud.toast(t('🎟️ Скін-бокс: +50 монет'));
+        } else if (roll < 0.8) {
+          save.crystals = (save.crystals || 0) + 3;
+          game.hud.toast(t('🎟️ Скін-бокс: +3 кристали'));
+        } else {
+          if (roll < 0.9) skin = 'cactus';
+          else if (roll < 0.94) skin = 'traveler';
+          else if (roll < 0.97) skin = 'rainbow';
+          else if (roll < 0.99) skin = 'gardener';
+          else skin = 'zombie';
+          if (!save.skins.includes(skin)) save.skins.push(skin);
+          save.activeSkin = skin;
+          game.hud.toast(t('🎟️ Скін-бокс: скін {n}!', { n: HERO_SKINS[skin].name }));
+        }
         break;
       }
       case 'coins500':
