@@ -1,4 +1,6 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch();
 let fail = 0;
 for (const [name, w, h] of [['iphone-land', 844, 390], ['small-land', 740, 360], ['tablet-land', 1024, 768], ['big-phone', 932, 430]]) {
@@ -6,7 +8,7 @@ for (const [name, w, h] of [['iphone-land', 844, 390], ['small-land', 740, 360],
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('http://localhost:8741/?test&fresh&touch&country=UKR');
+  await page.goto(`${BASE}/?test&fresh&touch&country=UKR`);
   await page.waitForFunction(() => window.__game?.level && window.__game.state === 'level', null, { timeout: 40000 });
   await page.waitForTimeout(2000);
   await page.screenshot({ path: `shots/touch-${name}.png` });
@@ -29,4 +31,5 @@ for (const [name, w, h] of [['iphone-land', 844, 390], ['small-land', 740, 360],
   await ctx.close();
 }
 await browser.close();
+closeServer();
 process.exit(fail ? 1 : 0);
