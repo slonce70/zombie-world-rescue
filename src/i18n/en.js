@@ -973,6 +973,7 @@ export const EN = {
 "🏅 Мої цифри": "🏅 My Stats",
 "🗺️ Моя пригода": "🗺️ My Adventure",
 "📖 Бестіарій {got}/{tot}": "📖 Bestiary {got}/{tot}",
+"Ранг Рятівника": "Rescuer Rank",
 "🎖️ Ранг Рятівника: {n} ⭐": "🎖️ Rescuer Rank: {n} ⭐",
 "переможено {n}": "defeated {n}",
 "Влучань у голову": "Headshots",

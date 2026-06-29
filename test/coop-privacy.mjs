@@ -5,7 +5,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 let failed = 0;
 const check = (ok, msg, x = '') => { console.log(ok ? '  ✅' : '  ❌', msg, x); if (!ok) failed++; };
 
-await page.goto('http://localhost:8741/?test&fresh');
+await page.goto('http://localhost:8741/?test&fresh&lang=en');
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
 await page.click('#btn-coop');
 await page.waitForSelector('#overlay-coop.show');
@@ -33,6 +33,22 @@ const prestigeProfile = await page.evaluate(async () => {
 });
 check(prestigeProfile.star === 40 && prestigeProfile.prestige === 2,
   'coop profile sends Star Path prestige after max level', JSON.stringify(prestigeProfile));
+
+const prestigeText = await page.evaluate(() => {
+  const c = window.__game.coop;
+  const data = {
+    online: 1,
+    today: 1,
+    players: ['TATO'],
+    profiles: [{ nick: 'TATO', countries: 1, coins: 2, crystals: 3, kills: 4, star: 40, prestige: 2, title: '' }],
+    rooms: [],
+  };
+  c.lobbyNet.data = data;
+  c._profileNick = 'TATO';
+  c._renderSide(data);
+  return document.getElementById('coop-players').innerText;
+});
+check(/Rescuer Rank 2/.test(prestigeText), 'coop profile localizes prestige rank in English', JSON.stringify(prestigeText));
 
 let state = await page.evaluate(() => {
   const c = window.__game.coop;
