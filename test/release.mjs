@@ -52,6 +52,7 @@ const suite = [
   ['node', ['test/update-mobile.mjs']],
   ['node', ['test/mobile-perf.mjs']],
   ['node', ['test/visual-polish.mjs']],
+  ['node', ['test/ux-polish.mjs']],
   ['node', ['test/living-hq.mjs']],
   ['node', ['test/mega-season.mjs']],
   ['node', ['test/titles.mjs']],
