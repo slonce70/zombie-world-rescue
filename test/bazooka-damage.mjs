@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 1024, height: 768 } })).newPage();
 let failed = 0;
@@ -46,4 +47,5 @@ check(realErrors.length === 0, `без JS-помилок консолі (${realE
 if (realErrors.length) console.log(realErrors.join('\n'));
 
 await browser.close();
+closeServer();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);
