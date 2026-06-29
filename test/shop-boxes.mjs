@@ -98,6 +98,11 @@ const res = await page.evaluate(async () => {
   g.save.coins = 50;
   g.save.crystals = 25;
   const megaCoins = buyWithRoll('megabox', 0.59);
+  const megaRevealEl = document.querySelector('#megabox-reveal');
+  const megaReveal = megaRevealEl && {
+    shown: megaRevealEl.classList.contains('show'),
+    text: megaRevealEl.textContent,
+  };
   g.save.coins = 50;
   g.save.crystals = 25;
   const megaCrystals = buyWithRoll('megabox', 0.79);
@@ -169,6 +174,7 @@ const res = await page.evaluate(async () => {
     mediumHyper,
     megaDenied,
     megaCoins,
+    megaReveal,
     megaCrystals,
     megaGadget,
     megaGhost,
@@ -229,6 +235,8 @@ check(res.megaDenied.after.crystals === 24 && res.megaDenied.after.coins === 50,
   '24 кристалів недостатньо для мегабокса', JSON.stringify(res.megaDenied));
 check(res.megaCoins.after.crystals === 0 && res.megaCoins.after.coins === 400,
   'мегабокс roll 0.59 дає 350 монет', JSON.stringify(res.megaCoins));
+check(res.megaReveal && res.megaReveal.shown && res.megaReveal.text.includes('+350 монет'),
+  'мегабокс показує reward overlay після відкриття', JSON.stringify(res.megaReveal));
 check(res.megaCrystals.after.crystals === 20 && res.megaCrystals.after.coins === 50,
   'мегабокс roll 0.79 дає 20 кристалів після ціни бокса', JSON.stringify(res.megaCrystals));
 check(res.megaGadget.after.crystals === 0 && res.megaGadget.after.gadgets.length === 1,

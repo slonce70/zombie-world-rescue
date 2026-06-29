@@ -216,6 +216,35 @@ body.in-level #hud { display: block; }
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
+#megabox-reveal {
+  position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0; transition: opacity .16s ease;
+  background: radial-gradient(circle at center, rgba(120, 67, 255, .22), rgba(8, 14, 22, 0) 58%);
+}
+#megabox-reveal.show { opacity: 1; }
+.megabox-reveal-card {
+  width: min(420px, calc(100vw - 28px)); padding: 24px 22px 22px; text-align: center; color: #fff;
+  border: 2px solid #ffe16a; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(43, 31, 80, .97), rgba(15, 32, 55, .97));
+  box-shadow: 0 20px 70px rgba(0,0,0,.65), 0 0 38px rgba(255, 225, 106, .35);
+}
+.megabox-box { font-size: 74px; animation: megabox-pop .72s cubic-bezier(.2, 1.25, .25, 1); }
+.megabox-title { margin-top: 4px; font-size: 28px; font-weight: 900; color: #ffe16a; }
+.megabox-reel { margin-top: 8px; color: #7cf2ff; font-size: 20px; font-weight: 900; animation: megabox-reel .72s ease-out; }
+.megabox-reward {
+  margin-top: 10px; font-size: 24px; font-weight: 900;
+  text-shadow: 0 3px 14px rgba(0,0,0,.6);
+}
+@keyframes megabox-pop {
+  0% { transform: scale(.35) rotate(-10deg); opacity: 0; }
+  62% { transform: scale(1.22) rotate(7deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes megabox-reel {
+  0% { opacity: .25; transform: translateY(-8px) scale(.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* віньєтка пошкоджень + лікування */
 #vignette {
   position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0;
@@ -1174,6 +1203,10 @@ body.touch-mode #touch-coach.show { display: block; }
   .shop-name { font-size: 14px; margin-top: 3px; }
   .shop-desc { font-size: 11px; min-height: 22px; }
   .shop-price { font-size: 14px; margin-top: 3px; }
+  .megabox-reveal-card { width: min(340px, calc(100vw - 20px)); padding: 16px 14px; }
+  .megabox-box { font-size: 52px; }
+  .megabox-title { font-size: 22px; }
+  .megabox-reward { font-size: 20px; }
   body.touch-mode .shop-key-hint { display: none; }
   body.touch-mode #toasts { left: calc(50% + 72px); top: 32px; bottom: auto; }
   body.touch-mode .toast { font-size: 12px; padding: 5px 9px; max-width: min(230px, 42vw); }
@@ -1183,6 +1216,11 @@ body.touch-mode #touch-coach.show { display: block; }
     padding: 0;
   }
   body.touch-mode #banner-sub { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .megabox-box,
+  .megabox-reel { animation: none; }
 }
 
 /* 💾 панель «Мій прогрес» і аварійний екран */

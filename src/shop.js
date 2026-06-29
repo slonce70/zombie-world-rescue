@@ -124,6 +124,28 @@ export class Shop {
     return item.price;
   }
 
+  showMegaboxReveal(reward) {
+    let el = document.getElementById('megabox-reveal');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'megabox-reveal';
+      el.innerHTML = `
+        <div class="megabox-reveal-card">
+          <div class="megabox-box">🦙</div>
+          <div class="megabox-title">${t('МЕГАБОКС')}</div>
+          <div class="megabox-reel">✦ ✦ ✦</div>
+          <div class="megabox-reward"></div>
+        </div>`;
+      document.body.appendChild(el);
+    }
+    el.querySelector('.megabox-reward').textContent = reward;
+    clearTimeout(this._megaboxRevealTimer);
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    this._megaboxRevealTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
   getCount(item) {
     if (item.weapon) return this.game.save.weapons.includes(item.id) ? 1 : 0;
     if (item.gadget) return this.game.save.gadgetsOwned.includes(item.id) ? 1 : 0;
@@ -338,12 +360,13 @@ export class Shop {
       }
       case 'megabox': {
         const roll = Math.random();
+        let reward = '';
         if (roll < 0.6) {
           save.coins += 350;
-          game.hud.toast(t('🦙 Мегабокс: +350 монет'));
+          reward = '+350 монет';
         } else if (roll < 0.8) {
           save.crystals = (save.crystals || 0) + 20;
-          game.hud.toast(t('🦙 Мегабокс: +20 кристалів'));
+          reward = '+20 кристалів';
         } else if (roll < 0.9) {
           const pool = Object.keys(GADGETS).filter((g) => !save.gadgetsOwned.includes(g));
           const gadget = pool[Math.floor(Math.random() * pool.length)];
@@ -351,22 +374,23 @@ export class Shop {
             save.gadgetsOwned.push(gadget);
             if (!save.activeGadget) save.activeGadget = gadget;
           }
-          game.hud.toast(t('🦙 Мегабокс: гаджет!'));
+          reward = gadget ? `${GADGETS[gadget].icon} ${GADGETS[gadget].name}` : 'Гаджет';
         } else if (roll < 0.95) {
           if (!save.skins.includes('ghost')) save.skins.push('ghost');
           save.activeSkin = 'ghost';
-          game.hud.toast(t('🦙 Мегабокс: скін Привид!'));
+          reward = '👻 Скін Привид';
         } else if (roll < 0.98) {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
           const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
-          game.hud.toast(t('🦙 Мегабокс: гіперзаряд!'));
+          reward = '⚡ Гіперзаряд';
         } else {
           if (!save.skins.includes('samurai')) save.skins.push('samurai');
           save.activeSkin = 'samurai';
-          game.hud.toast(t('🦙 Мегабокс: скін Самурай!'));
+          reward = '🎌 Скін Самурай';
         }
+        this.showMegaboxReveal(reward);
         break;
       }
       case 'coins500':
