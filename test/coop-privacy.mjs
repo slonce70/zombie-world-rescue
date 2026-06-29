@@ -23,6 +23,17 @@ const profile = await page.evaluate(async () => {
 });
 check(profile.star === 8, 'coop profile sends Star Path level, not difficulty stars', JSON.stringify(profile));
 
+const prestigeProfile = await page.evaluate(async () => {
+  const { xpForLevel, PASS_MAX_LEVEL } = await import('/src/progress.js');
+  const g = window.__game;
+  let xp = 0;
+  for (let n = 1; n < PASS_MAX_LEVEL; n++) xp += xpForLevel(n);
+  g.save.xp = xp + 1200;
+  return g.coop.lobbyNet._profile();
+});
+check(prestigeProfile.star === 40 && prestigeProfile.prestige === 2,
+  'coop profile sends Star Path prestige after max level', JSON.stringify(prestigeProfile));
+
 let state = await page.evaluate(() => {
   const c = window.__game.coop;
   c.session.role = 'host';

@@ -1222,6 +1222,17 @@ body.touch-mode #touch-coach.show { display: block; }
   .shop-name { font-size: 14px; margin-top: 3px; }
   .shop-desc { font-size: 11px; min-height: 22px; }
   .shop-price { font-size: 14px; margin-top: 3px; }
+  #overlay-wardrobe .overlay-card { display: flex; flex-direction: column; max-height: calc(100dvh - 16px); padding: 10px 16px; }
+  #overlay-wardrobe .panel-header h2 { font-size: 26px; }
+  #wardrobe-content { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 4px; }
+  .ward-tabs { gap: 5px; margin-bottom: 6px; }
+  .ward-section { margin: 5px 0 4px; }
+  .ward-grid { gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .ward-card { padding: 6px 8px; }
+  .ward-ico { font-size: 24px; }
+  .ward-name { font-size: 12px; margin-top: 2px; }
+  .ward-desc { font-size: 10px; line-height: 1.15; min-height: 0; }
+  .ward-stat, .ward-tag { font-size: 10px; margin-top: 2px; }
   .megabox-reveal-card { width: min(340px, calc(100vw - 20px)); padding: 16px 14px; }
   .megabox-box { font-size: 52px; }
   .megabox-title { font-size: 22px; }

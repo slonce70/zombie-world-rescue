@@ -229,6 +229,42 @@ console.log('▸ UX polish: tiny landscape shop shows a product');
   await ctx.close();
 }
 
+console.log('▸ UX polish: tiny landscape wardrobe shows a full title card');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
+  30000, 'globe');
+  const wardrobe = await page.evaluate(() => {
+    const g = window.__game;
+    g._showOverlay('overlay-wardrobe');
+    g._wardrobeTab = 'titles';
+    g.renderWardrobe();
+    const card = document.querySelector('#wardrobe-content .ward-pane:not([hidden]) .ward-card');
+    const r = card.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + 8);
+    const bottom = document.elementFromPoint(r.left + r.width / 2, r.bottom - 8);
+    return {
+      top: r.top,
+      bottom: r.bottom,
+      viewport: innerHeight,
+      tappable: !!top && top.closest('.ward-card') === card && !!bottom && bottom.closest('.ward-card') === card,
+      text: card.textContent.trim(),
+    };
+  });
+  check(wardrobe.top >= 0 && wardrobe.bottom <= wardrobe.viewport && wardrobe.tappable,
+    'гардероб на малому landscape показує повну картку титулу', JSON.stringify(wardrobe));
+  await ctx.close();
+}
+
 console.log('▸ UX polish: tiny landscape toast avoids aim center');
 {
   const ctx = await browser.newContext({

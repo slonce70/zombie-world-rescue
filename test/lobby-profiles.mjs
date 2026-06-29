@@ -15,16 +15,16 @@ const ping = (cid, nick, profile) => fetch(`${API}/lobby/ping`, {
 
 try {
   console.log('▸ Публічні профілі гравців у лобі');
-  await ping('cid-profile-1', 'Аня', { countries: 2, coins: 75, crystals: 4, kills: 9, star: 8, title: 'Зомбі кілер' });
-  const v = await ping('cid-profile-2', 'Боря', { countries: 99, coins: -5, crystals: 2.7, kills: 4, star: 99, title: '<b>0 монет</b>' });
+  await ping('cid-profile-1', 'Аня', { countries: 2, coins: 75, crystals: 4, kills: 9, star: 8, prestige: 2, title: 'Зомбі кілер' });
+  const v = await ping('cid-profile-2', 'Боря', { countries: 99, coins: -5, crystals: 2.7, kills: 4, star: 99, prestige: 9999, title: '<b>0 монет</b>' });
 
   check(v.players.includes('Аня') && v.players.includes('Боря'), 'старий список players лишився ніками', JSON.stringify(v.players));
   check(Array.isArray(v.profiles), 'lobby повертає масив profiles', JSON.stringify(v));
   const anya = (v.profiles || []).find((p) => p.nick === 'Аня');
   const borya = (v.profiles || []).find((p) => p.nick === 'Боря');
-  check(!!anya && anya.countries === 2 && anya.coins === 75 && anya.crystals === 4 && anya.kills === 9 && anya.star === 8 && anya.title === 'Зомбі кілер',
+  check(!!anya && anya.countries === 2 && anya.coins === 75 && anya.crystals === 4 && anya.kills === 9 && anya.star === 8 && anya.prestige === 2 && anya.title === 'Зомбі кілер',
     'профіль віддає статистику гравця', JSON.stringify(anya));
-  check(!!borya && borya.countries === 99 && borya.coins === 0 && borya.crystals === 2 && borya.kills === 4 && borya.star === 40 && borya.title === '0 монет',
+  check(!!borya && borya.countries === 99 && borya.coins === 0 && borya.crystals === 2 && borya.kills === 4 && borya.star === 40 && borya.prestige === 999 && borya.title === '0 монет',
     'числа профілю чистяться до безпечних меж', JSON.stringify(borya));
 } finally {
   relay.kill();

@@ -72,6 +72,7 @@ export class LobbyClient {
       crystals: s.crystals | 0,
       kills: (s.stats && s.stats.killed) | 0,
       star: this.game.progress ? this.game.progress.level : 1,
+      prestige: this.game.progress ? this.game.progress.prestigeStars : 0,
       title: titleName(s.activeTitle),
     };
   }

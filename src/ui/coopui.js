@@ -338,7 +338,7 @@ export class CoopUI {
     let ph = '';
     const profiles = Array.isArray(d.profiles)
       ? d.profiles
-      : (d.players || []).map((nick) => ({ nick, countries: 0, coins: 0, crystals: 0, kills: 0, star: 1, title: '' }));
+      : (d.players || []).map((nick) => ({ nick, countries: 0, coins: 0, crystals: 0, kills: 0, star: 1, prestige: 0, title: '' }));
     for (let i = 0; i < profiles.length; i++) {
       const p = profiles[i];
       const me = p.nick === myNick;
@@ -360,12 +360,15 @@ export class CoopUI {
   }
 
   _profileHtml(p) {
+    const star = Math.max(1, Math.min(40, p.star | 0));
+    const prestige = Math.max(0, p.prestige | 0);
+    const starText = prestige > 0 ? `${star} · ${t('Ранг Рятівника')} ${prestige}` : `${star}`;
     return `<div class="coop-profile">
       <div>🌍 ${t('Звільнені країни')}: <b>${p.countries | 0}</b></div>
       <div>🪙 ${t('Монети')}: <b>${p.coins | 0}</b></div>
       <div>💎 ${t('Кристали')}: <b>${p.crystals | 0}</b></div>
       <div>🧟 ${t('Зомбі вбито')}: <b>${p.kills | 0}</b></div>
-      <div>⭐ ${t('Зоряний шлях')}: <b>${p.star | 0}</b></div>
+      <div>⭐ ${t('Зоряний шлях')}: <b>${starText}</b></div>
     </div>`;
   }
 
