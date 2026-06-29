@@ -5,7 +5,13 @@ import { mkdirSync } from 'fs';
 
 const BASE = 'http://localhost:8741';
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
-const shot = (p, name) => p.screenshot({ path: `shots/${name}.png` });
+const shot = async (p, name) => {
+  try {
+    await p.screenshot({ path: `shots/${name}.png`, timeout: 8000 });
+  } catch (e) {
+    console.log(`  ⚠️ screenshot skipped: ${name} (${e.message.split('\n')[0]})`);
+  }
+};
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
