@@ -1,8 +1,9 @@
 // Co-op weapon regressions: network-visible weapon ids, continuous weapons from guest,
 // and host-side shot validation.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 
 let failed = 0;
 const check = (cond, msg, extra = '') => {
@@ -138,6 +139,7 @@ try {
   console.error('❌ ТЕСТ ВПАВ:', e.message);
 } finally {
   await browser.close();
+  closeServer();
 }
 
 console.log(failed === 0 ? '\n🎉 COOP WEAPONS: мережеві регресії закриті' : `\n💥 COOP WEAPONS провалів: ${failed}`);
