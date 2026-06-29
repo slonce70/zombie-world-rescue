@@ -1,5 +1,7 @@
 // Стрес-тест мобільного HUD: УСЕ ввімкнено одночасно, шукаємо перетини
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 for (const [name, w, h] of [['iphone', 844, 390], ['small', 740, 360], ['tablet', 1024, 768], ['big', 932, 430]]) {
@@ -7,7 +9,7 @@ for (const [name, w, h] of [['iphone', 844, 390], ['small', 740, 360], ['tablet'
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('http://localhost:8741/?test&fresh&touch&country=UKR');
+  await page.goto(`${BASE}/?test&fresh&touch&country=UKR`);
   await page.waitForFunction(() => window.__game?.level && window.__game.state === 'level', null, { timeout: 40000 });
   await page.evaluate(() => {
     const g = window.__game;
@@ -66,4 +68,5 @@ for (const [name, w, h] of [['iphone', 844, 390], ['small', 740, 360], ['tablet'
   await ctx.close();
 }
 await browser.close();
+closeServer();
 process.exit(fail ? 1 : 0);
