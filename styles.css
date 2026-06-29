@@ -1161,6 +1161,20 @@ body.touch-mode #touch-coach.show { display: block; }
   #overlay-menu .overlay-card { padding: 12px 14px; }
   #overlay-menu #menu-list { gap: 5px; max-height: calc(100dvh - 118px); }
   #overlay-menu #menu-list .globe-act { font-size: 13px; padding: 8px 10px; }
+  .shop-card { display: flex; flex-direction: column; max-height: calc(100dvh - 16px); padding: 10px 16px; }
+  .shop-card h2 { font-size: 26px; }
+  .shop-balance { font-size: 20px; }
+  #shop-tabs { gap: 5px; margin-top: 6px; }
+  .shop-tab { font-size: 12px; padding: 5px 9px; }
+  .shop-goal,
+  .shop-hint { display: none; }
+  #shop-grid { flex: 1 1 auto; max-height: none; margin-top: 6px; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .shop-item { padding: 8px 8px; }
+  .shop-icon { font-size: 28px; }
+  .shop-name { font-size: 14px; margin-top: 3px; }
+  .shop-desc { font-size: 11px; min-height: 22px; }
+  .shop-price { font-size: 14px; margin-top: 3px; }
+  body.touch-mode .shop-key-hint { display: none; }
   body.touch-mode #banner {
     top: 22%;
     width: min(560px, 58vw);

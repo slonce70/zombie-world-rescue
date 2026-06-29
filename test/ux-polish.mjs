@@ -169,6 +169,39 @@ console.log('▸ UX polish: mobile banner does not cover the live waypoint');
   await ctx.close();
 }
 
+console.log('▸ UX polish: tiny landscape shop shows a product');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&country=UKR&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
+  30000, 'level');
+  await page.click('#tb-shop');
+  await page.waitForTimeout(300);
+  const shop = await page.evaluate(() => {
+    const item = document.querySelector('#shop-grid .shop-item');
+    const r = item.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(40, r.height / 2));
+    const bottom = document.elementFromPoint(r.left + r.width / 2, r.bottom - 8);
+    return {
+      top: r.top,
+      bottom: r.bottom,
+      viewport: innerHeight,
+      tappable: !!top && top.closest('.shop-item') === item && !!bottom && bottom.closest('.shop-item') === item,
+    };
+  });
+  check(shop.top >= 0 && shop.bottom <= shop.viewport && shop.tappable,
+    'магазин на малому landscape одразу показує товар', JSON.stringify(shop));
+  await ctx.close();
+}
+
 console.log(failed === 0 ? '🎉 UX POLISH OK' : `💥 UX POLISH FAILURES: ${failed}`);
 await browser.close();
 process.exit(failed === 0 ? 0 : 1);
