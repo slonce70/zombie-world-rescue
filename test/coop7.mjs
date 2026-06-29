@@ -4,8 +4,9 @@
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8754;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
@@ -52,6 +53,9 @@ try {
   await A.evaluate(() => {
     window.__game.save.liberated = { UKR: true };
     window.__game.saveGame();
+    window.__game.coop.publicOn = true;
+    document.getElementById('coop-public').checked = true;
+    document.getElementById('lobby-public').checked = true;
   });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
@@ -153,6 +157,7 @@ try {
   await browserB.close().catch(() => {});
   if (browserC) await browserC.close().catch(() => {});
   relay.kill();
+  closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП ×N + MID-JOIN ЗІ СПИСКУ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

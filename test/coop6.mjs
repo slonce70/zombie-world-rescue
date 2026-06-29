@@ -5,8 +5,9 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8752;
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~N× повільніше (гостя тротлить особливо), тож фіксовані очікування мусять чекати у N× довше.
@@ -202,6 +203,7 @@ try {
   await browserA.close().catch(() => {});
   await browserB.close().catch(() => {});
   relay.kill();
+  closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 ЛОБІ + БАТЧИНГ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);
