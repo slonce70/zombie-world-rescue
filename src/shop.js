@@ -18,6 +18,7 @@ export const SHOP_ITEMS = [
   { id: 'bigbox', icon: '📦', name: t('Великий бокс'), desc: t('65%: 200 монет · 27%: 15 кристалів · 8%: срібний скін'), price: 0, crystalPrice: 10, max: Infinity, cat: t('Бокси') },
   { id: 'smallbox', icon: '🎁', name: t('Маленький бокс'), desc: t('80%: 50 монет · 15%: 5 кристалів · 5%: скін Медик'), price: 0, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   { id: 'mediumbox', icon: '🧰', name: t('Середній бокс'), desc: t('60%: 100 монет · 39%: 10 кристалів · 1%: гіперзаряд'), price: 500, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
+  { id: 'megabox', icon: '🦙', name: t('Мегабокс'), desc: t('60%: 350 монет · 20%: 20 кристалів · 10%: гаджет · 5%: скін Привид · 3%: гіперзаряд · 2%: скін Самурай'), price: 0, crystalPrice: 25, max: Infinity, cat: t('Бокси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -332,6 +333,39 @@ export class Shop {
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
           game.hud.toast(t('🧰 Середній бокс: гіперзаряд!'));
+        }
+        break;
+      }
+      case 'megabox': {
+        const roll = Math.random();
+        if (roll < 0.6) {
+          save.coins += 350;
+          game.hud.toast(t('🦙 Мегабокс: +350 монет'));
+        } else if (roll < 0.8) {
+          save.crystals = (save.crystals || 0) + 20;
+          game.hud.toast(t('🦙 Мегабокс: +20 кристалів'));
+        } else if (roll < 0.9) {
+          const pool = Object.keys(GADGETS).filter((g) => !save.gadgetsOwned.includes(g));
+          const gadget = pool[Math.floor(Math.random() * pool.length)];
+          if (gadget) {
+            save.gadgetsOwned.push(gadget);
+            if (!save.activeGadget) save.activeGadget = gadget;
+          }
+          game.hud.toast(t('🦙 Мегабокс: гаджет!'));
+        } else if (roll < 0.95) {
+          if (!save.skins.includes('ghost')) save.skins.push('ghost');
+          save.activeSkin = 'ghost';
+          game.hud.toast(t('🦙 Мегабокс: скін Привид!'));
+        } else if (roll < 0.98) {
+          if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
+          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor'].filter((h) => !save.gadgetHypers.includes(h));
+          const hyper = pool[Math.floor(Math.random() * pool.length)];
+          if (hyper) save.gadgetHypers.push(hyper);
+          game.hud.toast(t('🦙 Мегабокс: гіперзаряд!'));
+        } else {
+          if (!save.skins.includes('samurai')) save.skins.push('samurai');
+          save.activeSkin = 'samurai';
+          game.hud.toast(t('🦙 Мегабокс: скін Самурай!'));
         }
         break;
       }

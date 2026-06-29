@@ -34,6 +34,7 @@ const res = await page.evaluate(async () => {
       coins: g.save.coins, crystals: g.save.crystals || 0,
       skins: [...g.save.skins], active: g.save.activeSkin,
       hypers: [...(g.save.gadgetHypers || [])],
+      gadgets: [...(g.save.gadgetsOwned || [])],
     };
     try { g.test.shopBuy(id); } finally { Math.random = old; }
     return {
@@ -42,6 +43,7 @@ const res = await page.evaluate(async () => {
         coins: g.save.coins, crystals: g.save.crystals || 0,
         skins: [...g.save.skins], active: g.save.activeSkin,
         hypers: [...(g.save.gadgetHypers || [])],
+        gadgets: [...(g.save.gadgetsOwned || [])],
       },
     };
   };
@@ -90,7 +92,32 @@ const res = await page.evaluate(async () => {
   g.save.gadgetHypers = [];
   const mediumHyper = buyWithRoll('mediumbox', 0.995);
 
+  g.save.coins = 50;
+  g.save.crystals = 24;
+  const megaDenied = buyWithRoll('megabox', 0.1);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  const megaCoins = buyWithRoll('megabox', 0.59);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  const megaCrystals = buyWithRoll('megabox', 0.79);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  g.save.gadgetsOwned = [];
+  const megaGadget = buyWithRoll('megabox', 0.89);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  const megaGhost = buyWithRoll('megabox', 0.94);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  g.save.gadgetHypers = [];
+  const megaHyper = buyWithRoll('megabox', 0.97);
+  g.save.coins = 50;
+  g.save.crystals = 25;
+  const megaSamurai = buyWithRoll('megabox', 0.99);
+
   let built = false, looksSilver = false, medicBuilt = false, looksMedic = false;
+  let ghostBuilt = false, looksGhost = false, samuraiBuilt = false, looksSamurai = false;
   try {
     const rig = makeHero('silver', g.save.hero);
     built = !!rig.group;
@@ -101,18 +128,32 @@ const res = await page.evaluate(async () => {
     medicBuilt = !!rig.group;
     looksMedic = rig.heroSkin === 'medic';
   } catch (e) { medicBuilt = false; }
+  try {
+    const rig = makeHero('ghost', g.save.hero);
+    ghostBuilt = !!rig.group;
+    looksGhost = rig.heroSkin === 'ghost';
+  } catch (e) { ghostBuilt = false; }
+  try {
+    const rig = makeHero('samurai', g.save.hero);
+    samuraiBuilt = !!rig.group;
+    looksSamurai = rig.heroSkin === 'samurai';
+  } catch (e) { samuraiBuilt = false; }
 
   const item = SHOP_ITEMS.find((i) => i.id === 'bigbox');
   const smallItem = SHOP_ITEMS.find((i) => i.id === 'smallbox');
   const mediumItem = SHOP_ITEMS.find((i) => i.id === 'mediumbox');
+  const megaItem = SHOP_ITEMS.find((i) => i.id === 'megabox');
   return {
     tabs,
     boxItems,
     item: item && { crystalPrice: item.crystalPrice, max: item.max, cat: item.cat },
     smallItem: smallItem && { crystalPrice: smallItem.crystalPrice, max: smallItem.max, cat: smallItem.cat },
     mediumItem: mediumItem && { price: mediumItem.price, crystalPrice: mediumItem.crystalPrice, max: mediumItem.max, cat: mediumItem.cat },
+    megaItem: megaItem && { price: megaItem.price, crystalPrice: megaItem.crystalPrice, max: megaItem.max, cat: megaItem.cat },
     silverMeta: HERO_SKINS.silver,
     medicMeta: HERO_SKINS.medic,
+    ghostMeta: HERO_SKINS.ghost,
+    samuraiMeta: HERO_SKINS.samurai,
     denied,
     coins,
     crystals,
@@ -126,10 +167,21 @@ const res = await page.evaluate(async () => {
     mediumCoins,
     mediumCrystals,
     mediumHyper,
+    megaDenied,
+    megaCoins,
+    megaCrystals,
+    megaGadget,
+    megaGhost,
+    megaHyper,
+    megaSamurai,
     built,
     looksSilver,
     medicBuilt,
     looksMedic,
+    ghostBuilt,
+    looksGhost,
+    samuraiBuilt,
+    looksSamurai,
   };
 });
 
@@ -170,6 +222,25 @@ check(res.mediumCrystals.after.coins === 0 && res.mediumCrystals.after.crystals 
   'середній бокс roll 0.98 дає 10 кристалів після ціни бокса', JSON.stringify(res.mediumCrystals));
 check(res.mediumHyper.after.coins === 0 && res.mediumHyper.after.crystals === 0 && res.mediumHyper.after.hypers.length === 1,
   'середній бокс roll 0.995 дає один гіперзаряд', JSON.stringify(res.mediumHyper));
+check(res.boxItems.includes('megabox'), 'є мегабокс у розділі «Бокси»', JSON.stringify(res.boxItems));
+check(res.megaItem && res.megaItem.price === 0 && res.megaItem.crystalPrice === 25 && res.megaItem.max === Infinity && res.megaItem.cat === 'Бокси',
+  'мегабокс коштує 25 кристалів і купується повторно', JSON.stringify(res.megaItem));
+check(res.megaDenied.after.crystals === 24 && res.megaDenied.after.coins === 50,
+  '24 кристалів недостатньо для мегабокса', JSON.stringify(res.megaDenied));
+check(res.megaCoins.after.crystals === 0 && res.megaCoins.after.coins === 400,
+  'мегабокс roll 0.59 дає 350 монет', JSON.stringify(res.megaCoins));
+check(res.megaCrystals.after.crystals === 20 && res.megaCrystals.after.coins === 50,
+  'мегабокс roll 0.79 дає 20 кристалів після ціни бокса', JSON.stringify(res.megaCrystals));
+check(res.megaGadget.after.crystals === 0 && res.megaGadget.after.gadgets.length === 1,
+  'мегабокс roll 0.89 дає один гаджет', JSON.stringify(res.megaGadget));
+check(res.megaGhost.after.crystals === 0 && res.megaGhost.after.skins.includes('ghost') && res.megaGhost.after.active === 'ghost',
+  'мегабокс roll 0.94 дає скін Привид і одягає його', JSON.stringify(res.megaGhost));
+check(res.megaHyper.after.crystals === 0 && res.megaHyper.after.hypers.length === 1,
+  'мегабокс roll 0.97 дає один гіперзаряд', JSON.stringify(res.megaHyper));
+check(res.megaSamurai.after.crystals === 0 && res.megaSamurai.after.skins.includes('samurai') && res.megaSamurai.after.active === 'samurai',
+  'мегабокс roll 0.99 дає скін Самурай і одягає його', JSON.stringify(res.megaSamurai));
+check(res.ghostMeta && res.ghostBuilt && res.looksGhost, 'скін Привид має метадані і будується без fallback', JSON.stringify({ meta: res.ghostMeta, built: res.ghostBuilt, looksGhost: res.looksGhost }));
+check(res.samuraiMeta && res.samuraiBuilt && res.looksSamurai, 'скін Самурай має метадані і будується без fallback', JSON.stringify({ meta: res.samuraiMeta, built: res.samuraiBuilt, looksSamurai: res.looksSamurai }));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

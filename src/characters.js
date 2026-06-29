@@ -2387,6 +2387,8 @@ export const HERO_SKINS = {
   gold: { name: t('Золотий герой'), icon: '✨', desc: t('Купи в магазині') },
   silver: { name: t('Срібний герой'), icon: '🥈', desc: t('Випадає з великого бокса') },
   medic: { name: t('Медик'), icon: '💚', desc: t('Випадає з маленького бокса') },
+  ghost: { name: t('Привид'), icon: '👻', desc: t('Випадає з Мегабокса') },
+  samurai: { name: t('Самурай'), icon: '🎌', desc: t('Випадає з Мегабокса') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2821,6 +2823,41 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       const cr = box(0.04, 0.1, 0.02, redM); cr.position.set(0, 0.38, -0.225);
       rig.parts.torso.add(c1, c2);
       rig.parts.head.add(cap, cr);
+      return rig;
+    },
+    ghost() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xd8f4ff, shirt: 0xdfefff, pants: 0xb8d8f0, shoes: 0xe8f8ff,
+        eyeL: 0.065, eyeR: 0.065, eyeWhite: 0xaee8ff, pupilColor: 0x2d6f9f,
+        mouth: 'smile', mouthColor: 0x5f7f9f, brow: -0.04, cast: 'all',
+      });
+      const sheet = box(0.56, 0.82, 0.05, toonMat(0xe8f8ff, 0xaee8ff, 0.25));
+      sheet.position.set(0, 0.08, 0.27);
+      sheet.rotation.x = -0.08;
+      rig.parts.torso.add(sheet);
+      const glow = sphere(0.07, toonMat(0xaee8ff, 0xaee8ff, 0.7), 8, 6);
+      glow.position.set(0, 0.38, -0.27);
+      rig.parts.torso.add(glow);
+      return rig;
+    },
+    samurai() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd2a4, shirt: 0x8b1e1e, pants: 0x222733, shoes: 0x171a21,
+        eyeL: 0.058, eyeR: 0.058, mouth: 'smile', mouthColor: 0x7a3a2a,
+        brow: -0.16, cast: 'all', sleeves: 'shirt',
+      });
+      const armor = toonMat(0x8b1e1e), gold = toonMat(0xf4c430, 0xc99018, 0.3), dark = toonMat(0x222733);
+      const helm = sphere(0.28, dark, 16, 10);
+      helm.position.y = 0.2;
+      helm.scale.set(1.06, 0.62, 1.06);
+      const crest = cone(0.08, 0.28, gold, 8);
+      crest.position.y = 0.42;
+      rig.parts.head.add(helm, crest);
+      const chest = box(0.46, 0.36, 0.06, armor);
+      chest.position.set(0, 0.28, -0.26);
+      const sash = box(0.56, 0.08, 0.07, gold);
+      sash.position.set(0, 0.05, -0.27);
+      rig.parts.torso.add(chest, sash);
       return rig;
     },
     custom() {
