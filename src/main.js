@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 183;
+const APP_VERSION = 184;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1721,7 +1721,7 @@ class Game {
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
     if (isKnockout || isDefense || isPvp || isBank) {
-      level.player.weapons = isBank ? ['staff'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.weapons = isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isDefense ? ['pistol', 'rifle'] : ['pistol'];
       level.player.cur = isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       if (isPvp) {

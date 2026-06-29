@@ -39,7 +39,7 @@ export class BankMode {
       { icon: '🏦', title: t('БАНК'), done: false },
       { icon: '🔐', title: t('Зламай сейф: живих {n}/2', { n: liveSafes }), done: this.completed },
       { icon: '🧟', title: t('Кожні 5с біля сейфів зʼявляються 10 зомбі'), done: false },
-      { icon: '🪄', title: t('Тільки посох. Без магазину, гаджетів, бафів і пікапів.'), done: false },
+      { icon: '🪄', title: t('Посох і пістолет. Без магазину, гаджетів, бафів і пікапів.'), done: false },
     ];
   }
 

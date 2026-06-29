@@ -37,7 +37,7 @@ const menu = await page.evaluate(() => {
 check(menu.beforeExists && menu.beforeLocked, 'до 7 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /БАНК/i.test(menu.afterName), 'після 7 країн режим доступний', JSON.stringify(menu));
 
-console.log('▸ Старт Банку: кімната 55x23, 2 сейфи, посох, заборони');
+console.log('▸ Старт Банку: кімната 55x23, 2 сейфи, посох+пістолет, заборони');
 await page.evaluate(() => window.__game.test.startBank());
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.bank, null, { timeout: 30000 });
 const started = await page.evaluate(() => {
@@ -73,8 +73,8 @@ const started = await page.evaluate(() => {
 });
 check(started.roomW === 55 && started.roomD === 23, 'кімната має розмір 55x23 метри', JSON.stringify(started));
 check(started.safes.length === 2 && started.safes.every((s) => s.hp === 500 && s.maxHp === 500), 'є 2 сейфи по 500 HP', JSON.stringify(started));
-check(started.weapons.length === 1 && started.weapons[0] === 'staff' && started.cur === 'staff' && started.grenades === 0,
-  'гравець стартує тільки з посохом без гранат', JSON.stringify(started));
+check(started.weapons.length === 2 && started.weapons.includes('staff') && started.weapons.includes('pistol') && started.cur === 'staff' && started.grenades === 0,
+  'гравець стартує з посохом і пістолетом без гранат', JSON.stringify(started));
 check(!started.shopOpen && !started.gadgetUsed && started.afterGadget === started.beforeGadget,
   'магазин і гаджети вимкнені', JSON.stringify(started));
 check(started.noGadgets && started.noShop && started.noBuffs && started.noPickups && started.noZombiePickups && started.noCoinDrops
