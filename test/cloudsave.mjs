@@ -2,8 +2,9 @@
 // аварійний екран. Сам піднімає dev-relay (у ньому — dev-SaveVault).
 import { chromium } from 'playwright';
 import { spawnRelay } from './_relay.mjs';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8753;
 const API = `http://localhost:${RELAY_PORT}`;
 const URL_PARAMS = `?test&fresh&cloud&relay=ws://localhost:${RELAY_PORT}`;
@@ -286,4 +287,5 @@ check('у А не було JS-помилок', errorsA.length === 0, errorsA.sli
 console.log(failures === 0 ? '🎉 ХМАРНИЙ СЕЙВ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failures}`);
 await browser.close();
 relay.kill();
+closeServer();
 process.exit(failures === 0 ? 0 : 1);
