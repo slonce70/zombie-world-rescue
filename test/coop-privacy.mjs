@@ -1,11 +1,14 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 let failed = 0;
 const check = (ok, msg, x = '') => { console.log(ok ? '  ✅' : '  ❌', msg, x); if (!ok) failed++; };
 
-await page.goto('http://localhost:8741/?test&fresh&lang=en');
+await page.goto(`${BASE}/?test&fresh&lang=en`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
 await page.click('#btn-coop');
 await page.waitForSelector('#overlay-coop.show');
@@ -74,4 +77,5 @@ state = await page.evaluate(() => {
 check(state.saved === '1' && state.announce?.code === 'ABC123', 'opt-in announces public room', JSON.stringify(state));
 
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);
