@@ -782,6 +782,13 @@ export class Player {
         if (i < 3) level.effects.tracer(this._muzzlePos, wp);
         continue;
       }
+      const safeHit = level.bank ? level.bank.safeHitTest(origin, dir, MAX_D) : null;
+      if (safeHit && safeHit.t < blockT && (!hit || safeHit.t < hit.t)) {
+        level.bank.damageSafe(safeHit.safe, w.dmg * dmgMult, true);
+        if (i < 3) level.effects.tracer(this._muzzlePos, safeHit.point);
+        anyHit = true;
+        continue;
+      }
       const ballHit = level.effects.ballHitTest(origin, dir, MAX_D);
       if (ballHit && ballHit.t < blockT && (!hit || ballHit.t < hit.t)) {
         if (level.mirror) netBall = true;

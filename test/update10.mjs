@@ -48,13 +48,14 @@ try {
     defenseLocked: document.querySelector('.solo-mode[data-mode="defense"]').classList.contains('locked'),
     overloadedDefenseLocked: document.querySelector('.solo-mode[data-mode="overloaded-defense"]').classList.contains('locked'),
     overloadedLocked: document.querySelector('.solo-mode[data-mode="overloaded-pvp"]').classList.contains('locked'),
+    bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
     pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
     campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
   }));
-  check('10 режимів; спецрежими замкнені, Кампанія відкрита',
-    fresh.modes === 10 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('11 режимів; спецрежими замкнені, Кампанія відкрита',
+    fresh.modes === 11 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
-      && fresh.overloadedLocked && fresh.pvpLocked && !fresh.campLocked,
+      && fresh.overloadedLocked && fresh.bankLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
