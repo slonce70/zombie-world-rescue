@@ -252,7 +252,11 @@ export class Shop {
       return;
     }
     if (item.crystalPrice) save.crystals -= item.crystalPrice;
-    if (price) save.coins -= price;
+    if (price) {
+      save.coins -= price;
+      if (!save.stats || typeof save.stats !== 'object') save.stats = {};
+      save.stats.coinsSpent = (save.stats.coinsSpent || 0) + price;
+    }
     if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin) save.upgrades[id] = count + 1;
     if (item.skin) {
       if (!save.skins.includes(item.skin)) save.skins.push(item.skin);

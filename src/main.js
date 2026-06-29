@@ -38,6 +38,7 @@ import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter } from './chapter.js';
+import { TITLES, syncTitles } from './titles.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
@@ -68,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 181;
+const APP_VERSION = 182;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -414,12 +415,13 @@ class Game {
       weaponLoadout: ['pistol'],
       xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
+      titles: [], activeTitle: null,
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {}, worldBosses: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
-      stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0 },
+      stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [],
       diffStar: 1,
@@ -489,9 +491,12 @@ class Game {
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
         if (!out.stats || typeof out.stats !== 'object') out.stats = {};
-        for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo']) {
+        for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo', 'coinsSpent']) {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
         }
+        if (!Array.isArray(out.titles)) out.titles = [];
+        if (out.activeTitle !== null && typeof out.activeTitle !== 'string') out.activeTitle = null;
+        syncTitles(out);
         if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
         if (!out.chapter || typeof out.chapter !== 'object') out.chapter = { p: {}, done: false };
         if (!out.chapter.p || typeof out.chapter.p !== 'object') out.chapter.p = {};
@@ -521,11 +526,13 @@ class Game {
         if (w && !out.weapons.includes(w)) out.weapons.push(w);
       }
     }
+    syncTitles(out);
     return out;
   }
 
   saveGame() {
     if (this.level && this.level.playground) return;
+    syncTitles(this.save);
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.save));
     } catch (e) {
@@ -1019,6 +1026,7 @@ class Game {
 
   renderWardrobe() {
     const save = this.save;
+    syncTitles(save);
     const card = (id, meta, owned, equipped, kind) => `
       <div class="ward-card ${equipped ? 'equipped' : ''} ${owned ? '' : 'locked'}" data-kind="${kind}" data-id="${id}">
         <div class="ward-ico">${meta.icon}</div>
@@ -1036,6 +1044,7 @@ class Game {
       ['pet', t('Улюбленці')],
       ['tower', t('Башта')],
       ['tracer', t('Кулі')],
+      ['titles', t('Титули')],
       ['hero', t('Герой')],
     ];
     if (!this._wardrobeTab) this._wardrobeTab = save.activeSkin === 'custom' ? 'hero' : 'skins';
@@ -1127,8 +1136,13 @@ class Game {
       tracerHtml += card(id, meta, save.tracers.includes(id), save.activeTracer === id, 'tracer');
     }
     tracerHtml += '</div>';
+    let titleHtml = t('<div class="ward-section">Титули</div><div class="ward-grid">');
+    for (const [id, meta] of Object.entries(TITLES)) {
+      titleHtml += card(id, { icon: meta.icon, name: meta.name(), desc: meta.desc(), detail: meta.detail() }, save.titles.includes(id), save.activeTitle === id, 'title');
+    }
+    titleHtml += '</div>';
     let html = `<div class="ward-tabs">${tabs.map(([id, label]) => `<button class="shop-tab ward-tab ${this._wardrobeTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
-    html += pane('skins', skinsHtml) + pane('weapon', weaponHtml) + pane('gadget', gadgetHtml) + pane('dance', danceHtml) + pane('pet', petHtml) + pane('tower', towerHtml) + pane('tracer', tracerHtml) + pane('hero', heroHtml);
+    html += pane('skins', skinsHtml) + pane('weapon', weaponHtml) + pane('gadget', gadgetHtml) + pane('dance', danceHtml) + pane('pet', petHtml) + pane('tower', towerHtml) + pane('tracer', tracerHtml) + pane('titles', titleHtml) + pane('hero', heroHtml);
     const root = document.getElementById('wardrobe-content');
     this._stopHeroPreview(); // прибрати старий рендер перед перемальовкою
     root.innerHTML = html;
@@ -1161,6 +1175,7 @@ class Game {
         else if (kind === 'gadget') save.activeGadget = id;
         else if (kind === 'pet') { save.activePet = id; this.spawnPet(); }
         else if (kind === 'tower') save.activeTowerSkin = id;
+        else if (kind === 'title') save.activeTitle = id;
         else if (kind === 'tracer') {
           save.activeTracer = id;
           if (this.level) this.level.effects.tracerStyle = id === 'classic' ? null : id;

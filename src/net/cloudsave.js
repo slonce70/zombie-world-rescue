@@ -47,11 +47,13 @@ export function saveHasProgress(s) {
     || Object.values(s.megaQuests || {}).some((q) => q && ((q.progress | 0) > 0 || q.done))
     || (s.medals || []).length > 0                          // медалі
     || (s.stats && (s.stats.killed | 0) > 0)               // хоч одне вбивство в статистиці
+    || (s.stats && (s.stats.coinsSpent | 0) > 0)           // витрати монет для титулів
     || !!s.goal                                             // поставлена ціль
     || heroChanged                                          // кастом-герой ≠ дефолт
     || (s.skins || []).length > 2                           // більше за ['classic','custom']
     || (s.dances || []).length > 1                          // більше за ['shuffle']
     || (s.tracers || []).length > 1                         // більше за ['classic']
+    || (s.titles || []).length > 0 || !!s.activeTitle        // відкриті/активні титули
     || (s.gadgetsOwned || []).length > 0                    // куплені гаджети
     || (s.gadgetHypers || []).length > 0                    // постійні гіперзаряди гаджетів
     || (s.pets || []).length > 0                            // куплені улюбленці

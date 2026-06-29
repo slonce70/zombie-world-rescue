@@ -256,7 +256,7 @@ export class Lobby {
   constructor(state) {
     this.state = state;
     this.players = new Map(); // cid -> {nick, ts}
-    this.profiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, ts}
+    this.profiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, title, ts}
     this.rooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
     this._ping = new Map();   // ip -> {n, t0} (анти-флуд пінгів, як _claimAllowed у SaveVault)
     // 📅 скільки УНІКАЛЬНИХ гравців зайшло грати разом сьогодні (UTC).
@@ -309,6 +309,7 @@ export class Lobby {
       crystals: this._safeInt(raw.crystals, 0, 99999),
       kills: this._safeInt(raw.kills, 0, 999999),
       star: this._safeInt(raw.star || 1, 1, 5),
+      title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
       ts,
     };
   }

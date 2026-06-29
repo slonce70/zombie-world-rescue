@@ -27,7 +27,7 @@ const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789';
 // 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
 const LOBBY_TTL = 40_000;
 const lobbyPlayers = new Map(); // cid -> {nick, ts}
-const lobbyProfiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, ts}
+const lobbyProfiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, title, ts}
 const lobbyRooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
 let lobbyDay = '';              // 📅 унікальні гравці за сьогодні (дзеркало Lobby DO)
 let lobbyToday = new Set();
@@ -67,6 +67,7 @@ function cleanProfile(nick, raw = {}, ts) {
     crystals: safeInt(raw.crystals, 0, 99999),
     kills: safeInt(raw.kills, 0, 999999),
     star: safeInt(raw.star || 1, 1, 5),
+    title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
     ts,
   };
 }

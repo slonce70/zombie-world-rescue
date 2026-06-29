@@ -338,12 +338,12 @@ export class CoopUI {
     let ph = '';
     const profiles = Array.isArray(d.profiles)
       ? d.profiles
-      : (d.players || []).map((nick) => ({ nick, countries: 0, coins: 0, crystals: 0, kills: 0, star: 1 }));
+      : (d.players || []).map((nick) => ({ nick, countries: 0, coins: 0, crystals: 0, kills: 0, star: 1, title: '' }));
     for (let i = 0; i < profiles.length; i++) {
       const p = profiles[i];
       const me = p.nick === myNick;
       ph += `<div class="coop-player ${me ? 'me' : ''}">
-        <span class="cp-nick">${esc(p.nick)}${me ? t(' (ти)') : ''}</span>
+        <span class="cp-main"><span class="cp-nick">${esc(p.nick)}${me ? t(' (ти)') : ''}</span>${p.title ? `<span class="cp-title">${esc(p.title)}</span>` : ''}</span>
         <button class="cp-profile" data-i="${i}">${t('Профіль')}</button>
       </div>`;
       if (this._profileNick === p.nick) ph += this._profileHtml(p);

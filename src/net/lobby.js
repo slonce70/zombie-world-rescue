@@ -6,6 +6,7 @@ import { ensureCid } from './league.js';
 import { liberatedCount } from './cloudsave.js';
 import { loadNick, cleanNick } from './coop.js';
 import { t } from '../i18n.js';
+import { syncTitles, titleName } from '../titles.js';
 
 const PING_MS = 8000;
 
@@ -64,12 +65,14 @@ export class LobbyClient {
 
   _profile() {
     const s = this.game.save || {};
+    syncTitles(s);
     return {
       countries: liberatedCount(s.liberated),
       coins: s.coins | 0,
       crystals: s.crystals | 0,
       kills: (s.stats && s.stats.killed) | 0,
       star: s.diffStar | 0,
+      title: titleName(s.activeTitle),
     };
   }
 }

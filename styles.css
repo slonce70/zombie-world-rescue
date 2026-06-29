@@ -990,7 +990,9 @@ body.touch-mode #touch-coach.show { display: block; }
   border-radius: 10px; padding: 5px 8px; font-size: 12px; font-weight: 700; color: #d7e6f2;
 }
 .coop-player.me { border-color: var(--accent); color: var(--accent); }
-.cp-nick { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.cp-nick, .cp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-title { color: #ffd36a; font-size: 10px; font-weight: 900; }
 .cp-profile {
   flex: 0 0 auto; border: 1px solid rgba(77, 214, 168, 0.45); border-radius: 8px;
   background: rgba(77, 214, 168, 0.12); color: #dfffee; font: inherit; font-size: 11px;
