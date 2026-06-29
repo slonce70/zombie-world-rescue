@@ -1,5 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage();
 let failed = 0;
@@ -10,7 +12,7 @@ const check = (ok, msg, extra = '') => {
 
 page.on('pageerror', (e) => { console.log('PAGEERROR:', e.message); failed++; });
 
-await page.goto('http://localhost:8741/index.html?test&parts-only', { waitUntil: 'commit', timeout: 60000 });
+await page.goto(`${BASE}/index.html?test&parts-only`, { waitUntil: 'commit', timeout: 60000 });
 const res = await page.evaluate(async () => {
   const THREE = await import('/vendor/three.module.js');
   const {
@@ -53,4 +55,5 @@ check(res.faceClearance.cap >= 0.34 && res.faceClearance.beanie >= 0.32
   'hat fronts stay above the face', JSON.stringify({ all: res.hatClearance, face: res.faceClearance }));
 
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);
