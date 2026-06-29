@@ -1228,6 +1228,7 @@ body.touch-mode #touch-coach.show { display: block; }
   .megabox-reward { font-size: 20px; }
   body.touch-mode .shop-key-hint { display: none; }
   body.touch-mode #toasts { left: calc(50% + 72px); top: 32px; bottom: auto; }
+  body.touch-mode.banner-active #toasts { display: none; }
   body.touch-mode .toast { font-size: 12px; padding: 5px 9px; max-width: min(230px, 42vw); }
   body.touch-mode #banner {
     top: 22%;

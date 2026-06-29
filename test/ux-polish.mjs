@@ -246,17 +246,22 @@ console.log('▸ UX polish: tiny landscape toast avoids aim center');
   await page.waitForTimeout(800);
   const toast = await page.evaluate(() => {
     const el = document.querySelector('#toasts .toast.show');
-    const r = el.getBoundingClientRect();
+    const title = document.querySelector('#banner-title');
+    const visible = el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    const r = visible ? el.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+    const tr = title.getBoundingClientRect();
     const safe = {
       left: innerWidth / 2 - 90,
       right: innerWidth / 2 + 90,
       top: innerHeight / 2 - 55,
       bottom: innerHeight / 2 + 55,
     };
-    const intersects = r.left < safe.right && r.right > safe.left && r.top < safe.bottom && r.bottom > safe.top;
-    return { intersects, r, safe, text: el.textContent };
+    const intersects = visible && r.left < safe.right && r.right > safe.left && r.top < safe.bottom && r.bottom > safe.top;
+    const titleOverlap = visible && r.left < tr.right && r.right > tr.left && r.top < tr.bottom && r.bottom > tr.top;
+    return { visible, intersects, titleOverlap, r, title: tr, safe, text: el ? el.textContent : '' };
   });
   check(!toast.intersects, 'toast не закриває центр прицілювання на малому landscape', JSON.stringify(toast));
+  check(!toast.titleOverlap, 'toast не накриває назву країни на малому landscape', JSON.stringify(toast));
   await ctx.close();
 }
 
