@@ -202,6 +202,37 @@ console.log('▸ UX polish: tiny landscape shop shows a product');
   await ctx.close();
 }
 
+console.log('▸ UX polish: tiny landscape toast avoids aim center');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&country=UKR&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
+  30000, 'level');
+  await page.waitForTimeout(800);
+  const toast = await page.evaluate(() => {
+    const el = document.querySelector('#toasts .toast.show');
+    const r = el.getBoundingClientRect();
+    const safe = {
+      left: innerWidth / 2 - 90,
+      right: innerWidth / 2 + 90,
+      top: innerHeight / 2 - 55,
+      bottom: innerHeight / 2 + 55,
+    };
+    const intersects = r.left < safe.right && r.right > safe.left && r.top < safe.bottom && r.bottom > safe.top;
+    return { intersects, r, safe, text: el.textContent };
+  });
+  check(!toast.intersects, 'toast не закриває центр прицілювання на малому landscape', JSON.stringify(toast));
+  await ctx.close();
+}
+
 console.log(failed === 0 ? '🎉 UX POLISH OK' : `💥 UX POLISH FAILURES: ${failed}`);
 await browser.close();
 process.exit(failed === 0 ? 0 : 1);
