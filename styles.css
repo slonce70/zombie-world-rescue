@@ -1160,10 +1160,11 @@ body.touch-mode #touch-coach.show { display: block; }
   #overlay-menu #menu-list { gap: 5px; max-height: calc(100dvh - 118px); }
   #overlay-menu #menu-list .globe-act { font-size: 13px; padding: 8px 10px; }
   body.touch-mode #banner {
-    top: 52%;
+    top: 22%;
     width: min(560px, 58vw);
     padding: 0;
   }
+  body.touch-mode #banner-sub { display: none; }
 }
 
 /* 💾 панель «Мій прогрес» і аварійний екран */

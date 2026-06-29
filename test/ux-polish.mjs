@@ -103,6 +103,22 @@ console.log('▸ UX polish: mobile banner does not cover the live waypoint');
     return { intersects, bannerVisible: visible(banner), waypointVisible: visible(wp), br, wr };
   });
   check(!overlap.intersects, 'банер не перекриває waypoint на mobile landscape', JSON.stringify(overlap));
+
+  const centerOverlap = await page.evaluate(() => {
+    const banner = document.getElementById('banner');
+    const r = banner.getBoundingClientRect();
+    const safe = {
+      left: innerWidth / 2 - 90,
+      right: innerWidth / 2 + 90,
+      top: innerHeight / 2 - 55,
+      bottom: innerHeight / 2 + 55,
+    };
+    const cs = getComputedStyle(banner);
+    const visible = cs.display !== 'none' && Number(cs.opacity || 1) > 0.05;
+    const intersects = visible && r.left < safe.right && r.right > safe.left && r.top < safe.bottom && r.bottom > safe.top;
+    return { intersects, r, safe };
+  });
+  check(!centerOverlap.intersects, 'банер не закриває центр прицілювання на mobile landscape', JSON.stringify(centerOverlap));
   await ctx.close();
 }
 
