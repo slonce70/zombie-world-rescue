@@ -2,8 +2,9 @@
 // Усі очікування — полінг ігрового стану (headless час тече повільніше за реальний)
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox'] });
@@ -240,4 +241,5 @@ console.log('');
 console.log(failed === 0 ? '🎉 УСІ ПЕРЕВІРКИ ПРОЙДЕНО' : `❌ ПРОВАЛЕНО ПЕРЕВІРОК: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
 await browser.close();
+closeServer();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);
