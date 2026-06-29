@@ -1,8 +1,9 @@
 // Повне проходження кампанії від початку до кінця: усі країни поспіль
 // на одному сейві — місії, орди, боси, нагороди, прогресія.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
@@ -138,4 +139,5 @@ if (errors.length) {
 }
 console.log(failed === 0 ? '🏆 КАМПАНІЮ ПРОЙДЕНО ВІД ПОЧАТКУ ДО КІНЦЯ' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

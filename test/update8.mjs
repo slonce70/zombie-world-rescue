@@ -1,8 +1,9 @@
 // 🇹🇷🇪🇬🌙 Тести оновлення 8: Туреччина, Єгипет, цикл день/ніч, мумії, піраміда
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 // SLOW=N множить таймаути/вікна часу: на CI-ранері з софтверним рендером ігровий
 // час тече ~N× повільніше, тож фіксовані очікування мусять чекати у N× довше.
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -193,4 +194,5 @@ if (realErrors.length) {
 }
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 8 ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

@@ -5,8 +5,9 @@
 //  (4) 👑 МАТАДОР-бос виходить (style matador, HP з конфігу, дальня атака бандерильями);
 //  (5) звільнення ESP дає ВОГНЕМЕТ.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
@@ -180,4 +181,5 @@ if (errors.length) {
 }
 console.log(fail === 0 ? '🎉 ІСПАНІЯ (ESP) ПРОЙДЕНА' : `💥 ПРОВАЛЕНО: ${fail}`);
 await browser.close();
+closeServer();
 process.exit(fail === 0 ? 0 : 1);

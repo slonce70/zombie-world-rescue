@@ -1,7 +1,8 @@
 // Тести оновлення «Живі карти»: інтер'єри, бочки, золотий, батути, лід, м'яч, аеродроп, якість
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -284,4 +285,5 @@ console.log('');
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ КАРТ ПРОЙДЕНО' : `❌ ПРОВАЛЕНО: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
 await browser.close();
+closeServer();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);

@@ -1,4 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
@@ -8,7 +11,7 @@ let failed = 0;
 const check = (ok, msg, x = '') => { console.log(ok ? '  ✅' : '  ❌', msg, x); if (!ok) failed++; };
 
 // 1. украинский (явно: headless-браузер має navigator.language=en — автодетект дасть en)
-await page.goto('http://localhost:8741/?test&fresh');
+await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
 await page.evaluate(() => localStorage.setItem('zr-lang', 'uk'));
 await page.reload();
@@ -86,7 +89,7 @@ check(shopBoxesEn.tabs.includes('Boxes') && shopBoxesEn.tabs.includes('Hyperchar
   'en: shop boxes translated', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
 check(!/Бокси|Гіперзаряди|Великий бокс|Скін-бокс|Мегабокс|кристалів|монет/.test(shopBoxesEn.text + shopBoxesEn.tabs.join(' ')),
   'en: shop boxes are not Ukrainian', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
-await page.goto('http://localhost:8741/?test&fresh&lang=en');
+await page.goto(`${BASE}/?test&fresh&lang=en`);
 await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 30000 });
 await page.evaluate(() => {
   const g = window.__game;
@@ -105,7 +108,7 @@ check(mEn.some((s) => /Rescue|Repair|Clear/.test(s)), 'en: місії перек
 
 // 3. русский
 await page.evaluate(() => localStorage.setItem('zr-lang', 'ru'));
-await page.goto('http://localhost:8741/?test&fresh');
+await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
 txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
@@ -147,4 +150,5 @@ check(mRu.some((s) => /Спаси|Почини|Зачисти/.test(s)), 'ru: м
 check(errs.length === 0, 'без JS-ошибок', errs.slice(0, 2).join('|'));
 console.log(failed === 0 ? '🎉 ЛОКАЛІЗАЦІЯ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

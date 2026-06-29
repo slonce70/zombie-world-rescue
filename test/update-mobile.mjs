@@ -1,8 +1,9 @@
 // Тести мобільного оновлення (Task 1): режим «Малюк» — лише м'яка допомога
 // прицілу, БЕЗ автовогню й гарантованого хедшоту. Десктоп не зачіпається.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
 const page = await ctx.newPage();
@@ -190,4 +191,5 @@ if (errors.length) {
 }
 console.log(failed === 0 ? '🎉 УСІ ПЕРЕВІРКИ ПРОЙШЛИ' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

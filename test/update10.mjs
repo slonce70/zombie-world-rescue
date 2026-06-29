@@ -1,10 +1,11 @@
 // 🎮 Тест оновлення 10 (v14): нове головне меню (ГРАТИ / ГРАТИ РАЗОМ),
 // соло-меню режимів, відкриття всього світу після України, червоні країни на глобусі.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failures = 0;
@@ -151,6 +152,7 @@ try {
   await page.screenshot({ path: 'shots/u10-fail.png' }).catch(() => {});
 } finally {
   await browser.close().catch(() => {});
+closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 ОНОВЛЕННЯ 10 (МЕНЮ + СВІТ) ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

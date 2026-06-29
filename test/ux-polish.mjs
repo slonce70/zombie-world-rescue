@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
 const check = (ok, msg, extra = '') => {
@@ -332,4 +333,5 @@ console.log('▸ UX polish: mobile pause how-to returns to gameplay');
 
 console.log(failed === 0 ? '🎉 UX POLISH OK' : `💥 UX POLISH FAILURES: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

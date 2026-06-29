@@ -1,9 +1,10 @@
 // 🏆 Тести оновлення 9 «Ліга Шторму»: турель, щит-50, кооп-шторм передумови,
 // нагороди, пасс-30, арена босів (блоки додаються по ходу)
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failed = 0;
@@ -267,4 +268,5 @@ if (realErrors.length) {
 }
 console.log(failed === 0 ? '🎉 БЛОК ТУРЕЛЬ/ЩИТ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

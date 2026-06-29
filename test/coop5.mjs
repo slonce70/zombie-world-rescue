@@ -1,10 +1,11 @@
 // ⛈️🤝 Кооп-тест 5: Шторм разом — дзеркало кола, масштаб хвиль,
 // «лежи і чекай підняття», фінал «всі впали»
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8751;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
@@ -147,6 +148,7 @@ try {
   await browserA.close().catch(() => {});
   await browserB.close().catch(() => {});
   relay.kill();
+  closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ШТОРМ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

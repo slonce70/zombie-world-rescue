@@ -1,9 +1,10 @@
 // 🤝 Кооп-тест 3: приєднання ПОСЕРЕД гри + реконект після розриву звʼязку
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8747;
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~4× повільніше, тож фіксовані очікування мають чекати пропорційно довше.
@@ -114,6 +115,7 @@ try {
   await browserA.close().catch(() => {});
   await browserB.close().catch(() => {});
   relay.kill();
+  closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ТЕСТ 3 (mid-join + реконект) ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

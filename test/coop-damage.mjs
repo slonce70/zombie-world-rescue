@@ -4,8 +4,9 @@
 // (coopMul() → 2) і повторюємо: падіння HP має бути ІДЕНТИЧНИМ.
 // Якщо хтось поверне `* this.coopMul()` у damage-вираз — друга доза стане ×2 і тест впаде.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 
 let failed = 0;
 const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
@@ -98,6 +99,7 @@ try {
   console.error('❌ ТЕСТ ВПАВ:', e.message);
 } finally {
   await browser.close();
+closeServer();
 }
 
 console.log(failed === 0 ? '\n🎉 COOP-DAMAGE: F6 ПІДТВЕРДЖЕНО' : `\n💥 COOP-DAMAGE провалів: ${failed}`);

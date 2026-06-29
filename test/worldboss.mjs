@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
 let failed = 0;
@@ -396,6 +397,7 @@ check(loseInfo.title.includes('БОС СИЛЬНІШИЙ') && loseInfo.deathT ==
   'смерть у світовому босі завершує забіг без респавну', JSON.stringify(loseInfo));
 
 await browser.close();
+closeServer();
 if (errors.length) {
   console.error(errors.join('\n'));
   failed += errors.length;

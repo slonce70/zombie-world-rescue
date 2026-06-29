@@ -2,10 +2,11 @@
 // Дзеркалить харнес test/coop.mjs (власний dev-relay + два браузери, хост створює
 // кімнату через __game.test.coopCreate, гість приєднується coopJoin, старт рівня).
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8749; // окремий порт від coop.mjs (8743), щоб тести не билися
 const RELAY = `ws://localhost:${RELAY_PORT}`;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -145,6 +146,7 @@ try {
   await browserA.close();
   await browserB.close();
   relay.kill();
+  closeServer();
 }
 
 console.log(failures === 0 ? '\n🎉 M5 ПІНГ-ТЕСТ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

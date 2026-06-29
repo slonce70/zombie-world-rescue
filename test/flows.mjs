@@ -1,7 +1,8 @@
 // Додаткові сценарії: смерть/відродження, перезапуск боса, клік по глобусу, пауза, звук
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 // SLOW=N множить усі таймаути: на CI-ранері з софтверним рендером ігровий час
 // тече ~4× повільніше, тож фіксовані очікування мають чекати у N разів довше.
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -179,4 +180,5 @@ console.log('');
 console.log(failed === 0 ? '🎉 ВСІ СЦЕНАРІЇ ПРОЙДЕНО' : `❌ ПРОВАЛЕНО: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
 await browser.close();
+closeServer();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);

@@ -2,8 +2,9 @@
 // ★1 == сьогодні (ідентичність): множник = 1 для hp/dmg/counts і боса.
 // ★>1 робить зомбі міцнішими/сильнішими; дефолт save.diffStar === 1.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
@@ -96,4 +97,5 @@ if (errors.length) {
 }
 console.log(failed === 0 ? '🎉 УСІ ПЕРЕВІРКИ ПРОЙШЛИ' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);

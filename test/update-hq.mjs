@@ -1,7 +1,8 @@
 // Тести M1: Штаб — Моя пригода (lifetime-статистика)
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
@@ -181,5 +182,6 @@ check(/👑/.test(bHtml2) && /(Бос|Boss|Босс)/.test(bHtml2), 'F41: кар
 console.log('');
 if (errors.length) console.log('JS-помилки на сторінці:\n', errors.join('\n'));
 await browser.close();
+closeServer();
 if (failed) { console.log(`\n❌ ПРОВАЛЕНО: ${failed} перевірок`); process.exit(1); }
 else console.log('\n✅ ВСІ ПЕРЕВІРКИ ПРОЙДЕНО');

@@ -5,8 +5,9 @@
 //  (4) коли Ікс-рей згасає — привиди знову невидимі;
 //  (5) у магазині є товар xray за 1000.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
@@ -132,4 +133,5 @@ if (errors.length) {
 }
 console.log(fail === 0 ? '🎉 ПРИВИДИ + ІКС-РЕЙ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${fail}`);
 await browser.close();
+closeServer();
 process.exit(fail === 0 ? 0 : 1);

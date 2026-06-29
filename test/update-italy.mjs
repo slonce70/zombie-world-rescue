@@ -6,8 +6,9 @@
 //  (5) арена-бос виходить на ЧИСТУ землю Колізею (прохідність — не застряг у геометрії);
 //  (6) звільнення ITA дає ЛАЗЕР.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~N× повільніше — даємо стану гри дозріти, не послаблюючи асерти.
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -215,4 +216,5 @@ if (errors.length) {
 }
 console.log(fail === 0 ? '🎉 ІТАЛІЯ (ITA) ПРОЙДЕНА' : `💥 ПРОВАЛЕНО: ${fail}`);
 await browser.close();
+closeServer();
 process.exit(fail === 0 ? 0 : 1);
