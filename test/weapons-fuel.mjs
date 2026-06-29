@@ -3,8 +3,9 @@
 // Headless RAF буває 1-3 fps — тому дренаж і reload перевіряємо детермінованими
 // кроками _fireContinuous(), а не wall-clock очікуванням браузерного кадру.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
 const page = await ctx.newPage();
@@ -201,4 +202,5 @@ check(errs.length === 0, `без JS-помилок (${errs.length})`);
 if (errs.length) for (const e of errs.slice(0, 8)) console.log('   ', e);
 console.log(failed === 0 ? '🎉 ПАЛИВО-ЗБРОЇ ПРАЦЮЮТЬ' : `💥 ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);
