@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 182;
+const APP_VERSION = 183;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -421,7 +421,7 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
-      stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0 },
+      stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0, cloneUses: 0, gadgetUses: 0, damageDealt: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [],
       diffStar: 1,
@@ -491,7 +491,7 @@ class Game {
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
         if (!out.stats || typeof out.stats !== 'object') out.stats = {};
-        for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo', 'coinsSpent']) {
+        for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo', 'coinsSpent', 'cloneUses', 'gadgetUses', 'damageDealt']) {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
         }
         if (!Array.isArray(out.titles)) out.titles = [];
@@ -1975,11 +1975,14 @@ class Game {
     level.bus.on('zombieDamaged', (n, z) => {
       if (level.playground) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
+      this.save.stats.damageDealt += Math.round(n);
       this.quests.onEvent('damage', { n: Math.round(n) });
     });
     level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
+        this.save.stats.gadgetUses++;
+        if (id === 'clone') this.save.stats.cloneUses++;
         this.quests.onEvent('gadget');
         if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('gadget');
         return;

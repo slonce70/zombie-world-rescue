@@ -48,6 +48,7 @@ export function saveHasProgress(s) {
     || (s.medals || []).length > 0                          // медалі
     || (s.stats && (s.stats.killed | 0) > 0)               // хоч одне вбивство в статистиці
     || (s.stats && (s.stats.coinsSpent | 0) > 0)           // витрати монет для титулів
+    || (s.stats && ((s.stats.cloneUses | 0) > 0 || (s.stats.gadgetUses | 0) > 0 || (s.stats.damageDealt | 0) > 0))
     || !!s.goal                                             // поставлена ціль
     || heroChanged                                          // кастом-герой ≠ дефолт
     || (s.skins || []).length > 2                           // більше за ['classic','custom']

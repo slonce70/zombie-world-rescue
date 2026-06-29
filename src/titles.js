@@ -15,6 +15,27 @@ export const TITLES = {
     detail: () => t('Відкривається за 50000 витрачених монет'),
     unlocked: (s) => ((s.stats && s.stats.coinsSpent) | 0) >= 50000,
   },
+  clone_army: {
+    icon: '🧍',
+    name: () => t('Армія клонів'),
+    desc: () => t('Використай Клон 35 разів'),
+    detail: () => t('Відкривається за 35 використань гаджета Клон'),
+    unlocked: (s) => ((s.stats && s.stats.cloneUses) | 0) >= 35,
+  },
+  tyrant: {
+    icon: '👑',
+    name: () => t('Тиран'),
+    desc: () => t('Нанеси 50000 шкоди'),
+    detail: () => t('Відкривається за 50000 шкоди по ворогах'),
+    unlocked: (s) => ((s.stats && s.stats.damageDealt) | 0) >= 50000,
+  },
+  gadget_king: {
+    icon: '🧰',
+    name: () => t('Король гаджетів'),
+    desc: () => t('Використай гаджети 100 разів'),
+    detail: () => t('Відкривається за 100 використань будь-яких гаджетів'),
+    unlocked: (s) => ((s.stats && s.stats.gadgetUses) | 0) >= 100,
+  },
 };
 
 export function syncTitles(save) {
