@@ -1,32 +1,9 @@
 import { spawn } from 'child_process';
+import { ensureWebServer } from './_server.mjs';
 
-const PORT = 8741;
-const BASE = `http://localhost:${PORT}`;
 const BETWEEN_TESTS_MS = Number(process.env.RELEASE_BETWEEN_TESTS_MS || 500);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function ready() {
-  try {
-    const r = await fetch(`${BASE}/version.json`, { cache: 'no-store' });
-    return r.ok;
-  } catch (e) {
-    return false;
-  }
-}
-
-async function waitReady() {
-  for (let i = 0; i < 50; i++) {
-    if (await ready()) return;
-    await sleep(100);
-  }
-  throw new Error(`http://localhost:${PORT}/version.json не відповів`);
-}
-
-let server = null;
-if (!(await ready())) {
-  server = spawn('python3', ['-m', 'http.server', String(PORT)], { stdio: 'inherit' });
-  await waitReady();
-}
+const { close: closeServer } = await ensureWebServer({ quiet: false });
 
 const suite = [
   ['node', ['test/version-sync.mjs']],
@@ -84,7 +61,7 @@ try {
     if (BETWEEN_TESTS_MS > 0) await sleep(BETWEEN_TESTS_MS);
   }
 } finally {
-  if (server) server.kill();
+  closeServer();
 }
 
 process.exit(code);

@@ -2,33 +2,10 @@
 // Тепер із РЕАЛЬНИМИ перевірками й кодом виходу — щоб зламана гра валила CI, а не світилась зеленим.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
-import { spawn } from 'child_process';
+import { ensureWebServer } from './_server.mjs';
 
-const PORT = 8741;
-const BASE = `http://localhost:${PORT}`;
+const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function ready() {
-  try {
-    const r = await fetch(`${BASE}/version.json`, { cache: 'no-store' });
-    return r.ok;
-  } catch (e) {
-    return false;
-  }
-}
-async function waitReady() {
-  for (let i = 0; i < 50; i++) {
-    if (await ready()) return;
-    await sleep(100);
-  }
-  throw new Error(`${BASE}/version.json не відповів`);
-}
-let server = null;
-if (!(await ready())) {
-  server = spawn('python3', ['-m', 'http.server', String(PORT)], { stdio: 'ignore' });
-  process.on('exit', () => server?.kill());
-  await waitReady();
-}
 const shot = async (p, name) => {
   try {
     await p.screenshot({ path: `shots/${name}.png`, timeout: 8000 });
@@ -115,4 +92,5 @@ if (realErrors.length) console.log('CONSOLE ERRORS:\n' + realErrors.join('\n'));
 
 console.log(failed === 0 ? '\n🎉 СМОУК ПРОЙДЕНО' : `\n❌ СМОУК ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);
