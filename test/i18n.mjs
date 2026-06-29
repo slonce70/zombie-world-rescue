@@ -69,6 +69,25 @@ check(/Titles/.test(titlesEn) && /Zombie Killer/.test(titlesEn) && /Clone Army/.
   'en: wardrobe titles translated', titlesEn.slice(0, 220));
 check(!/Титули|Зомбі кілер|Армія клонів|Король гаджетів/.test(titlesEn),
   'en: wardrobe titles are not Ukrainian', titlesEn.slice(0, 220));
+await page.evaluate(() => window.__game.startLevel('UKR'));
+await page.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
+const shopBoxesEn = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.crystals = 100;
+  g.shop.open();
+  const tab = [...document.querySelectorAll('.shop-tab')].find((b) => /Boxes|Бокси/.test(b.textContent));
+  if (tab) tab.click();
+  return {
+    tabs: [...document.querySelectorAll('.shop-tab')].map((b) => b.textContent.trim()),
+    text: document.getElementById('shop-grid').innerText,
+  };
+});
+check(shopBoxesEn.tabs.includes('Boxes') && shopBoxesEn.tabs.includes('Hypercharges') && /Mega Box/.test(shopBoxesEn.text) && /Skin Box/.test(shopBoxesEn.text),
+  'en: shop boxes translated', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
+check(!/Бокси|Гіперзаряди|Великий бокс|Скін-бокс|Мегабокс|кристалів|монет/.test(shopBoxesEn.text + shopBoxesEn.tabs.join(' ')),
+  'en: shop boxes are not Ukrainian', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
+await page.goto('http://localhost:8741/?test&fresh&lang=en');
+await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 30000 });
 await page.evaluate(() => {
   const g = window.__game;
   g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
