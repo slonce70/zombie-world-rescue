@@ -1,8 +1,9 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
 const check = (ok, msg, extra = '') => {
@@ -116,5 +117,6 @@ check(metrics.triangles <= 540000, 'mobile triangles у бюджеті', `triang
 
 await ctx.close();
 await browser.close();
+closeServer();
 console.log(failed === 0 ? '🎉 MOBILE PERF OK' : `💥 MOBILE PERF FAILURES: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
