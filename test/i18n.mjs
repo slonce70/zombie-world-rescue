@@ -55,6 +55,20 @@ check(heroEn.run === 'Run' && heroEn.cape === 'Cape'
   'en: hero editor labels translated', JSON.stringify(heroEn));
 check(![heroEn.run, heroEn.cape, ...heroEn.subs].some((s) => ['Біг', 'Плащ', '🎩 Шапка', '😀 Обличчя'].includes(s)),
   'en: hero editor labels are not Ukrainian', JSON.stringify(heroEn));
+const titlesEn = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.stats.killed = 555;
+  g.save.stats.cloneUses = 35;
+  g.save.stats.gadgetUses = 100;
+  g.renderWardrobe();
+  g._wardrobeTab = 'titles';
+  g.renderWardrobe();
+  return document.getElementById('wardrobe-content').innerText;
+});
+check(/Titles/.test(titlesEn) && /Zombie Killer/.test(titlesEn) && /Clone Army/.test(titlesEn) && /Gadget King/.test(titlesEn),
+  'en: wardrobe titles translated', titlesEn.slice(0, 220));
+check(!/Титули|Зомбі кілер|Армія клонів|Король гаджетів/.test(titlesEn),
+  'en: wardrobe titles are not Ukrainian', titlesEn.slice(0, 220));
 await page.evaluate(() => {
   const g = window.__game;
   g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
