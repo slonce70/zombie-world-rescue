@@ -10,8 +10,9 @@
 // і UI-відмову (_acceptNick) перевіряємо через ту саму функцію nickIsBad,
 // бо повний 2-вкладковий relay-сценарій заради одного поля ростера — надмірний.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 let failed = 0;
 const check = (ok, msg, extra = '') => {
   console.log(ok ? '  ✅' : '  ❌', msg, extra);
@@ -68,5 +69,6 @@ check(r.isBad_good === false, 'nickIsBad пропускає нормальний
 check(errs.length === 0, 'без помилок сторінки', errs.join(' | '));
 
 await browser.close();
+closeServer();
 console.log(failed === 0 ? '\n✅ coop-nick: усі перевірки пройдені' : `\n❌ coop-nick: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);
