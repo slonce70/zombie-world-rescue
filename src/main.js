@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 171;
+const APP_VERSION = 172;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -219,6 +219,12 @@ class Game {
       const tgt = e.target;
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Escape' && this.state === 'hqbase') { this.exitHQBase(); return; }
+      if (e.code === 'Escape' && this.shop.isOpen) { this.shop.close(); return; }
+      if (e.code === 'Escape' && this.state === 'level' && !this.paused
+        && this.deathT < 0 && !this.victoryShown && !this.draft.isOpen) {
+        this.showPause();
+        return;
+      }
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }
@@ -230,7 +236,6 @@ class Game {
         this.audio.setMuted(!this.audio.muted);
         this.hud.toast(this.audio.muted ? t('🔇 Звук вимкнено') : t('🔊 Звук увімкнено'));
       }
-      if (e.code === 'Escape' && this.shop.isOpen) this.shop.close();
     });
 
     // кнопки оверлеїв

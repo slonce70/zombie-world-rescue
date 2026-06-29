@@ -72,6 +72,28 @@ console.log('▸ UX polish: clickable menu items are native buttons');
   await ctx.close();
 }
 
+console.log('▸ UX polish: desktop Escape opens pause menu');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&country=UKR&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
+  30000, 'level');
+  await page.waitForTimeout(800);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  const pause = await page.evaluate(() => ({
+    paused: window.__game.paused,
+    visible: document.getElementById('overlay-pause').classList.contains('show'),
+  }));
+  check(pause.paused && pause.visible, 'Escape відкриває паузу на desktop', JSON.stringify(pause));
+  await ctx.close();
+}
+
 console.log('▸ UX polish: mobile banner does not cover the live waypoint');
 {
   const ctx = await browser.newContext({
