@@ -1143,7 +1143,9 @@ body.touch-mode #touch-coach.show { display: block; }
 
 @media (orientation: portrait) and (max-width: 640px) {
   .globe-top { padding-top: 58px; }
-  #globe-ui h1 { line-height: 1.06; }
+  #globe-ui h1 { font-size: clamp(24px, 8vw, 34px); line-height: 1.04; }
+  .globe-sub,
+  .globe-hint { display: none; }
 }
 
 /* короткий ландшафт (телефон боком): тісно по висоті — підтискаємо все */

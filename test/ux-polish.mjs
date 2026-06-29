@@ -49,6 +49,31 @@ console.log('▸ UX polish: portrait globe remains playable');
   await ctx.close();
 }
 
+console.log('▸ UX polish: tiny portrait globe keeps text clear');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 320, height: 568 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
+  30000, 'globe');
+  const compact = await page.evaluate(() => ({
+    subDisplay: getComputedStyle(document.querySelector('.globe-sub')).display,
+    hintDisplay: getComputedStyle(document.querySelector('.globe-hint')).display,
+    soloTop: document.getElementById('btn-solo').getBoundingClientRect().top,
+  }));
+  check(compact.subDisplay === 'none' && compact.hintDisplay === 'none',
+    'малий portrait не показує текст поверх глобуса', JSON.stringify(compact));
+  check(compact.soloTop > 280, 'кнопка ГРАТИ лишається нижче beacon-зони', JSON.stringify(compact));
+  await ctx.close();
+}
+
 console.log('▸ UX polish: clickable menu items are native buttons');
 {
   const ctx = await browser.newContext({
