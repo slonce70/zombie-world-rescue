@@ -275,6 +275,15 @@ const MEGA_QUESTS = [
       label: () => t('💎 30 кристалів'),
     },
   },
+  {
+    id: 'titles3', icon: '🏷️', ev: 'titles', target: 3,
+    title: () => t('МЕГА: збери {n} титули', { n: 3 }),
+    current: (save) => (save.titles || []).length,
+    reward: {
+      coins: 5000,
+      label: () => t('🪙 5000 монет'),
+    },
+  },
 ];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
@@ -355,14 +364,29 @@ export class DailyQuests {
   ensureMegaQuests() {
     const save = this.game.save;
     if (!save.megaQuests || typeof save.megaQuests !== 'object' || Array.isArray(save.megaQuests)) save.megaQuests = {};
+    let changed = false;
+    const rewards = [];
     for (const def of MEGA_QUESTS) {
-      const q = save.megaQuests[def.id];
-      if (!q || typeof q !== 'object') save.megaQuests[def.id] = { progress: 0, done: false };
+      let q = save.megaQuests[def.id];
+      if (!q || typeof q !== 'object') {
+        q = save.megaQuests[def.id] = { progress: 0, done: false };
+        changed = true;
+      }
       else {
         q.progress = Math.max(0, Math.min(def.target, q.progress | 0));
-        q.done = !!q.done || q.progress >= def.target;
+        q.done = !!q.done || (!def.current && q.progress >= def.target);
+      }
+      if (!def.current) continue;
+      const current = Math.max(0, Math.min(def.target, def.current(save) | 0));
+      if (current > q.progress) { q.progress = current; changed = true; }
+      if (!q.done && q.progress >= def.target && this.megaUnlocked) {
+        q.done = true;
+        changed = true;
+        rewards.push(def);
       }
     }
+    for (const def of rewards) this._rewardMega({ ...def, title: def.title(), rewardText: def.reward.label() });
+    if (changed) this.game.saveGame();
   }
 
   get megaList() {

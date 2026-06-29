@@ -55,7 +55,7 @@ check(unlock.before.level === 31 && unlock.before.rows === 0 && unlock.before.te
   'до 32 рівня мега-квести закриті в UI', JSON.stringify(unlock.before));
 check(unlock.before.gadgetProgress === 0,
   'до 32 рівня події не просувають мега-квести', JSON.stringify(unlock.before));
-check(unlock.after.level === 32 && unlock.after.rows === 8,
+check(unlock.after.level === 32 && unlock.after.rows === 9,
   'на 32 рівні мега-квести доступні в UI', JSON.stringify(unlock.after));
 await page.evaluate((xp) => {
   window.__megaXpBase = xp;
@@ -75,9 +75,9 @@ const meta = await page.evaluate(() => {
   };
 });
 
-const expectedIds = ['damage10000', 'heal1000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8', 'gadget30'];
+const expectedIds = ['damage10000', 'heal1000', 'kills500', 'headshots150', 'bosses10', 'megabox10', 'countries8', 'gadget30', 'titles3'];
 check(expectedIds.every((id) => meta.ids.includes(id)) && meta.ids.length === expectedIds.length,
-  'є 8 мега-квестів сезону', JSON.stringify(meta.ids));
+  'є 9 мега-квестів сезону', JSON.stringify(meta.ids));
 check(meta.targets.damage10000 === 10000 && meta.targets.kills500 === 500 && meta.targets.headshots150 === 150,
   'цілі шкоди, перемог і хедшотів правильні', JSON.stringify(meta.targets));
 check(meta.targets.heal1000 === 1000,
@@ -86,11 +86,14 @@ check(meta.targets.bosses10 === 10 && meta.targets.megabox10 === 10 && meta.targ
   'цілі босів, мегабоксів і країн правильні', JSON.stringify(meta.targets));
 check(meta.targets.gadget30 === 30,
   'ціль gadget30 правильна', JSON.stringify(meta.targets));
+check(meta.targets.titles3 === 3,
+  'ціль titles3 правильна', JSON.stringify(meta.targets));
 check((meta.rewards.heal1000 || '').includes('500') && (meta.rewards.heal1000 || '').includes('300 XP')
   && meta.rewards.kills500.includes('Щит') && meta.rewards.countries8.includes('Клон')
-  && (meta.rewards.gadget30 || '').includes('30') && !(meta.rewards.gadget30 || '').includes('XP'),
+  && (meta.rewards.gadget30 || '').includes('30') && !(meta.rewards.gadget30 || '').includes('XP')
+  && (meta.rewards.titles3 || '').includes('5000'),
   'нагороди показують конкретні гіперзаряди', JSON.stringify(meta.rewards));
-check(meta.pending >= meta.dailyCount + 8,
+check(meta.pending >= meta.dailyCount + 9,
   'бейдж квестів рахує щоденні і мега-квести', JSON.stringify({ pending: meta.pending, dailyCount: meta.dailyCount }));
 
 const rewards = await page.evaluate(() => {
@@ -205,7 +208,25 @@ const rewards = await page.evaluate(() => {
     xp: g.save.xp - xpBase,
   };
 
-  return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry, beforeGadgetDone, afterGadgetDone, afterDuplicateGadget };
+  g.save.titles = ['zombie_killer', 'zero_coins'];
+  g.quests.ensureMegaQuests();
+  const beforeTitlesDone = {
+    q: { ...g.save.megaQuests.titles3 },
+    coins: g.save.coins,
+  };
+  g.save.titles.push('clone_army');
+  g.quests.ensureMegaQuests();
+  const afterTitlesDone = {
+    q: { ...g.save.megaQuests.titles3 },
+    coins: g.save.coins,
+  };
+  g.quests.ensureMegaQuests();
+  const afterDuplicateTitles = {
+    q: { ...g.save.megaQuests.titles3 },
+    coins: g.save.coins,
+  };
+
+  return { beforeKillDone, afterKillDone, beforeHealDone, afterHealDone, afterDuplicateHeal, afterBosses, afterMegaboxes, afterCountries, afterDuplicateCountry, beforeGadgetDone, afterGadgetDone, afterDuplicateGadget, beforeTitlesDone, afterTitlesDone, afterDuplicateTitles };
 });
 
 check(rewards.beforeKillDone.q.progress === 499 && !rewards.beforeKillDone.q.done
@@ -242,10 +263,18 @@ check(rewards.afterGadgetDone.q.done && rewards.afterGadgetDone.crystals === 85
   'gadget30 видає тільки 30 crystals', JSON.stringify(rewards.afterGadgetDone));
 check(rewards.afterDuplicateGadget.crystals === 85 && rewards.afterDuplicateGadget.xp === 1800,
   'gadget30 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateGadget));
+check(rewards.beforeTitlesDone.q.progress === 2 && !rewards.beforeTitlesDone.q.done,
+  'titles3 рахує вже відкриті титули і не видає нагороду на 2/3', JSON.stringify(rewards.beforeTitlesDone));
+check(rewards.afterTitlesDone.q.done && rewards.afterTitlesDone.q.progress === 3
+  && rewards.afterTitlesDone.coins - rewards.beforeTitlesDone.coins === 5000,
+  'titles3 видає 5000 монет за 3 титули', JSON.stringify(rewards.afterTitlesDone));
+check(rewards.afterDuplicateTitles.coins === rewards.afterTitlesDone.coins,
+  'titles3 не дублює нагороду після done', JSON.stringify(rewards.afterDuplicateTitles));
 
 const healHook = await page.evaluate(() => {
   const g = window.__game;
   g.save.megaQuests = null;
+  g.save.titles = [];
   g.save.coins = 0;
   const xp0 = g.progress._xpToCap;
   g.save.xp = xp0;
@@ -356,8 +385,8 @@ check(ui.headers.some((x) => x.includes('Мега-квести')),
   'у панелі є секція Мега-квести', JSON.stringify(ui.headers));
 check(ui.headers.some((x) => x.includes('Щоденні')),
   'у панелі є секція Щоденні', JSON.stringify(ui.headers));
-check(ui.megaRows === 8,
-  'усі 8 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
+check(ui.megaRows === 9,
+  'усі 9 мега-квестів мають окремий mega row клас', JSON.stringify({ megaRows: ui.megaRows }));
 check(ui.text.indexOf('Мега-квести') < ui.text.indexOf('Щоденні'),
   'мега-квести показані перед щоденними', ui.text);
 
@@ -372,7 +401,7 @@ check(enMegaText.includes('Mega') || enMegaText.includes('MEGA:'),
   'мега-квести можуть відрендеритись англійською', enMegaText.slice(0, 160));
 
 const stateShape = await page.evaluate(() => window.__game.test.state().megaQuests);
-check(Array.isArray(stateShape) && stateShape.length === 8 && stateShape.some((q) => q.id === 'gadget30'),
+check(Array.isArray(stateShape) && stateShape.length === 9 && stateShape.some((q) => q.id === 'titles3'),
   'debug state містить megaQuests для тестів і майбутнього QA', JSON.stringify(stateShape));
 
 if (errors.length) {
