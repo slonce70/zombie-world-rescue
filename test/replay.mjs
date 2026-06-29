@@ -1,6 +1,8 @@
 // Перегравання рівня після перемоги: ресурси диспозяться і відновлюються коректно
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -44,7 +46,7 @@ async function speedrun() {
 }
 
 console.log('▸ Проходження №1');
-await page.goto('http://localhost:8741/?test&fresh&country=UKR');
+await page.goto(`${BASE}/?test&fresh&country=UKR`);
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 25000, 'рівень 1');
 await speedrun();
 check((await state()).victoryShown, 'перемога №1');
@@ -81,4 +83,5 @@ console.log('');
 console.log(failed === 0 ? '🎉 ПЕРЕГРАВАННЯ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
 await browser.close();
+closeServer();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);
