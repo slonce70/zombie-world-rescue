@@ -4,8 +4,9 @@
 //  (в) звільнення ESP дає МОНЕТИ (coinReward), не зброю;
 //  (г) новий зомбі 'imp' (Шкет) спавниться: hp=50, дуже високий chaseSpeed, дрібний.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
@@ -178,4 +179,5 @@ if (errors.length) {
 }
 console.log(fail === 0 ? '🎉 ЗБРОЯ ЗА ЗІРКОВИЙ РІВЕНЬ + ШКЕТ — OK' : `💥 ПРОВАЛЕНО: ${fail}`);
 await browser.close();
+closeServer();
 process.exit(fail === 0 ? 0 : 1);
