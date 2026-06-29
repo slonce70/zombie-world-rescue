@@ -49,6 +49,33 @@ console.log('▸ UX polish: portrait globe remains playable');
   await ctx.close();
 }
 
+console.log('▸ UX polish: desktop globe title avoids top buttons');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
+  30000, 'globe');
+  const hero = await page.evaluate(() => {
+    const title = document.querySelector('#globe-ui h1').getBoundingClientRect();
+    const menu = document.getElementById('btn-menu').getBoundingClientRect();
+    const lang = document.getElementById('btn-lang-globe').getBoundingClientRect();
+    return {
+      clearOfMenu: title.left >= menu.right + 8,
+      clearOfLang: title.right <= lang.left - 8,
+      title: { left: title.left, right: title.right },
+      menu: { right: menu.right },
+      lang: { left: lang.left },
+    };
+  });
+  check(hero.clearOfMenu && hero.clearOfLang, 'desktop заголовок глобуса не залазить під верхні кнопки', JSON.stringify(hero));
+  await ctx.close();
+}
+
 console.log('▸ UX polish: tiny portrait globe keeps text clear');
 {
   const ctx = await browser.newContext({
