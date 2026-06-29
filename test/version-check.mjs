@@ -1,6 +1,8 @@
 // Авто-оновлення PWA: тег версії, авто-reload на нову версію, анти-цикл.
 // Тепер із перевірками й кодом виходу.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -14,7 +16,7 @@ const ignoreExpectedReloadRace = (e) => {
 };
 
 // 1. Звичайне завантаження: тег версії, без перезавантажень
-await page.goto('http://localhost:8741/');
+await page.goto(`${BASE}/`);
 await page.evaluate(() => localStorage.setItem('zr-save-v1', JSON.stringify({ coins: 500, upgrades: {}, liberated: { UKR: true, POL: true }, weapons: [], records: {} })));
 await page.reload();
 await page.waitForTimeout(4000);
@@ -61,4 +63,5 @@ check(realErrors.length === 0, `без JS-помилок консолі (${realE
 if (realErrors.length) console.log('ERRORS:\n' + realErrors.join('\n'));
 console.log(failed === 0 ? '\n🎉 ВЕРСІЮВАННЯ ОК' : `\n❌ ПРОВАЛЕНО: ${failed}`);
 await browser.close();
+closeServer();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);
