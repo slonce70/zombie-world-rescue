@@ -256,6 +256,7 @@ export class Lobby {
   constructor(state) {
     this.state = state;
     this.players = new Map(); // cid -> {nick, ts}
+    this.profiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, ts}
     this.rooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
     this._ping = new Map();   // ip -> {n, t0} (анти-флуд пінгів, як _claimAllowed у SaveVault)
     // 📅 скільки УНІКАЛЬНИХ гравців зайшло грати разом сьогодні (UTC).
@@ -289,6 +290,27 @@ export class Lobby {
       const old = [...this.players.entries()].sort((a, b) => a[1].ts - b[1].ts);
       for (let i = 0; i < old.length - 800; i++) this.players.delete(old[i][0]);
     }
+    if (this.profiles.size > 800) {
+      const old = [...this.profiles.entries()].sort((a, b) => a[1].ts - b[1].ts);
+      for (let i = 0; i < old.length - 800; i++) this.profiles.delete(old[i][0]);
+    }
+  }
+
+  _safeInt(v, min, max) {
+    v = Math.floor(Number(v) || 0);
+    return Math.max(min, Math.min(max, v));
+  }
+
+  _cleanProfile(nick, raw = {}, ts) {
+    return {
+      nick,
+      countries: this._safeInt(raw.countries, 0, 99),
+      coins: this._safeInt(raw.coins, 0, 999999),
+      crystals: this._safeInt(raw.crystals, 0, 99999),
+      kills: this._safeInt(raw.kills, 0, 999999),
+      star: this._safeInt(raw.star || 1, 1, 5),
+      ts,
+    };
   }
 
   _view(now) {
@@ -298,6 +320,7 @@ export class Lobby {
       players.push(p.nick);
       if (players.length >= 60) break;
     }
+    const profiles = [...this.profiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60);
     const rooms = [...this.rooms.entries()]
       .sort((a, b) => b[1].ts - a[1].ts)
       .slice(0, 20)
@@ -305,7 +328,7 @@ export class Lobby {
         code, host: r.host, mode: r.mode, country: r.country,
         n: r.n, state: r.state, build: r.build,
       }));
-    return { online: this.players.size, today: this.todaySet.size, players, rooms };
+    return { online: this.players.size, today: this.todaySet.size, players, profiles, rooms };
   }
 
   json(obj, status = 200) {
@@ -331,7 +354,9 @@ export class Lobby {
         const d = JSON.parse(_raw);
         const cid = String(d.cid || '').slice(0, 40);
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);
-        this.players.set(cid, { nick: cleanNickSrv(d.nick), ts: now });
+        const nick = cleanNickSrv(d.nick);
+        this.players.set(cid, { nick, ts: now });
+        this.profiles.set(cid, this._cleanProfile(nick, d.profile, now));
         this._recordToday(now, cid); // 📅 рахуємо унікального гравця за сьогодні
         if (this.players.size > 500) this._prune(now);
         // хост закрив кімнату — прибираємо одразу, не чекаючи TTL

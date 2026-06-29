@@ -983,12 +983,25 @@ body.touch-mode #touch-coach.show { display: block; }
 .cr-n { font-size: 12px; font-weight: 800; color: #bcd2e2; }
 .cr-join { padding: 6px 10px; font-size: 12px; }
 .cr-join[disabled] { opacity: 0.4; cursor: default; }
-.coop-players { display: flex; flex-wrap: wrap; gap: 6px; }
+.coop-players { display: flex; flex-direction: column; gap: 6px; }
 .coop-player {
+  display: flex; align-items: center; gap: 8px;
   background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; color: #d7e6f2;
+  border-radius: 10px; padding: 5px 8px; font-size: 12px; font-weight: 700; color: #d7e6f2;
 }
 .coop-player.me { border-color: var(--accent); color: var(--accent); }
+.cp-nick { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-profile {
+  flex: 0 0 auto; border: 1px solid rgba(77, 214, 168, 0.45); border-radius: 8px;
+  background: rgba(77, 214, 168, 0.12); color: #dfffee; font: inherit; font-size: 11px;
+  padding: 4px 7px; cursor: pointer;
+}
+.coop-profile {
+  margin: -2px 0 2px; padding: 8px 10px; border-radius: 10px;
+  background: rgba(77, 214, 168, 0.1); border: 1px solid rgba(77, 214, 168, 0.22);
+  color: #cfe5f2; font-size: 12px; line-height: 1.55;
+}
+.coop-profile b { color: #fff; }
 @media (max-width: 720px) {
   .coop-columns { flex-direction: column; }
   .coop-right { max-height: 220px; }

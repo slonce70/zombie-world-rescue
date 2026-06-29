@@ -27,6 +27,7 @@ const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789';
 // 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
 const LOBBY_TTL = 40_000;
 const lobbyPlayers = new Map(); // cid -> {nick, ts}
+const lobbyProfiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, ts}
 const lobbyRooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
 let lobbyDay = '';              // 📅 унікальні гравці за сьогодні (дзеркало Lobby DO)
 let lobbyToday = new Set();
@@ -39,12 +40,34 @@ function recordToday(now, cid) {
 function lobbyView(now) {
   for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
   for (const [code, r] of lobbyRooms) if (now - r.ts > LOBBY_TTL) lobbyRooms.delete(code);
+  if (lobbyProfiles.size > 800) {
+    const old = [...lobbyProfiles.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    for (let i = 0; i < old.length - 800; i++) lobbyProfiles.delete(old[i][0]);
+  }
   return {
     online: lobbyPlayers.size,
     today: lobbyToday.size,
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
+    profiles: [...lobbyProfiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
       .map(([code, r]) => ({ code, host: r.host, mode: r.mode, country: r.country, n: r.n, state: r.state, build: r.build })),
+  };
+}
+
+function safeInt(v, min, max) {
+  v = Math.floor(Number(v) || 0);
+  return Math.max(min, Math.min(max, v));
+}
+
+function cleanProfile(nick, raw = {}, ts) {
+  return {
+    nick,
+    countries: safeInt(raw.countries, 0, 99),
+    coins: safeInt(raw.coins, 0, 999999),
+    crystals: safeInt(raw.crystals, 0, 99999),
+    kills: safeInt(raw.kills, 0, 999999),
+    star: safeInt(raw.star || 1, 1, 5),
+    ts,
   };
 }
 
@@ -54,6 +77,7 @@ function lobbyPing(d) {
   if (cid.length < 8) return null;
   const nick = cleanNickSrv(d.nick);
   lobbyPlayers.set(cid, { nick, ts: now });
+  lobbyProfiles.set(cid, cleanProfile(nick, d.profile, now));
   recordToday(now, cid);
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);

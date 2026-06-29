@@ -334,13 +334,39 @@ export class CoopUI {
         this._join(b.dataset.code);
       }));
 
-    // гравці в мережі
+    // гравці + короткі профілі
     let ph = '';
-    for (const nick of d.players || []) {
-      const me = nick === myNick;
-      ph += `<span class="coop-player ${me ? 'me' : ''}">${esc(nick)}${me ? t(' (ти)') : ''}</span>`;
+    const profiles = Array.isArray(d.profiles)
+      ? d.profiles
+      : (d.players || []).map((nick) => ({ nick, countries: 0, coins: 0, crystals: 0, kills: 0, star: 1 }));
+    for (let i = 0; i < profiles.length; i++) {
+      const p = profiles[i];
+      const me = p.nick === myNick;
+      ph += `<div class="coop-player ${me ? 'me' : ''}">
+        <span class="cp-nick">${esc(p.nick)}${me ? t(' (ти)') : ''}</span>
+        <button class="cp-profile" data-i="${i}">${t('Профіль')}</button>
+      </div>`;
+      if (this._profileNick === p.nick) ph += this._profileHtml(p);
     }
     this.el.players.innerHTML = ph || t('<div class="coop-side-empty">Тут зʼявляться гравці онлайн</div>');
+    this.el.players.querySelectorAll('.cp-profile').forEach((b) => {
+      b.addEventListener('click', () => {
+        const p = profiles[b.dataset.i | 0];
+        this.game.audio.click();
+        this._profileNick = this._profileNick === p.nick ? null : p.nick;
+        this._renderSide(this.lobbyNet.data);
+      });
+    });
+  }
+
+  _profileHtml(p) {
+    return `<div class="coop-profile">
+      <div>🌍 ${t('Звільнені країни')}: <b>${p.countries | 0}</b></div>
+      <div>🪙 ${t('Монети')}: <b>${p.coins | 0}</b></div>
+      <div>💎 ${t('Кристали')}: <b>${p.crystals | 0}</b></div>
+      <div>🧟 ${t('Зомбі вбито')}: <b>${p.kills | 0}</b></div>
+      <div>⭐ ${t('Зоряний шлях')}: <b>${p.star | 0}</b></div>
+    </div>`;
   }
 
   // ---------- вхід у кімнату ----------

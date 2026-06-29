@@ -3,6 +3,7 @@
 // кооп-сесія. Всі фейли тихі — без інтернету панель просто каже «недоступно».
 import { apiBase } from './transport.js';
 import { ensureCid } from './league.js';
+import { liberatedCount } from './cloudsave.js';
 import { loadNick, cleanNick } from './coop.js';
 import { t } from '../i18n.js';
 
@@ -42,6 +43,7 @@ export class LobbyClient {
       const body = {
         cid: ensureCid(this.game),
         nick: cleanNick(loadNick()) || t('Гравець'),
+        profile: this._profile(),
         ...extra,
       };
       const room = this.getRoom && this.getRoom();
@@ -58,5 +60,16 @@ export class LobbyClient {
       this._busy = false;
     }
     if (this.onUpdate) this.onUpdate(this.data);
+  }
+
+  _profile() {
+    const s = this.game.save || {};
+    return {
+      countries: liberatedCount(s.liberated),
+      coins: s.coins | 0,
+      crystals: s.crystals | 0,
+      kills: (s.stats && s.stats.killed) | 0,
+      star: s.diffStar | 0,
+    };
   }
 }
