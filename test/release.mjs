@@ -48,6 +48,8 @@ const suite = [
   ['node', ['test/visual-polish.mjs']],
   ['node', ['test/living-hq.mjs']],
   ['node', ['test/mega-season.mjs']],
+  ['node', ['test/titles.mjs']],
+  ['node', ['test/bank.mjs']],
   ['node', ['test/draft.mjs']],
   ['node', ['test/draft-storm.mjs']],
   ['node', ['test/bazooka-damage.mjs']],

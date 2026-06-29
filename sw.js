@@ -29,6 +29,7 @@ const SHELL = [
   './src/utils.js',
   './src/countries.js',
   './src/chapter.js',
+  './src/titles.js',
   './src/touch.js',
   './src/progress.js',
   './src/extras.js',
