@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
 let failed = 0;
@@ -29,4 +30,5 @@ check(/Ранг Рятівника/.test(info.text) && /2/.test(info.text), 'З�
 
 await page.screenshot({ path: 'shots/pass-prestige.png', fullPage: true });
 await browser.close();
+closeServer();
 process.exit(failed === 0 ? 0 : 1);
