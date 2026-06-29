@@ -2,8 +2,9 @@
 //  Task 2 — тултип країни «звільнено…» не протікає з глобуса в рівень.
 //  Task 7 — зомбі не завмирають на нерівному терені (slope-guard дає ковзання, не стоп).
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m) => { console.log((c ? '✅' : '❌') + ' ' + m); if (!c) fail++; };
@@ -69,5 +70,6 @@ check(after.frozenFar === 0, `жоден зомбі не завмер далек
 check(errors.length === 0, `без JS-помилок (${errors.length})`);
 await ctx.close();
 await browser.close();
+closeServer();
 if (fail) { console.log(`\n❌ ${fail} перевірок впало`); process.exit(1); }
 console.log('\n🎉 BUGFIX v45 (тултип + застрягання зомбі) ПРОЙДЕНО');
