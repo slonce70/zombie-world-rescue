@@ -70,5 +70,5 @@ export default {
     ],
   },
   zombieDensity: 1.3,
-  signs: [{ x: 12, z: 162, ry: 0 }],
+  signs: [{ x: 8, z: 158, ry: 0 }],
 };

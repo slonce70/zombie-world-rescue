@@ -2881,6 +2881,7 @@ export class World {
     const postM = toonMat(0x7a5230);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.2, 8), postM);
     post.position.y = 1.1;
+    post.position.z = -0.08;
     const cv = document.createElement('canvas');
     cv.width = 512; cv.height = 128;
     const ctx = cv.getContext('2d');
