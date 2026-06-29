@@ -66,7 +66,7 @@ function cleanProfile(nick, raw = {}, ts) {
     coins: safeInt(raw.coins, 0, 999999),
     crystals: safeInt(raw.crystals, 0, 99999),
     kills: safeInt(raw.kills, 0, 999999),
-    star: safeInt(raw.star || 1, 1, 5),
+    star: safeInt(raw.star || 1, 1, 40),
     title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
     ts,
   };

@@ -12,6 +12,17 @@ await page.waitForSelector('#overlay-coop.show');
 await page.fill('#coop-nick', 'TATO');
 await page.click('#btn-coop-nick');
 
+const profile = await page.evaluate(async () => {
+  const { xpForLevel } = await import('/src/progress.js');
+  const g = window.__game;
+  let xp = 0;
+  for (let n = 1; n < 8; n++) xp += xpForLevel(n);
+  g.save.xp = xp;
+  g.save.diffStar = 4;
+  return g.coop.lobbyNet._profile();
+});
+check(profile.star === 8, 'coop profile sends Star Path level, not difficulty stars', JSON.stringify(profile));
+
 let state = await page.evaluate(() => {
   const c = window.__game.coop;
   c.session.role = 'host';
