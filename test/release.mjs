@@ -53,6 +53,7 @@ const suite = [
   ['node', ['test/draft.mjs']],
   ['node', ['test/draft-storm.mjs']],
   ['node', ['test/bazooka-damage.mjs']],
+  ['node', ['test/lobby-profiles.mjs']],
   ['node', ['test/coop-privacy.mjs']],
 ];
 
