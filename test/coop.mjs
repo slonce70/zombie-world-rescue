@@ -1,9 +1,11 @@
 // 🤝 Кооп-тест: дві вкладки → кімната → лобі → спільний рівень → синхронізація
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
+import { spawn } from 'child_process';
 import { spawnRelay } from './_relay.mjs';
 
-const BASE = 'http://localhost:8741';
+const PORT = 8741;
+const BASE = `http://localhost:${PORT}`;
 const RELAY_PORT = 8743;
 const RELAY = `ws://localhost:${RELAY_PORT}`;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
@@ -15,7 +17,28 @@ const check = (name, ok, extra = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+async function ready() {
+  try {
+    const r = await fetch(`${BASE}/version.json`, { cache: 'no-store' });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+async function waitReady() {
+  for (let i = 0; i < 50; i++) {
+    if (await ready()) return;
+    await sleep(100);
+  }
+  throw new Error(`${BASE}/version.json не відповів`);
+}
 
+let server = null;
+if (!(await ready())) {
+  server = spawn('python3', ['-m', 'http.server', String(PORT)], { stdio: 'ignore' });
+  process.on('exit', () => server?.kill());
+  await waitReady();
+}
 // власний relay на окремому порту — тест самодостатній
 const relay = await spawnRelay(RELAY_PORT);
 
@@ -248,6 +271,7 @@ try {
   await browserA.close();
   await browserB.close();
   relay.kill();
+  server?.kill();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ТЕСТ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);
