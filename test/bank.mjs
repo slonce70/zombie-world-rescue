@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
-const BASE = 'http://localhost:8741';
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
 let failed = 0;
@@ -102,6 +103,7 @@ check(waveAndWin.completed && waveAndWin.shown && /БАНК/i.test(waveAndWin.ti
 
 check(errors.length === 0, 'без JS-помилок консолі', errors.join('\n'));
 await browser.close();
+closeServer();
 console.log('');
 console.log(failed === 0 ? '🎉 БАНК ПРАЦЮЄ' : `💥 ПРОВАЛЕНО: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);
