@@ -2,6 +2,9 @@
 // Перевіряємо, що historичні/биті форми сейва не кидають винятку і коректно
 // мігрують. Потрібна статика на 8741.
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
 const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
@@ -12,7 +15,7 @@ async function loadWith(raw) {
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
   // ?test вимикає хмару/перевірку версій; ставимо сейв ДО завантаження модулів гри
   await page.addInitScript((r) => { try { localStorage.setItem('zr-save-v1', r); } catch (e) {} }, raw);
-  await page.goto('http://localhost:8741/?test');
+  await page.goto(`${BASE}/?test`);
   await page.waitForFunction(() => window.__game && window.__game.state === 'globe', { timeout: 15000 });
   const save = await page.evaluate(() => window.__game.save);
   await page.close();
@@ -93,5 +96,6 @@ async function loadWith(raw) {
 }
 
 await browser.close();
+closeServer();
 console.log(failed === 0 ? '\n🎉 МІГРАЦІЯ СЕЙВА НАДІЙНА' : `\n❌ МІГРАЦІЯ: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);
