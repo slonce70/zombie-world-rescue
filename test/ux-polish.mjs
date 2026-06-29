@@ -233,6 +233,35 @@ console.log('▸ UX polish: tiny landscape toast avoids aim center');
   await ctx.close();
 }
 
+console.log('▸ UX polish: mobile pause how-to returns to gameplay');
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 568, height: 320 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    serviceWorkers: 'block',
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/?test&fresh&country=UKR&touch&lang=uk`, { waitUntil: 'domcontentloaded' });
+  await waitFor(page, async () =>
+    (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
+  30000, 'level');
+  await page.click('#tb-pause');
+  await page.click('#btn-how-to-play');
+  await page.tap('#touch-coach', { position: { x: 300, y: 250 } });
+  await page.waitForTimeout(300);
+  const state = await page.evaluate(() => ({
+    paused: window.__game.paused,
+    coachShow: document.getElementById('touch-coach').classList.contains('show'),
+    pauseShow: document.getElementById('overlay-pause').classList.contains('show'),
+    visibleOverlays: [...document.querySelectorAll('.overlay.show')].map((el) => el.id),
+  }));
+  check(!state.paused && !state.coachShow && !state.pauseShow && state.visibleOverlays.length === 0,
+    'мобільна підказка з паузи не лишає гру приховано paused', JSON.stringify(state));
+  await ctx.close();
+}
+
 console.log(failed === 0 ? '🎉 UX POLISH OK' : `💥 UX POLISH FAILURES: ${failed}`);
 await browser.close();
 process.exit(failed === 0 ? 0 : 1);

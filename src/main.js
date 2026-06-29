@@ -67,7 +67,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 175;
+const APP_VERSION = 176;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -257,6 +257,7 @@ class Game {
       this.endLevel();
     });
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
+      this.paused = false;
       this._hideOverlay('overlay-pause');
       this._showTouchCoach(true);
     });
