@@ -64,6 +64,7 @@ const suite = [
   ['node', ['test/bazooka-damage.mjs']],
   ['node', ['test/lobby-profiles.mjs']],
   ['node', ['test/coop-privacy.mjs']],
+  ['node', ['test/pass-prestige.mjs']],
 ];
 
 function run(cmd, args, env = {}) {

@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 192;
+const APP_VERSION = 193;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -971,8 +971,9 @@ class Game {
     const lvl = this.progress.level;
     const frac = this.progress.levelFrac();
     const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
+    const prestige = this.progress.prestigeStars;
     document.getElementById('pass-progress').innerHTML = lvl >= PASS_MAX_LEVEL
-      ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl })
+      ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl }) + (prestige > 0 ? `<br>${t('🎖️ Ранг Рятівника: {n} ⭐', { n: prestige })}` : '')
       : t('⭐ Рівень {lvl} · до наступного: {a}/{b} XP', { lvl, a: Math.round(frac * need), b: need }) + `
          <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
     let html = '';
