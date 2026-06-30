@@ -21,7 +21,7 @@ import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import { KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE, OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES } from './knockout.js';
-import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
+import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import { BankMode, BANK_UNLOCK_COUNTRIES } from './bank.js';
 import {
@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 198;
+const APP_VERSION = 199;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -316,6 +316,7 @@ class Game {
       if (mode === 'knockout') this.startKnockout();
       else if (mode === 'defense') this.startDefense();
       else if (mode === 'overloaded-defense') this.startOverloadedDefense();
+      else if (mode === 'zone-defense') this.startZoneDefense();
       else if (mode === 'pvp') this.startPvp();
       else if (mode === 'bank') this.startBank();
       else if (mode === 'worldboss') this.startWorldBoss(this._lastWorldBossId || 'radiation');
@@ -838,6 +839,12 @@ class Game {
           : t('Кімната 33×33, 20 зомбі, у тебе 150 HP і тільки пістолет.'),
       },
       {
+        id: 'zone-defense', icon: '⭕', name: t('Оборона в зоні'), locked: libN < ZONE_DEFENSE_UNLOCK_COUNTRIES,
+        desc: libN < ZONE_DEFENSE_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES })
+          : t('Коло 30 метрів: протримайся 125 секунд із посохом і пістолетом.'),
+      },
+      {
         id: 'defense', icon: '🛡️', name: t('ОБОРОНА'), locked: libN < DEFENSE_UNLOCK_COUNTRIES,
         desc: libN < DEFENSE_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: DEFENSE_UNLOCK_COUNTRIES })
@@ -932,6 +939,9 @@ class Game {
         } else if (mode === 'overloaded-knockout') {
           this._hideOverlay('overlay-solo');
           this.startOverloadedKnockout();
+        } else if (mode === 'zone-defense') {
+          this._hideOverlay('overlay-solo');
+          this.startZoneDefense();
         } else if (mode === 'defense') {
           this._hideOverlay('overlay-solo');
           this.startDefense();
@@ -1483,6 +1493,22 @@ class Game {
     return this.startLevel('UKR', { defense: 'overloaded' });
   }
 
+  startZoneDefense() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('⭕🤝 Оборона в зоні поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < ZONE_DEFENSE_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('⭕ Оборона в зоні відкриється після {n} звільнених країн!', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { defense: 'zone' });
+  }
+
   // ---------- ⚔️ ПВП ----------
   startPvp() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -1610,8 +1636,9 @@ class Game {
     const knockoutVariant = opts.knockout === 'overloaded' ? 'overloaded' : 'normal';
     const isOverloadedKnockout = isKnockout && knockoutVariant === 'overloaded';
     const isDefense = !!opts.defense;
-    const defenseVariant = opts.defense === 'overloaded' ? 'overloaded' : 'normal';
+    const defenseVariant = opts.defense === 'overloaded' ? 'overloaded' : opts.defense === 'zone' ? 'zone' : 'normal';
     const isOverloadedDefense = isDefense && defenseVariant === 'overloaded';
+    const isZoneDefense = isDefense && defenseVariant === 'zone';
     const isPvp = !!opts.pvp;
     const pvpVariant = opts.pvp === 'overloaded' ? 'overloaded' : 'normal';
     const isBank = !!opts.bank;
@@ -1630,7 +1657,7 @@ class Game {
       : isBank
       ? t('🏦 БАНК')
       : isDefense
-      ? (isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
+      ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
       ? (isOverloadedKnockout ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ'))
       : isArena
@@ -1689,9 +1716,9 @@ class Game {
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp || isBank,
-      noPickups: isPvp || isBank || isOverloadedDefense,
+      noPickups: isPvp || isBank || isOverloadedDefense || isZoneDefense,
       noZombiePickups: isKnockout || isDefense || isPvp || isBank,
-      noCoinDrops: isPvp || isBank || isOverloadedDefense,
+      noCoinDrops: isPvp || isBank || isOverloadedDefense || isZoneDefense,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
@@ -1722,8 +1749,8 @@ class Game {
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
     if (isKnockout || isDefense || isPvp || isBank) {
-      level.player.weapons = isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isDefense ? ['pistol', 'rifle'] : ['pistol'];
-      level.player.cur = isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isDefense ? 'rifle' : 'pistol';
+      level.player.weapons = isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       if (isPvp) {
         level.player.maxHealth = pvpVariant === 'overloaded' ? 2500 : 50;
@@ -2061,6 +2088,7 @@ class Game {
       const z = isWorldBoss ? a.z + 16 : isKnockout ? a.z : isPvp ? a.z + 4 : isDefense ? a.z + 8 : a.z + 12;
       const gy = level.world.groundH(a.x, z);
       level.player.pos.set(a.x, gy, z);
+      if (level.defense && level.defense.zone) level.defense._placePlayerInZone();
     }
 
     this.level = level;
@@ -2085,8 +2113,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2573,12 +2601,19 @@ class Game {
       level.addCoins(150);
       this.saveGame();
     }
-    this._lastEndMode = level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
+    const isZone = level.defense.variant === 'zone';
+    this._lastEndMode = isZone ? 'zone-defense' : level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
-    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🛡️ ОБОРОНА ВИСТОЯЛА!') : t('💀 ВЕЖУ ЗРУЙНОВАНО');
-    document.getElementById('arena-stats').innerHTML = `
+    document.querySelector('#overlay-arena-end h1').textContent = isZone
+      ? (won ? t('🛡️ ЗОНУ ВТРИМАНО!') : t('💀 ЗОНУ ВТРАЧЕНО'))
+      : won ? t('🛡️ ОБОРОНА ВИСТОЯЛА!') : t('💀 ВЕЖУ ЗРУЙНОВАНО');
+    document.getElementById('arena-stats').innerHTML = isZone ? `
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Залишилось')}</span><span class="stat-val">${res.timeLeft} ${t('с')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`
+      : `
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('HP вежі')}</span><span class="stat-val">${res.towerHp} / ${level.defense.towerMaxHp}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`;
@@ -3241,6 +3276,10 @@ class Game {
       startOverloadedDefense: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true };
         return g.startOverloadedDefense();
+      },
+      startZoneDefense: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true };
+        return g.startZoneDefense();
       },
       startPvp: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true };
