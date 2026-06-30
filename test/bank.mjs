@@ -83,19 +83,67 @@ check(started.noGadgets && started.noShop && started.noBuffs && started.noPickup
   && Object.values(started.buffs).every((n) => n === 0) && started.playerHp === 50,
   'бафи, пікапи і дроп вимкнені', JSON.stringify(started));
 
-console.log('▸ Хвиля Банку, атака банку гравця і перемога від знищення банку зомбі');
+console.log('▸ Кімната Банку рівна, чиста від старих колайдерів і тримає гравця на підлозі');
+const roomShape = await page.evaluate(() => {
+  const g = window.__game;
+  const b = g.level.bank;
+  const p = g.level.player;
+  const inside = (c) => Math.abs(c.x - b.cx) < b._hx - 1 && Math.abs(c.z - b.cz) < b._hz - 1;
+  p.pos.set(b.cx, b.floorY + 12, b.cz);
+  p.vel.set(0, -3, 0);
+  b._clampActor(p);
+  const floorSamples = [
+    [b.cx, b.cz],
+    [b.cx - 80, b.cz - 18],
+    [b.cx - 80, b.cz + 18],
+    [b.cx + 80, b.cz - 18],
+    [b.cx + 80, b.cz + 18],
+  ].map(([x, z]) => g.level.world.floorAt(x, z, b.floorY + 0.2));
+  return {
+    playerY: p.pos.y,
+    floorY: b.floorY,
+    floorSamples,
+    collidersInside: g.level.world.colliders.filter(inside).length,
+    occludersInside: g.level.world.occluders.filter(inside).length,
+  };
+});
+check(Math.abs(roomShape.playerY - roomShape.floorY) < 0.001
+  && roomShape.floorSamples.every((y) => Math.abs(y - roomShape.floorY) < 0.001),
+  'у кімнаті Банку одна рівна підлога без пагорбів', JSON.stringify(roomShape));
+check(roomShape.collidersInside === 0 && roomShape.occludersInside === 0,
+  'у Банку немає камʼяних стовпів/старих перешкод з карти', JSON.stringify(roomShape));
+
+console.log('▸ Хвиля Банку, агро на банк гравця, сильний удар і перемога від знищення банку зомбі');
 const waveAndWin = await page.evaluate(() => {
   const g = window.__game;
   const b = g.level.bank;
   b.spawnT = 0;
   b.update(0.01);
   const alive = g.level.zombies.list.filter((z) => z.bank && z.state !== 'dead').length;
+  const z = g.level.zombies.list.find((it) => it.bank && it.state !== 'dead');
+  const aggroBeforeHit = { aggroed: z.aggroed, state: z.state, bankDmg: z.bankDmg };
   const target = b.zombieBank;
   const protectedBank = b.playerBank;
-  b.damageSafe(protectedBank, 25, false);
+  z.x = protectedBank.x + 1;
+  z.z = protectedBank.z;
+  z.bankSafeHitCd = 0;
+  const beforeSafe = protectedBank.hp;
+  b.update(0.1);
+  const safeDamage = beforeSafe - protectedBank.hp;
+  const p = g.level.player;
+  p.pos.set(z.x, b.floorY, z.z);
+  p.vel.set(0, 0, 0);
+  p.health = 100;
+  p.respawnProtect = 0;
+  z.bankPlayerHitCd = 0;
+  b._damagePlayerIfClose(z, 0.1);
+  const playerDamage = 100 - p.health;
   b.damageSafe(target, 500);
   return {
     alive,
+    aggroBeforeHit,
+    safeDamage,
+    playerDamage,
     playerBankHp: protectedBank.hp,
     zombieBankHp: target.hp,
     completed: b.completed,
@@ -104,7 +152,12 @@ const waveAndWin = await page.evaluate(() => {
   };
 });
 check(waveAndWin.alive === 5, 'кожна хвиля спавнить 5 зомбі біля банку зомбі', JSON.stringify(waveAndWin));
-check(waveAndWin.playerBankHp === 475, 'зомбі можуть пошкодити банк гравця', JSON.stringify(waveAndWin));
+check(waveAndWin.aggroBeforeHit.aggroed && waveAndWin.aggroBeforeHit.state === 'chase',
+  'зомбі Банку агряться на банк гравця', JSON.stringify(waveAndWin));
+check(waveAndWin.safeDamage >= 10 && waveAndWin.playerBankHp === 490,
+  'зомбі бʼють банк гравця повним ударом, а не по 1 HP', JSON.stringify(waveAndWin));
+check(waveAndWin.playerDamage >= 10,
+  'зомбі в Банку наносять гравцю повний удар, а не 1 HP за кадр', JSON.stringify(waveAndWin));
 check(waveAndWin.completed && waveAndWin.shown && /БАНК/i.test(waveAndWin.title), 'знищення банку зомбі завершує режим перемогою', JSON.stringify(waveAndWin));
 
 await page.evaluate(() => window.__game.startBank());

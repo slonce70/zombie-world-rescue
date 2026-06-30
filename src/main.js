@@ -2089,6 +2089,7 @@ class Game {
       const gy = level.world.groundH(a.x, z);
       level.player.pos.set(a.x, gy, z);
       if (level.defense && level.defense.zone) level.defense._placePlayerInZone();
+      if (level.bank) level.bank.placePlayer();
     }
 
     this.level = level;

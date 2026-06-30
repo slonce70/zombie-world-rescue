@@ -5,6 +5,8 @@ export const BANK_UNLOCK_COUNTRIES = 7;
 export const BANK_ROOM_W = 200;
 export const BANK_ROOM_D = 50;
 export const BANK_SAFE_HP = 500;
+const BANK_ZOMBIE_DMG = 10;
+const BANK_ZOMBIE_HIT_CD = 0.9;
 
 export class BankMode {
   constructor(level) {
@@ -22,12 +24,14 @@ export class BankMode {
     this.bossUnlocked = false;
     this.allDone = false;
     const a = level.world.layout.arena || { x: 0, z: 0 };
+    const bound = Number.isFinite(level.world.layout.BOUND) ? level.world.layout.BOUND : 180;
     this.cx = a.x;
-    this.cz = a.z;
+    this.cz = a.z + Math.max(bound + this.roomD, 240);
     this._hx = this.roomW / 2;
     this._hz = this.roomD / 2;
-    this.floorY = level.world.groundH(this.cx, this.cz) + 0.08;
+    this.floorY = this._calcFloorY();
     this.safes = [];
+    this._clearRoomBlockers();
     this._buildRoom();
   }
 
@@ -71,11 +75,13 @@ export class BankMode {
         const step = Math.min(d - 2.1, dt * (z.stats?.speed || 2.2) * 0.6);
         z.x += (dx / d) * step;
         z.z += (dz / d) * step;
-        z.aggroed = false;
-        z.state = 'wander';
-      } else {
-        this.damageSafe(safe, (z.stats?.dmg || 10) * dt, false);
+        z.aggroed = true;
+        z.state = 'chase';
+      } else if ((z.bankSafeHitCd || 0) <= 0) {
+        z.bankSafeHitCd = BANK_ZOMBIE_HIT_CD;
+        this.damageSafe(safe, z.bankDmg || BANK_ZOMBIE_DMG, false);
       }
+      z.bankSafeHitCd = Math.max(0, (z.bankSafeHitCd || 0) - dt);
       this._damagePlayerIfClose(z, dt);
     }
     if (!this.over && this.playerBank.hp <= 0) this.level.game._endBankRun(false);
@@ -181,10 +187,21 @@ export class BankMode {
       });
       zb.bank = true;
       zb.stats = { ...zb.stats, coins: 0 };
-      zb.aggroed = false;
-      zb.state = 'wander';
+      zb.bankDmg = BANK_ZOMBIE_DMG;
+      zb.bankSafeHitCd = 0;
+      zb.bankPlayerHitCd = 0;
+      zb.aggroed = true;
+      zb.state = 'chase';
       this._clampZombie(zb);
     }
+  }
+
+  placePlayer() {
+    const p = this.level.player;
+    if (!p) return;
+    p.pos.set(this.playerBank.x + 6, this.floorY, this.playerBank.z);
+    p.vel.set(0, 0, 0);
+    p.onGround = true;
   }
 
   _clampActor(p) {
@@ -192,7 +209,7 @@ export class BankMode {
     const z = Math.max(this.cz - this._hz + 1, Math.min(this.cz + this._hz - 1, p.pos.z));
     if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
     if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY) {
+    if (p.pos.y < this.floorY || p.pos.y > this.floorY + 4) {
       p.pos.y = this.floorY;
       if (p.vel.y < 0) p.vel.y = 0;
       p.onGround = true;
@@ -209,7 +226,27 @@ export class BankMode {
   _damagePlayerIfClose(z, dt) {
     const p = this.level.player;
     if (!p || p.health <= 0 || p.pos.y - this.floorY > 3) return;
+    z.bankPlayerHitCd = Math.max(0, (z.bankPlayerHitCd || 0) - dt);
     if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > 1.8) return;
-    p.takeDamage((z.stats?.dmg || 10) * dt, z.x, z.z);
+    if (z.bankPlayerHitCd > 0) return;
+    z.bankPlayerHitCd = BANK_ZOMBIE_HIT_CD;
+    p.takeDamage(z.bankDmg || BANK_ZOMBIE_DMG, z.x, z.z);
+  }
+
+  _calcFloorY() {
+    let y = -Infinity;
+    for (const ox of [-this._hx + 4, -this._hx * 0.5, 0, this._hx * 0.5, this._hx - 4]) {
+      for (const oz of [-this._hz + 4, -this._hz * 0.5, 0, this._hz * 0.5, this._hz - 4]) {
+        y = Math.max(y, this.level.world.groundH(this.cx + ox, this.cz + oz));
+      }
+    }
+    return y + 0.08;
+  }
+
+  _clearRoomBlockers() {
+    const inside = (c) => Math.abs(c.x - this.cx) < this._hx - 1 && Math.abs(c.z - this.cz) < this._hz - 1;
+    this.level.world.colliders = this.level.world.colliders.filter((c) => !inside(c));
+    this.level.world.occluders = this.level.world.occluders.filter((c) => !inside(c));
+    if (typeof this.level.world._buildGrid === 'function') this.level.world._buildGrid();
   }
 }
