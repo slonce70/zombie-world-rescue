@@ -56,7 +56,13 @@ const started = await page.evaluate(async () => {
   return {
     variant: h.variant,
     centerZ: h.cz,
+    roomClearOfCampaignMap: Math.abs(h.cx) - h._half > 230 || Math.abs(h.cz) - h._half > 230,
     floorY: h.floorY,
+    floorSamples: [
+      h._floorAt(h.cx, h.cz),
+      h._floorAt(h.cx - h._half + 5, h.cz - h._half + 5),
+      h._floorAt(h.cx + h._half - 5, h.cz + h._half - 5),
+    ],
     floorsInRoom: g.level.world.floors.filter((f) => Math.abs(f.x - h.cx) < h._half - 1 && Math.abs(f.z - h.cz) < h._half - 1).length,
     playerHp: g.level.player.health,
     playerMaxHp: g.level.player.maxHealth,
@@ -82,7 +88,8 @@ const started = await page.evaluate(async () => {
   };
 });
 check(started.variant === 'overloaded', 'варіант overloaded', JSON.stringify(started));
-check(started.floorsInRoom === 1, 'у кімнаті лишається тільки одна плоска підлога', JSON.stringify(started));
+check(started.roomClearOfCampaignMap && started.floorsInRoom === 1 && started.floorSamples.every((y) => Math.abs(y - started.floorY) < 0.001),
+  'кімната винесена з кампанійної мапи і має одну рівну підлогу без пагорбів', JSON.stringify(started));
 check(started.playerHp === 350 && started.playerMaxHp === 350, 'у гравця 350 HP', JSON.stringify(started));
 check(started.clones === 50 && started.shooters === 5, '45 клонів + 5 стрільців', JSON.stringify(started));
 check(started.zombies === 131 && started.boxers === 5 && started.robots === 1, '125 зомбі + 5 в перчатках + робот', JSON.stringify(started));

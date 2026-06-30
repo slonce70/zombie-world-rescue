@@ -8,6 +8,7 @@ export const OVERLOADED_HUMANS_UNLOCK_COUNTRIES = 12;
 export const HUMANS_ROOM_SIZE = 750;
 export const HUMANS_CLONES = 30;
 export const HUMANS_ZOMBIES = 65;
+const HUMANS_ROOM_CENTER = { x: 1400, z: 0 };
 const CLONE_FOOT_LIFT = 0.08;
 const HUMANS_CFG = {
   normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 65, boxers: 0, robotHp: null },
@@ -29,9 +30,8 @@ export class HumansMode {
     this.bossStarted = false;
     this.bossUnlocked = false;
     this.allDone = false;
-    const a = level.world.layout.arena || { x: 0, z: 0 };
-    this.cx = a.x;
-    this.cz = a.z;
+    this.cx = HUMANS_ROOM_CENTER.x;
+    this.cz = HUMANS_ROOM_CENTER.z;
     this._half = this.roomSize / 2;
     this.floorY = this._calcFloorY();
     this.clones = [];
@@ -268,6 +268,7 @@ export class HumansMode {
   }
 
   _floorAt(x, z) {
+    if (this._insideRoom(x, z)) return this.floorY;
     return Math.max(this.floorY, this.level.world.floorAt(x, z, this.floorY), this.level.world.groundH(x, z));
   }
 
@@ -278,11 +279,15 @@ export class HumansMode {
         y = Math.max(y, this.level.world.groundH(this.cx + ox, this.cz + oz));
       }
     }
-    return y + 0.08;
+    return Math.max(30, y + 2);
+  }
+
+  _insideRoom(x, z) {
+    return Math.abs(x - this.cx) <= this._half && Math.abs(z - this.cz) <= this._half;
   }
 
   _clearRoomBlockers() {
-    const inside = (c) => Math.abs(c.x - this.cx) < this._half - 1 && Math.abs(c.z - this.cz) < this._half - 1;
+    const inside = (c) => this._insideRoom(c.x, c.z);
     this.level.world.colliders = this.level.world.colliders.filter((c) => !inside(c));
     this.level.world.occluders = this.level.world.occluders.filter((c) => !inside(c));
     this.level.world.floors = this.level.world.floors.filter((f) => !inside(f));
