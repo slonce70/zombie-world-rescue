@@ -8,6 +8,7 @@ export const OVERLOADED_HUMANS_UNLOCK_COUNTRIES = 12;
 export const HUMANS_ROOM_SIZE = 750;
 export const HUMANS_CLONES = 30;
 export const HUMANS_ZOMBIES = 65;
+const CLONE_FOOT_LIFT = 0.08;
 const HUMANS_CFG = {
   normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 65, boxers: 0, robotHp: null },
   overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 125, boxers: 5, robotHp: 1795 },
@@ -132,7 +133,7 @@ export class HumansMode {
       const row = Math.floor(i / 10);
       const x = this.cx - 45 + col * 10;
       const z = baseZ + row * 10;
-      const y = this._floorAt(x, z);
+      const y = this._floorAt(x, z) + CLONE_FOOT_LIFT;
       const rig = makeHero('ninja');
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
@@ -261,7 +262,7 @@ export class HumansMode {
   _clampClone(c) {
     c.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, c.x));
     c.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, c.z));
-    c.y = this._floorAt(c.x, c.z);
+    c.y = this._floorAt(c.x, c.z) + CLONE_FOOT_LIFT;
     c.mesh.position.set(c.x, c.y, c.z);
   }
 

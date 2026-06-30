@@ -46,16 +46,22 @@ await page.evaluate(() => {
   window.__game.test.startHumans();
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.humans, null, { timeout: 30000 });
-const started = await page.evaluate(() => {
+const started = await page.evaluate(async () => {
+  const THREE = await import('./vendor/three.module.js');
   const g = window.__game;
   const h = g.level.humans;
   h.update(0.05);
   const enemies = g.level.zombies.list.filter((z) => z.humans && z.state !== 'dead');
+  const cloneBox = (c) => {
+    c.mesh.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(c.mesh);
+    return { hp: c.hp, x: c.x, z: c.z, y: c.y, meshY: c.mesh.position.y, minY: b.min.y };
+  };
   return {
     roomSize: h.roomSize,
     centerZ: h.cz,
     floorY: h.floorY,
-    clones: h.clones.map((c) => ({ hp: c.hp, x: c.x, z: c.z, y: c.y, meshY: c.mesh.position.y })),
+    clones: h.clones.map(cloneBox),
     zombies: enemies.length,
     robots: enemies.filter((z) => z.type === 'robot').length,
     enemyPositions: enemies.map((z) => ({ x: z.x, z: z.z, y: z.y })),
@@ -78,7 +84,7 @@ check(started.clones.every((c) => c.z - started.centerZ > 200)
   && started.enemyPositions.every((z) => z.z - started.centerZ < -200)
   && started.playerZ - started.centerZ > 280,
   'дві армії спавняться на протилежних сторонах кімнати', JSON.stringify(started));
-check(started.clones.every((c) => Math.abs(c.y - started.floorY) < 0.01 && Math.abs(c.meshY - started.floorY) < 0.01)
+check(started.clones.every((c) => c.y > started.floorY && c.meshY > started.floorY && c.minY >= started.floorY - 0.005)
   && started.enemyPositions.every((z) => Math.abs(z.y - started.floorY) < 0.01),
   'клони і зомбі стоять на рівній підлозі, не під землею', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
