@@ -67,33 +67,49 @@ try {
       && fresh.overloadedLocked && fresh.bankLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
-    JSON.stringify(fresh.tabs) === JSON.stringify(['Історія', 'Виживання', 'Випробування', 'Оборона', 'Боси', 'Дуелі'])
-      && fresh.activeTab === 'Історія'
+    JSON.stringify(fresh.tabs) === JSON.stringify([
+      'КАМПАНІЯ', 'ШТОРМ', 'АРЕНА БОСІВ', 'СВІТОВІ БОСИ',
+      'НОКАУТ', 'Перегружений нокаут', 'Оборона в зоні', 'ОБОРОНА',
+      'Перегружена оборона', 'Перегружене ПВП', 'БАНК', 'ПВП',
+    ])
+      && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
-        { title: 'Історія', modes: ['campaign'] },
-        { title: 'Виживання', modes: ['storm', 'zone-defense'] },
-        { title: 'Випробування', modes: ['knockout', 'overloaded-knockout', 'bank'] },
-        { title: 'Оборона', modes: ['defense', 'overloaded-defense'] },
-        { title: 'Боси', modes: ['arena', 'worldboss'] },
-        { title: 'Дуелі', modes: ['pvp', 'overloaded-pvp'] },
+        { title: 'КАМПАНІЯ', modes: ['campaign'] },
+        { title: 'ШТОРМ', modes: ['storm'] },
+        { title: 'АРЕНА БОСІВ', modes: ['arena'] },
+        { title: 'СВІТОВІ БОСИ', modes: ['worldboss'] },
+        { title: 'НОКАУТ', modes: ['knockout'] },
+        { title: 'Перегружений нокаут', modes: ['overloaded-knockout'] },
+        { title: 'Оборона в зоні', modes: ['zone-defense'] },
+        { title: 'ОБОРОНА', modes: ['defense'] },
+        { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
+        { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
+        { title: 'БАНК', modes: ['bank'] },
+        { title: 'ПВП', modes: ['pvp'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, sections: fresh.sections }));
-  await page.click('.solo-tab:has-text("Випробування")');
-  const challengeModes = await page.evaluate(() =>
+  await page.click('.solo-tab:has-text("БАНК")');
+  const bankModes = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode));
-  check('клік по вкладці показує тільки її режими',
-    JSON.stringify(challengeModes) === JSON.stringify(['knockout', 'overloaded-knockout', 'bank']),
-    challengeModes.join(','));
-  await page.click('.solo-tab:has-text("Історія")');
-  check('режими лишаються розкладені по pane-розділах',
+  check('клік по вкладці показує тільки один свій режим',
+    JSON.stringify(bankModes) === JSON.stringify(['bank']),
+    bankModes.join(','));
+  await page.click('.solo-tab:has-text("КАМПАНІЯ")');
+  check('кожен pane-розділ містить свій один режим',
     JSON.stringify(fresh.sections) === JSON.stringify([
-      { title: 'Історія', modes: ['campaign'] },
-      { title: 'Виживання', modes: ['storm', 'zone-defense'] },
-      { title: 'Випробування', modes: ['knockout', 'overloaded-knockout', 'bank'] },
-      { title: 'Оборона', modes: ['defense', 'overloaded-defense'] },
-      { title: 'Боси', modes: ['arena', 'worldboss'] },
-      { title: 'Дуелі', modes: ['pvp', 'overloaded-pvp'] },
+      { title: 'КАМПАНІЯ', modes: ['campaign'] },
+      { title: 'ШТОРМ', modes: ['storm'] },
+      { title: 'АРЕНА БОСІВ', modes: ['arena'] },
+      { title: 'СВІТОВІ БОСИ', modes: ['worldboss'] },
+      { title: 'НОКАУТ', modes: ['knockout'] },
+      { title: 'Перегружений нокаут', modes: ['overloaded-knockout'] },
+      { title: 'Оборона в зоні', modes: ['zone-defense'] },
+      { title: 'ОБОРОНА', modes: ['defense'] },
+      { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
+      { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
+      { title: 'БАНК', modes: ['bank'] },
+      { title: 'ПВП', modes: ['pvp'] },
     ]),
     JSON.stringify(fresh.sections));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });

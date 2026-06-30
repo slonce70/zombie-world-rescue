@@ -880,14 +880,7 @@ class Game {
     ];
     const root = document.getElementById('solo-modes');
     const byId = new Map(modes.map((m) => [m.id, m]));
-    const groups = [
-      { id: 'history', title: t('Історія'), ids: ['campaign'] },
-      { id: 'survival', title: t('Виживання'), ids: ['storm', 'zone-defense'] },
-      { id: 'challenge', title: t('Випробування'), ids: ['knockout', 'overloaded-knockout', 'bank'] },
-      { id: 'defense', title: t('Оборона'), ids: ['defense', 'overloaded-defense'] },
-      { id: 'bosses', title: t('Боси'), ids: ['arena', 'worldboss'] },
-      { id: 'duels', title: t('Дуелі'), ids: ['pvp', 'overloaded-pvp'] },
-    ];
+    const groups = modes.map((m) => ({ id: m.id, title: m.name, ids: [m.id] }));
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
