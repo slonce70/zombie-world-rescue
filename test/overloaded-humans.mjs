@@ -114,6 +114,36 @@ const shot = await page.evaluate(() => {
 });
 check(shot.shooter && shot.hp === 95, 'постріл стрільця знімає 5 HP', JSON.stringify(shot));
 
+console.log('▸ Гармата робота знімає HP клону здаля');
+const robotShot = await page.evaluate(() => {
+  const g = window.__game;
+  const h = g.level.humans;
+  h.update(0.05);
+  const robot = g.level.zombies.list.find((z) => z.humans && z.type === 'robot' && z.state !== 'dead');
+  const clone = h.clones.find((c) => c.hp > 0);
+  clone.hp = 30;
+  robot.x = clone.x;
+  robot.z = clone.z - 12;
+  robot.y = clone.y;
+  robot.rig.group.position.set(robot.x, robot.y, robot.z);
+  robot.state = 'chase';
+  robot.aggroed = true;
+  robot.rangedCd = 0;
+  robot.attackT = 0;
+  robot.didHit = false;
+  robot.telegraph = 0;
+  robot.charging = 0;
+  let sawProjectile = false;
+  for (let i = 0; i < 180; i++) {
+    g.level.zombies.update(1 / 60);
+    if (g.level.effects.projectiles.length) sawProjectile = true;
+    g.level.effects.update(1 / 60);
+  }
+  return { beforeHp: 30, afterHp: clone.hp, sawProjectile, robotDmg: robot.ranged && robot.ranged.dmg };
+});
+check(robotShot.sawProjectile && robotShot.robotDmg === 10 && robotShot.afterHp === 20,
+  'снаряд робота знімає 10 HP з клона', JSON.stringify(robotShot));
+
 console.log('▸ Фінальний екран і повтор лишаються в перегруженому режимі');
 const end = await page.evaluate(() => {
   const g = window.__game;

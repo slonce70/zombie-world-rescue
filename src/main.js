@@ -75,7 +75,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 220;
+const APP_VERSION = 221;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2130,8 +2130,21 @@ class Game {
       // Разом зі зведенням ракети (~3 м, див. effects.js) дитина не підриває себе
       // пострілом у натовп упритул. Шкода по ворогах (вище) лишається повною.
     };
-    // сніжки сніговиків
-    level.effects.onProjectileHit = (dmg, x, z) => {
+    // сніжки/гармати ворогів
+    level.effects.getDamageTargets = () => {
+      const out = level.player.health > 0 ? [{ pos: level.player.pos, pid: 1 }] : [];
+      const clones = level.gadgets && level.gadgets.clones;
+      if (clones && clones.length) {
+        for (const c of clones) if (c.hp > 0) out.push({ clone: c, pos: { x: c.x, y: c.y, z: c.z } });
+      }
+      return out;
+    };
+    level.effects.onProjectileHit = (dmg, x, z, tgt) => {
+      if (tgt && tgt.clone) {
+        if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg);
+        else tgt.clone.hp -= dmg;
+        return;
+      }
       level.player.takeDamage(dmg, x, z);
     };
 
