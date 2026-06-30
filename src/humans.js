@@ -7,9 +7,9 @@ export const HUMANS_UNLOCK_COUNTRIES = 11;
 export const OVERLOADED_HUMANS_UNLOCK_COUNTRIES = 12;
 export const HUMANS_ROOM_SIZE = 750;
 export const HUMANS_CLONES = 30;
-export const HUMANS_ZOMBIES = 30;
+export const HUMANS_ZOMBIES = 65;
 const HUMANS_CFG = {
-  normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 30, boxers: 0, robotHp: null },
+  normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 65, boxers: 0, robotHp: null },
   overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 45, boxers: 5, robotHp: 1795 },
 };
 

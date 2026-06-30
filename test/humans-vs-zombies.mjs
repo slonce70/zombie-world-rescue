@@ -40,7 +40,7 @@ const menu = await page.evaluate(() => {
 check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВІЙНА'), 'до 11 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ЗОМБІ ПРОТИ ЛЮДЕЙ/i.test(menu.name), 'після 11 країн режим доступний', JSON.stringify(menu));
 
-console.log('▸ Старт режиму: 30 клонів проти 30 зомбі і робота');
+console.log('▸ Старт режиму: 30 клонів проти 65 зомбі і робота');
 await page.evaluate(() => {
   window.__game.save.coins = 200;
   window.__game.test.startHumans();
@@ -73,7 +73,7 @@ const started = await page.evaluate(() => {
 });
 check(started.roomSize === 750, 'кімната 750 на 750 метрів', JSON.stringify(started));
 check(started.clones.length === 30 && started.clones.every((c) => c.hp === 100), 'з гравцем 30 клонів по 100 HP', JSON.stringify(started));
-check(started.zombies === 31 && started.robots === 1, 'вороги: 30 зомбі і 1 зомбі-робот', JSON.stringify(started));
+check(started.zombies === 66 && started.robots === 1, 'вороги: 65 зомбі і 1 зомбі-робот', JSON.stringify(started));
 check(started.clones.every((c) => c.z - started.centerZ > 200)
   && started.enemyPositions.every((z) => z.z - started.centerZ < -200)
   && started.playerZ - started.centerZ > 280,
@@ -86,7 +86,7 @@ check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sw
 check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'
   && started.modeShield.hp === 100 && started.modeShield.cd === 100,
   'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
-check(started.hud.some((x) => x.includes('Зомбі')) && started.markers >= 31, 'HUD і маркери показують битву', JSON.stringify(started));
+check(started.hud.some((x) => x.includes('Зомбі')) && started.markers >= 66, 'HUD і маркери показують битву', JSON.stringify(started));
 
 console.log('▸ Єдиний гаджет: щит 100 HP з перезарядкою 100с');
 const shield = await page.evaluate(() => {
