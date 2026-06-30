@@ -53,8 +53,11 @@ try {
     bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
     pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
     campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
+    tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
+    activeTab: document.querySelector('.solo-tab.on')?.textContent.trim(),
+    visibleModes: [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode),
     sections: [...document.querySelectorAll('.solo-section')].map((s) => ({
-      title: s.querySelector('.solo-section-title')?.textContent,
+      title: s.dataset.tab,
       modes: [...s.querySelectorAll('.solo-mode')].map((m) => m.dataset.mode),
     })),
   }));
@@ -63,7 +66,27 @@ try {
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
       && fresh.overloadedLocked && fresh.bankLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
-  check('режими згруповані по розділах',
+  check('режими згруповані у вкладки як Гардероб',
+    JSON.stringify(fresh.tabs) === JSON.stringify(['Історія', 'Виживання', 'Випробування', 'Оборона', 'Боси', 'Дуелі'])
+      && fresh.activeTab === 'Історія'
+      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
+      && JSON.stringify(fresh.sections) === JSON.stringify([
+        { title: 'Історія', modes: ['campaign'] },
+        { title: 'Виживання', modes: ['storm', 'zone-defense'] },
+        { title: 'Випробування', modes: ['knockout', 'overloaded-knockout', 'bank'] },
+        { title: 'Оборона', modes: ['defense', 'overloaded-defense'] },
+        { title: 'Боси', modes: ['arena', 'worldboss'] },
+        { title: 'Дуелі', modes: ['pvp', 'overloaded-pvp'] },
+      ]),
+    JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, sections: fresh.sections }));
+  await page.click('.solo-tab:has-text("Випробування")');
+  const challengeModes = await page.evaluate(() =>
+    [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode));
+  check('клік по вкладці показує тільки її режими',
+    JSON.stringify(challengeModes) === JSON.stringify(['knockout', 'overloaded-knockout', 'bank']),
+    challengeModes.join(','));
+  await page.click('.solo-tab:has-text("Історія")');
+  check('режими лишаються розкладені по pane-розділах',
     JSON.stringify(fresh.sections) === JSON.stringify([
       { title: 'Історія', modes: ['campaign'] },
       { title: 'Виживання', modes: ['storm', 'zone-defense'] },

@@ -881,13 +881,14 @@ class Game {
     const root = document.getElementById('solo-modes');
     const byId = new Map(modes.map((m) => [m.id, m]));
     const groups = [
-      { title: t('Історія'), ids: ['campaign'] },
-      { title: t('Виживання'), ids: ['storm', 'zone-defense'] },
-      { title: t('Випробування'), ids: ['knockout', 'overloaded-knockout', 'bank'] },
-      { title: t('Оборона'), ids: ['defense', 'overloaded-defense'] },
-      { title: t('Боси'), ids: ['arena', 'worldboss'] },
-      { title: t('Дуелі'), ids: ['pvp', 'overloaded-pvp'] },
+      { id: 'history', title: t('Історія'), ids: ['campaign'] },
+      { id: 'survival', title: t('Виживання'), ids: ['storm', 'zone-defense'] },
+      { id: 'challenge', title: t('Випробування'), ids: ['knockout', 'overloaded-knockout', 'bank'] },
+      { id: 'defense', title: t('Оборона'), ids: ['defense', 'overloaded-defense'] },
+      { id: 'bosses', title: t('Боси'), ids: ['arena', 'worldboss'] },
+      { id: 'duels', title: t('Дуелі'), ids: ['pvp', 'overloaded-pvp'] },
     ];
+    if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
@@ -895,14 +896,28 @@ class Game {
         <div class="sm-desc">${m.desc}</div></div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
-    root.innerHTML = groups.map((g) => `
-      <section class="solo-section">
-        <div class="solo-section-title">${g.title}</div>
+    root.innerHTML = `
+      <div class="solo-tabs">
+        ${groups.map((g) => `<button class="shop-tab solo-tab ${this._soloModeTab === g.id ? 'on' : ''}" data-tab="${g.id}">${g.title}</button>`).join('')}
+      </div>
+      ${groups.map((g) => `
+      <section class="solo-section" data-tab="${g.title}" data-tab-id="${g.id}" ${this._soloModeTab === g.id ? '' : 'hidden'}>
         ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
-      </section>`).join('');
+      </section>`).join('')}`;
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';
+    root.querySelectorAll('.solo-tab').forEach((el) => {
+      el.addEventListener('click', () => {
+        this._soloModeTab = el.dataset.tab;
+        this.audio.click();
+        root.querySelectorAll('.solo-tab').forEach((b) => b.classList.toggle('on', b === el));
+        root.querySelectorAll('.solo-section').forEach((s) => { s.hidden = s.dataset.tabId !== this._soloModeTab; });
+        root.querySelectorAll('.solo-mode').forEach((x) => x.classList.remove('sel'));
+        cRoot.style.display = 'none';
+        cRoot.innerHTML = '';
+      });
+    });
     root.querySelectorAll('.solo-mode').forEach((el) => {
       el.addEventListener('click', () => {
         const mode = el.dataset.mode;
