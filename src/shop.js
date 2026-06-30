@@ -41,6 +41,7 @@ export const SHOP_ITEMS = [
   { id: 'infammo', icon: GADGETS.infammo.icon, name: GADGETS.infammo.name, desc: () => GADGETS.infammo.desc + t(' · перезарядка {n}с', { n: GADGETS.infammo.cd }), price: GADGETS.infammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'invisibility', icon: GADGETS.invisibility.icon, name: GADGETS.invisibility.name, desc: () => GADGETS.invisibility.desc + t(' · перезарядка {n}с', { n: GADGETS.invisibility.cd }), price: 0, crystalPrice: 5, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'soulmagnet', icon: GADGETS.soulmagnet.icon, name: GADGETS.soulmagnet.name, desc: () => GADGETS.soulmagnet.desc + t(' · перезарядка {n}с', { n: GADGETS.soulmagnet.cd }), price: GADGETS.soulmagnet.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'soulmagnet-hyper', icon: '⚡', name: t('Гіперзаряд: Магніт душ'), desc: t('Після притягування відновлює 40 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'soulmagnet', needsGadget: 'soulmagnet' },
   { id: 'stunammo', icon: GADGETS.stunammo.icon, name: GADGETS.stunammo.name, desc: () => GADGETS.stunammo.desc + t(' · перезарядка {n}с', { n: GADGETS.stunammo.cd }), price: GADGETS.stunammo.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'stunammo-hyper', icon: '⚡', name: t('Гіперзаряд: Оглушливі кулі'), desc: t('Постійне покращення: зомбі оглушаються на 1 секунду'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'stunammo', needsGadget: 'stunammo' },
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -365,7 +366,7 @@ export class Shop {
           game.hud.toast(t('🧰 Середній бокс: +10 кристалів'));
         } else {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
-          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
+          const pool = ['shield', 'heal', 'turret', 'clone', 'soulmagnet', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
           game.hud.toast(t('🧰 Середній бокс: гіперзаряд!'));
@@ -395,7 +396,7 @@ export class Shop {
           reward = '👻 Скін Привид';
         } else if (roll < 0.98) {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
-          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
+          const pool = ['shield', 'heal', 'turret', 'clone', 'soulmagnet', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
           reward = '⚡ Гіперзаряд';

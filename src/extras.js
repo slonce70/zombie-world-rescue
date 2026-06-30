@@ -1044,7 +1044,7 @@ export class Gadgets {
   _placeSoulMagnet() {
     const p = this.level.player;
     while (this.soulMagnets.length) this.soulMagnets.pop();
-    this.soulMagnets.push({ x: p.pos.x, z: p.pos.z, y: p.pos.y, life: 4, pulseT: 0 });
+    this.soulMagnets.push({ x: p.pos.x, z: p.pos.z, y: p.pos.y, life: 4, pulseT: 0, hyper: (this.level.game.save.gadgetHypers || []).includes('soulmagnet') });
     this.level.audio.powerup();
     this.level.effects.ring(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), 0x9b6bff, 18);
     this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9b6bff, 20, { speed: 5, up: 4, life: 0.8 });
@@ -1056,7 +1056,16 @@ export class Gadgets {
     for (let i = this.soulMagnets.length - 1; i >= 0; i--) {
       const m = this.soulMagnets[i];
       m.life -= dt;
-      if (m.life <= 0) { this.soulMagnets.splice(i, 1); continue; }
+      if (m.life <= 0) {
+        this.soulMagnets.splice(i, 1);
+        if (m.hyper) {
+          this.level.player.heal(40);
+          this.level.audio.heal();
+          this.level.effects.burst(this.level.player.pos.clone().setY(this.level.player.pos.y + 1.4), 0x6dff9c, 14, { speed: 2.5, up: 3, life: 0.8 });
+          this.level.bus.emit('toast', t('🧲💚 Магніт душ відновив 40 HP!'));
+        }
+        continue;
+      }
       m.pulseT -= dt;
       if (m.pulseT <= 0) {
         m.pulseT = 0.6;
