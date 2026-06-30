@@ -311,7 +311,19 @@ export class DefenseMode {
 
   _clampActor(p) {
     if (this.zone) {
+      const beforeX = p.pos.x;
+      const beforeZ = p.pos.z;
       this._clampCircle(p.pos, 0.8);
+      if (p.pos.x !== beforeX || p.pos.z !== beforeZ) {
+        const dx = p.pos.x - this.cx;
+        const dz = p.pos.z - this.cz;
+        const d = Math.hypot(dx, dz) || 1;
+        const outward = (p.vel.x * dx + p.vel.z * dz) / d;
+        if (outward > 0) {
+          p.vel.x -= (dx / d) * outward;
+          p.vel.z -= (dz / d) * outward;
+        }
+      }
       if (p.pos.y < this.floorY) {
         p.pos.y = this.floorY;
         if (p.vel.y < 0) p.vel.y = 0;

@@ -100,6 +100,25 @@ const wave = await page.evaluate(() => {
 check(wave.alive >= 4 && wave.sides.length >= 4, 'зомбі приходять мінімум з 4 сторін', JSON.stringify(wave));
 check(wave.dist <= 14.25, 'гравця тримає всередині круглої зони', JSON.stringify(wave));
 
+console.log('▸ Удар біля краю зони не блокує рух гравця');
+const hitAtEdge = await page.evaluate(() => {
+  const g = window.__game;
+  const d = g.level.defense;
+  const p = g.level.player;
+  p.respawnProtect = 0;
+  p.health = 100;
+  p.pos.set(d.cx + d.radius + 0.5, d.floorY, d.cz);
+  p.vel.set(4, 0, 0);
+  d.update(0.016);
+  const dx = p.pos.x - d.cx;
+  const dz = p.pos.z - d.cz;
+  const dist = Math.hypot(dx, dz);
+  const outwardVel = (p.vel.x * dx + p.vel.z * dz) / (dist || 1);
+  return { dist, outwardVel, vx: p.vel.x, vz: p.vel.z };
+});
+check(hitAtEdge.dist <= 14.25 && hitAtEdge.outwardVel <= 0.01,
+  'після відкидання на межі зони швидкість назовні гаситься', JSON.stringify(hitAtEdge));
+
 const win = await page.evaluate(() => {
   const g = window.__game;
   document.getElementById('arena-league-place').textContent = 'STALE LEAGUE';
