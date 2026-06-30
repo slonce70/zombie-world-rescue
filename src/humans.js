@@ -55,7 +55,7 @@ export class HumansMode {
     const out = this.clones.filter((c) => c.hp > 0)
       .map((c) => ({ x: c.x, z: c.z, color: c.shooter ? '#7bdcff' : '#4dd6a8', icon: c.shooter ? '🔫' : '🧍' }));
     for (const z of this.level.zombies.list) {
-      if (z.humans && z.state !== 'dead') out.push({ x: z.x, z: z.z, color: z.type === 'robot' ? '#ffd23f' : '#ff5d73', icon: z.type === 'robot' ? '🤖' : '🧟' });
+      if (z.humans && z.state !== 'dead') out.push({ x: z.x, z: z.z, color: z.type === 'robot' ? '#ffd23f' : z.type === 'boxer' ? '#ff9a3d' : '#ff5d73', icon: z.type === 'robot' ? '🤖' : z.type === 'boxer' ? '🥊' : '🧟' });
     }
     return out;
   }

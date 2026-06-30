@@ -71,12 +71,14 @@ const started = await page.evaluate(() => {
     modeShield: g.level.modeShield,
     activeGadget: g.level.gadgets.active,
     hud: h.getHudList().map((x) => x.title),
+    boxerMarkers: h.getMarkers().filter((m) => m.icon === '🥊').length,
   };
 });
 check(started.variant === 'overloaded', 'варіант overloaded', JSON.stringify(started));
 check(started.playerHp === 350 && started.playerMaxHp === 350, 'у гравця 350 HP', JSON.stringify(started));
 check(started.clones === 50 && started.shooters === 5, '45 клонів + 5 стрільців', JSON.stringify(started));
 check(started.zombies === 131 && started.boxers === 5 && started.robots === 1, '125 зомбі + 5 в перчатках + робот', JSON.stringify(started));
+check(started.boxerMarkers === 5, '5 боксерів видно на маркерах як 🥊', JSON.stringify(started));
 check(started.clonePositions.every((c) => c.z - started.centerZ > 200)
   && started.enemyPositions.every((z) => z.z - started.centerZ < -200)
   && started.playerZ - started.centerZ > 280,
