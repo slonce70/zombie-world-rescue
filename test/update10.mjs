@@ -53,12 +53,26 @@ try {
     bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
     pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
     campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
+    sections: [...document.querySelectorAll('.solo-section')].map((s) => ({
+      title: s.querySelector('.solo-section-title')?.textContent,
+      modes: [...s.querySelectorAll('.solo-mode')].map((m) => m.dataset.mode),
+    })),
   }));
   check('12 режимів; спецрежими замкнені, Кампанія відкрита',
     fresh.modes === 12 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
       && fresh.overloadedLocked && fresh.bankLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
+  check('режими згруповані по розділах',
+    JSON.stringify(fresh.sections) === JSON.stringify([
+      { title: 'Історія', modes: ['campaign'] },
+      { title: 'Виживання', modes: ['storm', 'zone-defense'] },
+      { title: 'Випробування', modes: ['knockout', 'overloaded-knockout', 'bank'] },
+      { title: 'Оборона', modes: ['defense', 'overloaded-defense'] },
+      { title: 'Боси', modes: ['arena', 'worldboss'] },
+      { title: 'Дуелі', modes: ['pvp', 'overloaded-pvp'] },
+    ]),
+    JSON.stringify(fresh.sections));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
   await page.click('.solo-mode[data-mode="campaign"]');

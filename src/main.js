@@ -876,13 +876,27 @@ class Game {
       },
     ];
     const root = document.getElementById('solo-modes');
-    root.innerHTML = modes.map((m) => `
+    const byId = new Map(modes.map((m) => [m.id, m]));
+    const groups = [
+      { title: t('Історія'), ids: ['campaign'] },
+      { title: t('Виживання'), ids: ['storm', 'zone-defense'] },
+      { title: t('Випробування'), ids: ['knockout', 'overloaded-knockout', 'bank'] },
+      { title: t('Оборона'), ids: ['defense', 'overloaded-defense'] },
+      { title: t('Боси'), ids: ['arena', 'worldboss'] },
+      { title: t('Дуелі'), ids: ['pvp', 'overloaded-pvp'] },
+    ];
+    const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
         <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}</div>
         <div class="sm-desc">${m.desc}</div></div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
-      </button>`).join('');
+      </button>`;
+    root.innerHTML = groups.map((g) => `
+      <section class="solo-section">
+        <div class="solo-section-title">${g.title}</div>
+        ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
+      </section>`).join('');
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';
