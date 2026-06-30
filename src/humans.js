@@ -10,7 +10,7 @@ export const HUMANS_CLONES = 30;
 export const HUMANS_ZOMBIES = 65;
 const HUMANS_CFG = {
   normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 65, boxers: 0, robotHp: null },
-  overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 45, boxers: 5, robotHp: 1795 },
+  overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 125, boxers: 5, robotHp: 1795 },
 };
 
 export class HumansMode {
