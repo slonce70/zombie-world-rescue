@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 
 export const PORTAL_UNLOCK_COUNTRIES = 9;
-export const PORTAL_HP = 300;
+export const PORTAL_HP = 1222;
 export const PORTAL_ROOM_SIZE = 70;
 
 export class PortalMode {

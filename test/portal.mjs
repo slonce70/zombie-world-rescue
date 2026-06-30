@@ -60,8 +60,8 @@ const started = await page.evaluate(() => {
     markers: p.getMarkers().length,
   };
 });
-check(started.portals.length === 3 && started.portals.every((p) => p.hp === 300 && p.maxHp === 300 && p.open),
-  'стартує 3 відкриті портали по 300 HP', JSON.stringify(started));
+check(started.portals.length === 3 && started.portals.every((p) => p.hp === 1222 && p.maxHp === 1222 && p.open),
+  'стартує 3 відкриті портали по 1222 HP', JSON.stringify(started));
 check(started.alivePortalZombies === 6, 'хвиля спавнить по 2 зомбі з кожного відкритого порталу', JSON.stringify(started));
 check(started.noShop && started.noPickups && !started.noGadgets, 'магазин і пікапи вимкнені, гаджети дозволені', JSON.stringify(started));
 check(started.hud.some((x) => x.includes('Закрий портали')) && started.markers >= 3, 'HUD і маркери показують портали', JSON.stringify(started));
@@ -69,11 +69,11 @@ check(started.hud.some((x) => x.includes('Закрий портали')) && star
 const closing = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.portal;
-  p.damagePortal(p.portals[0], 299);
+  p.damagePortal(p.portals[0], p.portals[0].maxHp - 1);
   const almost = { hp: p.portals[0].hp, open: p.portals[0].open, over: p.over };
   p.damagePortal(p.portals[0], 1);
   const closedOne = { hp: p.portals[0].hp, open: p.portals[0].open, closed: p.closedCount(), over: p.over };
-  for (const portal of p.portals.slice(1)) p.damagePortal(portal, 999);
+  for (const portal of p.portals.slice(1)) p.damagePortal(portal, portal.maxHp);
   return {
     almost,
     closedOne,
