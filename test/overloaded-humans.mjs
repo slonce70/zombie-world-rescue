@@ -63,6 +63,8 @@ const started = await page.evaluate(() => {
     noShop: g.level.noShop,
     noPickups: g.level.noPickups,
     noGadgets: g.level.noGadgets,
+    modeShield: g.level.modeShield,
+    activeGadget: g.level.gadgets.active,
     hud: h.getHudList().map((x) => x.title),
   };
 });
@@ -73,7 +75,9 @@ check(started.zombies === 51 && started.boxers === 5 && started.robots === 1, '4
 check(started.robotHp === 1795 && started.robotMaxHp === 1795, 'робот має 1795 HP', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
-check(started.noShop && started.noPickups && started.noGadgets, 'немає пікапів, магазину і гаджетів', JSON.stringify(started));
+check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'
+  && started.modeShield.hp === 100 && started.modeShield.cd === 100,
+  'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
 
 console.log('▸ Стрілець-клон наносить 5 HP');
 const shot = await page.evaluate(() => {

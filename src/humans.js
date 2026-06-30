@@ -47,7 +47,7 @@ export class HumansMode {
       { icon: '⚔️', title: t(this.cfg.title), done: false },
       { icon: '🧍', title: t('Клони живі: {n}/{total}', { n: this.aliveClones(), total: this.cfg.clones + this.cfg.shooters }), done: false },
       { icon: '🧟', title: t('Зомбі лишилось: {n}/{total}', { n: this.remaining(), total: this.target }), done: this.completed },
-      { icon: '🔫', title: t('Пістолет, посох і меч. Без пікапів, магазину і гаджетів.'), done: false },
+      { icon: '🔫', title: t('Пістолет, посох і меч. Без пікапів і магазину. Є тільки щит-гаджет.'), done: false },
     ];
   }
 

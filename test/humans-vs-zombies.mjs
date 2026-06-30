@@ -60,6 +60,8 @@ const started = await page.evaluate(() => {
     noShop: g.level.noShop,
     noPickups: g.level.noPickups,
     noGadgets: g.level.noGadgets,
+    modeShield: g.level.modeShield,
+    activeGadget: g.level.gadgets.active,
     hud: h.getHudList().map((x) => x.title),
     markers: h.getMarkers().length,
   };
@@ -69,8 +71,23 @@ check(started.clones.length === 30 && started.clones.every((c) => c.hp === 100),
 check(started.zombies === 31 && started.robots === 1, 'вороги: 30 зомбі і 1 зомбі-робот', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
-check(started.noShop && started.noPickups && started.noGadgets, 'немає пікапів, магазину і гаджетів', JSON.stringify(started));
+check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'
+  && started.modeShield.hp === 100 && started.modeShield.cd === 100,
+  'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
 check(started.hud.some((x) => x.includes('Зомбі')) && started.markers >= 31, 'HUD і маркери показують битву', JSON.stringify(started));
+
+console.log('▸ Єдиний гаджет: щит 100 HP з перезарядкою 100с');
+const shield = await page.evaluate(() => {
+  const g = window.__game;
+  g.level.player.gadgetShield = 0;
+  g.level.gadgets.cd = 0;
+  const used = g.test.useGadget();
+  const afterUse = { shield: g.level.player.gadgetShield, cd: g.level.gadgets.cd, active: g.level.gadgets.active };
+  const usedAgain = g.test.useGadget();
+  return { used, usedAgain, afterUse, afterAgain: { shield: g.level.player.gadgetShield, cd: g.level.gadgets.cd } };
+});
+check(shield.used && !shield.usedAgain && shield.afterUse.shield === 100 && shield.afterUse.cd === 100 && shield.afterUse.active === 'shield',
+  'щит вмикається на 100 HP і одразу йде на 100с перезарядки', JSON.stringify(shield));
 
 console.log('▸ Програш забирає 100 монет, перемога після знищення армії');
 const lose = await page.evaluate(() => {

@@ -75,7 +75,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 211;
+const APP_VERSION = 212;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1863,7 +1863,7 @@ class Game {
       playground: isPlayground,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
       noGadgets: isKnockout || isDefense || isPvp || isBank || isPortal || isHumans,
-      modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
+      modeShield: isHumans ? { hp: 100, cd: 100 } : pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp || isBank,
       noPickups: isPvp || isBank || isPortal || isMaze || isHumans || isOverloadedDefense || isZoneDefense,
