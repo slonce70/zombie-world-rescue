@@ -69,7 +69,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 197;
+const APP_VERSION = 198;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -859,7 +859,7 @@ class Game {
         id: 'bank', icon: '🏦', name: t('БАНК'), locked: libN < BANK_UNLOCK_COUNTRIES,
         desc: libN < BANK_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: BANK_UNLOCK_COUNTRIES })
-          : t('Кімната 55×23, 2 сейфи, тільки посох. Зламай сейф!'),
+          : t('Кімната 200×50: захисти свій банк і знищ банк зомбі.'),
       },
       {
         id: 'pvp', icon: '⚔️', name: t('ПВП'), locked: libN < PVP_UNLOCK_COUNTRIES,
@@ -2086,7 +2086,7 @@ class Game {
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
     const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.bank ? t('Зламай один із двох сейфів. Кожні 5 секунд біля них зʼявляються зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2663,9 +2663,9 @@ class Game {
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
-    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🏦 БАНК ПОГРАБОВАНО!') : t('💀 БАНК ВТРАЧЕНО');
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🏦 БАНК ЗАХИЩЕНО!') : t('💀 БАНК ВТРАЧЕНО');
     document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">🔐</span><span class="stat-name">${t('Сейфів лишилось')}</span><span class="stat-val">${res.safesLeft} / 2</span></div>
+      <div class="stat"><span class="stat-icon">🏦</span><span class="stat-name">${t('Банків лишилось')}</span><span class="stat-val">${res.safesLeft} / 2</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
@@ -3274,7 +3274,7 @@ class Game {
         g.level.pvp.update();
       },
       finishBank: () => {
-        const s = g.level.bank && g.level.bank.safes[0];
+        const s = g.level.bank && g.level.bank.zombieBank;
         if (s) g.level.bank.damageSafe(s, 99999, true);
       },
       questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),

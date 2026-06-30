@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 
 export const BANK_UNLOCK_COUNTRIES = 7;
-export const BANK_ROOM_W = 55;
-export const BANK_ROOM_D = 23;
+export const BANK_ROOM_W = 200;
+export const BANK_ROOM_D = 50;
 export const BANK_SAFE_HP = 500;
 
 export class BankMode {
@@ -34,17 +34,18 @@ export class BankMode {
   get(id) { void id; return null; }
 
   getHudList() {
-    const liveSafes = this.safes.filter((s) => s.hp > 0).length;
     return [
       { icon: '🏦', title: t('БАНК'), done: false },
-      { icon: '🔐', title: t('Зламай сейф: живих {n}/2', { n: liveSafes }), done: this.completed },
-      { icon: '🧟', title: t('Кожні 5с біля сейфів зʼявляються 10 зомбі'), done: false },
+      { icon: '🛡️', title: t('Захисти свій банк: {hp}/500 HP', { hp: Math.ceil(this.playerBank.hp) }), done: false },
+      { icon: '💥', title: t('Знищ банк зомбі: {hp}/500 HP', { hp: Math.ceil(this.zombieBank.hp) }), done: this.completed },
+      { icon: '🧟', title: t('Кожні 5с біля банку зомбі зʼявляються 5 зомбі'), done: false },
       { icon: '🪄', title: t('Посох і пістолет. Без магазину, гаджетів, бафів і пікапів.'), done: false },
     ];
   }
 
   getMarkers() {
-    const out = this.safes.filter((s) => s.hp > 0).map((s) => ({ x: s.x, z: s.z, color: '#ffd23f', icon: '🔐' }));
+    const out = this.safes.filter((s) => s.hp > 0)
+      .map((s) => ({ x: s.x, z: s.z, color: s.role === 'player' ? '#4dd6a8' : '#ffd23f', icon: s.role === 'player' ? '🏦' : '💀' }));
     for (const z of this.level.zombies.list) {
       if (z.bank && z.state !== 'dead') out.push({ x: z.x, z: z.z, color: '#ff5d73', icon: '🧟' });
     }
@@ -61,7 +62,7 @@ export class BankMode {
     for (const z of this.level.zombies.list) {
       if (!z.bank || z.state === 'dead') continue;
       this._clampZombie(z);
-      const safe = this._nearestLiveSafe(z.x, z.z);
+      const safe = this.playerBank.hp > 0 ? this.playerBank : null;
       if (!safe) continue;
       const dx = safe.x - z.x;
       const dz = safe.z - z.z;
@@ -77,12 +78,13 @@ export class BankMode {
       }
       this._damagePlayerIfClose(z, dt);
     }
-    if (!this.over && this.safes.every((s) => s.hp <= 0)) this.level.game._endBankRun(false);
+    if (!this.over && this.playerBank.hp <= 0) this.level.game._endBankRun(false);
   }
 
   safeHitTest(origin, dir, maxD) {
     let best = null;
     for (const safe of this.safes) {
+      if (safe.role !== 'zombie') continue;
       if (safe.hp <= 0) continue;
       const c = safe.pos;
       const oc = c.clone().sub(origin);
@@ -102,9 +104,11 @@ export class BankMode {
     if (byPlayer) this.level.effects.damageNumber(safe.pos.clone().setY(this.floorY + 1.7), Math.round(dmg), false);
     if (safe.hp <= 0) {
       safe.group.visible = false;
-      if (byPlayer) {
+      if (safe.role === 'zombie' && byPlayer && this.playerBank.hp > 0) {
         this.completed = true;
         this.level.game._endBankRun(true);
+      } else if (safe.role === 'player') {
+        this.level.game._endBankRun(false);
       }
     }
   }
@@ -138,13 +142,13 @@ export class BankMode {
     mkWall(cx, cz + hz, this.roomW, 0.4);
     mkWall(cx - hx, cz, 0.4, this.roomD);
     mkWall(cx + hx, cz, 0.4, this.roomD);
-    this._addSafe(cx - 12, cz);
-    this._addSafe(cx + 12, cz);
+    this.playerBank = this._addSafe(cx - 72, cz, 'player');
+    this.zombieBank = this._addSafe(cx + 72, cz, 'zombie');
   }
 
-  _addSafe(x, z) {
+  _addSafe(x, z, role) {
     const group = new THREE.Group();
-    const bodyM = new THREE.MeshStandardMaterial({ color: 0x9aa7b3, roughness: 0.45, metalness: 0.35 });
+    const bodyM = new THREE.MeshStandardMaterial({ color: role === 'player' ? 0x6fd3ba : 0x9aa7b3, roughness: 0.45, metalness: 0.35 });
     const doorM = new THREE.MeshStandardMaterial({ color: 0x59636f, roughness: 0.45, metalness: 0.45 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.3, 1.6), bodyM);
     body.position.y = 1.15;
@@ -159,39 +163,28 @@ export class BankMode {
     group.add(body, door, knob, bar);
     group.position.set(x, this.floorY, z);
     this.level.scene.add(group);
-    this.safes.push({ x, z, pos: new THREE.Vector3(x, this.floorY + 1.15, z), hp: BANK_SAFE_HP, maxHp: BANK_SAFE_HP, group, bar });
+    const safe = { role, x, z, pos: new THREE.Vector3(x, this.floorY + 1.15, z), hp: BANK_SAFE_HP, maxHp: BANK_SAFE_HP, group, bar };
+    this.safes.push(safe);
+    return safe;
   }
 
   _spawnWave() {
     const types = ['walker', 'runner', 'imp', 'spitter', 'walker'];
-    for (let s = 0; s < this.safes.length; s++) {
-      const safe = this.safes[s];
-      if (safe.hp <= 0) continue;
-      for (let i = 0; i < 5; i++) {
-        const side = s === 0 ? -1 : 1;
-        const x = safe.x + side * (4 + i * 0.7);
-        const z = safe.z + (i - 2) * 1.4;
-        const zb = this.level.zombies.spawn(types[(s * 5 + i) % types.length], x, z, {
-          noLeash: true,
-          anchor: { x: this.cx, z: this.cz, r: Math.max(this._hx, this._hz) },
-        });
-        zb.bank = true;
-        zb.stats = { ...zb.stats, coins: 0 };
-        zb.aggroed = false;
-        zb.state = 'wander';
-        this._clampZombie(zb);
-      }
+    const safe = this.zombieBank;
+    if (!safe || safe.hp <= 0) return;
+    for (let i = 0; i < 5; i++) {
+      const x = safe.x - (4 + i * 0.7);
+      const z = safe.z + (i - 2) * 1.4;
+      const zb = this.level.zombies.spawn(types[i % types.length], x, z, {
+        noLeash: true,
+        anchor: { x: this.cx, z: this.cz, r: Math.max(this._hx, this._hz) },
+      });
+      zb.bank = true;
+      zb.stats = { ...zb.stats, coins: 0 };
+      zb.aggroed = false;
+      zb.state = 'wander';
+      this._clampZombie(zb);
     }
-  }
-
-  _nearestLiveSafe(x, z) {
-    let best = null, bestD = Infinity;
-    for (const s of this.safes) {
-      if (s.hp <= 0) continue;
-      const d = Math.hypot(s.x - x, s.z - z);
-      if (d < bestD) { bestD = d; best = s; }
-    }
-    return best;
   }
 
   _clampActor(p) {

@@ -38,7 +38,7 @@ const menu = await page.evaluate(() => {
 check(menu.beforeExists && menu.beforeLocked, 'до 7 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /БАНК/i.test(menu.afterName), 'після 7 країн режим доступний', JSON.stringify(menu));
 
-console.log('▸ Старт Банку: кімната 55x23, 2 сейфи, посох+пістолет, заборони');
+console.log('▸ Старт Банку: кімната 200x50, банк гравця + банк зомбі, посох+пістолет, заборони');
 await page.evaluate(() => window.__game.test.startBank());
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.bank, null, { timeout: 30000 });
 const started = await page.evaluate(() => {
@@ -54,7 +54,7 @@ const started = await page.evaluate(() => {
   return {
     roomW: g.level.bank.roomW,
     roomD: g.level.bank.roomD,
-    safes: g.level.bank.safes.map((s) => ({ hp: s.hp, maxHp: s.maxHp })),
+    safes: g.level.bank.safes.map((s) => ({ role: s.role, hp: s.hp, maxHp: s.maxHp })),
     weapons: [...p.weapons],
     cur: p.cur,
     grenades: p.grenades,
@@ -72,8 +72,9 @@ const started = await page.evaluate(() => {
     noCoinDrops: g.level.noCoinDrops,
   };
 });
-check(started.roomW === 55 && started.roomD === 23, 'кімната має розмір 55x23 метри', JSON.stringify(started));
-check(started.safes.length === 2 && started.safes.every((s) => s.hp === 500 && s.maxHp === 500), 'є 2 сейфи по 500 HP', JSON.stringify(started));
+check(started.roomW === 200 && started.roomD === 50, 'кімната має розмір 200x50 метрів', JSON.stringify(started));
+check(started.safes.length === 2 && started.safes.some((s) => s.role === 'player') && started.safes.some((s) => s.role === 'zombie')
+  && started.safes.every((s) => s.hp === 500 && s.maxHp === 500), 'є банк гравця і банк зомбі по 500 HP', JSON.stringify(started));
 check(started.weapons.length === 2 && started.weapons.includes('staff') && started.weapons.includes('pistol') && started.cur === 'staff' && started.grenades === 0,
   'гравець стартує з посохом і пістолетом без гранат', JSON.stringify(started));
 check(!started.shopOpen && !started.gadgetUsed && started.afterGadget === started.beforeGadget,
@@ -82,24 +83,44 @@ check(started.noGadgets && started.noShop && started.noBuffs && started.noPickup
   && Object.values(started.buffs).every((n) => n === 0) && started.playerHp === 50,
   'бафи, пікапи і дроп вимкнені', JSON.stringify(started));
 
-console.log('▸ Хвиля Банку і перемога від зламу одного сейфа');
+console.log('▸ Хвиля Банку, атака банку гравця і перемога від знищення банку зомбі');
 const waveAndWin = await page.evaluate(() => {
   const g = window.__game;
   const b = g.level.bank;
   b.spawnT = 0;
   b.update(0.01);
   const alive = g.level.zombies.list.filter((z) => z.bank && z.state !== 'dead').length;
-  const safe = b.safes[0];
-  b.damageSafe(safe, 500);
+  const target = b.zombieBank;
+  const protectedBank = b.playerBank;
+  b.damageSafe(protectedBank, 25, false);
+  b.damageSafe(target, 500);
   return {
     alive,
+    playerBankHp: protectedBank.hp,
+    zombieBankHp: target.hp,
     completed: b.completed,
     shown: document.getElementById('overlay-arena-end').classList.contains('show'),
     title: document.querySelector('#overlay-arena-end h1').textContent,
   };
 });
-check(waveAndWin.alive === 10, 'кожна хвиля спавнить 10 зомбі біля сейфів', JSON.stringify(waveAndWin));
-check(waveAndWin.completed && waveAndWin.shown && /БАНК/i.test(waveAndWin.title), 'злам одного сейфа завершує режим перемогою', JSON.stringify(waveAndWin));
+check(waveAndWin.alive === 5, 'кожна хвиля спавнить 5 зомбі біля банку зомбі', JSON.stringify(waveAndWin));
+check(waveAndWin.playerBankHp === 475, 'зомбі можуть пошкодити банк гравця', JSON.stringify(waveAndWin));
+check(waveAndWin.completed && waveAndWin.shown && /БАНК/i.test(waveAndWin.title), 'знищення банку зомбі завершує режим перемогою', JSON.stringify(waveAndWin));
+
+await page.evaluate(() => window.__game.startBank());
+await page.waitForFunction(() => window.__game.level && window.__game.level.bank
+  && !window.__game.level.bank.over && window.__game.level.bank.playerBank.hp === 500, null, { timeout: 30000 });
+const loss = await page.evaluate(() => {
+  const g = window.__game;
+  const b = g.level.bank;
+  b.damageSafe(b.playerBank, 500, false);
+  return {
+    completed: b.completed,
+    shown: document.getElementById('overlay-arena-end').classList.contains('show'),
+    title: document.querySelector('#overlay-arena-end h1').textContent,
+  };
+});
+check(!loss.completed && loss.shown && /ВТРАЧЕНО/i.test(loss.title), 'знищення банку гравця завершує режим поразкою', JSON.stringify(loss));
 
 check(errors.length === 0, 'без JS-помилок консолі', errors.join('\n'));
 await browser.close();
