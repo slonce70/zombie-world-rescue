@@ -438,6 +438,7 @@ export const GADGETS = {
   // 🍎 Золоте яблуко: +20 тимчасового HP на 5с (бонус-макс, згасає сам), перезарядка 45с
   goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
   dash: { name: t('Ривок'), icon: '🏃', cd: 30, price: 1000, desc: t('Короткий ривок уперед і 1с невразливості') },
+  mine: { name: t('Міна'), icon: '💥', cd: 35, price: 1000, desc: t('Ставить пастку: вибухає, коли зомбі підходить') },
   // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
   meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 250 шкоди по площі 7×7 м') },
 };
@@ -515,6 +516,19 @@ function makeDamageTotemMesh() {
   return g;
 }
 
+function makeMineMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.52, 0.14, 16), new THREE.MeshToonMaterial({ color: 0x2b3038 }));
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshToonMaterial({ color: 0xff4d3d }));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.025, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.45 }));
+  body.position.y = 0.07;
+  cap.position.y = 0.2;
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.08;
+  g.add(body, cap, ring);
+  return g;
+}
+
 export class Gadgets {
   constructor(level) {
     this.level = level;
@@ -527,6 +541,7 @@ export class Gadgets {
     this.damageTotems = [];
     this.towers = [];
     this.soulMagnets = [];
+    this.mines = [];
     this._meteorFires = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
@@ -619,6 +634,7 @@ export class Gadgets {
     this._updateDamageTotems(dt);
     this._updateTowers(dt);
     this._updateSoulMagnets(dt);
+    this._updateMines(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -804,6 +820,12 @@ export class Gadgets {
       level.audio.powerup();
       level.bus.emit('toast', hyper ? t('🏃🔥 Гіпер-ривок! 3с невразливості') : t('🏃 Ривок! 1с невразливості'));
       ok = true;
+    } else if (id === 'mine') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Міна доступна тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._placeMine();
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму
       ok = level.mirror ? this._requestMeteor() : this._callMeteor();
@@ -1050,6 +1072,58 @@ export class Gadgets {
     this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9b6bff, 20, { speed: 5, up: 4, life: 0.8 });
     this.level.bus.emit('toast', t('🧲 Магніт душ притягує зомбі!'));
     return true;
+  }
+
+  _placeMine() {
+    const p = this.level.player;
+    const x = p.pos.x;
+    const z = p.pos.z;
+    const y = Math.max(this.level.world.groundH(x, z), this.level.world.floorAt(x, z, p.pos.y));
+    const mesh = makeMineMesh();
+    mesh.position.set(x, y + 0.03, z);
+    this.level.scene.add(mesh);
+    this.mines.push({ x, z, y, mesh, life: 45, hyper: (this.level.game.save.gadgetHypers || []).includes('mine') });
+    this.level.audio.powerup();
+    this.level.effects.ring(new THREE.Vector3(x, y, z), 0xffd23f, 1.8);
+    this.level.bus.emit('toast', t('💥 Міну поставлено!'));
+    return true;
+  }
+
+  _explodeMine(i) {
+    const m = this.mines[i];
+    if (!m) return;
+    this.mines.splice(i, 1);
+    this.level.scene.remove(m.mesh);
+    disposeObject(m.mesh);
+    const r = m.hyper ? 6 : 5;
+    const dmg = m.hyper ? 260 : 180;
+    this.level.audio.explosion();
+    this.level.effects.burst(new THREE.Vector3(m.x, m.y + 0.3, m.z), 0xff6a18, 24, { speed: 6, up: 4, life: 0.8 });
+    this.level.effects.onExplosion(m.x, m.y + 0.2, m.z, r, dmg, 1, { finalDamage: true });
+    if (m.hyper) this._addMeteorFire(m.x, m.z, true, 8, 2.6);
+  }
+
+  _updateMines(dt) {
+    for (let i = this.mines.length - 1; i >= 0; i--) {
+      const m = this.mines[i];
+      m.life -= dt;
+      m.mesh.rotation.y += dt * 1.4;
+      const pulse = 1 + Math.sin(m.life * 6) * 0.04;
+      m.mesh.scale.set(pulse, 1, pulse);
+      if (m.life <= 0) {
+        this.level.scene.remove(m.mesh);
+        disposeObject(m.mesh);
+        this.mines.splice(i, 1);
+        continue;
+      }
+      for (const z of this.level.zombies.list) {
+        if (z.state === 'dead' || z.gone) continue;
+        if (Math.hypot(z.x - m.x, z.z - m.z) <= 2.2) {
+          this._explodeMine(i);
+          break;
+        }
+      }
+    }
   }
 
   _updateSoulMagnets(dt) {
