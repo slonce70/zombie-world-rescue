@@ -37,7 +37,7 @@ const menu = await page.evaluate(() => {
     tabsBefore,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ЗОМБІ ПРОТИ ЛЮДЕЙ'), 'до 11 країн режим заблокований', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВІЙНА'), 'до 11 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ЗОМБІ ПРОТИ ЛЮДЕЙ/i.test(menu.name), 'після 11 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: 30 клонів проти 30 зомбі і робота');

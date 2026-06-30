@@ -39,7 +39,7 @@ const menu = await page.evaluate(() => {
     tabsAfter,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ПОРТАЛ'), 'до 9 країн режим заблокований', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВІЙНА'), 'до 9 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ПОРТАЛ/i.test(menu.name), 'після 9 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт Порталу: 3 портали, хвилі зомбі, перемога після закриття всіх');

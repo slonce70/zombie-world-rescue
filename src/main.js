@@ -75,7 +75,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 212;
+const APP_VERSION = 213;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -911,7 +911,17 @@ class Game {
     ];
     const root = document.getElementById('solo-modes');
     const byId = new Map(modes.map((m) => [m.id, m]));
-    const groups = modes.map((m) => ({ id: m.id, title: m.name, ids: [m.id] }));
+    const groups = [
+      { id: 'campaign', title: t('КАМПАНІЯ'), ids: ['campaign'] },
+      { id: 'bosses', title: t('БОСИ'), ids: ['arena', 'worldboss'] },
+      { id: 'overloaded', title: t('ПЕРЕГРУЖЕНІ РЕЖИМИ'), ids: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
+      { id: 'duels', title: t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
+      { id: 'war', title: t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
+      { id: 'trials', title: t('ВИПРОБУВАННЯ'), ids: ['zone-defense'] },
+      { id: 'maze', title: t('ЛАБІРИНТ'), ids: ['maze'] },
+      { id: 'bank', title: t('БАНК'), ids: ['bank'] },
+      { id: 'defense', title: t('ОБОРОНА'), ids: ['defense'] },
+    ];
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">

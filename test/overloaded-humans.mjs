@@ -37,7 +37,7 @@ const menu = await page.evaluate(() => {
   };
 });
 check(menu.beforeExists && menu.beforeLocked, 'до 12 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && menu.tabs.includes('Перегружена зомбі проти людей'), 'після 12 країн режим доступний', JSON.stringify(menu));
+check(menu.afterExists && !menu.afterLocked && menu.tabs.includes('ПЕРЕГРУЖЕНІ РЕЖИМИ'), 'після 12 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: 45 клонів, 5 стрільців, 45 зомбі, 5 боксерів і робот');
 await page.evaluate(() => window.__game.test.startOverloadedHumans());

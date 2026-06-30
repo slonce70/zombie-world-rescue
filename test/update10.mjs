@@ -82,30 +82,22 @@ try {
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
     JSON.stringify(fresh.tabs) === JSON.stringify([
-      'КАМПАНІЯ', 'ШТОРМ', 'АРЕНА БОСІВ', 'СВІТОВІ БОСИ',
-      'НОКАУТ', 'Перегружений нокаут', 'Оборона в зоні', 'ОБОРОНА',
-      'Перегружена оборона', 'Перегружене ПВП', 'БАНК', 'ПОРТАЛ', 'ЛАБІРИНТ', 'ЗОМБІ ПРОТИ ЛЮДЕЙ', 'Перегружена зомбі проти людей', 'ПВП',
+      'КАМПАНІЯ', 'БОСИ', 'ПЕРЕГРУЖЕНІ РЕЖИМИ', 'ДУЕЛІ', 'ВІЙНА',
+      'ВИПРОБУВАННЯ', 'ЛАБІРИНТ', 'БАНК', 'ОБОРОНА',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
       && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
         { title: 'КАМПАНІЯ', modes: ['campaign'] },
-        { title: 'ШТОРМ', modes: ['storm'] },
-        { title: 'АРЕНА БОСІВ', modes: ['arena'] },
-        { title: 'СВІТОВІ БОСИ', modes: ['worldboss'] },
-        { title: 'НОКАУТ', modes: ['knockout'] },
-        { title: 'Перегружений нокаут', modes: ['overloaded-knockout'] },
-        { title: 'Оборона в зоні', modes: ['zone-defense'] },
-        { title: 'ОБОРОНА', modes: ['defense'] },
-        { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
-        { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
-        { title: 'БАНК', modes: ['bank'] },
-        { title: 'ПОРТАЛ', modes: ['portal'] },
+        { title: 'БОСИ', modes: ['arena', 'worldboss'] },
+        { title: 'ПЕРЕГРУЖЕНІ РЕЖИМИ', modes: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
+        { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
+        { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
+        { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense'] },
         { title: 'ЛАБІРИНТ', modes: ['maze'] },
-        { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', modes: ['humans'] },
-        { title: 'Перегружена зомбі проти людей', modes: ['overloaded-humans'] },
-        { title: 'ПВП', modes: ['pvp'] },
+        { title: 'БАНК', modes: ['bank'] },
+        { title: 'ОБОРОНА', modes: ['defense'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
   await page.click('.solo-tab:has-text("БАНК")');
@@ -121,24 +113,17 @@ try {
     JSON.stringify(bankModes) === JSON.stringify(['bank']),
     bankModes.join(','));
   await page.click('.solo-tab:has-text("КАМПАНІЯ")');
-  check('кожен pane-розділ містить свій один режим',
+  check('кожен pane-розділ містить свої режими',
     JSON.stringify(fresh.sections) === JSON.stringify([
       { title: 'КАМПАНІЯ', modes: ['campaign'] },
-      { title: 'ШТОРМ', modes: ['storm'] },
-      { title: 'АРЕНА БОСІВ', modes: ['arena'] },
-      { title: 'СВІТОВІ БОСИ', modes: ['worldboss'] },
-      { title: 'НОКАУТ', modes: ['knockout'] },
-      { title: 'Перегружений нокаут', modes: ['overloaded-knockout'] },
-      { title: 'Оборона в зоні', modes: ['zone-defense'] },
-      { title: 'ОБОРОНА', modes: ['defense'] },
-      { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
-      { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
-      { title: 'БАНК', modes: ['bank'] },
-      { title: 'ПОРТАЛ', modes: ['portal'] },
+      { title: 'БОСИ', modes: ['arena', 'worldboss'] },
+      { title: 'ПЕРЕГРУЖЕНІ РЕЖИМИ', modes: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
+      { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
+      { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
+      { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense'] },
       { title: 'ЛАБІРИНТ', modes: ['maze'] },
-      { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', modes: ['humans'] },
-      { title: 'Перегружена зомбі проти людей', modes: ['overloaded-humans'] },
-      { title: 'ПВП', modes: ['pvp'] },
+      { title: 'БАНК', modes: ['bank'] },
+      { title: 'ОБОРОНА', modes: ['defense'] },
     ]),
     JSON.stringify(fresh.sections));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
@@ -212,7 +197,7 @@ try {
   }));
   check('2 країни звільнено → Шторм і Арена відкриті', unlocked.storm && unlocked.arena, JSON.stringify(unlocked));
 
-  await page.click('.solo-tab:has-text("ШТОРМ")');
+  await page.click('.solo-tab:has-text("ВІЙНА")');
   await page.click('.solo-mode[data-mode="storm"]');
   const ctys = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-cty')].map((b) => b.dataset.id));
