@@ -17,6 +17,7 @@ const suite = [
   ['node', ['test/crystals.mjs']],
   ['node', ['test/shop-packs.mjs']],
   ['node', ['test/gadget-dash.mjs']],
+  ['node', ['test/gadget-soulmagnet.mjs']],
   ['node', ['test/gadget-clone.mjs']],
   ['node', ['test/knockout.mjs']],
   ['node', ['test/friendly-knockout.mjs']],

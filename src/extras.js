@@ -429,6 +429,7 @@ export const GADGETS = {
   xray: { name: t('Ікс-рей'), icon: '🩻', cd: 25, price: 1000, desc: t('Підсвічує всіх невидимих зомбі на 4 секунди') },
   infammo: { name: t('Бескінечні патрони'), icon: '♾️', cd: 45, price: 1000, desc: t('3 секунди автомат і швидкостріл не витрачають патрони') },
   invisibility: { name: t('Невидимка'), icon: '👻', cd: 45, price: 0, desc: t('Гравця не видно зомбі 5 секунд') },
+  soulmagnet: { name: t('Магніт душ'), icon: '🧲', cd: 45, price: 1000, desc: t('4 секунди притягує зомбі в радіусі 18 метрів') },
   // 💫 Оглушливі кулі: 3с кулі пістолета/магнума оглушують зомбі на 0.5с
   stunammo: { name: t('Оглушливі кулі'), icon: '💫', cd: 45, price: 1000, desc: t('3 секунди кулі пістолета й магнума оглушують зомбі на 0.5с') },
   // 🪄 Телепортація: миттєвий ривок уперед на ~8м (вирватись із натовпу), перезарядка 45с
@@ -525,6 +526,7 @@ export class Gadgets {
     this.totems = [];
     this.damageTotems = [];
     this.towers = [];
+    this.soulMagnets = [];
     this._meteorFires = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
@@ -616,6 +618,7 @@ export class Gadgets {
     this._updateTotems(dt);
     this._updateDamageTotems(dt);
     this._updateTowers(dt);
+    this._updateSoulMagnets(dt);
     // зомбі гатять по барикадах (рахує лише хост/соло)
     this._thunkCd -= dt;
     for (let i = this.walls.length - 1; i >= 0; i--) {
@@ -742,6 +745,12 @@ export class Gadgets {
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9be8ff, 16, { speed: 3, up: 3, life: 0.7 });
       level.bus.emit('toast', t('👻 Невидимка на 5 секунд!'));
       ok = true;
+    } else if (id === 'soulmagnet') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Магніт душ доступний тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._placeSoulMagnet();
     } else if (id === 'stunammo') {
       p.stunAmmoT = 3;
       level.audio.powerup();
@@ -1029,6 +1038,43 @@ export class Gadgets {
     if (broken) {
       this.level.effects.burst(new THREE.Vector3(ttm.x, ttm.y + 0.6, ttm.z), 0xff6a2a, 12, { speed: 3, up: 3, life: 0.6 });
       this.level.bus.emit('toast', t('🔥 Тотем шкоди зламали!'));
+    }
+  }
+
+  _placeSoulMagnet() {
+    const p = this.level.player;
+    while (this.soulMagnets.length) this.soulMagnets.pop();
+    this.soulMagnets.push({ x: p.pos.x, z: p.pos.z, y: p.pos.y, life: 4, pulseT: 0 });
+    this.level.audio.powerup();
+    this.level.effects.ring(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), 0x9b6bff, 18);
+    this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9b6bff, 20, { speed: 5, up: 4, life: 0.8 });
+    this.level.bus.emit('toast', t('🧲 Магніт душ притягує зомбі!'));
+    return true;
+  }
+
+  _updateSoulMagnets(dt) {
+    for (let i = this.soulMagnets.length - 1; i >= 0; i--) {
+      const m = this.soulMagnets[i];
+      m.life -= dt;
+      if (m.life <= 0) { this.soulMagnets.splice(i, 1); continue; }
+      m.pulseT -= dt;
+      if (m.pulseT <= 0) {
+        m.pulseT = 0.6;
+        this.level.effects.ring(new THREE.Vector3(m.x, m.y, m.z), 0x9b6bff, 18);
+      }
+      for (const z of this.level.zombies.list) {
+        if (z.state === 'dead' || z.gone) continue;
+        const dx = m.x - z.x, dz = m.z - z.z;
+        const d = Math.hypot(dx, dz);
+        if (d <= 0.5 || d > 18) continue;
+        const step = Math.min(d - 0.5, 12 * dt);
+        const solved = this.level.world.collide(z.x + (dx / d) * step, z.z + (dz / d) * step, z.rig.radius * 0.8, z.y);
+        z.x = solved.x;
+        z.z = solved.z;
+        z.y = this.level.world.groundH(z.x, z.z);
+        z.aggroed = true;
+        z.rig.group.position.set(z.x, z.y, z.z);
+      }
     }
   }
 
