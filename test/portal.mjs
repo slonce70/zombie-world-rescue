@@ -56,6 +56,9 @@ const started = await page.evaluate(() => {
     noShop: g.level.noShop,
     noPickups: g.level.noPickups,
     noGadgets: g.level.noGadgets,
+    weapons: [...g.level.player.weapons],
+    currentWeapon: g.level.player.cur,
+    bazookaReserve: g.level.player.ammo.bazooka.reserve,
     hud: p.getHudList().map((x) => x.title),
     markers: p.getMarkers().length,
   };
@@ -63,7 +66,9 @@ const started = await page.evaluate(() => {
 check(started.portals.length === 3 && started.portals.every((p) => p.hp === 1222 && p.maxHp === 1222 && p.open),
   'стартує 3 відкриті портали по 1222 HP', JSON.stringify(started));
 check(started.alivePortalZombies === 6, 'хвиля спавнить по 2 зомбі з кожного відкритого порталу', JSON.stringify(started));
-check(started.noShop && started.noPickups && !started.noGadgets, 'магазин і пікапи вимкнені, гаджети дозволені', JSON.stringify(started));
+check(started.noShop && started.noPickups && started.noGadgets, 'магазин, пікапи і гаджети вимкнені', JSON.stringify(started));
+check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'bazooka']) && started.currentWeapon === 'pistol' && started.bazookaReserve > 0,
+  'у Порталі тільки пістолет і базука з ракетами', JSON.stringify(started));
 check(started.hud.some((x) => x.includes('Закрий портали')) && started.markers >= 3, 'HUD і маркери показують портали', JSON.stringify(started));
 
 const closing = await page.evaluate(() => {

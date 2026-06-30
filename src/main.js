@@ -74,7 +74,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 207;
+const APP_VERSION = 208;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1802,7 +1802,7 @@ class Game {
       runIndex: coop && coop.spec ? coop.spec.runIndex : undefined,
       playground: isPlayground,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
-      noGadgets: isKnockout || isDefense || isPvp || isBank,
+      noGadgets: isKnockout || isDefense || isPvp || isBank || isPortal,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp || isBank,
@@ -1838,10 +1838,11 @@ class Game {
     level.player.applyGear(u);
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
-    if (isKnockout || isDefense || isPvp || isBank) {
-      level.player.weapons = isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
-      level.player.cur = isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
+    if (isKnockout || isDefense || isPvp || isBank || isPortal) {
+      level.player.weapons = isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
+      if (isPortal) level.player.addRockets(WEAPONS.bazooka.cap);
       if (isPvp) {
         level.player.maxHealth = pvpVariant === 'overloaded' ? 2500 : 50;
         level.player.health = level.player.maxHealth;
