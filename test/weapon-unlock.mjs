@@ -128,7 +128,7 @@ while (Date.now() - tH < 60000 * SLOW) {
     unlocked: window.__game.level.missions.bossUnlocked,
   }));
   if (stH.unlocked) { unlocked = true; break; }
-  if (stH.active) await page.evaluate(() => window.__game.test.finishHorde());
+  await page.evaluate(() => window.__game.test.finishHorde());
   await page.waitForTimeout(400);
 }
 check(unlocked, 'арена боса відкрилась');
