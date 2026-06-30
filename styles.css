@@ -1186,7 +1186,7 @@ body.touch-mode #touch-coach.show { display: block; }
 }
 
 @media (min-width: 901px) {
-  .globe-top { max-width: calc(100vw - 320px); }
+  .globe-top { max-width: calc(100vw - 360px); }
 }
 
 @media (orientation: portrait) and (max-width: 640px) {
