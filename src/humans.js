@@ -95,7 +95,9 @@ export class HumansMode {
 
   placePlayer() {
     const p = this.level.player;
-    p.pos.set(this.cx, this.floorY, this.cz + 130);
+    const x = this.cx;
+    const z = this.cz + this._half - 55;
+    p.pos.set(x, this._floorAt(x, z), z);
     p.vel.set(0, 0, 0);
     p.onGround = true;
   }
@@ -124,15 +126,17 @@ export class HumansMode {
 
   _spawnClones() {
     const total = this.cfg.clones + this.cfg.shooters;
+    const baseZ = this.cz + this._half - 130;
     for (let i = 0; i < total; i++) {
       const col = i % 10;
       const row = Math.floor(i / 10);
       const x = this.cx - 45 + col * 10;
-      const z = this.cz + 85 + row * 10;
+      const z = baseZ + row * 10;
+      const y = this._floorAt(x, z);
       const rig = makeHero('ninja');
-      rig.group.position.set(x, this.floorY, z);
+      rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
-      const clone = { x, z, y: this.floorY, hp: 100, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };
+      const clone = { x, z, y, hp: 100, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };
       clone.takeDamage = (dmg) => {
         clone.hp = Math.max(0, clone.hp - dmg);
         if (clone.hp <= 0) clone.mesh.visible = false;
@@ -143,15 +147,16 @@ export class HumansMode {
 
   _spawnZombies() {
     const types = ['walker', 'runner', 'imp', 'spitter', 'gunner', 'tank'];
+    const baseZ = this.cz - this._half + 130;
     for (let i = 0; i < this.cfg.zombies; i++) {
       const col = i % 10;
       const row = Math.floor(i / 10);
-      this._addZombie(types[i % types.length], this.cx - 45 + col * 10, this.cz - 95 - row * 10);
+      this._addZombie(types[i % types.length], this.cx - 45 + col * 10, baseZ - row * 10);
     }
     for (let i = 0; i < this.cfg.boxers; i++) {
-      this._addZombie('boxer', this.cx + 70 + i * 8, this.cz - 95);
+      this._addZombie('boxer', this.cx + 70 + i * 8, baseZ);
     }
-    const robot = this._addZombie('robot', this.cx, this.cz - 155);
+    const robot = this._addZombie('robot', this.cx, this.cz - this._half + 55);
     if (this.cfg.robotHp) {
       robot.hp = robot.maxHp = this.cfg.robotHp;
       robot.stats = { ...robot.stats, hp: this.cfg.robotHp };
@@ -236,10 +241,11 @@ export class HumansMode {
   _clampActor(p) {
     const x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, p.pos.x));
     const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
+    const floorY = this._floorAt(x, z);
     if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
     if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY || p.pos.y > this.floorY + 4) {
-      p.pos.y = this.floorY;
+    if (p.pos.y < floorY || p.pos.y > floorY + 4) {
+      p.pos.y = floorY;
       if (p.vel.y < 0) p.vel.y = 0;
       p.onGround = true;
     }
@@ -248,15 +254,19 @@ export class HumansMode {
   _clampZombie(z) {
     z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
     z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
-    z.y = this.floorY;
+    z.y = this._floorAt(z.x, z.z);
     if (z.rig && z.rig.group) z.rig.group.position.set(z.x, z.y, z.z);
   }
 
   _clampClone(c) {
     c.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, c.x));
     c.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, c.z));
-    c.y = this.floorY;
+    c.y = this._floorAt(c.x, c.z);
     c.mesh.position.set(c.x, c.y, c.z);
+  }
+
+  _floorAt(x, z) {
+    return Math.max(this.floorY, this.level.world.floorAt(x, z, this.floorY), this.level.world.groundH(x, z));
   }
 
   _calcFloorY() {

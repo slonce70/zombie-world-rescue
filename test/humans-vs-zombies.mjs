@@ -50,11 +50,16 @@ const started = await page.evaluate(() => {
   const g = window.__game;
   const h = g.level.humans;
   h.update(0.05);
+  const enemies = g.level.zombies.list.filter((z) => z.humans && z.state !== 'dead');
   return {
     roomSize: h.roomSize,
-    clones: h.clones.map((c) => ({ hp: c.hp })),
-    zombies: g.level.zombies.list.filter((z) => z.humans && z.state !== 'dead').length,
-    robots: g.level.zombies.list.filter((z) => z.humans && z.type === 'robot' && z.state !== 'dead').length,
+    centerZ: h.cz,
+    floorY: h.floorY,
+    clones: h.clones.map((c) => ({ hp: c.hp, x: c.x, z: c.z, y: c.y, meshY: c.mesh.position.y })),
+    zombies: enemies.length,
+    robots: enemies.filter((z) => z.type === 'robot').length,
+    enemyPositions: enemies.map((z) => ({ x: z.x, z: z.z, y: z.y })),
+    playerZ: g.level.player.pos.z,
     weapons: [...g.level.player.weapons],
     currentWeapon: g.level.player.cur,
     noShop: g.level.noShop,
@@ -69,6 +74,13 @@ const started = await page.evaluate(() => {
 check(started.roomSize === 750, 'кімната 750 на 750 метрів', JSON.stringify(started));
 check(started.clones.length === 30 && started.clones.every((c) => c.hp === 100), 'з гравцем 30 клонів по 100 HP', JSON.stringify(started));
 check(started.zombies === 31 && started.robots === 1, 'вороги: 30 зомбі і 1 зомбі-робот', JSON.stringify(started));
+check(started.clones.every((c) => c.z - started.centerZ > 200)
+  && started.enemyPositions.every((z) => z.z - started.centerZ < -200)
+  && started.playerZ - started.centerZ > 280,
+  'дві армії спавняться на протилежних сторонах кімнати', JSON.stringify(started));
+check(started.clones.every((c) => Math.abs(c.y - started.floorY) < 0.01 && Math.abs(c.meshY - started.floorY) < 0.01)
+  && started.enemyPositions.every((z) => Math.abs(z.y - started.floorY) < 0.01),
+  'клони і зомбі стоять на рівній підлозі, не під землею', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
 check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'

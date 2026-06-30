@@ -49,11 +49,16 @@ const started = await page.evaluate(() => {
   const enemies = g.level.zombies.list.filter((z) => z.humans && z.state !== 'dead');
   return {
     variant: h.variant,
+    centerZ: h.cz,
+    floorY: h.floorY,
     playerHp: g.level.player.health,
     playerMaxHp: g.level.player.maxHealth,
     clones: h.clones.length,
+    clonePositions: h.clones.map((c) => ({ z: c.z, y: c.y, meshY: c.mesh.position.y })),
     shooters: h.clones.filter((c) => c.shooter).length,
     zombies: enemies.length,
+    enemyPositions: enemies.map((z) => ({ z: z.z, y: z.y })),
+    playerZ: g.level.player.pos.z,
     boxers: enemies.filter((z) => z.type === 'boxer').length,
     robots: enemies.filter((z) => z.type === 'robot').length,
     robotHp: enemies.find((z) => z.type === 'robot')?.hp,
@@ -72,6 +77,13 @@ check(started.variant === 'overloaded', 'варіант overloaded', JSON.string
 check(started.playerHp === 350 && started.playerMaxHp === 350, 'у гравця 350 HP', JSON.stringify(started));
 check(started.clones === 50 && started.shooters === 5, '45 клонів + 5 стрільців', JSON.stringify(started));
 check(started.zombies === 51 && started.boxers === 5 && started.robots === 1, '45 зомбі + 5 в перчатках + робот', JSON.stringify(started));
+check(started.clonePositions.every((c) => c.z - started.centerZ > 200)
+  && started.enemyPositions.every((z) => z.z - started.centerZ < -200)
+  && started.playerZ - started.centerZ > 280,
+  'дві армії спавняться на протилежних сторонах кімнати', JSON.stringify(started));
+check(started.clonePositions.every((c) => Math.abs(c.y - started.floorY) < 0.01 && Math.abs(c.meshY - started.floorY) < 0.01)
+  && started.enemyPositions.every((z) => Math.abs(z.y - started.floorY) < 0.01),
+  'клони і зомбі стоять на рівній підлозі, не під землею', JSON.stringify(started));
 check(started.robotHp === 1795 && started.robotMaxHp === 1795, 'робот має 1795 HP', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
