@@ -72,7 +72,7 @@ const started = await page.evaluate(() => {
   };
 });
 check(started.roomSize === 750, 'кімната 750 на 750 метрів', JSON.stringify(started));
-check(started.clones.length === 30 && started.clones.every((c) => c.hp === 100), 'з гравцем 30 клонів по 100 HP', JSON.stringify(started));
+check(started.clones.length === 30 && started.clones.every((c) => c.hp === 30), 'з гравцем 30 клонів по 30 HP', JSON.stringify(started));
 check(started.zombies === 66 && started.robots === 1, 'вороги: 65 зомбі і 1 зомбі-робот', JSON.stringify(started));
 check(started.clones.every((c) => c.z - started.centerZ > 200)
   && started.enemyPositions.every((z) => z.z - started.centerZ < -200)

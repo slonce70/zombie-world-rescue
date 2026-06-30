@@ -136,7 +136,7 @@ export class HumansMode {
       const rig = makeHero('ninja');
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
-      const clone = { x, z, y, hp: 100, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };
+      const clone = { x, z, y, hp: 30, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };
       clone.takeDamage = (dmg) => {
         clone.hp = Math.max(0, clone.hp - dmg);
         if (clone.hp <= 0) clone.mesh.visible = false;
