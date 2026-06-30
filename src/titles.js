@@ -36,6 +36,13 @@ export const TITLES = {
     detail: () => t('Відкривається за 100 використань будь-яких гаджетів'),
     unlocked: (s) => ((s.stats && s.stats.gadgetUses) | 0) >= 100,
   },
+  infection_cleaner: {
+    icon: '🧪',
+    name: () => t('Очищувач'),
+    desc: () => t('Очисти заражену країну'),
+    detail: () => t('Відкривається за першу перемогу в Главі 2'),
+    unlocked: (s) => Object.keys((s.infected && s.infected.cleared) || {}).length >= 1,
+  },
 };
 
 export function syncTitles(save) {

@@ -14,6 +14,14 @@ export const CHAPTER1 = {
   ],
 };
 
+export const CHAPTER2_UNLOCK_COUNTRIES = 12;
+export const CHAPTER2 = {
+  id: 'infected',
+  title: t('Глава 2: Заражені країни'),
+  medalName: t('Медаль «Очищувач зараження»'),
+  target: 3,
+};
+
 export class Chapter {
   constructor(game) { this.game = game; }
   get state() {

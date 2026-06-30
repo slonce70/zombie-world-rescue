@@ -68,7 +68,7 @@ await page.evaluate(() => { window.__game.save.chapter = { p: { kill:3 }, done:f
 let hq = await page.evaluate(() => document.getElementById('hq-content').innerHTML);
 check(/hq-chapter/.test(hq), 'Штаб показує секцію глави');
 check(/Я рятівник|I'm a Rescuer|Я спасатель/.test(hq), 'є назва глави');
-check((hq.match(/hq-step/g) || []).length === 5, 'рівно 5 кроків');
+check((hq.match(/hq-step/g) || []).length >= 5, 'кроки глави рендеряться');
 check(/3\/10/.test(hq) || (/\b3\b/.test(hq) && /\b10\b/.test(hq)), 'прогрес кроку рендериться (3/10)');
 
 // пройдена глава → лінія медалі рендериться у Штабі

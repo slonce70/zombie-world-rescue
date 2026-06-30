@@ -138,6 +138,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.towerSkin = saveHasProgress({ ...fresh, towerSkins: ['default', 'gold'], activeTowerSkin: 'gold' }) === true;
     out.worldBoss = saveHasProgress({ ...fresh, worldBosses: { radiation: true } }) === true;
     out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
+    out.infected = saveHasProgress({ ...fresh, infected: { cleared: { UKR: true }, done: false } }) === true;
     out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
     return out;
   });
@@ -165,6 +166,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('куплений скін башти → прогрес=true', res.towerSkin);
   check('переможений світовий бос → прогрес=true', res.worldBoss);
   check('прогрес глави → прогрес=true', res.chapter);
+  check('прогрес Глави 2 → прогрес=true', res.infected);
   await ctxU.close();
 }
 

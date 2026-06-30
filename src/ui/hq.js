@@ -3,7 +3,7 @@
 import { t } from '../i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { goalInfo } from '../shop.js';
-import { CHAPTER1 } from '../chapter.js';
+import { CHAPTER1, CHAPTER2, CHAPTER2_UNLOCK_COUNTRIES } from '../chapter.js';
 
 const BESTIARY = [
   { id: 'walker', icon: '🧟', name: t('Волоцюга'), desc: t('Повільний, зате їх багато!') },
@@ -115,6 +115,14 @@ export class RescueHQ {
     }
     h += '</div>';
     if (doneAll) h += `<div class="hq-medal">${t('🎖️ {m} — отримано!', { m: CHAPTER1.medalName })}</div>`;
+    const libN = Object.values(save.liberated || {}).filter(Boolean).length;
+    const inf = save.infected || {};
+    const cleared = Object.keys(inf.cleared || {}).length;
+    h += `<h3 class="hq-h">${t('🧟 Глава 2: Заражені країни')} ${inf.done ? '🎖️' : ''}</h3><div class="hq-chapter">`;
+    h += `<div class="hq-step ${libN >= CHAPTER2_UNLOCK_COUNTRIES ? 'done' : ''}"><span class="hq-st-c">${libN >= CHAPTER2_UNLOCK_COUNTRIES ? '✅' : '🔒'}</span><span class="hq-st-i">🌍</span><span class="hq-st-t">${t('Звільни {n} країн', { n: CHAPTER2_UNLOCK_COUNTRIES })} (${Math.min(libN, CHAPTER2_UNLOCK_COUNTRIES)}/${CHAPTER2_UNLOCK_COUNTRIES})</span></div>`;
+    h += `<div class="hq-step ${cleared >= CHAPTER2.target ? 'done' : ''}"><span class="hq-st-c">${cleared >= CHAPTER2.target ? '✅' : '⬜'}</span><span class="hq-st-i">🧪</span><span class="hq-st-t">${t('Очисти заражені країни')} (${Math.min(cleared, CHAPTER2.target)}/${CHAPTER2.target})</span></div>`;
+    h += '</div>';
+    if (inf.done) h += `<div class="hq-medal">${t('🎖️ {m} — отримано!', { m: CHAPTER2.medalName })}</div>`;
     return h;
   }
 
