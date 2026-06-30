@@ -57,6 +57,7 @@ const started = await page.evaluate(async () => {
     variant: h.variant,
     centerZ: h.cz,
     floorY: h.floorY,
+    floorsInRoom: g.level.world.floors.filter((f) => Math.abs(f.x - h.cx) < h._half - 1 && Math.abs(f.z - h.cz) < h._half - 1).length,
     playerHp: g.level.player.health,
     playerMaxHp: g.level.player.maxHealth,
     clones: h.clones.length,
@@ -81,6 +82,7 @@ const started = await page.evaluate(async () => {
   };
 });
 check(started.variant === 'overloaded', 'варіант overloaded', JSON.stringify(started));
+check(started.floorsInRoom === 1, 'у кімнаті лишається тільки одна плоска підлога', JSON.stringify(started));
 check(started.playerHp === 350 && started.playerMaxHp === 350, 'у гравця 350 HP', JSON.stringify(started));
 check(started.clones === 50 && started.shooters === 5, '45 клонів + 5 стрільців', JSON.stringify(started));
 check(started.zombies === 131 && started.boxers === 5 && started.robots === 1, '125 зомбі + 5 в перчатках + робот', JSON.stringify(started));

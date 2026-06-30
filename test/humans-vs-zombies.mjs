@@ -61,6 +61,7 @@ const started = await page.evaluate(async () => {
     roomSize: h.roomSize,
     centerZ: h.cz,
     floorY: h.floorY,
+    floorsInRoom: g.level.world.floors.filter((f) => Math.abs(f.x - h.cx) < h._half - 1 && Math.abs(f.z - h.cz) < h._half - 1).length,
     clones: h.clones.map(cloneBox),
     zombies: enemies.length,
     robots: enemies.filter((z) => z.type === 'robot').length,
@@ -78,6 +79,7 @@ const started = await page.evaluate(async () => {
   };
 });
 check(started.roomSize === 750, 'кімната 750 на 750 метрів', JSON.stringify(started));
+check(started.floorsInRoom === 1, 'у кімнаті лишається тільки одна плоска підлога', JSON.stringify(started));
 check(started.clones.length === 30 && started.clones.every((c) => c.hp === 30), 'з гравцем 30 клонів по 30 HP', JSON.stringify(started));
 check(started.zombies === 66 && started.robots === 1, 'вороги: 65 зомбі і 1 зомбі-робот', JSON.stringify(started));
 check(started.clones.every((c) => c.z - started.centerZ > 200)

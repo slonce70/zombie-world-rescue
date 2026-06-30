@@ -284,6 +284,7 @@ export class HumansMode {
     const inside = (c) => Math.abs(c.x - this.cx) < this._half - 1 && Math.abs(c.z - this.cz) < this._half - 1;
     this.level.world.colliders = this.level.world.colliders.filter((c) => !inside(c));
     this.level.world.occluders = this.level.world.occluders.filter((c) => !inside(c));
+    this.level.world.floors = this.level.world.floors.filter((f) => !inside(f));
     if (typeof this.level.world._buildGrid === 'function') this.level.world._buildGrid();
   }
 
