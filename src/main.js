@@ -29,7 +29,7 @@ import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from '
 import { BankMode, BANK_UNLOCK_COUNTRIES } from './bank.js';
 import { PortalMode, PORTAL_UNLOCK_COUNTRIES } from './portal.js';
 import { MazeMode, MAZE_UNLOCK_COUNTRIES } from './maze.js';
-import { HumansMode, HUMANS_UNLOCK_COUNTRIES } from './humans.js';
+import { HumansMode, HUMANS_UNLOCK_COUNTRIES, OVERLOADED_HUMANS_UNLOCK_COUNTRIES } from './humans.js';
 import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
   worldBossUnlocked,
@@ -75,7 +75,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 210;
+const APP_VERSION = 211;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -328,6 +328,7 @@ class Game {
       else if (mode === 'portal') this.startPortal();
       else if (mode === 'maze') this.startMaze();
       else if (mode === 'humans') this.startHumans();
+      else if (mode === 'overloaded-humans') this.startOverloadedHumans();
       else if (mode === 'worldboss') this.startWorldBoss(this._lastWorldBossId || 'radiation');
       else this.startArena();
     });
@@ -896,6 +897,12 @@ class Game {
           : t('30 клонів проти армії зомбі і робота. Поразка: -100 монет.'),
       },
       {
+        id: 'overloaded-humans', icon: '💥', name: t('Перегружена зомбі проти людей'), locked: libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES,
+        desc: libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES })
+          : t('45 клонів, 5 стрільців, 45 зомбі, 5 боксерів і робот 1795 HP.'),
+      },
+      {
         id: 'pvp', icon: '⚔️', name: t('ПВП'), locked: libN < PVP_UNLOCK_COUNTRIES,
         desc: libN < PVP_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: PVP_UNLOCK_COUNTRIES })
@@ -1012,6 +1019,9 @@ class Game {
         } else if (mode === 'humans') {
           this._hideOverlay('overlay-solo');
           this.startHumans();
+        } else if (mode === 'overloaded-humans') {
+          this._hideOverlay('overlay-solo');
+          this.startOverloadedHumans();
         } else if (mode === 'pvp') {
           this._hideOverlay('overlay-solo');
           this.startPvp();
@@ -1668,6 +1678,22 @@ class Game {
     return this.startLevel('UKR', { humans: true });
   }
 
+  startOverloadedHumans() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('💥🤝 Перегружена зомбі проти людей поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < OVERLOADED_HUMANS_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('💥 Перегружена зомбі проти людей відкриється після {n} звільнених країн!', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { humans: 'overloaded' });
+  }
+
   // ---------- автооновлення ----------
   // Браузер (особливо відновлена стара вкладка) може тримати застарілу збірку.
   // Періодично звіряємо version.json із сервера і перезавантажуємось на глобусі.
@@ -1755,6 +1781,8 @@ class Game {
     const isPortal = !!opts.portal;
     const isMaze = !!opts.maze;
     const isHumans = !!opts.humans;
+    const humansVariant = opts.humans === 'overloaded' ? 'overloaded' : 'normal';
+    const isOverloadedHumans = isHumans && humansVariant === 'overloaded';
     const worldBossId = opts.worldBoss || null;
     const isWorldBoss = !!worldBossId;
     document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isWorldBoss);
@@ -1774,7 +1802,7 @@ class Game {
       : isMaze
       ? t('🧩 ЛАБІРИНТ')
       : isHumans
-      ? t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')
+      ? (isOverloadedHumans ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ'))
       : isDefense
       ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
@@ -1891,6 +1919,11 @@ class Game {
         level.player.health = 150;
         level.player.maxArmor = 0;
         level.player.armor = 0;
+      } else if (isOverloadedHumans) {
+        level.player.maxHealth = 350;
+        level.player.health = 350;
+        level.player.maxArmor = 0;
+        level.player.armor = 0;
       }
       level.player._applyView();
     } else {
@@ -1921,7 +1954,7 @@ class Game {
       level.maze = new MazeMode(level);
       level.missions = level.maze;
     } else if (isHumans) {
-      level.humans = new HumansMode(level);
+      level.humans = new HumansMode(level, humansVariant);
       level.missions = level.humans;
     } else if (isWorldBoss) {
       level.worldBoss = new WorldBossMode(level, worldBossId);
@@ -2249,8 +2282,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.humans ? t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.humans ? t('30 клонів проти 30 зомбі і робота. Поразка забирає 100 монет.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 45 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 30 зомбі і робота. Поразка забирає 100 монет.')) : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2962,14 +2995,14 @@ class Game {
       rewardTitle = t('🪙 -100 монет');
       this.saveGame();
     }
-    this._lastEndMode = 'humans';
+    this._lastEndMode = level.humans.variant === 'overloaded' ? 'overloaded-humans' : 'humans';
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('⚔️ ЛЮДИ ПЕРЕМОГЛИ!') : t('💀 ЗОМБІ ПЕРЕМОГЛИ');
     document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі лишилось')}</span><span class="stat-val">${res.remaining} / 31</span></div>
-      <div class="stat"><span class="stat-icon">🧍</span><span class="stat-name">${t('Клони живі')}</span><span class="stat-val">${res.clones} / 30</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі лишилось')}</span><span class="stat-val">${res.remaining} / ${res.target}</span></div>
+      <div class="stat"><span class="stat-icon">🧍</span><span class="stat-name">${t('Клони живі')}</span><span class="stat-val">${res.clones} / ${res.cloneTotal}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Наслідок')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -3572,6 +3605,10 @@ class Game {
       startHumans: () => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true };
         return g.startHumans();
+      },
+      startOverloadedHumans: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
+        return g.startOverloadedHumans();
       },
       weapon: (id) => WEAPONS[id] || null,
       startWorldBoss: (id) => {

@@ -42,6 +42,7 @@ const suite = [
   ['node', ['test/portal.mjs']],
   ['node', ['test/maze.mjs']],
   ['node', ['test/humans-vs-zombies.mjs']],
+  ['node', ['test/overloaded-humans.mjs']],
   ['node', ['test/zombie-boxer.mjs']],
   ['node', ['test/draft.mjs']],
   ['node', ['test/draft-storm.mjs']],

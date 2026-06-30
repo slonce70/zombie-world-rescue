@@ -4,15 +4,22 @@ import { disposeObject } from './utils.js';
 import { t } from './i18n.js';
 
 export const HUMANS_UNLOCK_COUNTRIES = 11;
+export const OVERLOADED_HUMANS_UNLOCK_COUNTRIES = 12;
 export const HUMANS_ROOM_SIZE = 750;
 export const HUMANS_CLONES = 30;
 export const HUMANS_ZOMBIES = 30;
+const HUMANS_CFG = {
+  normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 30, boxers: 0, robotHp: null },
+  overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 45, boxers: 5, robotHp: 1795 },
+};
 
 export class HumansMode {
-  constructor(level) {
+  constructor(level, variant = 'normal') {
     this.level = level;
+    this.variant = variant === 'overloaded' ? 'overloaded' : 'normal';
+    this.cfg = HUMANS_CFG[this.variant];
     this.roomSize = HUMANS_ROOM_SIZE;
-    this.target = HUMANS_ZOMBIES + 1;
+    this.target = this.cfg.zombies + this.cfg.boxers + 1;
     this.completed = false;
     this.over = false;
     this.prompt = null;
@@ -37,16 +44,16 @@ export class HumansMode {
 
   getHudList() {
     return [
-      { icon: '⚔️', title: t('ЗОМБІ ПРОТИ ЛЮДЕЙ'), done: false },
-      { icon: '🧍', title: t('Клони живі: {n}/30', { n: this.aliveClones() }), done: false },
-      { icon: '🧟', title: t('Зомбі лишилось: {n}/31', { n: this.remaining() }), done: this.completed },
+      { icon: '⚔️', title: t(this.cfg.title), done: false },
+      { icon: '🧍', title: t('Клони живі: {n}/{total}', { n: this.aliveClones(), total: this.cfg.clones + this.cfg.shooters }), done: false },
+      { icon: '🧟', title: t('Зомбі лишилось: {n}/{total}', { n: this.remaining(), total: this.target }), done: this.completed },
       { icon: '🔫', title: t('Пістолет, посох і меч. Без пікапів, магазину і гаджетів.'), done: false },
     ];
   }
 
   getMarkers() {
     const out = this.clones.filter((c) => c.hp > 0)
-      .map((c) => ({ x: c.x, z: c.z, color: '#4dd6a8', icon: '🧍' }));
+      .map((c) => ({ x: c.x, z: c.z, color: c.shooter ? '#7bdcff' : '#4dd6a8', icon: c.shooter ? '🔫' : '🧍' }));
     for (const z of this.level.zombies.list) {
       if (z.humans && z.state !== 'dead') out.push({ x: z.x, z: z.z, color: z.type === 'robot' ? '#ffd23f' : '#ff5d73', icon: z.type === 'robot' ? '🤖' : '🧟' });
     }
@@ -81,6 +88,8 @@ export class HumansMode {
       completed: this.completed,
       remaining: this.remaining(),
       clones: this.aliveClones(),
+      target: this.target,
+      cloneTotal: this.cfg.clones + this.cfg.shooters,
     };
   }
 
@@ -114,7 +123,8 @@ export class HumansMode {
   }
 
   _spawnClones() {
-    for (let i = 0; i < HUMANS_CLONES; i++) {
+    const total = this.cfg.clones + this.cfg.shooters;
+    for (let i = 0; i < total; i++) {
       const col = i % 10;
       const row = Math.floor(i / 10);
       const x = this.cx - 45 + col * 10;
@@ -122,7 +132,7 @@ export class HumansMode {
       const rig = makeHero('ninja');
       rig.group.position.set(x, this.floorY, z);
       this.level.scene.add(rig.group);
-      const clone = { x, z, y: this.floorY, hp: 100, hitT: 0, rig, mesh: rig.group };
+      const clone = { x, z, y: this.floorY, hp: 100, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };
       clone.takeDamage = (dmg) => {
         clone.hp = Math.max(0, clone.hp - dmg);
         if (clone.hp <= 0) clone.mesh.visible = false;
@@ -133,12 +143,19 @@ export class HumansMode {
 
   _spawnZombies() {
     const types = ['walker', 'runner', 'imp', 'spitter', 'gunner', 'tank'];
-    for (let i = 0; i < HUMANS_ZOMBIES; i++) {
+    for (let i = 0; i < this.cfg.zombies; i++) {
       const col = i % 10;
       const row = Math.floor(i / 10);
       this._addZombie(types[i % types.length], this.cx - 45 + col * 10, this.cz - 95 - row * 10);
     }
-    this._addZombie('robot', this.cx, this.cz - 155);
+    for (let i = 0; i < this.cfg.boxers; i++) {
+      this._addZombie('boxer', this.cx + 70 + i * 8, this.cz - 95);
+    }
+    const robot = this._addZombie('robot', this.cx, this.cz - 155);
+    if (this.cfg.robotHp) {
+      robot.hp = robot.maxHp = this.cfg.robotHp;
+      robot.stats = { ...robot.stats, hp: this.cfg.robotHp };
+    }
   }
 
   _addZombie(type, x, z) {
@@ -163,6 +180,7 @@ export class HumansMode {
       const dz = target.z - c.z;
       const dist = Math.hypot(dx, dz) || 1;
       c.mesh.rotation.y = Math.atan2(-dx, -dz);
+      if (c.shooter) { this._updateShooterClone(c, target, dx, dz, dist, dt); updateRig(c.rig, dt); continue; }
       if (dist > 2.1) {
         const step = Math.min(dist - 2.0, 5.2 * dt);
         c.x += (dx / dist) * step;
@@ -181,6 +199,26 @@ export class HumansMode {
         }
       }
       updateRig(c.rig, dt);
+    }
+  }
+
+  _updateShooterClone(c, target, dx, dz, dist, dt) {
+    if (dist > 18) {
+      const step = Math.min(dist - 16, 4.6 * dt);
+      c.x += (dx / dist) * step;
+      c.z += (dz / dist) * step;
+      this._clampClone(c);
+      setAnim(c.rig, 'run');
+      return;
+    }
+    c.hitT -= dt;
+    if (c.hitT <= 0) {
+      c.hitT = 0.9;
+      target.lastHitBy = 1;
+      target.damage(5, new THREE.Vector3(dx, 0, dz).normalize(), false);
+      setAnim(c.rig, 'attack');
+    } else {
+      setAnim(c.rig, 'idle');
     }
   }
 
