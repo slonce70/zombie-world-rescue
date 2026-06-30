@@ -9,6 +9,7 @@ const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
   runner: { hp: 45, speed: 2.8, chaseSpeed: 5.6, aggro: 32, dmg: 8, attackR: 1.7, coins: 8, pitch: 1.5 },
   headphones: { hp: 102, speed: 1.6, chaseSpeed: 3.3, aggro: 24, dmg: 10, attackR: 1.8, coins: 11, pitch: 1.05, stunImmune: true },
+  boxer: { hp: 125, speed: 1.55, chaseSpeed: 3.5, aggro: 26, dmg: 7, attackR: 1.9, coins: 16, pitch: 0.8, punchEvery: 3, punchPush: 5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
   // 🛡 щитоносець: тіло слабке (20 hp), але щит дуже міцний (1000) — НЕ ламай у лоб, ОБІЙДИ збоку/ззаду!
   // фронтальний конус щита (v42) лишається: збоку та ззаду тіло вразливе.
@@ -323,6 +324,7 @@ export class Zombies {
         // 🧟 шкет — дрібний швидкий зомбі, доступний з УСІХ країн (зокрема UKR)
         else if (this.rng.chance(0.13)) type = 'imp';
         else if (this.rng.chance(0.08)) type = 'headphones';
+        else if (this.rng.chance(0.07)) type = 'boxer';
         this.spawn(type, gx + Math.cos(a) * r, gz + Math.sin(a) * r, {
           anchor: { x: gx, z: gz, r: 14 }, groupId: gi,
         });
@@ -927,7 +929,11 @@ export class Zombies {
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
-            this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
+            const hit = this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
+            if (hit && st.punchEvery) {
+              z.punchHits = (z.punchHits || 0) + 1;
+              if (z.punchHits % st.punchEvery === 0) this._punchPush(tgt, z.x, z.z, st.punchPush || 5);
+            }
             level.audio.zattack(1);
             if (z.type === 'boss') {
               level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), z.frost ? 0x66ccff : 0xff6644, 5);
@@ -1476,13 +1482,26 @@ export class Zombies {
 
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
   _hurt(tgt, dmg, fx, fz) {
-    if (!tgt) return;
-    if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return; }
+    if (!tgt) return false;
+    if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return true; }
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
-    if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return;
+    if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return false;
     if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz);
     else this.level.player.takeDamage(dmg, fx, fz);
+    return true;
+  }
+
+  _punchPush(tgt, fx, fz, dist) {
+    const pos = tgt.clone || tgt.pos;
+    if (!pos) return;
+    const dx = pos.x - fx;
+    const dz = pos.z - fz;
+    const d = Math.hypot(dx, dz) || 1;
+    const out = this.world.collide(pos.x + (dx / d) * dist, pos.z + (dz / d) * dist, tgt.clone ? 0.35 : 0.45, pos.y);
+    pos.x = out.x;
+    pos.z = out.z;
+    if (tgt.clone && tgt.clone.mesh) tgt.clone.mesh.position.set(pos.x, pos.y, pos.z);
   }
 
   // ================= ДЗЕРКАЛО (гість кооперативу) =================

@@ -974,6 +974,18 @@ function buildZombie(type, rng) {
       cup.scale.set(0.55, 1, 1);
       rig.parts.head.add(cup);
     }
+  } else if (type === 'boxer') {
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.08, belly: 1.2, armsForward: 1.45, shirt: 0xb43a38, pants: 0x2f3340,
+      eyeL: 0.075, eyeR: 0.075, brow: 0.55,
+    }));
+    const gloveM = toonMat(0xd62f2f, 0x8f1717, 0.35);
+    for (const arm of [rig.parts.armL, rig.parts.armR]) {
+      const glove = sphere(0.16, gloveM, 10, 8);
+      glove.position.set(0, -0.64, -0.05);
+      glove.scale.set(1.25, 0.9, 1.1);
+      arm.add(glove);
+    }
   } else if (type === 'tank') {
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.35, belly: 1.65, armsForward: 0.9, headR: 0.22,
