@@ -96,6 +96,22 @@ check(started.noShop && started.noPickups && started.noGadgets && started.active
   'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
 check(started.hud.some((x) => x.includes('Зомбі')) && started.markers >= 66, 'HUD і маркери показують битву', JSON.stringify(started));
 
+console.log('▸ Відштовхування боксера не закопує клона під підлогу');
+const pushedClone = await page.evaluate(async () => {
+  const THREE = await import('./vendor/three.module.js');
+  const g = window.__game;
+  const h = g.level.humans;
+  const clone = h.clones[0];
+  clone.y = h.floorY - 10;
+  clone.mesh.position.y = clone.y;
+  g.level.zombies._punchPush({ clone }, clone.x, clone.z - 1, 5);
+  clone.mesh.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(clone.mesh);
+  return { y: clone.y, meshY: clone.mesh.position.y, minY: b.min.y, floorY: h.floorY };
+});
+check(pushedClone.y > pushedClone.floorY && pushedClone.meshY > pushedClone.floorY && pushedClone.minY >= pushedClone.floorY - 0.005,
+  'після punch-push клон повертається на рівну підлогу', JSON.stringify(pushedClone));
+
 console.log('▸ Єдиний гаджет: щит 100 HP з перезарядкою 100с');
 const shield = await page.evaluate(() => {
   const g = window.__game;

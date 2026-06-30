@@ -1501,7 +1501,10 @@ export class Zombies {
     const out = this.world.collide(pos.x + (dx / d) * dist, pos.z + (dz / d) * dist, tgt.clone ? 0.35 : 0.45, pos.y);
     pos.x = out.x;
     pos.z = out.z;
-    if (tgt.clone && tgt.clone.mesh) tgt.clone.mesh.position.set(pos.x, pos.y, pos.z);
+    if (tgt.clone) {
+      if (typeof tgt.clone.syncToFloor === 'function') tgt.clone.syncToFloor();
+      else if (tgt.clone.mesh) tgt.clone.mesh.position.set(pos.x, pos.y, pos.z);
+    }
   }
 
   // ================= ДЗЕРКАЛО (гість кооперативу) =================
