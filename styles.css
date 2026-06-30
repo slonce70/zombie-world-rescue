@@ -1094,7 +1094,7 @@ body.touch-mode #touch-coach.show { display: block; }
 }
 
 /* кооп: перемикач режиму в лобі */
-#lobby-modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 6px; }
+#lobby-modes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 6px; }
 .lobby-mode {
   padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 14px;
   background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);

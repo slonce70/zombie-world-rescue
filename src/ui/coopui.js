@@ -8,9 +8,10 @@ import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
 import { liberatedCount, hasLiberated } from '../net/cloudsave.js';
+import { FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES } from '../knockout.js';
 
 const PUBLIC_KEY = 'zr-public';
-const MODE_ICON = { campaign: '🎯', storm: '⛈️', arena: '👑' };
+const MODE_ICON = { campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝' };
 
 export class CoopUI {
   constructor(game) {
@@ -487,14 +488,21 @@ export class CoopUI {
     }
     this.el.roster.innerHTML = html;
 
-    // режим: кампанія чи шторм
+    // режим
     const save = this.game.save;
     const anyLib = liberatedCount(save.liberated) > 0;
     let mh = '';
     const libCount = liberatedCount(save.liberated);
-    for (const [mid, label] of [['campaign', t('🎯 Кампанія')], ['storm', t('⛈️ Шторм')], ['arena', t('👑 Арена')]]) {
+    for (const [mid, label] of [
+      ['campaign', t('🎯 Кампанія')],
+      ['storm', t('⛈️ Шторм')],
+      ['friendly-knockout', t('🤝 Дружній нокаут')],
+      ['arena', t('👑 Арена')],
+    ]) {
       const sel = s.mode === mid;
-      const locked = isHost && ((mid === 'storm' && !anyLib) || (mid === 'arena' && libCount < 2));
+      const locked = isHost && ((mid === 'storm' && !anyLib)
+        || (mid === 'arena' && libCount < 2)
+        || (mid === 'friendly-knockout' && libCount < FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES));
       mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
     }
     this.el.modes.innerHTML = mh;
@@ -514,9 +522,10 @@ export class CoopUI {
       });
     }
 
-    // вибір країни (в Арени своя мапа — пікер ховаємо)
-    document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = s.mode === 'arena' ? 'none' : '';
-    this.el.countries.style.display = s.mode === 'arena' ? 'none' : '';
+    // вибір країни (в Арени і Дружнього нокауту своя кімната — пікер ховаємо)
+    const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout';
+    document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
+    this.el.countries.style.display = hideCountries ? 'none' : '';
     let ch = '';
     for (const id of CAMPAIGN_ORDER) {
       const c = COUNTRIES[id];
@@ -542,7 +551,7 @@ export class CoopUI {
 
     this.el.start.style.display = isHost ? '' : 'none';
     this.el.start.disabled = false;
-    const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : t('кампанію');
+    const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : s.mode === 'friendly-knockout' ? t('🤝 ДРУЖНІЙ НОКАУТ') : t('кампанію');
     this.el.hint.textContent = isHost
       ? (s.roster.size > 1 ? t('Усі в зборі? Тисни СТАРТ!') : (this.publicOn
         ? t('Кімнату видно у списку — чекай гостей або продиктуй код 👆')

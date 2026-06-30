@@ -19,6 +19,7 @@ const suite = [
   ['node', ['test/gadget-dash.mjs']],
   ['node', ['test/gadget-clone.mjs']],
   ['node', ['test/knockout.mjs']],
+  ['node', ['test/friendly-knockout.mjs']],
   ['node', ['test/zone-defense.mjs']],
   ['node', ['test/defense.mjs']],
   ['node', ['test/overloaded-defense.mjs']],

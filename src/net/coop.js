@@ -44,7 +44,7 @@ export class CoopSession {
     this.state = 'idle';       // idle | lobby | level
     this.net = null;           // HostNet | GuestNet поточного рівня
     this.countryId = 'UKR';
-    this.mode = 'campaign';    // campaign | storm
+    this.mode = 'campaign';    // campaign | storm | arena | friendly-knockout
     this.onRoster = null;      // () => {} — оновити лобі
     this.onCfg = null;         // (countryId)
     this.onEnd = null;         // (reason) — кімната померла
@@ -171,12 +171,13 @@ export class CoopSession {
     const runIndex = (game.save.missionRuns && game.save.missionRuns[countryId]) || 0;
     const storm = this.mode === 'storm';
     const arena = this.mode === 'arena';
-    const realCountry = arena ? 'UKR' : countryId;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena };
+    const knockout = this.mode === 'friendly-knockout' ? 'friendly' : null;
+    const realCountry = (arena || knockout) ? 'UKR' : countryId;
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -209,6 +210,7 @@ export class CoopSession {
         this.roster.clear();
         for (const r of d.roster) this.roster.set(r.pid, r);
         this.countryId = d.countryId || 'UKR';
+        if (d.mode) this.mode = d.mode;
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'reject') {
@@ -231,7 +233,7 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {
@@ -262,7 +264,7 @@ export class CoopSession {
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
     this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
     this.transport.send(from, {
-      t: 'welcome', pid: from, countryId: this.countryId,
+      t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
       inLevel: this.state === 'level',
     }, true);

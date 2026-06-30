@@ -3,6 +3,7 @@ import { t } from './i18n.js';
 
 export const KNOCKOUT_UNLOCK_LEVEL = 20;
 export const OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES = 8;
+export const FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES = 8;
 export const KNOCKOUT_ROOM_SIZE = 33;
 export const KNOCKOUT_STAFF_CHANCE = 0.12;
 
@@ -18,6 +19,12 @@ const KNOCKOUT_CONFIGS = {
     zombies: 20,
     playerHp: 150,
     loadoutText: '20 зомбі, 150 HP, тільки пістолет. Без магазину, гаджетів і бафів.',
+  },
+  friendly: {
+    title: 'Дружній нокаут',
+    zombies: 20,
+    playerHp: null,
+    loadoutText: '20 зомбі для гри з другом. Тільки пістолет. Без магазину, гаджетів і бафів.',
   },
 };
 
