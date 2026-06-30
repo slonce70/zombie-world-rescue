@@ -45,6 +45,7 @@ export const SHOP_ITEMS = [
   { id: 'teleport', icon: GADGETS.teleport.icon, name: GADGETS.teleport.name, desc: () => GADGETS.teleport.desc + t(' · перезарядка {n}с', { n: GADGETS.teleport.cd }), price: GADGETS.teleport.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'goldapple', icon: GADGETS.goldapple.icon, name: GADGETS.goldapple.name, desc: () => GADGETS.goldapple.desc + t(' · перезарядка {n}с', { n: GADGETS.goldapple.cd }), price: GADGETS.goldapple.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'dash', icon: GADGETS.dash.icon, name: GADGETS.dash.name, desc: () => GADGETS.dash.desc + t(' · перезарядка {n}с', { n: GADGETS.dash.cd }), price: GADGETS.dash.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'dash-hyper', icon: '⚡', name: t('Гіперзаряд: Ривок'), desc: t('Ривок 12м, 3с невразливості і вогняний слід 10с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'dash', needsGadget: 'dash' },
   { id: 'goldapple-hyper', icon: '⚡', name: t('Гіперзаряд: Золоте яблуко'), desc: t('Постійне покращення яблука: +40 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'goldapple', needsGadget: 'goldapple' },
   { id: 'meteor-hyper', icon: '⚡', name: t('Гіперзаряд: Метеорит'), desc: t('Після падіння лишає вогонь: 5 HP кожні 0.5с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'meteor', needsGadget: 'meteor' },
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
@@ -363,7 +364,7 @@ export class Shop {
           game.hud.toast(t('🧰 Середній бокс: +10 кристалів'));
         } else {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
-          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor'].filter((h) => !save.gadgetHypers.includes(h));
+          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
           game.hud.toast(t('🧰 Середній бокс: гіперзаряд!'));
@@ -393,7 +394,7 @@ export class Shop {
           reward = '👻 Скін Привид';
         } else if (roll < 0.98) {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
-          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor'].filter((h) => !save.gadgetHypers.includes(h));
+          const pool = ['shield', 'heal', 'turret', 'clone', 'stunammo', 'goldapple', 'meteor', 'dash'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
           reward = '⚡ Гіперзаряд';

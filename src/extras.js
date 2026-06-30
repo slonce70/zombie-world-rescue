@@ -775,7 +775,10 @@ export class Gadgets {
       level.bus.emit('toast', t('🍎 Золоте яблуко: +{n} здоров\'я на 5с!', { n: hp }));
       ok = true;
     } else if (id === 'dash') {
-      const dist = 8;
+      const hyper = (game.save.gadgetHypers || []).includes('dash');
+      const dist = hyper ? 12 : 8;
+      const sx = p.pos.x;
+      const sz = p.pos.z;
       const tx = p.pos.x - Math.sin(p.yaw) * dist;
       const tz = p.pos.z - Math.cos(p.yaw) * dist;
       const solved = level.world.collide(tx, tz, 0.45, p.pos.y);
@@ -786,10 +789,11 @@ export class Gadgets {
       p.pos.y = Math.max(level.world.groundH(solved.x, solved.z), level.world.floorAt(solved.x, solved.z, p.pos.y));
       p.vel.set(0, 0, 0);
       p.onGround = true;
-      p.respawnProtect = Math.max(p.respawnProtect, 1);
+      p.respawnProtect = Math.max(p.respawnProtect, hyper ? 3 : 1);
+      if (hyper) this._addDashFireTrail(sx, sz, solved.x, solved.z);
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.0), 0xffd23f, 14, { speed: 4, up: 2.5, life: 0.45 });
       level.audio.powerup();
-      level.bus.emit('toast', t('🏃 Ривок! 1с невразливості'));
+      level.bus.emit('toast', hyper ? t('🏃🔥 Гіпер-ривок! 3с невразливості') : t('🏃 Ривок! 1с невразливості'));
       ok = true;
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму
@@ -825,15 +829,15 @@ export class Gadgets {
     if (hyper) this._addMeteorFire(x, z, true);
   }
 
-  _addMeteorFire(x, z, damage = true) {
+  _addMeteorFire(x, z, damage = true, dps = 10, radius = 3.5) {
     const y = this.level.world.groundH(x, z) + 0.04;
     const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.5, 3.5, 0.05, 24),
+      new THREE.CylinderGeometry(radius, radius, 0.05, 24),
       new THREE.MeshBasicMaterial({ color: 0xff6a18, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false })
     );
     mesh.position.set(x, y, z);
     this.level.scene.add(mesh);
-    this._meteorFires.push({ x, z, mesh, life: 10, damage });
+    this._meteorFires.push({ x, z, mesh, life: 10, damage, dps, radius });
   }
 
   _updateMeteorFires(dt) {
@@ -846,7 +850,7 @@ export class Gadgets {
       if (f.damage) {
         for (const zb of this.level.zombies.list) {
           if (zb.state === 'dead' || zb.gone) continue;
-          if (Math.hypot(zb.x - f.x, zb.z - f.z) <= 3.5) zb.damage(10 * dt, null, false, { fire: true });
+          if (Math.hypot(zb.x - f.x, zb.z - f.z) <= (f.radius || 3.5)) zb.damage((f.dps || 10) * dt, null, false, { fire: true });
         }
       }
       if (f.life <= 0) {
@@ -855,6 +859,13 @@ export class Gadgets {
         f.mesh.material.dispose();
         this._meteorFires.splice(i, 1);
       }
+    }
+  }
+
+  _addDashFireTrail(x0, z0, x1, z1) {
+    for (let i = 1; i <= 4; i++) {
+      const k = i / 4;
+      this._addMeteorFire(x0 + (x1 - x0) * k, z0 + (z1 - z0) * k, true, 5, 1.8);
     }
   }
 
