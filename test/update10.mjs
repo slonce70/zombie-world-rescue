@@ -59,6 +59,7 @@ try {
       overloadedDefenseLocked: document.querySelector('.solo-mode[data-mode="overloaded-defense"]').classList.contains('locked'),
       overloadedLocked: document.querySelector('.solo-mode[data-mode="overloaded-pvp"]').classList.contains('locked'),
       bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
+      portalLocked: document.querySelector('.solo-mode[data-mode="portal"]').classList.contains('locked'),
       pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
       campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
       tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
@@ -71,16 +72,16 @@ try {
       })),
     };
   });
-  check('12 режимів; спецрежими замкнені, Кампанія відкрита',
-    fresh.modes === 12 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('13 режимів; спецрежими замкнені, Кампанія відкрита',
+    fresh.modes === 13 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
-      && fresh.overloadedLocked && fresh.bankLocked && fresh.pvpLocked && !fresh.campLocked,
+      && fresh.overloadedLocked && fresh.bankLocked && fresh.portalLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
     JSON.stringify(fresh.tabs) === JSON.stringify([
       'КАМПАНІЯ', 'ШТОРМ', 'АРЕНА БОСІВ', 'СВІТОВІ БОСИ',
       'НОКАУТ', 'Перегружений нокаут', 'Оборона в зоні', 'ОБОРОНА',
-      'Перегружена оборона', 'Перегружене ПВП', 'БАНК', 'ПВП',
+      'Перегружена оборона', 'Перегружене ПВП', 'БАНК', 'ПОРТАЛ', 'ПВП',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
@@ -97,6 +98,7 @@ try {
         { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
         { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
         { title: 'БАНК', modes: ['bank'] },
+        { title: 'ПОРТАЛ', modes: ['portal'] },
         { title: 'ПВП', modes: ['pvp'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
@@ -126,6 +128,7 @@ try {
       { title: 'Перегружена оборона', modes: ['overloaded-defense'] },
       { title: 'Перегружене ПВП', modes: ['overloaded-pvp'] },
       { title: 'БАНК', modes: ['bank'] },
+      { title: 'ПОРТАЛ', modes: ['portal'] },
       { title: 'ПВП', modes: ['pvp'] },
     ]),
     JSON.stringify(fresh.sections));

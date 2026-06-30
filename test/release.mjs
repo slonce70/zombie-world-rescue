@@ -39,6 +39,7 @@ const suite = [
   ['node', ['test/wardrobe-tabs.mjs']],
   ['node', ['test/weapon-unlock.mjs']],
   ['node', ['test/bank.mjs']],
+  ['node', ['test/portal.mjs']],
   ['node', ['test/draft.mjs']],
   ['node', ['test/draft-storm.mjs']],
   ['node', ['test/bazooka-damage.mjs']],

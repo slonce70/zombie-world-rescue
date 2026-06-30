@@ -789,6 +789,13 @@ export class Player {
         anyHit = true;
         continue;
       }
+      const portalHit = level.portal ? level.portal.portalHitTest(origin, dir, MAX_D) : null;
+      if (portalHit && portalHit.t < blockT && (!hit || portalHit.t < hit.t)) {
+        level.portal.damagePortal(portalHit.portal, w.dmg * dmgMult);
+        if (i < 3) level.effects.tracer(this._muzzlePos, portalHit.point);
+        anyHit = true;
+        continue;
+      }
       const ballHit = level.effects.ballHitTest(origin, dir, MAX_D);
       if (ballHit && ballHit.t < blockT && (!hit || ballHit.t < hit.t)) {
         if (level.mirror) netBall = true;

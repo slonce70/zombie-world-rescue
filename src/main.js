@@ -27,6 +27,7 @@ import {
 import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import { BankMode, BANK_UNLOCK_COUNTRIES } from './bank.js';
+import { PortalMode, PORTAL_UNLOCK_COUNTRIES } from './portal.js';
 import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
   worldBossUnlocked,
@@ -72,7 +73,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 204;
+const APP_VERSION = 205;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -322,6 +323,7 @@ class Game {
       else if (mode === 'zone-defense') this.startZoneDefense();
       else if (mode === 'pvp') this.startPvp();
       else if (mode === 'bank') this.startBank();
+      else if (mode === 'portal') this.startPortal();
       else if (mode === 'worldboss') this.startWorldBoss(this._lastWorldBossId || 'radiation');
       else this.startArena();
     });
@@ -872,6 +874,12 @@ class Game {
           : t('Кімната 200×50: захисти свій банк і знищ банк зомбі.'),
       },
       {
+        id: 'portal', icon: '🌀', name: t('ПОРТАЛ'), locked: libN < PORTAL_UNLOCK_COUNTRIES,
+        desc: libN < PORTAL_UNLOCK_COUNTRIES
+          ? t('Відкриється після {n} звільнених країн', { n: PORTAL_UNLOCK_COUNTRIES })
+          : t('Закрий 3 портали, поки вони випускають хвилі зомбі.'),
+      },
+      {
         id: 'pvp', icon: '⚔️', name: t('ПВП'), locked: libN < PVP_UNLOCK_COUNTRIES,
         desc: libN < PVP_UNLOCK_COUNTRIES
           ? t('Відкриється після {n} звільнених країн', { n: PVP_UNLOCK_COUNTRIES })
@@ -979,6 +987,9 @@ class Game {
         } else if (mode === 'bank') {
           this._hideOverlay('overlay-solo');
           this.startBank();
+        } else if (mode === 'portal') {
+          this._hideOverlay('overlay-solo');
+          this.startPortal();
         } else if (mode === 'pvp') {
           this._hideOverlay('overlay-solo');
           this.startPvp();
@@ -1584,6 +1595,23 @@ class Game {
     return this.startLevel('UKR', { bank: true });
   }
 
+  // ---------- 🌀 Портал ----------
+  startPortal() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('🌀🤝 Портал поки доступний тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < PORTAL_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('🌀 Портал відкриється після {n} звільнених країн!', { n: PORTAL_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startLevel('UKR', { portal: true });
+  }
+
   // ---------- автооновлення ----------
   // Браузер (особливо відновлена стара вкладка) може тримати застарілу збірку.
   // Періодично звіряємо version.json із сервера і перезавантажуємось на глобусі.
@@ -1668,9 +1696,10 @@ class Game {
     const isPvp = !!opts.pvp;
     const pvpVariant = opts.pvp === 'overloaded' ? 'overloaded' : 'normal';
     const isBank = !!opts.bank;
+    const isPortal = !!opts.portal;
     const worldBossId = opts.worldBoss || null;
     const isWorldBoss = !!worldBossId;
-    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isBank || isWorldBoss);
+    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isWorldBoss);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
@@ -1682,6 +1711,8 @@ class Game {
       ? (pvpVariant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП'))
       : isBank
       ? t('🏦 БАНК')
+      : isPortal
+      ? t('🌀 ПОРТАЛ')
       : isDefense
       ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
@@ -1714,6 +1745,7 @@ class Game {
      *   defense  — тільки в режимі Оборона (isDefense); інакше — undefined.
      *   pvp      — тільки в режимі ПВП (isPvp); інакше — undefined.
      *   bank     — тільки в режимі Банк; інакше — undefined.
+     *   portal   — тільки в режимі Портал; інакше — undefined.
      *   worldBoss — тільки в режимі Світового боса; інакше — undefined.
      *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
      *
@@ -1740,17 +1772,17 @@ class Game {
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
       noGadgets: isKnockout || isDefense || isPvp || isBank,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
-      noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isWorldBoss,
+      noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isWorldBoss,
       noBuffs: isKnockout || isDefense || isPvp || isBank,
-      noPickups: isPvp || isBank || isOverloadedDefense || isZoneDefense,
-      noZombiePickups: isKnockout || isDefense || isPvp || isBank,
-      noCoinDrops: isPvp || isBank || isOverloadedDefense || isZoneDefense,
+      noPickups: isPvp || isBank || isPortal || isOverloadedDefense || isZoneDefense,
+      noZombiePickups: isKnockout || isDefense || isPvp || isBank || isPortal,
+      noCoinDrops: isPvp || isBank || isPortal || isOverloadedDefense || isZoneDefense,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -1817,6 +1849,9 @@ class Game {
     } else if (isBank) {
       level.bank = new BankMode(level);
       level.missions = level.bank;
+    } else if (isPortal) {
+      level.portal = new PortalMode(level);
+      level.missions = level.portal;
     } else if (isWorldBoss) {
       level.worldBoss = new WorldBossMode(level, worldBossId);
       level.missions = level.worldBoss;
@@ -1835,7 +1870,7 @@ class Game {
       level.missions = new DynamicMissions(level);
     }
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
@@ -1843,7 +1878,7 @@ class Game {
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isGuest && !isPlayground) {
+    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isGuest && !isPlayground) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -1855,7 +1890,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPlayground) ? [] : level.world.lootSpots)) {
+    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isPlayground) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -1864,7 +1899,7 @@ class Game {
         level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
       }
     }
-    if (!isGuest && !isKnockout && !isDefense && !isPvp) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+    if (!isGuest && !isKnockout && !isDefense && !isPvp && !isPortal) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
 
     // приколи карти: бочки, м'яч, тварини, аеродроп
     const fun = country.map.fun || {};
@@ -1887,7 +1922,7 @@ class Game {
       if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
       return 'grenade';
     };
-    if (isKnockout || isDefense || isPvp || isBank) level.effects.airdropT = Infinity;
+    if (isKnockout || isDefense || isPvp || isBank || isPortal) level.effects.airdropT = Infinity;
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
@@ -2018,11 +2053,11 @@ class Game {
         : z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill;
       if (killXp) this.progress.addXp(killXp);
       if (!(level.worldBoss && z.type === 'boss')) this.quests.onEvent('kill', { weapon: level.player.cur });
-      if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('kill');
+      if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.worldBoss) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
       if (z.type === 'boss' && !level.storm && !level.worldBoss) {
         this.quests.onEvent('boss');
-        if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('boss');
+        if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.worldBoss) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
     });
@@ -2032,13 +2067,13 @@ class Game {
       this.save.stats.damageDealt += Math.round(n);
       this.quests.onEvent('damage', { n: Math.round(n) });
     });
-    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('mission'); } });
+    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.worldBoss) this.chapter.onEvent('mission'); } });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
         this.save.stats.gadgetUses++;
         if (id === 'clone') this.save.stats.cloneUses++;
         this.quests.onEvent('gadget');
-        if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('gadget');
+        if (!level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.worldBoss) this.chapter.onEvent('gadget');
         return;
       }
       const ch = level.gadgetChallenge;
@@ -2057,7 +2092,7 @@ class Game {
     level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
     level.bus.on('zombieKilled', (z) => {
-      if (level.playground || level.knockout || level.defense || level.pvp || level.bank || level.worldBoss) return;
+      if (level.playground || level.knockout || level.defense || level.pvp || level.bank || level.portal || level.worldBoss) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
@@ -2109,17 +2144,18 @@ class Game {
       level.net.attach(coop.spec);
     }
 
-    if (isArena || isKnockout || isDefense || isPvp || isBank || isWorldBoss) {
+    if (isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isWorldBoss) {
       const a = level.world.layout.arena;
-      const z = isWorldBoss ? a.z + 16 : isKnockout ? a.z : isPvp ? a.z + 4 : isDefense ? a.z + 8 : a.z + 12;
+      const z = isWorldBoss ? a.z + 16 : isKnockout ? a.z : isPvp ? a.z + 4 : isPortal ? a.z + 18 : isDefense ? a.z + 8 : a.z + 12;
       const gy = level.world.groundH(a.x, z);
       level.player.pos.set(a.x, gy, z);
       if (level.defense && level.defense.zone) level.defense._placePlayerInZone();
       if (level.bank) level.bank.placePlayer();
+      if (level.portal) level.portal.placePlayer();
     }
 
     this.level = level;
-    if (this.chapter && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.worldBoss) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
@@ -2140,8 +2176,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.worldBoss ? level.worldBoss.cfg.name() : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.worldBoss ? level.worldBoss.cfg.mechanic() : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2358,6 +2394,10 @@ class Game {
     }
     if (this.level.bank) {
       this._endBankRun(false);
+      return;
+    }
+    if (this.level.portal) {
+      this._endPortalRun(false);
       return;
     }
     if (this.level.worldBoss) {
@@ -2728,6 +2768,45 @@ class Game {
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🏦 БАНК ЗАХИЩЕНО!') : t('💀 БАНК ВТРАЧЕНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🏦</span><span class="stat-name">${t('Банків лишилось')}</span><span class="stat-val">${res.safesLeft} / 2</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
+    this._showOverlay('overlay-arena-end');
+  }
+
+  _endPortalRun(won = true) {
+    const level = this.level;
+    if (!level || !level.portal || level.portal.over) return;
+    const res = level.portal.results();
+    level.portal.completed = !!won;
+    level.portal.over = true;
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('🌀 Ще раз!');
+    }
+    let rewardTitle = t('Без нагороди');
+    if (won) {
+      this.progress.addXp(110);
+      level.addCoins(150);
+      rewardTitle = t('🪙 +150 монет');
+      this.saveGame();
+    }
+    this._lastEndMode = 'portal';
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🌀 ПОРТАЛИ ЗАКРИТО!') : t('💀 ПОРТАЛИ ПРОРВАЛИСЯ');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">${t('Портали закрито')}</span><span class="stat-val">${res.closed} / 3</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
@@ -3320,6 +3399,10 @@ class Game {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
         return g.startBank();
       },
+      startPortal: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true };
+        return g.startPortal();
+      },
       weapon: (id) => WEAPONS[id] || null,
       startWorldBoss: (id) => {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
@@ -3342,6 +3425,10 @@ class Game {
       finishBank: () => {
         const s = g.level.bank && g.level.bank.zombieBank;
         if (s) g.level.bank.damageSafe(s, 99999, true);
+      },
+      finishPortal: () => {
+        if (!g.level.portal) return;
+        for (const p of g.level.portal.portals) g.level.portal.damagePortal(p, 99999);
       },
       questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),
       regenQuests: (dateKey) => {
