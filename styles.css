@@ -1144,6 +1144,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .solo-modes { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
 .solo-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
 .solo-section { display: flex; flex-direction: column; gap: 8px; }
+.solo-section[hidden] { display: none; }
 .solo-mode {
   display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer;
   background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.12);

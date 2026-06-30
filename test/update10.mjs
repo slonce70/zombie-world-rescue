@@ -39,28 +39,38 @@ try {
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');
   await page.waitForSelector('#overlay-solo.show');
-  const fresh = await page.evaluate(() => ({
-    modes: document.querySelectorAll('.solo-mode').length,
-    stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
-    arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
-    worldbossLocked: document.querySelector('.solo-mode[data-mode="worldboss"]').classList.contains('locked'),
-    knockoutLocked: document.querySelector('.solo-mode[data-mode="knockout"]').classList.contains('locked'),
-    overloadedKnockoutLocked: document.querySelector('.solo-mode[data-mode="overloaded-knockout"]').classList.contains('locked'),
-    zoneDefenseLocked: document.querySelector('.solo-mode[data-mode="zone-defense"]').classList.contains('locked'),
-    defenseLocked: document.querySelector('.solo-mode[data-mode="defense"]').classList.contains('locked'),
-    overloadedDefenseLocked: document.querySelector('.solo-mode[data-mode="overloaded-defense"]').classList.contains('locked'),
-    overloadedLocked: document.querySelector('.solo-mode[data-mode="overloaded-pvp"]').classList.contains('locked'),
-    bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
-    pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
-    campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
-    tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
-    activeTab: document.querySelector('.solo-tab.on')?.textContent.trim(),
-    visibleModes: [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode),
-    sections: [...document.querySelectorAll('.solo-section')].map((s) => ({
-      title: s.dataset.tab,
-      modes: [...s.querySelectorAll('.solo-mode')].map((m) => m.dataset.mode),
-    })),
-  }));
+  const fresh = await page.evaluate(() => {
+    const paintedModes = () => [...document.querySelectorAll('.solo-mode')]
+      .filter((m) => {
+        const r = m.getBoundingClientRect();
+        const css = getComputedStyle(m);
+        return r.width > 0 && r.height > 0 && css.display !== 'none' && css.visibility !== 'hidden';
+      })
+      .map((m) => m.dataset.mode);
+    return {
+      modes: document.querySelectorAll('.solo-mode').length,
+      stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
+      arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
+      worldbossLocked: document.querySelector('.solo-mode[data-mode="worldboss"]').classList.contains('locked'),
+      knockoutLocked: document.querySelector('.solo-mode[data-mode="knockout"]').classList.contains('locked'),
+      overloadedKnockoutLocked: document.querySelector('.solo-mode[data-mode="overloaded-knockout"]').classList.contains('locked'),
+      zoneDefenseLocked: document.querySelector('.solo-mode[data-mode="zone-defense"]').classList.contains('locked'),
+      defenseLocked: document.querySelector('.solo-mode[data-mode="defense"]').classList.contains('locked'),
+      overloadedDefenseLocked: document.querySelector('.solo-mode[data-mode="overloaded-defense"]').classList.contains('locked'),
+      overloadedLocked: document.querySelector('.solo-mode[data-mode="overloaded-pvp"]').classList.contains('locked'),
+      bankLocked: document.querySelector('.solo-mode[data-mode="bank"]').classList.contains('locked'),
+      pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
+      campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
+      tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
+      activeTab: document.querySelector('.solo-tab.on')?.textContent.trim(),
+      visibleModes: [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode),
+      paintedModes: paintedModes(),
+      sections: [...document.querySelectorAll('.solo-section')].map((s) => ({
+        title: s.dataset.tab,
+        modes: [...s.querySelectorAll('.solo-mode')].map((m) => m.dataset.mode),
+      })),
+    };
+  });
   check('12 режимів; спецрежими замкнені, Кампанія відкрита',
     fresh.modes === 12 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
@@ -74,6 +84,7 @@ try {
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
+      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
         { title: 'КАМПАНІЯ', modes: ['campaign'] },
         { title: 'ШТОРМ', modes: ['storm'] },
@@ -88,10 +99,16 @@ try {
         { title: 'БАНК', modes: ['bank'] },
         { title: 'ПВП', modes: ['pvp'] },
       ]),
-    JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, sections: fresh.sections }));
+    JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
   await page.click('.solo-tab:has-text("БАНК")');
   const bankModes = await page.evaluate(() =>
-    [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode));
+    [...document.querySelectorAll('.solo-mode')]
+      .filter((m) => {
+        const r = m.getBoundingClientRect();
+        const css = getComputedStyle(m);
+        return r.width > 0 && r.height > 0 && css.display !== 'none' && css.visibility !== 'hidden';
+      })
+      .map((m) => m.dataset.mode));
   check('клік по вкладці показує тільки один свій режим',
     JSON.stringify(bankModes) === JSON.stringify(['bank']),
     bankModes.join(','));
@@ -183,6 +200,7 @@ try {
   }));
   check('2 країни звільнено → Шторм і Арена відкриті', unlocked.storm && unlocked.arena, JSON.stringify(unlocked));
 
+  await page.click('.solo-tab:has-text("ШТОРМ")');
   await page.click('.solo-mode[data-mode="storm"]');
   const ctys = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-cty')].map((b) => b.dataset.id));
