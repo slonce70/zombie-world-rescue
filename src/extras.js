@@ -7,6 +7,8 @@ import {
 } from './characters.js';
 import { disposeObject } from './utils.js';
 
+const CLONE_FOOT_LIFT = 0.08;
+
 // ============================================================
 // 🦙 Мегабокс: святкова скриня з pity-механікою
 // ============================================================
@@ -964,7 +966,7 @@ export class Gadgets {
       const off = (i - (count - 1) / 2) * 1.1;
       const x = pos.x + Math.cos(this.level.player.yaw) * off;
       const z = pos.z - Math.sin(this.level.player.yaw) * off;
-      const y = this.level.world.groundH(x, z);
+      const y = this.level.world.groundH(x, z) + CLONE_FOOT_LIFT;
       const rig = makeHero('ninja');
       const shieldMesh = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.72, 1),
@@ -1237,7 +1239,7 @@ export class Gadgets {
       if (dist > 2.0) {
         const step = Math.min(dist - 1.8, 5.5 * dt);
         const solved = level.world.collide(c.x + (dx / dist) * step, c.z + (dz / dist) * step, 0.45, c.y);
-        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z);
+        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
         c.mesh.position.set(c.x, c.y, c.z);
         setAnim(c.rig, 'run');
       } else {
@@ -1254,7 +1256,7 @@ export class Gadgets {
         c.x += (sx / sd) * push;
         c.z += (sz / sd) * push;
         const solved = level.world.collide(c.x, c.z, 0.45, c.y);
-        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z);
+        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
         c.mesh.position.set(c.x, c.y, c.z);
       }
       c.hitT -= dt;

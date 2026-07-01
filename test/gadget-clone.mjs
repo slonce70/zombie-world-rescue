@@ -70,7 +70,8 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'level
 const persisted = await page.evaluate(() => (window.__game.save.gadgetHypers || []).includes('clone'));
 check(persisted, 'гіперзаряд клона лишається після перезавантаження сторінки');
 
-const fight = await page.evaluate(() => {
+const fight = await page.evaluate(async () => {
+  const THREE = await import('/vendor/three.module.js');
   const g = window.__game;
   const p = g.level.player;
   g.test.unlockGadget('clone');
@@ -83,6 +84,9 @@ const fight = await page.evaluate(() => {
   const used = g.test.useGadget();
   const clone = (g.level.gadgets.clones || [])[0];
   if (!clone || typeof g.level.gadgets._updateClones !== 'function') return { used, count: 0, cd: g.level.gadgets.cd };
+  clone.mesh.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(clone.mesh);
+  const floorY = g.level.world.groundH(clone.x, clone.z);
   const near = g.test.spawnZombie('tank', clone.x + 1.2, clone.z);
   const far = g.test.spawnZombie('tank', clone.x + 8, clone.z);
   near.hp = near.maxHp = 1000;
@@ -99,11 +103,16 @@ const fight = await page.evaluate(() => {
     count: g.level.gadgets.clones.length,
     hp: clone.hp,
     cd: g.level.gadgets.cd,
+    y: clone.y,
+    floorY,
+    minY: box.min.y,
     nearDmg,
     farDmg: 1000 - far.hp,
   };
 });
 check(fight.used && fight.count === 1, 'клон спавниться', JSON.stringify(fight));
+check(fight.y > fight.floorY && fight.minY >= fight.floorY - 0.005,
+  'клон-гаджет стоїть над землею, не під землею', JSON.stringify(fight));
 check(fight.hp === 50, 'у клона 50 HP', JSON.stringify(fight));
 check(fight.cd === 50, 'перезарядка 50с', JSON.stringify(fight));
 check(fight.nearDmg === 10, 'зблизька меч наносить 10 HP', JSON.stringify(fight));
