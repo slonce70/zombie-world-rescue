@@ -43,6 +43,13 @@ export const TITLES = {
     detail: () => t('Відкривається за першу перемогу в Главі 2'),
     unlocked: (s) => Object.keys((s.infected && s.infected.cleared) || {}).length >= 1,
   },
+  ghost: {
+    icon: '👻',
+    name: () => t('Привид'),
+    desc: () => t('Досягни 5 рівня Шляху душ'),
+    detail: () => t('Відкривається на 5 рівні Шляху душ'),
+    unlocked: (s) => ((s.soulLevel || 1) | 0) >= 5,
+  },
 };
 
 export function syncTitles(save) {

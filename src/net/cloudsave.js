@@ -56,6 +56,7 @@ export function saveHasProgress(s) {
     || (s.dances || []).length > 1                          // більше за ['shuffle']
     || (s.tracers || []).length > 1                         // більше за ['classic']
     || (s.titles || []).length > 0 || !!s.activeTitle        // відкриті/активні титули
+    || (s.souls | 0) > 0 || (s.soulLevel | 0) > 1            // шлях душ
     || (s.gadgetsOwned || []).length > 0                    // куплені гаджети
     || (s.gadgetHypers || []).length > 0                    // постійні гіперзаряди гаджетів
     || (s.pets || []).length > 0                            // куплені улюбленці
