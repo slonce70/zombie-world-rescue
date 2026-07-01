@@ -118,6 +118,30 @@ check(fight.cd === 50, 'перезарядка 50с', JSON.stringify(fight));
 check(fight.nearDmg === 10, 'зблизька меч наносить 10 HP', JSON.stringify(fight));
 check(fight.farDmg === 5, 'здалека пістолет наносить 5 HP', JSON.stringify(fight));
 
+const raisedFloor = await page.evaluate(async () => {
+  const THREE = await import('/vendor/three.module.js');
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.gadgets.clones = [];
+  g.save.gadgetHypers = [];
+  g.save.activeGadget = 'clone';
+  g.test.gadgetCdReset();
+  g.test.teleport(0, 120);
+  p.yaw = 0;
+  const floor = { x: p.pos.x, z: p.pos.z - 1.8, ry: 0, w: 12, d: 12, top: g.level.world.groundH(p.pos.x, p.pos.z) + 4 };
+  g.level.world.floors.push(floor);
+  p.pos.y = floor.top;
+  const used = g.test.useGadget();
+  const clone = (g.level.gadgets.clones || [])[0];
+  clone?.syncToFloor?.();
+  clone?.mesh.updateMatrixWorld(true);
+  const box = clone ? new THREE.Box3().setFromObject(clone.mesh) : null;
+  g.level.world.floors = g.level.world.floors.filter((f) => f !== floor);
+  return clone ? { used, y: clone.y, meshY: clone.mesh.position.y, minY: box.min.y, top: floor.top } : { used, missing: true, top: floor.top };
+});
+check(raisedFloor.used && !raisedFloor.missing && raisedFloor.y > raisedFloor.top && raisedFloor.meshY > raisedFloor.top && raisedFloor.minY >= raisedFloor.top - 0.005,
+  'клон-гаджет стає на штучну підлогу кімнати, не під неї', JSON.stringify(raisedFloor));
+
 const hyperFight = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;

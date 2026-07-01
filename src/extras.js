@@ -951,7 +951,11 @@ export class Gadgets {
     const z = p.pos.z - Math.cos(p.yaw) * dist;
     const solved = this.level.world.collide(x, z, 0.7);
     if (Math.hypot(solved.x - x, solved.z - z) > 0.4) return null;
-    return { x, z, y: this.level.world.groundH(x, z) };
+    return { x: solved.x, z: solved.z, y: this._floorY(solved.x, solved.z, p.pos.y) };
+  }
+
+  _floorY(x, z, fromY = this.level.player.pos.y) {
+    return Math.max(this.level.world.groundH(x, z), this.level.world.floorAt(x, z, fromY));
   }
 
   _spawnClone() {
@@ -966,7 +970,7 @@ export class Gadgets {
       const off = (i - (count - 1) / 2) * 1.1;
       const x = pos.x + Math.cos(this.level.player.yaw) * off;
       const z = pos.z - Math.sin(this.level.player.yaw) * off;
-      const y = this.level.world.groundH(x, z) + CLONE_FOOT_LIFT;
+      const y = this._floorY(x, z, pos.y) + CLONE_FOOT_LIFT;
       const rig = makeHero('ninja');
       const shieldMesh = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.72, 1),
@@ -977,6 +981,10 @@ export class Gadgets {
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
       const clone = { x, z, y, hp: 50, shieldHp: 20, shieldMesh, hitT: 0, rig, mesh: rig.group };
+      clone.syncToFloor = () => {
+        clone.y = this._floorY(clone.x, clone.z, clone.y) + CLONE_FOOT_LIFT;
+        clone.mesh.position.set(clone.x, clone.y, clone.z);
+      };
       clone.takeDamage = (dmg) => {
         const block = Math.min(clone.shieldHp || 0, dmg);
         clone.shieldHp = Math.max(0, (clone.shieldHp || 0) - block);
@@ -1239,8 +1247,12 @@ export class Gadgets {
       if (dist > 2.0) {
         const step = Math.min(dist - 1.8, 5.5 * dt);
         const solved = level.world.collide(c.x + (dx / dist) * step, c.z + (dz / dist) * step, 0.45, c.y);
-        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
-        c.mesh.position.set(c.x, c.y, c.z);
+        c.x = solved.x; c.z = solved.z;
+        if (c.syncToFloor) c.syncToFloor();
+        else {
+          c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
+          c.mesh.position.set(c.x, c.y, c.z);
+        }
         setAnim(c.rig, 'run');
       } else {
         setAnim(c.rig, 'idle');
@@ -1256,8 +1268,12 @@ export class Gadgets {
         c.x += (sx / sd) * push;
         c.z += (sz / sd) * push;
         const solved = level.world.collide(c.x, c.z, 0.45, c.y);
-        c.x = solved.x; c.z = solved.z; c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
-        c.mesh.position.set(c.x, c.y, c.z);
+        c.x = solved.x; c.z = solved.z;
+        if (c.syncToFloor) c.syncToFloor();
+        else {
+          c.y = level.world.groundH(c.x, c.z) + CLONE_FOOT_LIFT;
+          c.mesh.position.set(c.x, c.y, c.z);
+        }
       }
       c.hitT -= dt;
       if (c.hitT <= 0 && dist <= 16) {
