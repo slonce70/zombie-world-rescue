@@ -70,11 +70,31 @@ check(started.roomSize === 100, 'кімната має розмір 100x100 ме
 check(started.ghosts === 20 && started.ghostStats.every((z) => z.type === 'ghost' && z.hp === 125 && z.maxHp === 125 && z.visible),
   'є 20 видимих білих привидів по 125 HP', JSON.stringify(started));
 check(started.player.hp === 50 && started.player.maxHp === 50
-  && JSON.stringify(started.player.weapons) === JSON.stringify(['staff'])
+  && JSON.stringify(started.player.weapons) === JSON.stringify(['staff', 'sword'])
   && started.player.cur === 'staff' && started.player.grenades === 0,
-  'гравець має 50 HP, тільки посох і 0 гранат', JSON.stringify(started));
+  'гравець має 50 HP, посох, меч і 0 гранат', JSON.stringify(started));
 check(started.noGadgets && started.noShop && started.noPickups && started.noZombiePickups && started.noCoinDrops && started.noBuffs,
   'пікапи, гаджети, магазин, бафи і дроп вимкнені', JSON.stringify(started));
+
+console.log('▸ Меч у Збирачі душ наносить 30 HP');
+const swordHit = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  const z = g.level.zombies.list.find((x) => x.soulGhost && x.state !== 'dead');
+  z.hp = z.maxHp = 125;
+  z.x = p.pos.x;
+  z.z = p.pos.z - 2;
+  z.y = g.level.soulCollector.floorY;
+  z.rig.group.position.set(z.x, z.y, z.z);
+  p.cur = 'sword';
+  p.ammo.sword.mag = p.weapon.mag;
+  p.yaw = 0;
+  p.pitch = 0;
+  p.shootCd = 0;
+  p._shoot();
+  return { hp: z.hp, damage: 125 - z.hp, weapon: p.cur };
+});
+check(swordHit.damage === 30, 'меч знімає рівно 30 HP', JSON.stringify(swordHit));
 
 console.log('▸ Привиди бʼють гравця');
 const ghostHit = await page.evaluate(() => {

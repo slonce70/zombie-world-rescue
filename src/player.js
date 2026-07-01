@@ -715,10 +715,11 @@ export class Player {
       const dir = this.forwardVec(this._shootDir).normalize();
       const hit = level.zombies ? level.zombies.hitTest(origin, dir, w.range || 3) : null;
       if (hit) {
-        if (level.mirror) level.net.shotReport(this.cur, hit.point, [[hit.zombie.nid, Math.round(w.dmg * dmgMult), 0]], [], [], false);
-        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(w.dmg * dmgMult, dir, false); }
+        const baseDmg = level.soulCollector && this.cur === 'sword' ? 30 : w.dmg;
+        if (level.mirror) level.net.shotReport(this.cur, hit.point, [[hit.zombie.nid, Math.round(baseDmg * dmgMult), 0]], [], [], false);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(baseDmg * dmgMult, dir, false); }
         level.effects.burst(hit.point, 0x86d14e, 8, { speed: 2.4, life: 0.4 });
-        level.effects.damageNumber(hit.point, w.dmg * dmgMult, false);
+        level.effects.damageNumber(hit.point, baseDmg * dmgMult, false);
         level.audio.hit(false);
         level.stats.shotsHit++;
         level.bus.emit('hitmarker', false, this.cur);

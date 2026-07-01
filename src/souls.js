@@ -38,7 +38,7 @@ export class SoulCollectorMode {
     return [
       { icon: '👻', title: t('ЗБИРАЧ ДУШ'), done: false },
       { icon: '🧟', title: t('Привидів лишилось: {n}/{total}', { n: this.remaining(), total: this.target }), done: this.completed },
-      { icon: '🪄', title: t('Тільки посох. Без пікапів, гаджетів і магазину.'), done: false },
+      { icon: '🪄', title: t('Посох і меч. Без пікапів, гаджетів і магазину.'), done: false },
     ];
   }
 
