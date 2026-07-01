@@ -74,6 +74,19 @@ const started = await page.evaluate(async () => {
     zombies: enemies.length,
     robots: enemies.filter((z) => z.type === 'robot').length,
     enemyPositions: enemies.map((z) => ({ x: z.x, z: z.z, y: z.y })),
+    minAnimatedCloneClearance: (() => {
+      let min = Infinity;
+      for (let step = 0; step < 240; step++) {
+        h.update(1 / 30);
+        for (const c of h.clones) {
+          if (c.hp <= 0) continue;
+          c.mesh.updateMatrixWorld(true);
+          const b = new THREE.Box3().setFromObject(c.mesh);
+          min = Math.min(min, b.min.y - h._floorAt(c.x, c.z));
+        }
+      }
+      return min;
+    })(),
     playerZ: g.level.player.pos.z,
     weapons: [...g.level.player.weapons],
     currentWeapon: g.level.player.cur,
@@ -98,6 +111,8 @@ check(started.clones.every((c) => c.z - started.centerZ > 200)
 check(started.clones.every((c) => c.y > started.floorY && c.meshY > started.floorY && c.minY >= started.floorY - 0.005)
   && started.enemyPositions.every((z) => Math.abs(z.y - started.floorY) < 0.01),
   'клони і зомбі стоять на рівній підлозі, не під землею', JSON.stringify(started));
+check(started.minAnimatedCloneClearance >= 0.08,
+  'клони не провалюються в підлогу під час бігу/анімацій', String(started.minAnimatedCloneClearance));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
 check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'

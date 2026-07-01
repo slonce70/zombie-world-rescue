@@ -7,7 +7,7 @@ import {
 } from './characters.js';
 import { disposeObject } from './utils.js';
 
-const CLONE_FOOT_LIFT = 0.08;
+const CLONE_FOOT_LIFT = 0.16;
 
 // ============================================================
 // 🦙 Мегабокс: святкова скриня з pity-механікою
