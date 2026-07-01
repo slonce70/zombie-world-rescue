@@ -1486,7 +1486,8 @@ export class Zombies {
     if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return true; }
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
-    if (tgt.pos.y - this.world.groundH(tgt.pos.x, tgt.pos.z) > 3) return false;
+    const floorY = Math.max(this.world.groundH(tgt.pos.x, tgt.pos.z), this.world.floorAt(tgt.pos.x, tgt.pos.z, tgt.pos.y));
+    if (tgt.pos.y - floorY > 3) return false;
     if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz);
     else this.level.player.takeDamage(dmg, fx, fz);
     return true;

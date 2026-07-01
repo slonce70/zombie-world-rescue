@@ -104,9 +104,9 @@ check(started.clonePositions.every((c) => c.y > started.floorY && c.meshY > star
 check(started.robotHp === 1795 && started.robotMaxHp === 1795, 'робот має 1795 HP', JSON.stringify(started));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
-check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'
-  && started.modeShield.hp === 100 && started.modeShield.cd === 100,
-  'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
+check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === null
+  && started.modeShield === null,
+  'немає пікапів, магазину і гаджетів', JSON.stringify(started));
 
 console.log('▸ Стрілець-клон наносить 5 HP');
 const shot = await page.evaluate(() => {

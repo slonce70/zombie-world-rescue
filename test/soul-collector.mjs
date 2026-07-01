@@ -76,6 +76,26 @@ check(started.player.hp === 50 && started.player.maxHp === 50
 check(started.noGadgets && started.noShop && started.noPickups && started.noZombiePickups && started.noCoinDrops && started.noBuffs,
   'пікапи, гаджети, магазин, бафи і дроп вимкнені', JSON.stringify(started));
 
+console.log('▸ Привиди бʼють гравця');
+const ghostHit = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  const z = g.level.zombies.list.find((x) => x.soulGhost && x.state !== 'dead');
+  p.health = 50;
+  z.x = p.pos.x + 1.1;
+  z.z = p.pos.z;
+  z.y = g.level.soulCollector.floorY;
+  z.rig.group.position.set(z.x, z.y, z.z);
+  z.aggroed = true;
+  z.state = 'chase';
+  for (let i = 0; i < 30; i++) {
+    g.level.zombies.update(1 / 30);
+    g.level.soulCollector.update(1 / 30);
+  }
+  return { hp: p.health };
+});
+check(ghostHit.hp > 0 && ghostHit.hp < 50, 'привид знімає HP гравцю', JSON.stringify(ghostHit));
+
 console.log('▸ Перемога дає 3 душі, шлях душ піднімається за 5 душ і видає нагороду');
 const rewards = await page.evaluate(() => {
   const g = window.__game;

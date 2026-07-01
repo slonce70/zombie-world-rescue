@@ -115,9 +115,9 @@ check(started.minAnimatedCloneClearance >= 0.08,
   'клони не провалюються в підлогу під час бігу/анімацій', String(started.minAnimatedCloneClearance));
 check(JSON.stringify(started.weapons) === JSON.stringify(['pistol', 'staff', 'sword']) && started.currentWeapon === 'pistol',
   'у гравця пістолет, посох і меч', JSON.stringify(started));
-check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === 'shield'
-  && started.modeShield.hp === 100 && started.modeShield.cd === 100,
-  'немає пікапів і магазину; є тільки щит-гаджет 100 HP / 100с', JSON.stringify(started));
+check(started.noShop && started.noPickups && started.noGadgets && started.activeGadget === null
+  && started.modeShield === null,
+  'немає пікапів, магазину і гаджетів', JSON.stringify(started));
 check(started.hud.some((x) => x.includes('Зомбі')) && started.markers >= 66, 'HUD і маркери показують битву', JSON.stringify(started));
 
 console.log('▸ Відштовхування боксера не закопує клона під підлогу');
@@ -136,18 +136,16 @@ const pushedClone = await page.evaluate(async () => {
 check(pushedClone.y > pushedClone.floorY && pushedClone.meshY > pushedClone.floorY && pushedClone.minY >= pushedClone.floorY - 0.005,
   'після punch-push клон повертається на рівну підлогу', JSON.stringify(pushedClone));
 
-console.log('▸ Єдиний гаджет: щит 100 HP з перезарядкою 100с');
-const shield = await page.evaluate(() => {
+console.log('▸ Гаджети вимкнені');
+const gadget = await page.evaluate(() => {
   const g = window.__game;
   g.level.player.gadgetShield = 0;
   g.level.gadgets.cd = 0;
   const used = g.test.useGadget();
-  const afterUse = { shield: g.level.player.gadgetShield, cd: g.level.gadgets.cd, active: g.level.gadgets.active };
-  const usedAgain = g.test.useGadget();
-  return { used, usedAgain, afterUse, afterAgain: { shield: g.level.player.gadgetShield, cd: g.level.gadgets.cd } };
+  return { used, shield: g.level.player.gadgetShield, cd: g.level.gadgets.cd, active: g.level.gadgets.active };
 });
-check(shield.used && !shield.usedAgain && shield.afterUse.shield === 100 && shield.afterUse.cd === 100 && shield.afterUse.active === 'shield',
-  'щит вмикається на 100 HP і одразу йде на 100с перезарядки', JSON.stringify(shield));
+check(!gadget.used && gadget.shield === 0 && gadget.cd === 0 && gadget.active === null,
+  'щит-гаджет у режимі зомбі проти людей прибраний', JSON.stringify(gadget));
 
 console.log('▸ Програш забирає 100 монет, перемога після знищення армії');
 const lose = await page.evaluate(() => {
