@@ -48,8 +48,10 @@ try {
   await A.evaluate(() => {
     const g = window.__game;
     g.test.god();
-    const zs = g.level.zombies.list.filter((z) => z.state !== 'dead').slice(0, 3);
-    for (const z of zs) z.damage(99999, null, false);
+    const zs = g.level.zombies.list.filter((z) => z.state !== 'dead');
+    for (const z of zs.slice(0, 3)) z.damage(99999, null, false);
+    // CI рендерить через SwiftShader: mid-join перевіряє синк стану, а не FPS орди.
+    for (const z of zs.slice(18)) z.damage(99999, null, false);
     g.level.missions.useBarn = g.level.missions.useBarn; // no-op
   });
   const hostZombies0 = await A.evaluate(() => window.__game.level.zombies.list.filter((z) => z.state !== 'dead').length);
