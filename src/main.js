@@ -76,7 +76,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 232;
+const APP_VERSION = 233;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -142,8 +142,9 @@ const SOLO_MODE_GROUPS = [
   { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss'] },
   { id: 'duels', title: () => t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
   { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
-  { id: 'trials', title: () => t('ВИПРОБУВАННЯ'), ids: ['zone-defense', 'defense', 'bank', 'maze'] },
-  { id: 'souls', title: () => t('ШЛЯХ ДУШ'), ids: ['soul-collector'] },
+  // «ВИКЛИКИ», не «ВИПРОБУВАННЯ»: довше слово не влазить у 2 ряди табів на 375px
+  { id: 'trials', title: () => t('ВИКЛИКИ'), ids: ['zone-defense', 'defense', 'bank', 'maze'] },
+  { id: 'souls', title: () => t('ДУШІ'), ids: ['soul-collector'] },
 ];
 
 // 💀 базовий режим → його «перегружений» варіант (кнопка на картці)
@@ -1082,10 +1083,10 @@ class Game {
     const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}${!m.locked && m.id === daily ? ' daily' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
-        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ` <span class="sm-daily">🎯 ${t('СЬОГОДНІ ×2')}</span>` : ''}</div>
+        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ' <span class="sm-daily">🎯 ×2</span>' : ''}</div>
         <div class="sm-desc">${m.desc}</div>
-        ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}</div>
-        ${hardBtn(m)}
+        ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}
+        ${hardBtn(m)}</div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
     root.innerHTML = `

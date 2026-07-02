@@ -80,7 +80,7 @@ try {
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
     JSON.stringify(fresh.tabs) === JSON.stringify([
-      'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИПРОБУВАННЯ', 'ШЛЯХ ДУШ',
+      'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИКЛИКИ', 'ДУШІ',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected'])
@@ -90,11 +90,11 @@ try {
         { title: 'БОСИ', modes: ['arena', 'worldboss'] },
         { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
         { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-        { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
-        { title: 'ШЛЯХ ДУШ', modes: ['soul-collector'] },
+        { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
+        { title: 'ДУШІ', modes: ['soul-collector'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
-  await page.click('.solo-tab:has-text("ВИПРОБУВАННЯ")');
+  await page.click('.solo-tab:has-text("ВИКЛИКИ")');
   const trialModes = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-mode')]
       .filter((m) => {
@@ -113,8 +113,8 @@ try {
       { title: 'БОСИ', modes: ['arena', 'worldboss'] },
       { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
       { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-      { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
-      { title: 'ШЛЯХ ДУШ', modes: ['soul-collector'] },
+      { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
+      { title: 'ДУШІ', modes: ['soul-collector'] },
     ]),
     JSON.stringify(fresh.sections));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });

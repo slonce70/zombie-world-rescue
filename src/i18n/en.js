@@ -1222,6 +1222,8 @@ export const EN = {
 "Дивись у Гардеробі 🎒": "Check the Wardrobe 🎒",
 "СЬОГОДНІ ×2": "TODAY ×2",
 "Складно": "Hard",
+"ВИКЛИКИ": "TRIALS",
+"ДУШІ": "SOULS",
 "Рекорд: {t}": "Best: {t}",
 "Випробування дня": "Daily challenge",
 "{i} {m} — нагорода ×2 сьогодні!": "{i} {m} — ×2 reward today!",
