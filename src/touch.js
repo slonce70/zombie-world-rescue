@@ -278,6 +278,15 @@ export class TouchControls {
     if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } }
   }
 
+  // вібро на вбивство: соковитий «тук», босс — сильніший. Тротлінг, щоб орда
+  // в Штормі не перетворювала телефон на масажер.
+  vibeKill(boss = false) {
+    const now = performance.now();
+    if (now - (this._lastKillVibe || 0) < 120) return;
+    this._lastKillVibe = now;
+    this._vibe(boss ? 40 : 12);
+  }
+
   // іконка кнопки звуку віддзеркалює стан mute
   _syncMute() {
     const el = document.getElementById('tb-mute');

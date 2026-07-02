@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeHero, setAnim, updateRig } from './characters.js';
+import { makeHero, cloneRig, setAnim, updateRig } from './characters.js';
 import { disposeObject } from './utils.js';
 import { t } from './i18n.js';
 
@@ -128,13 +128,16 @@ export class HumansMode {
   _spawnClones() {
     const total = this.cfg.clones + this.cfg.shooters;
     const baseZ = this.cz + this._half - 130;
+    // один шаблон-риг на всіх: геометрія/матеріали спільні (інваріант bakeRig+cloneRig),
+    // інакше 50 повних makeHero = фриз на старті і десятки МБ GPU-памʼяті
+    const tpl = makeHero('ninja');
     for (let i = 0; i < total; i++) {
       const col = i % 10;
       const row = Math.floor(i / 10);
       const x = this.cx - 45 + col * 10;
       const z = baseZ + row * 10;
       const y = this._floorAt(x, z) + CLONE_FOOT_LIFT;
-      const rig = makeHero('ninja');
+      const rig = cloneRig(tpl);
       rig.group.position.set(x, y, z);
       this.level.scene.add(rig.group);
       const clone = { x, z, y, hp: 30, hitT: 0, shooter: i >= this.cfg.clones, rig, mesh: rig.group };

@@ -2382,6 +2382,7 @@ class Game {
       if (level.playground) return;
       // кооп-хост: чужі перемоги зараховуються їхнім господарям (події zd)
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
+      if (this.touch) this.touch.vibeKill(z.type === 'boss');
       this.save.stats.killed++;
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
