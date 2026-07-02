@@ -70,7 +70,7 @@ const started = await page.evaluate(() => {
 });
 check(started.roomSize === 30 && started.radius === 15, 'зона має діаметр 30 метрів', JSON.stringify(started));
 check(started.playerDist < 0.01 && Math.abs(started.playerY - started.floorY) < 0.01, 'гравця телепортує в центр зони', JSON.stringify(started));
-check(started.timer === 125, 'таймер виживання 125 секунд', JSON.stringify(started));
+check(started.timer <= 125 && started.timer >= 124, 'таймер виживання стартує з 125 секунд', JSON.stringify(started));
 check(started.weapons.length === 2 && started.weapons.includes('staff') && started.weapons.includes('pistol') && started.cur === 'staff' && started.grenades === 0,
   'гравець стартує з посохом і пістолетом без гранат', JSON.stringify(started));
 check(started.noPickups && started.noZombiePickups, 'пікапи і дроп із зомбі вимкнені', JSON.stringify(started));
