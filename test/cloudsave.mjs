@@ -133,7 +133,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
       'bestiary', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
       'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'liberated', 'medals',
-      'megaPity', 'megaQuests', 'missionRuns', 'pets', 'quests', 'records', 'skins', 'soulLevel',
+      'megaPity', 'megaQuests', 'missionRuns', 'modeBest', 'modeRewards', 'modeWins', 'pets', 'quests', 'records', 'skins', 'soulLevel',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
       'weapons', 'worldBosses', 'xp',
     ]);

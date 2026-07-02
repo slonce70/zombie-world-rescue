@@ -28,6 +28,7 @@ export const hasLiberated = (liberated = {}, id) => !!(liberated && liberated[id
 // explicitly listed as non-progress in the focused cloudsave test.
 export const SAVE_PROGRESS_KEYS = Object.freeze([
   'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses',
+  'modeBest', 'modeWins', 'modeRewards',
   'coins', 'crystals', 'upgrades', 'bestiary',
   'chapter', 'infected', 'megaQuests', 'medals', 'stats',
   'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
@@ -51,6 +52,8 @@ export function saveHasProgress(s) {
     || Object.keys(s.missionRuns || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
     || Object.keys(s.worldBosses || {}).length > 0
+    || Object.keys(s.modeBest || {}).length > 0             // рекорди соло-режимів
+    || Object.keys(s.modeWins || {}).length > 0             // перемоги/віхи соло-режимів (modeRewards похідні)
     || (s.coins | 0) > NEW_SAVE_COINS                       // більше за стартові монети
     || (s.crystals | 0) > 0                                  // преміальна валюта зі скінів
     || Object.keys(s.upgrades || {}).length > 0             // куплені прокачування
