@@ -33,6 +33,42 @@ function getGlowTexture() {
   return glowTexture;
 }
 
+// 💥 текстура 4-променевої зірки дульного спалаху — модульний синглтон
+// (Effects створюється на кожен рівень; текстура в конструкторі текла б по рівню за гру)
+let starTexture = null;
+function getStarTexture() {
+  if (!starTexture) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const ctx = cv.getContext('2d');
+    const grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.35, 'rgba(255,214,90,0.95)');
+    grad.addColorStop(1, 'rgba(255,140,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    // 4-променева зірка: гострі промені з вузькою «талією» між ними
+    const pts = [[32, 0], [39, 25], [64, 32], [39, 39], [32, 64], [25, 39], [0, 32], [25, 25]];
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fill();
+    starTexture = new THREE.CanvasTexture(cv);
+    starTexture.userData.shared = true;
+  }
+  return starTexture;
+}
+
+// 🟡 геометрія гільзи — теж синглтон на сеанс
+let shellGeoShared = null;
+function getShellGeo() {
+  if (!shellGeoShared) {
+    shellGeoShared = new THREE.CylinderGeometry(0.016, 0.016, 0.06, 5);
+    shellGeoShared.userData.shared = true;
+  }
+  return shellGeoShared;
+}
+
 export class Effects {
   constructor(scene, world, audio) {
     this.scene = scene;
@@ -111,28 +147,11 @@ export class Effects {
     this.flashT = 0;
 
     // 💥 мультяшна зірка-спалах біля дула: пул спрайтів, нуль алокацій на постріл
-    const starCv = document.createElement('canvas');
-    starCv.width = starCv.height = 64;
-    const starCtx = starCv.getContext('2d');
-    const starGrad = starCtx.createRadialGradient(32, 32, 2, 32, 32, 32);
-    starGrad.addColorStop(0, 'rgba(255,255,255,1)');
-    starGrad.addColorStop(0.35, 'rgba(255,214,90,0.95)');
-    starGrad.addColorStop(1, 'rgba(255,140,0,0)');
-    starCtx.fillStyle = starGrad;
-    starCtx.beginPath();
-    // 4-променева зірка: гострі промені з вузькою «талією» між ними
-    const starPts = [[32, 0], [39, 25], [64, 32], [39, 39], [32, 64], [25, 39], [0, 32], [25, 25]];
-    starCtx.moveTo(starPts[0][0], starPts[0][1]);
-    for (let i = 1; i < starPts.length; i++) starCtx.lineTo(starPts[i][0], starPts[i][1]);
-    starCtx.closePath();
-    starCtx.fill();
-    const starTex = new THREE.CanvasTexture(starCv);
-    starTex.userData.shared = true;
     this.flashSprites = [];
     this._flashIdx = 0;
     for (let i = 0; i < 4; i++) {
       const spr = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: starTex, color: 0xffcf6e, transparent: true, opacity: 0,
+        map: getStarTexture(), color: 0xffcf6e, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
       }));
       spr.visible = false;
@@ -142,8 +161,7 @@ export class Effects {
     }
 
     // 🟡 гільзи: пул циліндриків зі спільними геометрією/матеріалом, перезапис найстарішої
-    this.shellGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.06, 5);
-    this.shellGeo.userData.shared = true;
+    this.shellGeo = getShellGeo();
     this.shellMat = toonMat(0xe0b64a);
     this.shells = [];
     this._shellIdx = 0;

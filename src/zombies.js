@@ -610,13 +610,15 @@ export class Zombies {
     const dealt = Math.min(amt, z.hp);
     z.hp -= amt;
     if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
-    // 💥 постріл ФІЗИЧНО відчутний: здригання + нокбек у напрямку пострілу
-    z.rig.anim.flinchT = 0.18;
-    if (dir && z.type !== 'boss') {
+    // 💥 постріл ФІЗИЧНО відчутний: здригання + нокбек у напрямку пострілу.
+    // ВАЖЛИВО: лазер/вогнемет/калюжі б'ють ЩОКАДРУ дрібним amt — такі тіки НЕ дають
+    // ні flinch, ні нокбек (інакше зомбі здуває через мапу і морозить у позі). Поріг amt.
+    if (amt >= 5) z.rig.anim.flinchT = 0.18;
+    if (dir && z.type !== 'boss' && amt >= 3) {
       // важкі майже не зсуваються, дрібнота відлітає далі
       const mass = (z.type === 'tank' || z.type === 'robot' || z.type === 'ironclad') ? 0.3
         : z.type === 'imp' ? 1.7 : 1;
-      const kb = Math.min(3.5, 0.6 + amt * 0.028) * mass;
+      const kb = Math.min(3.5, amt * 0.04) * mass;
       z.kbX = (z.kbX || 0) + dir.x * kb;
       z.kbZ = (z.kbZ || 0) + dir.z * kb;
     }
@@ -795,12 +797,14 @@ export class Zombies {
         // оновлюємо повний риг лише поки програється сама die-анімація (~0.85с);
         // далі поза вже статична — заморожуємо її й не тратимо CPU на риг трупа
         if (rig.anim.dieT < 1) updateRig(rig, dt);
-        // труп ковзає від нокбека («збило з ніг»)
+        // труп ковзає від нокбека («збило з ніг») — але не крізь стіни
         if (z.kbX || z.kbZ) {
           z.x += z.kbX * dt; z.z += z.kbZ * dt;
           const kf = Math.max(0, 1 - dt * 4);
           z.kbX *= kf; z.kbZ *= kf;
           if (Math.abs(z.kbX) + Math.abs(z.kbZ) < 0.04) z.kbX = z.kbZ = 0;
+          const ds = this.world.collide(z.x, z.z, rig.radius * 0.6);
+          z.x = ds.x; z.z = ds.z;
           rig.group.position.x = z.x;
           rig.group.position.z = z.z;
         }

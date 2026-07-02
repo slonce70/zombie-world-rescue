@@ -349,6 +349,7 @@ export class AudioMan {
   }
 
   heal() {
+    this.voiceOnce('heal', 25);
     const t = this.t;
     [72, 76, 79].forEach((m, i) => this._osc('sine', midi(m), t + i * 0.07, 0.18, 0.18));
   }
@@ -452,7 +453,12 @@ export class AudioMan {
     const p = fetch(`./assets/voice/${id}.m4a`)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
       .then((ab) => this.ctx.decodeAudioData(ab))
-      .catch(() => null); // offline-запобіжник: тихо ковтаємо
+      .catch(() => {
+        // offline-запобіжник: тихо ковтаємо, але НЕ кешуємо фейл —
+        // наступний viклик спробує ще раз (мережа могла повернутись)
+        this._voiceBufs.delete(id);
+        return null;
+      });
     this._voiceBufs.set(id, p);
     return p;
   }
@@ -471,6 +477,7 @@ export class AudioMan {
       s.connect(g).connect(this.sfxGain);
       s.start();
       this._voiceBusyUntil = this.ctx.currentTime + buf.duration + 0.4;
+      this._voiceCd.set(id, this.ctx.currentTime); // кулдаун — лише коли РЕАЛЬНО зіграла
     });
   }
 
@@ -478,8 +485,7 @@ export class AudioMan {
   voiceOnce(id, cdSec = 20, vol = 1) {
     const now = this.ctx ? this.ctx.currentTime : 0;
     if ((this._voiceCd.get(id) ?? -1e9) + cdSec > now) return;
-    this._voiceCd.set(id, now);
-    this.voice(id, vol);
+    this.voice(id, vol); // мітку часу ставить voice() у момент старту звуку
   }
 
   // ---------- музика ----------
