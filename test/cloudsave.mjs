@@ -333,6 +333,41 @@ const cCoins = await evaluateAcrossReloads(C, () => {
 }, T(25000), (v) => v === 7777);
 check('bootSync сам підтягнув хмарний прогрес', cCoins === 7777, `coins=${cCoins}`);
 
+// ---------- bootSync conflict: локальний офлайн-прогрес не можна тихо затерти новішою хмарою ----------
+console.log('▸ bootSync: конфлікт локального офлайн-прогресу і новішої хмари');
+const ctxD = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const D = await ctxD.newPage();
+await D.addInitScript((cid) => {
+  localStorage.setItem('zr-save-v1', JSON.stringify({
+    cid,
+    coins: 8888,
+    liberated: { POL: true },
+    weapons: ['pistol', 'rifle'],
+    cloudTs: 0,
+  }));
+}, cidA);
+await D.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await D.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
+await D.waitForFunction(() => !!localStorage.getItem('zr-save-conflict-v1'), null, { timeout: T(8000) }).catch(() => null);
+const conflict = await D.evaluate(() => {
+  const g = window.__game;
+  const raw = localStorage.getItem('zr-save-conflict-v1');
+  let cloud = null;
+  try { cloud = raw ? JSON.parse(raw) : null; } catch (e) {}
+  return {
+    localCoins: g.save.coins,
+    localPol: !!g.save.liberated.POL,
+    localUkr: !!g.save.liberated.UKR,
+    conflictCoins: cloud && cloud.save && cloud.save.coins,
+    conflictUkr: !!(cloud && cloud.save && cloud.save.liberated && cloud.save.liberated.UKR),
+    status: document.getElementById('cloud-status')?.textContent || '',
+  };
+});
+check('conflict не затирає локальний офлайн-прогрес', conflict.localCoins === 8888 && conflict.localPol && !conflict.localUkr,
+  JSON.stringify(conflict));
+check('conflict backup містить хмарний сейв', conflict.conflictCoins === 7777 && conflict.conflictUkr,
+  JSON.stringify(conflict));
+
 // ---------- файл-копія (панель А досі відкрита) ----------
 console.log('▸ Файл-копія');
 const dlPromise = A.waitForEvent('download', { timeout: T(8000) }).catch(() => null);

@@ -27,9 +27,19 @@ visit(entry);
 const sw = readFileSync(root + 'sw.js', 'utf8');
 const shell = new Set([...sw.matchAll(/['"]\.\/([^'"]+)['"]/g)].map((m) => m[1]));
 const missing = [...needed].filter((file) => !shell.has(file));
+const missingShellFiles = [...shell].filter((file) => !existsSync(root + file));
+const hidesInstallFailures = /allSettled\s*\(/.test(sw);
 
 if (missing.length) {
   console.error('sw.js SHELL misses ESM modules:\n' + missing.map((f) => '  - ./' + f).join('\n'));
+  process.exit(1);
+}
+if (missingShellFiles.length) {
+  console.error('sw.js SHELL points at missing files:\n' + missingShellFiles.map((f) => '  - ./' + f).join('\n'));
+  process.exit(1);
+}
+if (hidesInstallFailures) {
+  console.error('sw.js install must fail on missing required SHELL files; do not use Promise.allSettled for cache.add.');
   process.exit(1);
 }
 

@@ -1337,6 +1337,12 @@ export class DynamicMissions {
     // ескорт синхронізується снапшотом (m.started → гість спавнить мандрівника); окрема подія не потрібна
   }
 
+  _removeTraveler(m) {
+    if (!m || !m.traveler) return;
+    this.level.scene.remove(m.traveler.rig.group);
+    m.traveler = null;
+  }
+
   // --- хост: стан місій для снапшота ---
   netState() {
     const out = {
@@ -1413,6 +1419,7 @@ export class DynamicMissions {
         m.nestList.forEach((n, j) => { if (!n.cleared) n.progress = a[2 + j] || 0; });
       } else if (m.type === 'escort') {
         if (a[1] && !m.started) { m.started = true; if (!m.traveler) this._spawnTraveler(m); }
+        else if (!a[1]) { m.started = false; this._removeTraveler(m); }
       } else if (m.points) {
         m.activated = a[1];
         m.points.forEach((p, j) => { if (!p.done) p.progress = a[2 + j] || 0; });
@@ -1427,6 +1434,9 @@ export class DynamicMissions {
     if (esc && esc.traveler && ms.t) {
       esc.traveler.netT = { x: ms.t[0], z: ms.t[1] };
       esc.traveler.hp = ms.t[2];
+    } else if (esc && esc.traveler && !ms.t) {
+      esc.started = false;
+      this._removeTraveler(esc);
     }
     this._civNet = ms.c || [];
   }

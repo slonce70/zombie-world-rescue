@@ -155,6 +155,65 @@ const HARD_VARIANTS = {
   humans: 'overloaded-humans',
 };
 
+export const MODE_RULES = {
+  campaign: {},
+  infected: {},
+  storm: { noShop: true },
+  arena: {},
+  worldboss: { noShop: true },
+  knockout: { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
+  'friendly-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
+  'overloaded-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
+  defense: { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
+  'overloaded-defense': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  'zone-defense': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  pvp: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  'overloaded-pvp': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  bank: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  portal: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  maze: { noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  humans: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  'overloaded-humans': { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  'soul-collector': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+};
+
+function modeIdFromOpts(opts, worldBossId) {
+  if (worldBossId) return 'worldboss';
+  if (opts.storm) return 'storm';
+  if (opts.arena) return 'arena';
+  if (opts.knockout) return opts.knockout === 'overloaded' ? 'overloaded-knockout' : opts.knockout === 'friendly' ? 'friendly-knockout' : 'knockout';
+  if (opts.defense) return opts.defense === 'overloaded' ? 'overloaded-defense' : opts.defense === 'zone' ? 'zone-defense' : 'defense';
+  if (opts.pvp) return opts.pvp === 'overloaded' ? 'overloaded-pvp' : 'pvp';
+  if (opts.bank) return 'bank';
+  if (opts.portal) return 'portal';
+  if (opts.maze) return 'maze';
+  if (opts.humans) return opts.humans === 'overloaded' ? 'overloaded-humans' : 'humans';
+  if (opts.soulCollector) return 'soul-collector';
+  return opts.infected ? 'infected' : 'campaign';
+}
+
+const MODE_START_OPTS = {
+  campaign: () => ({}),
+  infected: () => ({ infected: true }),
+  storm: () => ({ storm: true }),
+  arena: () => ({ arena: true }),
+  worldboss: (id) => ({ worldBoss: id }),
+  knockout: () => ({ knockout: true }),
+  'friendly-knockout': () => ({ knockout: 'friendly' }),
+  'overloaded-knockout': () => ({ knockout: 'overloaded' }),
+  defense: () => ({ defense: true }),
+  'overloaded-defense': () => ({ defense: 'overloaded' }),
+  'zone-defense': () => ({ defense: 'zone' }),
+  pvp: () => ({ pvp: true }),
+  'overloaded-pvp': () => ({ pvp: 'overloaded' }),
+  bank: () => ({ bank: true }),
+  portal: () => ({ portal: true }),
+  maze: () => ({ maze: true }),
+  humans: () => ({ humans: true }),
+  'overloaded-humans': () => ({ humans: 'overloaded' }),
+  'soul-collector': () => ({ soulCollector: true }),
+};
+
 const SOLO_MODES = [
   {
     id: 'campaign', icon: '🎯', name: () => t('КАМПАНІЯ'), picker: 'campaign',
@@ -629,7 +688,9 @@ class Game {
         }
         // вкладені об'єкти і списки могли прийти зі старого сейва неповними
         if (!Array.isArray(out.gadgetsOwned)) out.gadgetsOwned = [];
+        out.gadgetsOwned = out.gadgetsOwned.filter((id, i, arr) => GADGETS[id] && arr.indexOf(id) === i);
         if (!Array.isArray(out.gadgetHypers)) out.gadgetHypers = [];
+        out.gadgetHypers = out.gadgetHypers.filter((id, i, arr) => GADGETS[id] && arr.indexOf(id) === i);
         if (!out.megaQuests || typeof out.megaQuests !== 'object' || Array.isArray(out.megaQuests)) out.megaQuests = {};
         if (!out.worldBosses || typeof out.worldBosses !== 'object' || Array.isArray(out.worldBosses)) out.worldBosses = {};
         // міграція зі старої системи витратних гаджетів: заряди → відкриття назавжди
@@ -638,7 +699,7 @@ class Game {
           if (out.gadgets.wall > 0 && !out.gadgetsOwned.includes('wall')) out.gadgetsOwned.push('wall');
           delete out.gadgets;
         }
-        if (out.activeGadget && !out.gadgetsOwned.includes(out.activeGadget)) out.activeGadget = null;
+        if (out.activeGadget && (!GADGETS[out.activeGadget] || !out.gadgetsOwned.includes(out.activeGadget))) out.activeGadget = null;
         out.missionRuns = out.missionRuns || {};
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         // улюбленці: легасі-собака (upgrades.dog) → у список pets; узгодити activePet
@@ -719,6 +780,7 @@ class Game {
   saveGame() {
     if (this.level && this.level.playground) return;
     syncTitles(this.save);
+    this.save._cloudDirty = true;
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.save));
     } catch (e) {
@@ -1053,6 +1115,13 @@ class Game {
     if (!mode || typeof mode.start !== 'function') return false;
     mode.start(this, arg);
     return true;
+  }
+
+  startMode(modeId, arg) {
+    const make = MODE_START_OPTS[modeId];
+    if (!make) return false;
+    const countryId = arg && COUNTRIES[arg] ? arg : 'UKR';
+    return this.startLevel(countryId, make(arg));
   }
 
   // ---------- 🎮 меню «Грати» (соло-режими) ----------
@@ -1730,7 +1799,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { worldBoss: id });
+    return this.startMode('worldboss', id);
   }
 
   // ---------- 🥊 Нокаут ----------
@@ -1746,7 +1815,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { knockout: true });
+    return this.startMode('knockout');
   }
 
   startOverloadedKnockout() {
@@ -1762,7 +1831,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { knockout: 'overloaded' });
+    return this.startMode('overloaded-knockout');
   }
 
   // ---------- 🛡️ Оборона ----------
@@ -1779,7 +1848,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { defense: true });
+    return this.startMode('defense');
   }
 
   startOverloadedDefense() {
@@ -1795,7 +1864,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { defense: 'overloaded' });
+    return this.startMode('overloaded-defense');
   }
 
   startZoneDefense() {
@@ -1811,7 +1880,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { defense: 'zone' });
+    return this.startMode('zone-defense');
   }
 
   // ---------- ⚔️ ПВП ----------
@@ -1828,7 +1897,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { pvp: true });
+    return this.startMode('pvp');
   }
 
   startOverloadedPvp() {
@@ -1844,7 +1913,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { pvp: 'overloaded' });
+    return this.startMode('overloaded-pvp');
   }
 
   // ---------- 🏦 Банк ----------
@@ -1861,7 +1930,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { bank: true });
+    return this.startMode('bank');
   }
 
   // ---------- 🌀 Портал ----------
@@ -1878,7 +1947,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { portal: true });
+    return this.startMode('portal');
   }
 
   // ---------- 🧩 Лабіринт ----------
@@ -1895,7 +1964,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { maze: true });
+    return this.startMode('maze');
   }
 
   // ---------- ⚔️ Зомбі проти людей ----------
@@ -1912,7 +1981,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { humans: true });
+    return this.startMode('humans');
   }
 
   startOverloadedHumans() {
@@ -1928,7 +1997,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { humans: 'overloaded' });
+    return this.startMode('overloaded-humans');
   }
 
   // ---------- 👻 Збирач душ ----------
@@ -1944,7 +2013,7 @@ class Game {
       return;
     }
     this.audio.click();
-    return this.startLevel('UKR', { soulCollector: true });
+    return this.startMode('soul-collector');
   }
 
   // ---------- автооновлення ----------
@@ -2040,7 +2109,9 @@ class Game {
     const isOverloadedHumans = isHumans && humansVariant === 'overloaded';
     const worldBossId = opts.worldBoss || null;
     const isWorldBoss = !!worldBossId;
-    document.body.classList.toggle('no-shop-mode', isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isWorldBoss);
+    const modeId = modeIdFromOpts(opts, worldBossId);
+    const modeRules = MODE_RULES[modeId] || MODE_RULES.campaign;
+    document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
     const isGuest = !!(coop && coop.role === 'guest');
@@ -2103,6 +2174,7 @@ class Game {
     const level = {
       game: this,
       countryId,
+      modeId,
       country,
       scene: new THREE.Scene(),
       bus: new Bus(),
@@ -2120,13 +2192,13 @@ class Game {
       playground: isPlayground,
       infected: isInfected,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
-      noGadgets: isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector,
+      noGadgets: !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
-      noShop: isStorm || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isWorldBoss,
-      noBuffs: isKnockout || isDefense || isPvp || isBank || isSoulCollector,
-      noPickups: isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isOverloadedDefense || isZoneDefense,
-      noZombiePickups: isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector,
-      noCoinDrops: isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isOverloadedDefense || isZoneDefense,
+      noShop: !!modeRules.noShop,
+      noBuffs: !!modeRules.noBuffs,
+      noPickups: !!modeRules.noPickups,
+      noZombiePickups: !!modeRules.noZombiePickups,
+      noCoinDrops: !!modeRules.noCoinDrops,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
@@ -2754,6 +2826,8 @@ class Game {
     this.victoryShown = false;
     this.deathT = -1;
     this.input.exitLock();
+    if (this.touch && this.touch.resetPointers) this.touch.resetPointers();
+    else if (this.input && this.input.resetTransient) this.input.resetTransient();
     // прибираємо всі оверлеї рівня
     for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end']) {
       this._hideOverlay(id);
@@ -3827,6 +3901,8 @@ class Game {
   }
 
   showPause() {
+    if (this.touch && this.touch.resetPointers) this.touch.resetPointers();
+    else if (this.input && this.input.resetTransient) this.input.resetTransient();
     this.paused = true;
     const note = document.getElementById('pause-coop-note');
     if (note) note.style.display = this.level && this.level.net ? 'block' : 'none';

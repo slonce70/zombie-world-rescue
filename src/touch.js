@@ -206,6 +206,18 @@ export class TouchControls {
     this._wheelTrigger = null;
   }
 
+  resetPointers() {
+    this.lookId = null;
+    this.joyId = null;
+    this.input.resetTransient();
+    clearTimeout(this._wheelTimer);
+    this._wheelTimer = null;
+    this._wheelLongPressed = false;
+    if (this.joyBase) this.joyBase.style.display = 'none';
+    if (this.joyKnob) this._setKnob(0, 0);
+    this._closeWheel();
+  }
+
   _onStart(e) {
     if (this.wheelOpen) { e.preventDefault(); return; } // тапи йдуть у колесо, не в канву
     if (this.game.state !== 'level') return;

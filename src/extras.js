@@ -685,8 +685,14 @@ export class Gadgets {
       level.bus.emit('toast', t('🧰 Обери гаджет у Гардеробі на глобусі!'));
       return false;
     }
+    const cfg = GADGETS[id];
+    if (!cfg) {
+      this.active = null;
+      level.bus.emit('toast', t('🧰 Обери гаджет у Гардеробі на глобусі!'));
+      return false;
+    }
     if (this.cd > 0) {
-      level.bus.emit('toast', t('{i} Ще {n}с перезарядки…', { i: GADGETS[id].icon, n: Math.ceil(this.cd) }));
+      level.bus.emit('toast', t('{i} Ще {n}с перезарядки…', { i: cfg.icon, n: Math.ceil(this.cd) }));
       game.audio.denied();
       return false;
     }
@@ -833,7 +839,7 @@ export class Gadgets {
       ok = level.mirror ? this._requestMeteor() : this._callMeteor();
     }
     if (ok) {
-      this.cd = level.playground ? 0 : GADGETS[id].cd;
+      this.cd = level.playground ? 0 : cfg.cd;
       level.bus.emit('gadgetUsed', id);
     }
     return ok;

@@ -95,6 +95,17 @@ async function loadWith(raw) {
   check(save.activePet === 'cat', 'битий activePet → перший із наявних (cat)');
 }
 
+// 8. Битий activeGadget / gadgetsOwned не має лишати невідомі id, які крешать Gadgets.use()
+{
+  const { save, errs } = await loadWith(JSON.stringify({
+    gadgetsOwned: ['bogus', 'heal'],
+    activeGadget: 'bogus',
+  }));
+  check(errs.length === 0, `битий activeGadget: без винятків (${errs[0] || 'ok'})`);
+  check(JSON.stringify(save.gadgetsOwned) === JSON.stringify(['heal']), 'невідомі gadgetsOwned відфільтровано');
+  check(save.activeGadget === 'heal', 'битий activeGadget → перший валідний гаджет');
+}
+
 await browser.close();
 closeServer();
 console.log(failed === 0 ? '\n🎉 МІГРАЦІЯ СЕЙВА НАДІЙНА' : `\n❌ МІГРАЦІЯ: ${failed} провалів`);

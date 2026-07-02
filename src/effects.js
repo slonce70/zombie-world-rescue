@@ -1,6 +1,6 @@
 // Частинки, трасери, монети, підбирання, промені-маркери, бочки, м'яч, аеродроп, тварини
 import * as THREE from 'three';
-import { toonMat } from './characters.js';
+import { toonMat } from './renderkit.js';
 import { closestRaySeg, disposeObject } from './utils.js';
 
 // квадрат найкоротшої відстані від точки (px,py,pz) до відрізка a→b (обидва THREE.Vector3)

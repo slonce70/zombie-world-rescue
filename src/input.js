@@ -31,9 +31,7 @@ export class Input {
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => {
-      this.keys.clear();
-      this.mouseDown = false;
-      this.rmbDown = false;
+      this.resetTransient();
     });
 
     dom.addEventListener('mousedown', (e) => {
@@ -77,6 +75,19 @@ export class Input {
 
   exitLock() {
     if (document.exitPointerLock) document.exitPointerLock();
+  }
+
+  resetTransient() {
+    this.keys.clear();
+    this.justPressed.clear();
+    this.mouseDown = false;
+    this.justClicked = false;
+    this.rmbDown = false;
+    this.dx = 0;
+    this.dy = 0;
+    this.touchMove.x = 0;
+    this.touchMove.z = 0;
+    this.touchSprint = false;
   }
 
   down(code) { return this.keys.has(code); }

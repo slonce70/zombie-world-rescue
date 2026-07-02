@@ -29,6 +29,13 @@ function connect(query) {
 }
 
 try {
+  const tooBig = await fetch(`http://localhost:${PORT}/lobby/ping`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cid: 'oversize-client-0123456789', nick: 'Влад', pad: 'x'.repeat(5000) }),
+  });
+  check('dev-relay відкидає завелике REST body', tooBig.status === 413, `status=${tooBig.status}`);
+
   const host = await connect('&create=1');
   const g2 = await connect('');
   const g3 = await connect('');
@@ -66,6 +73,16 @@ try {
   await sleep(300);
   const ping = host.messages.find((m) => m.from === 2 && m.d && m.d.t === 'resume-ping');
   check('новий сокет говорить від старого pid', !!ping);
+
+  const beforeBatch = host.messages.length;
+  replacement.ws.send(JSON.stringify({
+    t: 'b',
+    m: Array.from({ length: 150 }, (_, i) => ({ to: 1, d: { t: 'batch-limit', i } })),
+  }));
+  await sleep(300);
+  const batch = host.messages.slice(beforeBatch).find((m) => m.from === 2 && Array.isArray(m.b));
+  check('dev-relay обрізає WS batch до 128 елементів', !!batch && batch.b.length === 128,
+    batch ? `len=${batch.b.length}` : 'no batch');
 
   const peerOff = host.messages.find((m) => m.t === 'peer' && m.id === 2 && m.on === false);
   check('close старого сокета не шле peer-off для pid=2', !peerOff);

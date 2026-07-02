@@ -88,7 +88,7 @@ page.on('pageerror', (err) => errors.push(err.message));
 
 await page.goto(`${BASE}/?test&fresh&touch&country=UKR&lang=uk`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__game?.state === 'level', null, { timeout: 30000 });
-await page.waitForTimeout(2500);
+await page.waitForFunction(() => window.__game?.renderer?.info?.render?.calls > 0, null, { timeout: 10000 });
 
 const metrics = await page.evaluate(() => {
   const g = window.__game;
@@ -114,6 +114,51 @@ check(sky.avg[2] > 70 && sky.avg[0] > 20, 'mobile небо не обрізаєт
 check(metrics.cameraFar <= 220, 'mobile камера не малює дальню непотрібну сцену');
 check(metrics.calls <= 420, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
 check(metrics.triangles <= 540000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
+
+const heavy = await page.evaluate(async () => {
+  const g = window.__game;
+  const l = g.level;
+  const p = l.player;
+  p.pos.x = 0;
+  p.pos.z = 0;
+  p.pos.y = l.world.groundH(0, 0);
+  l.gadgets._placeMine();
+  p.pos.x = 3;
+  l.gadgets._placeMine();
+  p.pos.x = -3;
+  l.gadgets._placeHealTotem();
+  p.pos.x = 3;
+  l.gadgets._placeDamageTotem();
+  p.pos.x = 0;
+  p.pos.z = 0;
+  l.gadgets._placeSoulMagnet();
+  l.gadgets._addMeteorFire(2, 2, true, 8, 3.2);
+  l.gadgets._addMeteorFire(-2, 2, true, 8, 3.2);
+  for (let i = 0; i < 36; i++) {
+    const a = (Math.PI * 2 * i) / 36;
+    const z = l.zombies.spawn(i % 5 === 0 ? 'runner' : i % 7 === 0 ? 'tank' : 'walker', Math.cos(a) * 12, Math.sin(a) * 12, { horde: true });
+    z.aggroed = true;
+    z.state = 'chase';
+  }
+  l.zombies.hordeActive = true;
+  l.zombies.hordeRemaining = l.zombies.list.filter((z) => z.horde && z.state !== 'dead').length;
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  return {
+    zombies: l.zombies.list.filter((z) => z.horde && z.state !== 'dead').length,
+    mines: l.gadgets.mines.length,
+    totems: l.gadgets.totems.length + l.gadgets.damageTotems.length,
+    magnets: l.gadgets.soulMagnets.length,
+    fires: l.gadgets._meteorFires.length,
+    calls: g.renderer.info.render.calls,
+    triangles: g.renderer.info.render.triangles,
+  };
+});
+
+console.log('▸ Mobile heavy metrics', JSON.stringify(heavy));
+check(heavy.zombies >= 36 && heavy.mines >= 2 && heavy.totems >= 2 && heavy.magnets >= 1 && heavy.fires >= 2,
+  'mobile heavy state: horde + mines/totems/soulmagnet/fire активні', JSON.stringify(heavy));
+check(heavy.calls <= 520, 'mobile heavy draw calls у бюджеті', `calls=${heavy.calls}`);
+check(heavy.triangles <= 620000, 'mobile heavy triangles у бюджеті', `triangles=${heavy.triangles}`);
 
 await ctx.close();
 await browser.close();

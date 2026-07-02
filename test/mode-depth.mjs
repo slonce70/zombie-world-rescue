@@ -34,15 +34,26 @@ await page.waitForFunction(() => window.__game.state === 'level' && window.__gam
 const winA = await page.evaluate(() => {
   const g = window.__game;
   const coins0 = g.save.coins;
+  const modeShape = {
+    modeId: g.level.modeId,
+    noShop: g.level.noShop,
+    noPickups: g.level.noPickups,
+    noGadgets: g.level.noGadgets,
+    loadout: [...g.level.player.weapons],
+  };
   g.level.stats.time = 90; // 1:30
   g._endBankRun(true);
   return {
+    modeShape,
     dCoins: g.save.coins - coins0,
     wins: g.save.modeWins.bank,
     best: g.save.modeBest.bank,
     statsHtml: document.getElementById('arena-stats').innerHTML.includes('🏆'),
   };
 });
+check(winA.modeShape.modeId === 'bank' && winA.modeShape.noShop && winA.modeShape.noPickups && winA.modeShape.noGadgets
+  && JSON.stringify(winA.modeShape.loadout) === JSON.stringify(['staff', 'pistol']),
+  'level.modeId і MODE_RULES задають правила Банку', JSON.stringify(winA.modeShape));
 check(winA.dCoins === 250, 'випробування дня подвоїло монети (125→250)', JSON.stringify(winA.dCoins));
 check(winA.wins === 1, 'перемога зарахована у modeWins', winA.wins);
 check(winA.best === 90000, 'рекорд часу записано (90с)', winA.best);

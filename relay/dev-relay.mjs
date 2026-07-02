@@ -10,9 +10,13 @@ import { WebSocketServer } from 'ws';
 import { cleanNickSrv } from '../worker/nick.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
+const HOST = process.env.RELAY_HOST || '127.0.0.1';
 const BOOT_TOKEN = `${process.pid}-${Date.now().toString(36)}`;
 const MAX_PLAYERS = 4;
 const HOST_GRACE_MS = 30_000;
+const MAX_WS_BYTES = 65536;
+const MAX_BATCH_ITEMS = 128;
+const MAX_BODY_BYTES = 4096;
 
 const rooms = new Map(); // code -> { sockets: Map<id, ws>, nextId, hostTimer }
 
@@ -126,8 +130,19 @@ function leagueTop(mode, country, cid) {
 
 function readBody(req, cb, res) {
   let body = '';
-  req.on('data', (ch) => { body += ch; });
+  let tooBig = false;
+  req.on('data', (ch) => {
+    if (tooBig) return;
+    body += ch;
+    if (body.length > MAX_BODY_BYTES) {
+      tooBig = true;
+      res.writeHead(413, CORS);
+      res.end('{"error":"too_big"}');
+      req.destroy();
+    }
+  });
   req.on('end', () => {
+    if (tooBig) return;
     try { cb(JSON.parse(body)); } catch (e) {
       res.writeHead(400, CORS);
       res.end('{"error":"bad"}');
@@ -223,19 +238,12 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/lobby/ping' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (ch) => { body += ch; });
-    req.on('end', () => {
-      try {
-        const view = lobbyPing(JSON.parse(body));
-        if (!view) { res.writeHead(400, CORS); res.end('{"error":"bad"}'); return; }
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify(view));
-      } catch (e) {
-        res.writeHead(400, CORS);
-        res.end('{"error":"bad"}');
-      }
-    });
+    readBody(req, (d) => {
+      const view = lobbyPing(d);
+      if (!view) { res.writeHead(400, CORS); res.end('{"error":"bad"}'); return; }
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(view));
+    }, res);
     return;
   }
   if (url.pathname === '/league/top') {
@@ -245,22 +253,14 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/league/submit' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (ch) => { body += ch; });
-    req.on('end', () => {
-      try {
-        const d = JSON.parse(body);
-        const key = `${d.cid}|${d.mode}|${String(d.country).toUpperCase()}`;
-        const cur = league.get(key);
-        const better = !cur || (d.mode === 'arena' ? d.score < cur.score : d.score > cur.score);
-        if (better) league.set(key, { nick: cleanNickSrv(d.nick), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify(leagueTop(d.mode, String(d.country).toUpperCase(), d.cid)));
-      } catch (e) {
-        res.writeHead(400, CORS);
-        res.end('{"error":"bad"}');
-      }
-    });
+    readBody(req, (d) => {
+      const key = `${d.cid}|${d.mode}|${String(d.country).toUpperCase()}`;
+      const cur = league.get(key);
+      const better = !cur || (d.mode === 'arena' ? d.score < cur.score : d.score > cur.score);
+      if (better) league.set(key, { nick: cleanNickSrv(d.nick), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(leagueTop(d.mode, String(d.country).toUpperCase(), d.cid)));
+    }, res);
     return;
   }
   res.writeHead(404, CORS);
@@ -272,8 +272,8 @@ httpServer.on('error', (e) => {
   console.error('[relay] listen FAILED', e && e.code || e);
   process.exit(1); // напр. EADDRINUSE: не лишаємо тести підключатися до сироти
 });
-httpServer.listen(PORT, () => console.log(`[relay] BOOT ${BOOT_TOKEN}`));
-console.log(`[relay] ws://localhost:${PORT}/ws?room=CODE (+ /league/*)`);
+httpServer.listen(PORT, HOST, () => console.log(`[relay] BOOT ${BOOT_TOKEN}`));
+console.log(`[relay] ws://${HOST}:${PORT}/ws?room=CODE (+ /league/*)`);
 
 function send(ws, obj) {
   if (ws.readyState === 1) ws.send(JSON.stringify(obj));
@@ -319,12 +319,13 @@ wss.on('connection', (ws, req) => {
   console.log(`[relay] ${code}: +${id} (${room.sockets.size} у кімнаті)`);
 
   ws.on('message', (raw) => {
+    if (raw.length > MAX_WS_BYTES) return;
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах (як у воркері)
     if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
       const per = new Map();
-      for (const it of msg.m) {
+      for (const it of msg.m.slice(0, MAX_BATCH_ITEMS)) {
         if (!it || it.d === undefined) continue;
         if (it.to === 0) {
           for (const pid of room.sockets.keys()) {

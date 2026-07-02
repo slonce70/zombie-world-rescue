@@ -51,6 +51,40 @@ try {
   check(remote.laser === 'laser', 'remote rig switches to laser', JSON.stringify(remote));
   check(remote.flamethrower === 'flamethrower', 'remote rig switches to flamethrower', JSON.stringify(remote));
 
+  console.log('▸ Co-op zombie shields: wizard recast reaches guest puppets');
+  const wizardShield = await page.evaluate(() => {
+    const g = window.__game;
+    const z = g.level.zombies.spawnPuppet(998877, 'wizard', g.level.player.pos.x + 6, g.level.player.pos.z + 6, { sh: 0 });
+    const broken = !z.shieldObj && z.shieldHp === 0;
+    g.level.zombies.puppetShieldRecast(998877);
+    return { broken, type: z.type, hasShield: !!z.shieldObj, hp: z.shieldHp, max: z.shieldMax };
+  });
+  check(wizardShield.broken, 'guest puppet wizard starts with broken shield', JSON.stringify(wizardShield));
+  check(wizardShield.hasShield && wizardShield.hp === wizardShield.max && wizardShield.max > 0,
+    'guest puppet wizard can recast shield from zsr event', JSON.stringify(wizardShield));
+
+  console.log('▸ Co-op missions: escort traveler removal reaches guest');
+  const travelerSync = await page.evaluate(async () => {
+    const g = window.__game;
+    g.endLevel();
+    g._forceMissionSet = ['escort', 'repair', 'clear'];
+    await g.startLevel('UKR');
+    const ms = g.level.missions;
+    const escIndex = ms.missions.findIndex((m) => m.type === 'escort');
+    const esc = ms.missions[escIndex];
+    const state = { g: [0, 0, 0], s: ms.missions.map(() => [0, 0]), c: [], t: [esc.site.x, esc.site.z, 60] };
+    state.s[escIndex] = [0, 1];
+    ms.applyNet(state);
+    const spawned = !!esc.traveler && esc.started;
+    state.s[escIndex] = [0, 0];
+    state.t = 0;
+    ms.applyNet(state);
+    return { spawned, stillHasTraveler: !!esc.traveler, started: esc.started };
+  });
+  check(travelerSync.spawned, 'guest spawned escort traveler from host state', JSON.stringify(travelerSync));
+  check(!travelerSync.stillHasTraveler && !travelerSync.started,
+    'guest removes stale escort traveler when host clears it', JSON.stringify(travelerSync));
+
   console.log('▸ Guest continuous weapons: report authoritative hits to host');
   const cont = await page.evaluate(() => {
     const g = window.__game;

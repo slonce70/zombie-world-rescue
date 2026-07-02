@@ -37,7 +37,7 @@ const menu = await page.evaluate(() => {
     tabsBefore,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ЛАБІРИНТ'), 'до 11 країн режим заблокований', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВИКЛИКИ'), 'до 11 країн режим заблокований', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ЛАБІРИНТ/i.test(menu.name), 'після 11 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт Лабіринту: 3 ключі, вихід і перемога після збору ключів');

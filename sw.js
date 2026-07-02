@@ -44,6 +44,7 @@ const SHELL = [
   './src/humans.js',
   './src/souls.js',
   './src/worldboss.js',
+  './src/renderkit.js',
   './src/characters.js',
   './src/maps/ukraine.js',
   './src/maps/poland.js',
@@ -80,8 +81,8 @@ const SHELL = [
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    // best-effort: один битий файл не валить установку
-    await Promise.allSettled(SHELL.map((u) => cache.add(u)));
+    // Required shell: якщо файл зник із релізу, install має впасти, а не сховати битий офлайн.
+    await Promise.all(SHELL.map((u) => cache.add(u)));
     await self.skipWaiting();
   })());
 });

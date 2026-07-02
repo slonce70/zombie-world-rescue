@@ -19,6 +19,10 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+const SAVE_CORS = {
+  ...CORS,
+  'Access-Control-Allow-Origin': 'https://slonce70.github.io',
+};
 
 export default {
   async fetch(request, env) {
@@ -37,7 +41,9 @@ export default {
     }
     // 💾 Хмарний сейв
     if (url.pathname.startsWith('/save/')) {
-      if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== SAVE_CORS['Access-Control-Allow-Origin']) return new Response('forbidden origin', { status: 403 });
+      if (request.method === 'OPTIONS') return new Response(null, { headers: SAVE_CORS });
       const id = env.SAVE.idFromName('save');
       return env.SAVE.get(id).fetch(request);
     }
@@ -448,13 +454,13 @@ export class SaveVault {
   json(obj, status = 200) {
     return new Response(JSON.stringify(obj), {
       status,
-      headers: { 'Content-Type': 'application/json', ...CORS },
+      headers: { 'Content-Type': 'application/json', ...SAVE_CORS },
     });
   }
 
   _cid(raw) {
-    const cid = String(raw || '').slice(0, 40);
-    return cid.length >= 8 ? cid : null;
+    const cid = String(raw || '');
+    return /^[A-Za-z0-9_-]{8,40}$/.test(cid) ? cid : null;
   }
 
   async fetch(request) {

@@ -1423,18 +1423,12 @@ export class Zombies {
 
     // 3) РЕ-КАСТ ЩИТА: коли щит зламано — через ~5с чарівник ставить новий (100 HP)
     if (!z.shieldObj && z.shieldRecastCd > 0) {
+      const net = this.level.net;
+      if (net && !net.authority) return;
       z.shieldRecastCd -= dt;
       if (z.shieldRecastCd <= 0) {
-        z.shieldHp = z.shieldMax = z.stats.shieldHp;
-        const shield = makeShieldMesh();
-        shield.group.position.set(0, 1.05, -0.62);
-        z.rig.body.add(shield.group);
-        z.shieldObj = shield;
-        z.shieldFire = false;
-        // ефект касту — синьо-фіолетове кільце
-        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0x6aa9ff, 3.2);
-        level.effects.burst(new THREE.Vector3(z.x, z.y + 1.1, z.z), 0x6aa9ff, 12, { speed: 3, up: 2.6, life: 0.6, size: 1.0 });
-        level.audio.clang();
+        this._recastWizardShield(z);
+        this.level.netEv('zsr', z.nid);
       }
     }
   }
@@ -1466,6 +1460,21 @@ export class Zombies {
     // ефект касту — жовтогаряче кільце (під колір меха/гармати)
     level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xffd24a, 3.6);
     level.effects.burst(new THREE.Vector3(z.x, z.y + 1.3, z.z), 0xffd24a, 14, { speed: 3.2, up: 3, life: 0.6, size: 1.2 });
+    level.audio.clang();
+  }
+
+  _recastWizardShield(z) {
+    if (z.shieldObj) return;
+    const level = this.level;
+    z.shieldHp = z.shieldMax = z.stats.shieldHp;
+    const shield = makeShieldMesh();
+    shield.group.position.set(0, 1.05, -0.62);
+    z.rig.body.add(shield.group);
+    z.shieldObj = shield;
+    z.shieldFire = false;
+    z.shieldRecastCd = 0;
+    level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0x6aa9ff, 3.2);
+    level.effects.burst(new THREE.Vector3(z.x, z.y + 1.1, z.z), 0x6aa9ff, 12, { speed: 3, up: 2.6, life: 0.6, size: 1.0 });
     level.audio.clang();
   }
 
@@ -1561,8 +1570,9 @@ export class Zombies {
 
   puppetShieldRecast(nid) {
     const z = this.byNidMap.get(nid);
-    if (!z || z.type !== 'robot' || z.shieldObj) return;
-    this._recastRobotShield(z);
+    if (!z || z.shieldObj) return;
+    if (z.type === 'robot') this._recastRobotShield(z);
+    else if (z.type === 'wizard') this._recastWizardShield(z);
   }
 
   puppetChestBreak(nid) {

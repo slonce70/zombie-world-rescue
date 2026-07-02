@@ -1,7 +1,7 @@
 // Відкритий світ: терен, село, ліс, дороги, особливі будівлі, колайдери
 import * as THREE from 'three';
 import { t } from './i18n.js';
-import { toonMat, bakeGroupMeshes } from './characters.js';
+import { toonMat, bakeGroupMeshes } from './renderkit.js';
 import { makeFBM, smoothstep, lerp, clamp, distToSeg, closestRaySeg, RNG } from './utils.js';
 import { BIOMES } from './countries.js';
 

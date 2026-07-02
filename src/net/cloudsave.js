@@ -8,6 +8,7 @@ import { ensureCid } from './league.js';
 
 const PUSH_DELAY_MS = 25_000;
 export const SAVE_KEY = 'zr-save-v1';
+export const SAVE_CONFLICT_KEY = 'zr-save-conflict-v1';
 
 // 🎨 Дефолтний герой і стартові монети — ЄДИНЕ ДЖЕРЕЛО для _newSave (main.js) і
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
@@ -131,6 +132,7 @@ export class CloudSave {
         const j = await res.json().catch(() => null);
         if (j && j.ts) {
           this.game.save.cloudTs = j.ts;
+          delete this.game.save._cloudDirty;
           try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.game.save)); } catch (e) { /* ignore */ }
         }
         return true;
@@ -238,7 +240,19 @@ export class CloudSave {
     };
     if (!localHas) { adoptWithTs(cloud.data); return; }      // локально порожньо → беремо хмару
     // обидва мають прогрес: вирішує серверний час
-    if ((Number(cloud.ts) || 0) > (Number(local.cloudTs) || 0)) adoptWithTs(cloud.data); // хмара новіша за наш останній пуш
-    else this.push();                                                    // ми не старіші → пушимо своє
+    if ((Number(cloud.ts) || 0) > (Number(local.cloudTs) || 0)) {
+      if (local._cloudDirty) {
+        try {
+          localStorage.setItem(SAVE_CONFLICT_KEY, JSON.stringify({
+            ts: Number(cloud.ts) || 0,
+            save: cloudObj,
+          }));
+        } catch (e) { /* ignore */ }
+        this.lastFailTs = Date.now();
+        this.lastFailStatus = 409;
+        return;
+      }
+      adoptWithTs(cloud.data); // хмара новіша за наш останній пуш
+    } else this.push();                                                    // ми не старіші → пушимо своє
   }
 }

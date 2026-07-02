@@ -46,6 +46,49 @@ await page.waitForTimeout(1500);
 const shotsAfter = await page.evaluate(() => window.__game.level.stats.shotsFired);
 check(shotsAfter === shotsBefore, `режим Малюк НЕ стріляє сам (${shotsBefore}→${shotsAfter})`);
 
+// ============ 🧯 Touch transient reset: pause/exit не лишають рух/вогонь залиплими ============
+console.log('▸ Mobile: pause/exit чистять тимчасовий тач-ввід');
+const resetProbe = await page.evaluate(() => {
+  const g = window.__game;
+  const arm = () => {
+    g.input.mouseDown = true;
+    g.input.justClicked = true;
+    g.input.touchMove.x = 0.8;
+    g.input.touchMove.z = -0.5;
+    g.input.touchSprint = true;
+    g.input.keys.add('KeyE');
+    if (g.touch) {
+      g.touch.joyId = 1;
+      g.touch.lookId = 2;
+    }
+  };
+  const snap = () => ({
+    mouseDown: g.input.mouseDown,
+    justClicked: g.input.justClicked,
+    moveX: g.input.touchMove.x,
+    moveZ: g.input.touchMove.z,
+    sprint: g.input.touchSprint,
+    keyE: g.input.keys.has('KeyE'),
+    joyId: g.touch && g.touch.joyId,
+    lookId: g.touch && g.touch.lookId,
+  });
+  arm();
+  g.showPause();
+  const afterPause = snap();
+  g.paused = false;
+  document.getElementById('overlay-pause').classList.remove('show');
+  arm();
+  g.endLevel();
+  const afterExit = snap();
+  return { afterPause, afterExit };
+});
+const cleanTouch = (s) => !s.mouseDown && !s.justClicked && s.moveX === 0 && s.moveZ === 0 && !s.sprint && !s.keyE && s.joyId === null && s.lookId === null;
+check(cleanTouch(resetProbe.afterPause), `pause скинув тач-ввід (${JSON.stringify(resetProbe.afterPause)})`);
+check(cleanTouch(resetProbe.afterExit), `exit level скинув тач-ввід (${JSON.stringify(resetProbe.afterExit)})`);
+
+await page.goto(`${BASE}/?test&fresh&country=UKR&touch`);
+await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 30000, 'level після reset probe');
+
 // ============ ✋ Task 2: жодних клавіш на тачі (E→✋) ============
 console.log('▸ Mobile: підказки взаємодії на тачі — ✋, не «E»');
 

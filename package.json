@@ -7,7 +7,7 @@
     "relay": "node relay/dev-relay.mjs",
     "test": "node test/smoke.mjs",
     "test:quick-release": "node test/quick-release.mjs",
-    "test:release": "node test/release.mjs",
+    "test:release": "node test/release.mjs && npm run test:coop-release",
     "test:coop": "node test/coop.mjs",
     "test:coop-release": "node test/relay-reconnect.mjs && node test/coop-reconnect-guard.mjs && SLOW=2 node test/coop3.mjs"
   },

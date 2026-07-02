@@ -91,6 +91,8 @@ export class SaveUI {
     if (g.cloud.lastFailTs && g.cloud.lastFailTs >= g.cloud.lastOkTs) {
       if (g.cloud.lastFailStatus === 429) {
         this._status(t('☁️ Хмара тимчасово зайнята — прогрес лишився на пристрої, спробуй ще раз трохи пізніше'));
+      } else if (g.cloud.lastFailStatus === 409) {
+        this._status(t('☁️ Є новіша хмарна копія, але локальний прогрес не перезаписано'));
       } else {
         this._status(t('😕 хмара недоступна'));
       }
