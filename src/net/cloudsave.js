@@ -23,6 +23,18 @@ export const liberatedIds = (liberated = {}) => Object.keys(liberated || {}).fil
 export const liberatedCount = (liberated = {}) => liberatedIds(liberated).length;
 export const hasLiberated = (liberated = {}, id) => !!(liberated && liberated[id]);
 
+// Drift guard for permanent save/progress keys. Any new top-level permanent key in
+// _newSave() should either be added here if it can protect real progress, or be
+// explicitly listed as non-progress in the focused cloudsave test.
+export const SAVE_PROGRESS_KEYS = Object.freeze([
+  'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses',
+  'coins', 'crystals', 'upgrades', 'bestiary',
+  'chapter', 'infected', 'megaQuests', 'medals', 'stats',
+  'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
+  'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
+  'towerSkins', 'diffStar', 'weapons',
+]);
+
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
 // імпорту/claim (adopt + confirm-діалоги в saveui), і newest-wins у bootSync.
 // F24+F27: раніше рахувались лише 4 поля (liberated/xp/missionRuns/stormBest), тож
@@ -71,6 +83,8 @@ export class CloudSave {
     // тести не мають спамити продакшн-хмару; ?cloud вмикає її явно (з dev-relay)
     this.enabled = !game.testMode || game.params.has('cloud');
     this.lastOkTs = 0;   // коли востаннє успішно синхронізувались
+    this.lastFailTs = 0;
+    this.lastFailStatus = 0;
     this._timer = null;
     // дебаунс 25с не встигає при швидкому закритті вкладки → флашимо стан при відході зі сторінки,
     // щоб остання нагорода не загубилась при переході телефон↔планшет
@@ -105,6 +119,8 @@ export class CloudSave {
       });
       if (res.ok) {
         this.lastOkTs = Date.now();
+        this.lastFailTs = 0;
+        this.lastFailStatus = 0;
         // запам'ятовуємо серверний ts цього сейва: bootSync порівнюватиме його з хмарним.
         // ВАЖЛИВО: /save/put МАЄ повертати {ts} — без цього cloudTs залишається 0 і
         // bootSync при наступному запуску може знову взяти хмарний сейв. Самолікується
@@ -116,7 +132,13 @@ export class CloudSave {
         }
         return true;
       }
+      this.lastFailTs = Date.now();
+      this.lastFailStatus = res.status || 0;
     } catch (e) { /* офлайн — нічого страшного */ }
+    if (!this.lastFailTs) {
+      this.lastFailTs = Date.now();
+      this.lastFailStatus = 0;
+    }
     return false;
   }
 

@@ -63,6 +63,8 @@ check(!!await page.$('#btn-hqbase-quests'), 'у базі є швидка кно�
 check(await page.textContent('#hqbase-ui').then((s) => /Скіни.*5|Skins.*5|Скины.*5/.test(s || '')), 'UI бази показує кількість скінів');
 check(await page.textContent('#hqbase-ui').then((s) => /Зал.*4|Hall.*4|Зал.*4/.test(s || '')), 'UI бази показує зал слави');
 check(await page.textContent('#hqbase-mega-list').then((s) => /МЕГА|MEGA/.test(s || '')), 'UI бази показує мега-квести');
+const firstNextAction = await page.textContent('#hqbase-next-action');
+check(/звільни країну|liberate|країну/i.test(firstNextAction || ''), `UI бази показує наступну дію (${firstNextAction})`);
 
 console.log('▸ 3D-сцена і трофеї з сейва');
 const st = await page.evaluate(() => window.__game.hqbase.debugState());
@@ -75,8 +77,16 @@ check(st.skinDisplays >= 5, `показано колекцію скінів (${s
 check(st.hallPlaques >= 4, `показано зал слави (${st.hallPlaques})`);
 check(st.hallTrophies >= 4, `зал слави має trophy-моделі, не box-заглушки (${st.hallTrophies})`);
 check(st.hasHero === true, 'манекен героя створено з поточного скіна');
+check(st.hintDisplays >= 4, `HQ має клікабельні підказки-експонати (${st.hintDisplays})`);
+const initialHintDisplays = st.hintDisplays;
 const canvasOk = await page.evaluate(() => { const c = document.getElementById('game-canvas'); return !!c && c.width > 0 && c.height > 0; });
 check(canvasOk, 'canvas живий після входу');
+
+console.log('▸ Клікабельні підказки HQ');
+const hintText = await page.evaluate(() => window.__game.hqbase.tapFirstHint());
+check(/Трофей|Штаб|скін|Зал|Мега/i.test(hintText || ''), `експонат показує дружню підказку (${hintText})`);
+const toastText = await page.textContent('#toasts').catch(() => '');
+check((toastText || '').includes(hintText), 'підказка показана як toast');
 
 console.log('▸ Тренувальна арена і манекени шкоди');
 const beforeTarget = await page.evaluate(() => window.__game.hqbase.debugState().hitCount);
@@ -101,15 +111,29 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 check(await page.evaluate(() => window.__game.state) === 'globe', 'вихід кнопкою повертає на глобус');
 check(await page.evaluate(() => window.__game.hqbase.debugState().children) === 0, 'сцену очищено при виході');
 
+await page.evaluate(() => {
+  const g = window.__game;
+  g.save.coins = 0;
+  g.save.crystals = 0;
+  g.save.upgrades.maxhp = 0;
+  g.save.goal = 'maxhp';
+  g.saveGame();
+});
+
 // повторний вхід + Escape
 await page.click('#btn-menu');
 await page.click('#btn-hq');
 await page.waitForSelector('#overlay-hq.show', { timeout: 10000 });
 await page.click('#btn-hqbase');
 await page.waitForFunction(() => window.__game.state === 'hqbase', null, { timeout: 10000 });
+const updatedNextAction = await page.textContent('#hqbase-next-action');
+check(/Міцність|ціль|Ціль|ще/i.test(updatedNextAction || '') && updatedNextAction !== firstNextAction,
+  `компас Бази оновлюється при повторному вході (${updatedNextAction})`);
 // мішень знову клікабельна після повторного входу
 const re = await page.evaluate(() => { window.__game.hqbase.hitFirstTarget(); return window.__game.hqbase.debugState().hitCount; });
 check(re === 1, 'після повторного входу мішень знову реагує');
+const reHints = await page.evaluate(() => window.__game.hqbase.debugState().hintDisplays);
+check(reHints === initialHintDisplays, `підказки не дублюються після повторного входу (${reHints})`);
 await page.keyboard.press('Escape');
 await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 10000 });
 check(await page.evaluate(() => window.__game.hqbase.debugState().ready) === false, 'Escape виходить і чистить active-state');

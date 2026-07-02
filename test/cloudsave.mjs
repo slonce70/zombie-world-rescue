@@ -5,6 +5,12 @@ import { spawnRelay } from './_relay.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
+const serverClosers = [closeServer];
+async function ensureAppServer() {
+  const h = await ensureWebServer();
+  serverClosers.push(h.close);
+  return h.base;
+}
 const RELAY_PORT = 8753;
 const API = `http://localhost:${RELAY_PORT}`;
 const URL_PARAMS = `?test&fresh&cloud&relay=ws://localhost:${RELAY_PORT}`;
@@ -81,6 +87,19 @@ console.log('▸ SaveVault REST');
     body: JSON.stringify({ cid, data: 'не json' }),
   });
   check('put відкидає не-JSON', !put2.ok);
+  const throttledCid = 'test-throttle-0123456789';
+  const throttledData = JSON.stringify({ coins: 111, liberated: { UKR: true }, cid: throttledCid });
+  const fast1 = await fetch(`${API}/save/put`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cid: throttledCid, data: throttledData }),
+  });
+  const fast2 = await fetch(`${API}/save/put`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cid: throttledCid, data: throttledData }),
+  });
+  const fast2Json = await fast2.json().catch(() => ({}));
+  check('SaveVault throttle: повторний швидкий put → 429 slow', fast1.ok && fast2.status === 429 && fast2Json.error === 'slow',
+    JSON.stringify({ first: fast1.status, second: fast2.status, error: fast2Json.error }));
 }
 
 // ---------- Фільтр ніків (світ бачить Лобі й Лігу — лайка ріжеться сервером) ----------
@@ -106,9 +125,26 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   await U.goto(`${BASE}/?test&fresh`);
   await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
   const res = await U.evaluate(async () => {
-    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
+    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS, SAVE_PROGRESS_KEYS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
     const fresh = window.__game._newSave();
     const out = {};
+    const knownProgressKeys = new Set(SAVE_PROGRESS_KEYS);
+    const guardedTopLevelKeys = new Set([
+      'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
+      'bestiary', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
+      'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'liberated', 'medals',
+      'megaPity', 'megaQuests', 'missionRuns', 'pets', 'quests', 'records', 'skins', 'soulLevel',
+      'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
+      'weapons', 'worldBosses', 'xp',
+    ]);
+    out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
+    out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
+    out.progressManifestHasCurrentCategories = [
+      'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses', 'coins', 'crystals', 'upgrades',
+      'bestiary', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
+      'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
+      'towerSkins', 'diffStar', 'weapons',
+    ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
     out.pistolOnlyIsEmpty = saveHasProgress({ ...fresh, weapons: ['pistol'] }) === false;
@@ -142,6 +178,9 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
     return out;
   });
+  check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
+    res.progressManifestMissingKeys ? res.progressManifestMissingKeys.join(',') : '');
+  check('drift guard: manifest містить поточні категорії прогресу', res.progressManifestHasCurrentCategories);
   check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
   check('liberated:false ≠ прогрес', res.falseLiberatedIsEmpty);
   check('тільки pistol ≠ прогрес', res.pistolOnlyIsEmpty);
@@ -184,11 +223,29 @@ const codeA = await A.evaluate(async () => {
   g.save.liberated.UKR = true;
   g.save.xp = 500;
   g.saveGame();
+  clearTimeout(g.cloud._timer);
   await g.cloud.push();
   return g.cloud.fetchCode();
 });
 check('А отримав код відновлення', typeof codeA === 'string' && codeA.length === 8, codeA);
-const cidA = await A.evaluate(() => window.__game.save.cid);
+const cidA = await (await fetch(`${API}/save/claim`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: codeA }),
+})).json().then((r) => r.cid);
+const throttledPush = await A.evaluate(async () => {
+  const g = window.__game;
+  g.save.coins += 1;
+  const ok = await g.cloud.push();
+  clearTimeout(g.cloud._timer);
+  return {
+    ok,
+    lastOkTs: g.cloud.lastOkTs,
+    lastFailStatus: g.cloud.lastFailStatus,
+    lastFailTs: g.cloud.lastFailTs,
+  };
+});
+check('CloudSave push fail-soft на SaveVault 429', throttledPush.ok === false && throttledPush.lastOkTs > 0
+  && throttledPush.lastFailStatus === 429 && throttledPush.lastFailTs > 0, JSON.stringify(throttledPush));
 
 // панель: відкривається кнопкою (v34: кнопки тепер у ☰-меню — спершу відкриваємо його)
 await A.click('#btn-menu');
@@ -197,6 +254,8 @@ await A.click('#btn-progress');
 await sleep(T(700));
 const panelVisible = await A.evaluate(() => document.getElementById('overlay-progress').classList.contains('show'));
 check('панель «Мій прогрес» відкривається', panelVisible);
+const throttledStatus = await A.evaluate(() => document.getElementById('cloud-status').textContent);
+check('панель не називає 429 успішною синхронізацією', /зайнята|обмеж|спробуй|недоступ/i.test(throttledStatus), throttledStatus);
 await A.click('#btn-cloud-code');
 await A.waitForFunction(() => /-/.test(document.getElementById('cloud-code').textContent), null, { timeout: T(5000) });
 const shownCode = await A.evaluate(() => document.getElementById('cloud-code').textContent);
@@ -207,7 +266,7 @@ console.log('▸ Гравець Б: чистий браузер + код = пр�
 const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const B = await ctxB.newPage();
 // ?fresh не даємо: інакше adopt-нутий сейв знову зітреться після перезавантаження
-await B.goto(`${BASE}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await B.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
 await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 B.on('dialog', (d) => d.accept());
 await B.click('#btn-menu');
@@ -220,13 +279,28 @@ await Promise.all([
 ]);
 // adopt робить ще один location.reload() — чекаємо саме цільовий стан як boolean,
 // щоб не тримати JSHandle з контексту, який може зникнути під час фінального reload.
-await B.waitForFunction(({ codeCid }) => {
-  const g = window.__game;
-  return !!(g && g.state === 'globe' && g.save
-    && g.save.coins === 7777
-    && g.save.liberated.UKR
-    && g.save.cid === codeCid);
-}, { codeCid: cidA }, { timeout: T(25000), polling: 300 });
+try {
+  await B.waitForFunction(({ codeCid }) => {
+    const g = window.__game;
+    return !!(g && g.state === 'globe' && g.save
+      && g.save.coins === 7777
+      && g.save.liberated.UKR
+      && g.save.cid === codeCid);
+  }, { codeCid: cidA }, { timeout: T(25000), polling: 300 });
+} catch (e) {
+  const dbg = await B.evaluate(() => {
+    const g = window.__game;
+    return {
+      href: location.href,
+      state: g && g.state,
+      save: g && g.save ? { cid: g.save.cid, coins: g.save.coins, ukr: !!(g.save.liberated && g.save.liberated.UKR), cloudTs: g.save.cloudTs } : null,
+      status: document.getElementById('cloud-status')?.textContent || '',
+      codeText: document.getElementById('cloud-code')?.textContent || '',
+    };
+  }).catch((err) => ({ evalError: String(err && err.message || err) }));
+  console.log('B restore debug', JSON.stringify(dbg));
+  throw e;
+}
 const restored = await evaluateAcrossReloads(B, () => {
   const g = window.__game;
   if (!g || !g.save) return null;
@@ -243,7 +317,7 @@ check('Б успадкував cid (далі синхрон той самий)',
 console.log('▸ bootSync: «почистив браузер» (cid зберігся через відновлення)');
 const ctxC = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const C = await ctxC.newPage();
-await C.goto(`${BASE}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await C.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
 await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await C.evaluate((cid) => {
   localStorage.setItem('zr-save-v1', JSON.stringify({ cid })); // свіжий сейв, але cid відомий
@@ -270,7 +344,7 @@ check('експорт качає zr-progres.json', !!dl && dl.suggestedFilename(
 console.log('▸ Аварійний екран');
 const ctxE = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const E = await ctxE.newPage();
-await E.goto(`${BASE}/?test&fresh`);
+await E.goto(`${await ensureAppServer()}/?test&fresh`);
 await E.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await E.evaluate(() => setTimeout(() => { throw new Error('тестовий вибух'); }, 0));
 await E.waitForFunction(
@@ -289,5 +363,5 @@ check('у А не було JS-помилок', errorsA.length === 0, errorsA.sli
 console.log(failures === 0 ? '🎉 ХМАРНИЙ СЕЙВ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failures}`);
 await browser.close();
 relay.kill();
-closeServer();
+for (const close of serverClosers) close();
 process.exit(failures === 0 ? 0 : 1);

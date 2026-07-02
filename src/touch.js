@@ -21,6 +21,7 @@ export class TouchControls {
     this.wheelOpen = false;        // 🔫 чи відкрите колесо зброї
     this._wheelTimer = null;       // таймер довгого утримання
     this._wheelLongPressed = false;// чи спрацювало довге натискання (тоді короткий цикл не робимо)
+    this._wheelTrigger = null;
 
     this.root = document.getElementById('touch-ui');
     // видимість #touch-ui керується CSS (body.touch-mode.in-level) — лише в бою, не в меню
@@ -37,6 +38,11 @@ export class TouchControls {
       this.wheelEl.addEventListener('touchstart', closeBg, { passive: false });
       this.wheelEl.addEventListener('mousedown', closeBg);
     }
+    document.addEventListener('keydown', (e) => {
+      if (!this.wheelOpen || e.key !== 'Escape') return;
+      e.preventDefault();
+      this._closeWheel();
+    });
 
     const canvas = game.renderer.domElement;
     // джойстик і огляд — по половинах екрана, поверх канви
@@ -145,6 +151,7 @@ export class TouchControls {
     if (!player || this.game.state !== 'level') return;
     const grid = this.wheelGrid;
     grid.innerHTML = '';
+    let focusBtn = null;
     for (const id of player.weapons) {
       const w = WEAPONS[id];
       if (!w) continue;
@@ -155,6 +162,9 @@ export class TouchControls {
       let ammoText = '∞';
       if (w.continuous) ammoText = '🔋 ' + (player.fuel[id] || 0).toFixed(1) + t('с');
       else if (am && am.reserve !== Infinity) ammoText = (am.mag | 0) + ' / ' + (am.reserve | 0);
+      btn.setAttribute('role', 'listitem');
+      btn.setAttribute('aria-label', `${t('Зброя')}: ${t(w.name)}, ${ammoText}`);
+      if (id === player.cur) btn.setAttribute('aria-current', 'true');
       btn.innerHTML = `<span class="ww-icon">${w.icon}</span>`
         + `<span class="ww-name">${w.name}</span>`
         + `<span class="ww-ammo">${ammoText}</span>`;
@@ -168,10 +178,17 @@ export class TouchControls {
       btn.addEventListener('touchstart', pick, { passive: false });
       btn.addEventListener('mousedown', pick);
       grid.appendChild(btn);
+      if (id === player.cur) focusBtn = btn;
     }
     this.wheelOpen = true;
+    this._wheelTrigger = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : document.getElementById('tb-weapon');
     this.wheelEl.classList.add('show');
     this.wheelEl.setAttribute('aria-hidden', 'false');
+    if (focusBtn || grid.firstElementChild) {
+      (focusBtn || grid.firstElementChild).focus({ preventScroll: true });
+    }
     // поки колесо відкрите — зупиняємо рух/огляд
     this.input.touchMove.x = 0;
     this.input.touchMove.z = 0;
@@ -184,6 +201,9 @@ export class TouchControls {
       this.wheelEl.classList.remove('show');
       this.wheelEl.setAttribute('aria-hidden', 'true');
     }
+    const target = this._wheelTrigger || document.getElementById('tb-weapon');
+    if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+    this._wheelTrigger = null;
   }
 
   _onStart(e) {

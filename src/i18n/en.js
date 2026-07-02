@@ -1228,4 +1228,9 @@ export const EN = {
 "😀 Обличчя": "😀 Face",
 "⭐ Аксесуар": "⭐ Accessory",
 "🎒 Спина": "🎒 Back",
+"Ціль магазину": "Shop goal",
+"{f} {n}: звільни країну": "{f} {n}: liberate this country",
+"Глава 2: очисти заражені країни": "Chapter 2: clear infected countries",
+"Острів Динозаврів чекає фінальний бій": "Dinosaur Island awaits the final battle",
+"Світ врятовано! Спробуй Шторм або рекорди": "World saved! Try Storm or records",
 };

@@ -18,11 +18,13 @@ export class LivingHQ {
     this.ready = false;
     this.targets = [];
     this.dummies = [];
+    this.hints = [];
     this.damageTotal = 0;
     this.worldBossTrophies = 0;
     this.megaQuestRows = 0;
     this.skinDisplays = 0;
     this.hallPlaques = 0;
+    this.hintDisplays = 0;
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
     this._onPointerDown = (e) => this._pickTarget(e);
@@ -83,9 +85,31 @@ export class LivingHQ {
     this._addHallOfFame();
     this._addTrainingTargets();
     this._addDamageDummies();
+    this._refreshHints();
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
     });
+  }
+
+  _hintText(data = {}) {
+    if (data.kind === 'country') return t('🏆 Трофей країни: {n}. Штаб памʼятає твою перемогу!', { n: data.label || t('країна') });
+    if (data.kind === 'world-boss-trophy') return t('🌋 Трофей світового боса. Смілива перемога!');
+    if (data.kind === 'mega-board') return t('📅 Мега-дошка показує великі цілі на потім.');
+    if (data.kind === 'skin-display' || data.kind === 'skin-stand') return t('👕 Колекція скінів: можна вибрати стиль у Гардеробі.');
+    if (data.kind === 'hall-trophy') return t('🏆 Зал слави рахує твої найкращі подвиги.');
+    if (data.kind === 'beast') return t('📖 Бестіарій: тут живуть відкриті записи про зомбі.');
+    return '';
+  }
+
+  _refreshHints() {
+    this.hints = [];
+    this.scene.traverse((obj) => {
+      const text = this._hintText(obj.userData || {});
+      if (!text) return;
+      obj.userData.hqHint = text;
+      this.hints.push(obj);
+    });
+    this.hintDisplays = this.hints.length;
   }
 
   _addWall(x, z, color) {
@@ -295,14 +319,30 @@ export class LivingHQ {
     if (this.dummies && this.dummies[0]) this._hitTarget(this.dummies[0]);
   }
 
+  tapFirstHint() {
+    const hint = (this.hints || [])[0];
+    return hint ? this._showHint(hint) : '';
+  }
+
   _pickTarget(e) {
     if (!this.ready || this.game.state !== 'hqbase') return;
     const rect = this.game.renderer.domElement.getBoundingClientRect();
     this._pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._pointer, this.camera);
-    const hit = this._raycaster.intersectObjects(this.targets || [], false)[0];
-    if (hit) this._hitTarget(hit.object);
+    const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || [])], true)[0];
+    if (!hit) return;
+    let obj = hit.object;
+    while (obj && !obj.userData?.isHqTarget && !obj.userData?.hqHint) obj = obj.parent;
+    if (!obj) return;
+    if (obj.userData.isHqTarget) this._hitTarget(obj);
+    else this._showHint(obj);
+  }
+
+  _showHint(obj) {
+    const text = obj.userData.hqHint || '';
+    if (text && this.game.hud) this.game.hud.toast(text);
+    return text;
   }
 
   _hitTarget(target) {
@@ -358,12 +398,14 @@ export class LivingHQ {
     this.hero = null;
     this.targets = [];
     this.dummies = [];
+    this.hints = [];
     this.countryTrophies = 0;
     this.beastTrophies = 0;
     this.worldBossTrophies = 0;
     this.megaQuestRows = 0;
     this.skinDisplays = 0;
     this.hallPlaques = 0;
+    this.hintDisplays = 0;
     this.damageTotal = 0;
     this.scene.rotation.y = 0;
     for (const obj of [...this.scene.children]) {
@@ -391,6 +433,7 @@ export class LivingHQ {
       skinDisplays: this.skinDisplays || 0,
       hallPlaques: this.hallPlaques || 0,
       hallTrophies: this.scene.children.filter((obj) => obj.userData?.kind === 'hall-trophy').length,
+      hintDisplays: this.hintDisplays || 0,
       dummyCount: (this.dummies || []).length,
       hasHero: !!this.hero,
     };
@@ -407,6 +450,7 @@ export class LivingHQ {
         <button id="btn-hqbase-quests" class="btn">📅 ${t('Квести')}</button>
         <button id="btn-hqbase-wardrobe" class="btn">🎒 ${t('Гардероб')}</button>
       </div><div class="hqbase-counter">
+        <span>🧭 <b id="hqbase-next-action">${this.game._nextActionInfo().text}</b></span>
         <span>🗺️ ${t('Країни')}: <b id="hqbase-country-count">0</b></span>
         <span>📖 ${t('Бестіарій')}: <b id="hqbase-beast-count">0</b></span>
         <span>👕 ${t('Скіни')}: <b id="hqbase-skin-count">0</b></span>
@@ -437,6 +481,8 @@ export class LivingHQ {
     if (hit) hit.textContent = '0';
     const dmg = document.getElementById('hqbase-damage-count');
     if (dmg) dmg.textContent = '0';
+    const next = document.getElementById('hqbase-next-action');
+    if (next) next.textContent = this.game._nextActionInfo().text;
     const save = this.game.save;
     const saved = save.liberated || {};
     const bestiary = save.bestiary || {};
