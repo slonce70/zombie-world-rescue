@@ -228,7 +228,7 @@ npm run serve
 - Сценарні тести: `test/update2.mjs` (Польща), `test/update3.mjs` (щит/зброя/магазин), `test/update4.mjs` (XP/завдання/скіни/Шторм), `test/update5.mjs` (баланс/оптика/гаджети), `test/update6.mjs` (динамічні місії), `test/update8.mjs` (Туреччина/Єгипет), `test/update9.mjs` (турель/щит/Ліга/Арена), `test/campaign.mjs` (повна кампанія)
 - `test/e2e.mjs` — довгий сценарій України; у CI запускається окремим `e2e` job.
 - Кооп-тести: `node test/coop.mjs` (кімната/лобі/синхронізація/кіл-кредити), `test/coop2.mjs` (місії/гранати/мегабокс/перемога/лобі-цикл), `test/coop3.mjs` (mid-join і реконект), `test/coop4.mjs` (підняття тіммейта і песик), `test/coop5.mjs` (кооп-Шторм), `test/coop6.mjs` (лобі-сервіс/публічні кімнати/батчинг), `test/update9.mjs` (турель/щит/Ліга/пасс-30/Арена), `test/cloudsave.mjs` (хмарний сейв/код відновлення/фільтр ніків/аварійний екран), `test/update11.mjs` (нові місії: ролли, activate/fetch-двигуни), `test/i18n.mjs` (локалізація uk/en/ru) — самі піднімають relay (із вбудованими dev-Лігою, dev-Лобі і dev-SaveVault)
-- URL-параметри: `?test&fresh&country=POL&touch&seed=N`, кооп: `?relay=ws://...&coophost`/`?coopjoin=КОД&nick=Імʼя`
+- URL-параметри: `?test&fresh&country=POL&touch&seed=N`, кооп: `?relay=ws://...&coophost`/`?coopjoin=КОД&nick=Імʼя`; у `?test` драфт кампанії вимкнено — вмикає `&draft` (test/draft-campaign.mjs)
 - Дебаг-API: `window.__game.test.*` (кооп: `coopCreate/coopJoin/coopStartLevel/coopState`)
 - Нова країна = запис у `src/countries.js` (біом, складність, бос, нагорода) + карта в `src/maps/` + lat/lon для глобуса
 
