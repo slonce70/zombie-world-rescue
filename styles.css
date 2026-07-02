@@ -1377,3 +1377,16 @@ body.touch-mode #touch-coach.show { display: block; }
 .draft-card.tag-power { border-color: #ff5a4d; box-shadow: 0 0 18px rgba(255,90,77,.4); }
 .draft-card.tag-speed { border-color: #ffd23d; box-shadow: 0 0 18px rgba(255,210,61,.4); }
 .draft-card.tag-tank  { border-color: #4db8ff; box-shadow: 0 0 18px rgba(77,184,255,.4); }
+/* рідкість: бейдж + рамка (епік «сяє» поверх кольору тега) */
+.draft-card .draft-rarity { font-size: 11px; font-weight: 800; letter-spacing: .06em; border-radius: 8px; padding: 2px 8px; }
+.draft-card.rarity-rare .draft-rarity { background: rgba(77,148,255,.25); color: #9cc8ff; }
+.draft-card.rarity-epic .draft-rarity { background: rgba(255,204,64,.25); color: #ffde7a; }
+.draft-card.rarity-epic {
+  border-color: #ffcc40;
+  box-shadow: 0 0 22px rgba(255,204,64,.55);
+  animation: draft-epic-glow 1.2s ease-in-out infinite alternate;
+}
+@keyframes draft-epic-glow {
+  from { box-shadow: 0 0 14px rgba(255,204,64,.35); }
+  to   { box-shadow: 0 0 30px rgba(255,204,64,.75); }
+}

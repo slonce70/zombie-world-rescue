@@ -43,5 +43,35 @@ check(rb2.apply(dmg, p2) === null, '4-та — комбо НЕ повторює�
 // summary() — непорожній рядок іконок зібраної збірки
 check(typeof rb2.summary() === 'string' && rb2.summary().length > 0, 'summary() дає рядок збірки', rb2.summary());
 
+// === Прокачка 2.0 ===
+// пул великий, id унікальні, рідкості валідні, кожна рідкість представлена
+check(CARD_POOL.length >= 15, 'у пулі ≥15 карток', CARD_POOL.length);
+check(new Set(CARD_POOL.map((c) => c.id)).size === CARD_POOL.length, 'id карток унікальні');
+check(CARD_POOL.every((c) => ['common', 'rare', 'epic'].includes(c.rarity)), 'усі рідкості валідні');
+check(['common', 'rare', 'epic'].every((r) => CARD_POOL.some((c) => c.rarity === r)), 'є common, rare і epic');
+
+// взяті картки не пропонуються повторно (поки колода не скінчилась)
+const rb3 = new RunBuild();
+const p3 = mkPlayer();
+const first = rb3.offer({ int: () => 0 });
+rb3.apply(first[0], p3);
+const second = rb3.offer({ int: () => 0 });
+check(!second.some((c) => c.id === first[0].id), 'взята картка не повторюється у наступному драфті');
+
+// коли колода вичерпана — перетасовується, offer() завжди дає 3 картки
+const rb4 = new RunBuild();
+for (const c of CARD_POOL) rb4.taken.add(c.id);
+const reshuffled = rb4.offer({ int: () => 0 });
+check(reshuffled.length === 3, 'після вичерпання колоди драфт знову дає 3 картки', reshuffled.length);
+
+// вампіризм: картка додає run-only поле lifeSteal
+const vamp = CARD_POOL.find((c) => c.id === 'vamp');
+const p4 = mkPlayer();
+vamp.apply(p4);
+check(p4.lifeSteal === 1, 'картка вампіризму дає lifeSteal=1', p4.lifeSteal);
+
+// стара домінована картка «Лікування вщент» видалена
+check(!CARD_POOL.some((c) => c.id === 'heal'), 'мертвого піка heal більше немає');
+
 console.log(fail === 0 ? '\n🎉 RUNBUILD OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
 process.exit(fail ? 1 : 0);

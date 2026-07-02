@@ -39,8 +39,11 @@ export class Draft {
   }
 
   _render() {
+    const badge = (r) => r === 'epic' ? `<div class="draft-rarity">💫 ${t('ЕПІЧНА')}</div>`
+      : r === 'rare' ? `<div class="draft-rarity">⭐ ${t('РІДКІСНА')}</div>` : '';
     this.elGrid.innerHTML = this.offered.map((card, i) => `
-      <button class="draft-card tag-${card.tag}" data-i="${i}">
+      <button class="draft-card tag-${card.tag} rarity-${card.rarity || 'common'}" data-i="${i}">
+        ${badge(card.rarity)}
         <div class="draft-icon">${card.icon}</div>
         <div class="draft-name">${t(card.name)}</div>
       </button>`).join('');

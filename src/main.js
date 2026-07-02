@@ -2193,6 +2193,8 @@ class Game {
     } else {
       if (!isGuest) level.zombies.populate();
       level.missions = new DynamicMissions(level);
+      // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
+      if (!level.net && !isPlayground) level.runBuild = new RunBuild();
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -2383,6 +2385,9 @@ class Game {
       // кооп-хост: чужі перемоги зараховуються їхнім господарям (події zd)
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (this.touch) this.touch.vibeKill(z.type === 'boss');
+      // 🧛 картка драфта «+1 HP за вбивство» (run-only, лише соло — runBuild нема в коопі)
+      const lp = level.player;
+      if (lp.lifeSteal > 0 && lp.health > 0) lp.health = Math.min(lp.maxHealth, lp.health + lp.lifeSteal);
       this.save.stats.killed++;
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
@@ -2407,7 +2412,13 @@ class Game {
       this.save.stats.damageDealt += Math.round(n);
       this.quests.onEvent('damage', { n: Math.round(n) });
     });
-    level.bus.on('missionDone', () => { if (!level.playground) { this.progress.addXp(XP_VALUES.mission); if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('mission'); } });
+    level.bus.on('missionDone', () => {
+      if (level.playground) return;
+      this.progress.addXp(XP_VALUES.mission);
+      if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('mission');
+      // 🎲 кампанія: місію здано → драфт «Прокачки» (лише соло; Шторм відкриває свій після хвилі)
+      if (!level.net && level.runBuild && !level.storm && !this.victoryShown && this.draft) this.draft.open();
+    });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
         this.save.stats.gadgetUses++;
@@ -3458,9 +3469,14 @@ class Game {
     const bestLine = prev && !isRecord
       ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд часу')}</span><span class="stat-val">${Math.floor(prev.time / 60)}:${String(prev.time % 60).padStart(2, '0')}</span></div>`
       : '';
+    const vrb = this.level.runBuild;
+    const victoryBuildRow = vrb && vrb.picks.length
+      ? `<div class="stat"><span class="stat-icon">🎲</span><span class="stat-name">${t('Твоя збірка')}</span><span class="stat-val">${vrb.summary()}</span></div>`
+      : '';
     document.getElementById('victory-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${bestLine}
+      ${victoryBuildRow}
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${s.kills}</span></div>
       <div class="stat"><span class="stat-icon">🔥</span><span class="stat-name">${t('Найкраще комбо')}</span><span class="stat-val">x${this.level.combo.best}</span></div>
       <div class="stat"><span class="stat-icon">🎯</span><span class="stat-name">${t('Точність')}</span><span class="stat-val">${acc}%</span></div>
