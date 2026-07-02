@@ -72,8 +72,8 @@ try {
       })),
     };
   });
-  check('14 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
-    fresh.modes === 14 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('16 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
+    fresh.modes === 16 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked
       && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
@@ -83,14 +83,14 @@ try {
       'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИКЛИКИ', 'ДУШІ',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
-      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected'])
-      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign', 'infected'])
+      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
+      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
-        { title: 'КАМПАНІЯ', modes: ['campaign', 'infected'] },
+        { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
         { title: 'БОСИ', modes: ['arena', 'worldboss'] },
         { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
         { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-        { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
+        { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
         { title: 'ДУШІ', modes: ['soul-collector'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
@@ -104,16 +104,16 @@ try {
       })
       .map((m) => m.dataset.mode));
   check('клік по вкладці показує тільки свої режими',
-    JSON.stringify(trialModes) === JSON.stringify(['zone-defense', 'defense', 'bank', 'maze']),
+    JSON.stringify(trialModes) === JSON.stringify(['zone-defense', 'defense', 'turretwar', 'bank', 'maze']),
     trialModes.join(','));
   await page.click('.solo-tab:has-text("КАМПАНІЯ")');
   check('кожен pane-розділ містить свої режими',
     JSON.stringify(fresh.sections) === JSON.stringify([
-      { title: 'КАМПАНІЯ', modes: ['campaign', 'infected'] },
+      { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
       { title: 'БОСИ', modes: ['arena', 'worldboss'] },
       { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
       { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-      { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'bank', 'maze'] },
+      { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
       { title: 'ДУШІ', modes: ['soul-collector'] },
     ]),
     JSON.stringify(fresh.sections));

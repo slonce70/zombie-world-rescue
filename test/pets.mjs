@@ -22,17 +22,22 @@ const meta = await page.evaluate(async () => {
   const { SHOP_ITEMS } = await import('/src/shop.js');
   const ids = Object.keys(PETS);
   const items = SHOP_ITEMS.filter((i) => i.pet);
+  const shopPetIds = new Set(items.map((i) => i.id));
+  const rewardOnly = ['slimepet'];
+  const shopIds = ids.filter((id) => !rewardOnly.includes(id));
   const dog = items.find((i) => i.id === 'dog');
   const cat = items.find((i) => i.id === 'cat');
   return {
     count: ids.length, ids,
     items: items.length,
+    shopIds,
+    rewardOnlyHidden: rewardOnly.every((id) => !shopPetIds.has(id)),
     dogPrice: dog && dog.price, catPrice: cat && cat.price,
     allHaveMeta: ids.every((id) => PETS[id].name && PETS[id].icon && PETS[id].make && PETS[id].move),
   };
 });
 check(meta.count >= 12 && meta.allHaveMeta, `реєстр PETS: ${meta.count} тварин з повними метаданими`, meta.ids.join(','));
-check(meta.items === meta.count, `усі ${meta.count} улюбленців є в магазині`, `items=${meta.items}`);
+check(meta.items === meta.shopIds.length && meta.rewardOnlyHidden, `магазин продає ${meta.shopIds.length} купованих улюбленців, reward-only схований`, `items=${meta.items}`);
 check(meta.dogPrice === 350 && meta.catPrice === 1500, 'ціни: собака 350 (стартова), решта 1500', JSON.stringify(meta));
 
 console.log('▸ Купівля і вибір');

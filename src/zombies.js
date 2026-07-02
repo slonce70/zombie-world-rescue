@@ -610,6 +610,16 @@ export class Zombies {
     const dealt = Math.min(amt, z.hp);
     z.hp -= amt;
     if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
+    // 💥 постріл ФІЗИЧНО відчутний: здригання + нокбек у напрямку пострілу
+    z.rig.anim.flinchT = 0.18;
+    if (dir && z.type !== 'boss') {
+      // важкі майже не зсуваються, дрібнота відлітає далі
+      const mass = (z.type === 'tank' || z.type === 'robot' || z.type === 'ironclad') ? 0.3
+        : z.type === 'imp' ? 1.7 : 1;
+      const kb = Math.min(3.5, 0.6 + amt * 0.028) * mass;
+      z.kbX = (z.kbX || 0) + dir.x * kb;
+      z.kbZ = (z.kbZ || 0) + dir.z * kb;
+    }
     this._aggro(z);
     // розбудити сусідів по групі (тільки поблизу — не весь склад одразу)
     for (const o of this.list) {
@@ -652,9 +662,15 @@ export class Zombies {
     z.state = 'dead';
     z.deadT = 0;
     setAnim(z.rig, 'die');
+    // фінальний удар збиває з ніг: труп ковзає від пострілу (ковзання у dead-блоці update)
+    if (dir && z.type !== 'boss') {
+      z.kbX = (z.kbX || 0) + dir.x * 2.6;
+      z.kbZ = (z.kbZ || 0) + dir.z * 2.6;
+    }
     const level = this.level;
     const distV = Math.hypot(z.x - level.player.pos.x, z.z - level.player.pos.z);
     level.audio.zdie(1 - clamp(distV / 50, 0, 0.9));
+    if (z.type !== 'boss') level.audio.killPop(1 - clamp(distV / 40, 0, 0.9)); // 🎈 мультяшний «поп»
     // у коопі особиста статистика рахує лише власні перемоги
     if (!level.net || (z.lastHitBy || 1) === 1) level.stats.kills++;
     level.netEv('zd', z.nid, z.lastHitBy || 1, z.golden ? 1 : 0);
@@ -779,6 +795,15 @@ export class Zombies {
         // оновлюємо повний риг лише поки програється сама die-анімація (~0.85с);
         // далі поза вже статична — заморожуємо її й не тратимо CPU на риг трупа
         if (rig.anim.dieT < 1) updateRig(rig, dt);
+        // труп ковзає від нокбека («збило з ніг»)
+        if (z.kbX || z.kbZ) {
+          z.x += z.kbX * dt; z.z += z.kbZ * dt;
+          const kf = Math.max(0, 1 - dt * 4);
+          z.kbX *= kf; z.kbZ *= kf;
+          if (Math.abs(z.kbX) + Math.abs(z.kbZ) < 0.04) z.kbX = z.kbZ = 0;
+          rig.group.position.x = z.x;
+          rig.group.position.z = z.z;
+        }
         // занурюємо тіло в землю в останні ~0.7с перед прибиранням — щоб і на тачі
         // (короткий TTL 1.6с) труп плавно зникав, а не «вистрибував»
         if (z.deadT > this._corpseTtl - 0.7) rig.group.position.y -= dt * 0.9;
@@ -1349,6 +1374,14 @@ export class Zombies {
         moving = true;
       }
     }
+    // нокбек від пострілів: імпульс штовхає й швидко згасає (працює навіть коли зомбі стоїть)
+    if (z.kbX || z.kbZ) {
+      z.x += z.kbX * dt;
+      z.z += z.kbZ * dt;
+      const kf = Math.max(0, 1 - dt * 6);
+      z.kbX *= kf; z.kbZ *= kf;
+      if (Math.abs(z.kbX) + Math.abs(z.kbZ) < 0.04) z.kbX = z.kbZ = 0;
+    }
     // колізії зі світом
     const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
     z.x = solved.x;
@@ -1560,6 +1593,7 @@ export class Zombies {
     const level = this.level;
     const distV = Math.hypot(z.x - level.player.pos.x, z.z - level.player.pos.z);
     level.audio.zdie(1 - clamp(distV / 50, 0, 0.9));
+    if (z.type !== 'boss') level.audio.killPop(1 - clamp(distV / 40, 0, 0.9)); // 🎈 мультяшний «поп»
     if (z.horde) this.hordeRemaining--;
     if (mine) {
       level.stats.kills++;

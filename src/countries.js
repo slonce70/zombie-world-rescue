@@ -16,8 +16,8 @@ import labMap from './maps/lab.js';
 
 export const BIOMES = {
   summer: {
-    skyTop: 0x4d9ef7, skyHorizon: 0xcfeeff, skyBottom: 0xb8d9c9,
-    fogColor: 0xcfe8ff, fogNear: 130, fogFar: 430,
+    skyTop: 0x4d9ef7, skyHorizon: 0xffe9c8, skyBottom: 0xb8d9c9, // 🌅 тепло-кремовий горизонт
+    fogColor: 0xdde9f2, fogNear: 130, fogFar: 430, // трохи тепліший серпанок під кремовий горизонт
     hemiSky: 0xcfe8ff, hemiGround: 0x6a9a50, hemiIntensity: 0.85,
     sunColor: 0xfff0d6, sunIntensity: 1.9, sunPos: [70, 110, 50],
     sunDisc: 0xfff6c9, sunDiscPos: [330, 420, 240],
@@ -158,7 +158,7 @@ export const BIOMES = {
   },
   // 🇪🇬 розпечена пустеля з пірамідами
   desert: {
-    skyTop: 0x4a9ce8, skyHorizon: 0xffe6b0, skyBottom: 0xe2c188,
+    skyTop: 0x4a9ce8, skyHorizon: 0xffdd96, skyBottom: 0xe2c188, // 🏜️ золотіший горизонт
     fogColor: 0xf2e0b4, fogNear: 110, fogFar: 390,
     hemiSky: 0xffeccc, hemiGround: 0xb89c5e, hemiIntensity: 1.0,
     sunColor: 0xfff2cc, sunIntensity: 2.0, sunPos: [60, 120, 40],
@@ -179,7 +179,7 @@ export const BIOMES = {
   },
   // 🌸 японська весна — рожева сакура, пастельне небо, летять пелюстки
   sakura: {
-    skyTop: 0x6fb3ee, skyHorizon: 0xffe0ec, skyBottom: 0xe6cfe0,
+    skyTop: 0x6fb3ee, skyHorizon: 0xffd4e4, skyBottom: 0xe6cfe0, // 🌸 рожевіший горизонт
     fogColor: 0xf2dce8, fogNear: 125, fogFar: 420,
     hemiSky: 0xfbe2ee, hemiGround: 0x9aa86a, hemiIntensity: 0.95,
     sunColor: 0xfff0f0, sunIntensity: 1.85, sunPos: [82, 100, 52],

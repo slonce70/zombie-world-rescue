@@ -9,6 +9,7 @@ import { ensureCid } from './league.js';
 const PUSH_DELAY_MS = 25_000;
 export const SAVE_KEY = 'zr-save-v1';
 export const SAVE_CONFLICT_KEY = 'zr-save-conflict-v1';
+const SHIPPED_ORIGIN = 'https://slonce70.github.io';
 
 // 🎨 Дефолтний герой і стартові монети — ЄДИНЕ ДЖЕРЕЛО для _newSave (main.js) і
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
@@ -85,8 +86,8 @@ export function saveHasProgress(s) {
 export class CloudSave {
   constructor(game) {
     this.game = game;
-    // тести не мають спамити продакшн-хмару; ?cloud вмикає її явно (з dev-relay)
-    this.enabled = !game.testMode || game.params.has('cloud');
+    // тести/localhost не мають спамити продакшн-хмару; ?cloud вмикає її явно (з dev-relay)
+    this.enabled = game.params.has('cloud') || (typeof location !== 'undefined' && location.origin === SHIPPED_ORIGIN);
     this.lastOkTs = 0;   // коли востаннє успішно синхронізувались
     this.lastFailTs = 0;
     this.lastFailStatus = 0;

@@ -816,6 +816,27 @@ export class World {
     water.position.set(x, 0, z);
     this.scene.add(water);
     this.pond = { mesh: water, base: pp.array.slice(), t: 0 };
+    // ✨ блискітки на воді: один InstancedMesh additive-квадратиків, мерехтять по синусу в update
+    const gN = 7;
+    const gGeo = new THREE.PlaneGeometry(0.55, 0.55);
+    gGeo.rotateX(-Math.PI / 2);
+    const glints = new THREE.InstancedMesh(gGeo, new THREE.MeshBasicMaterial({
+      color: 0xfff7d0, transparent: true, opacity: 0.75,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }), gN);
+    glints.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    glints.frustumCulled = false;
+    glints.renderOrder = 2;
+    const gPts = [];
+    for (let i = 0; i < gN; i++) {
+      const ga = this.rng.range(0, 6.28), grr = this.rng.range(0.15, 0.75) * r;
+      const gx = x + Math.cos(ga) * grr, gz = z + Math.sin(ga) * grr;
+      // трохи вище гребеня хвилі (вода = groundH + 0.34, хвиля ±0.16)
+      gPts.push({ x: gx, y: this.groundH(gx, gz) + 0.62, z: gz, ph: this.rng.range(0, 6.28), spd: this.rng.range(0.6, 1.3) });
+    }
+    this.scene.add(glints);
+    // скретч-обʼєкти один раз — жодних алокацій у кадрі
+    this.pondGlints = { mesh: glints, pts: gPts, m4: new THREE.Matrix4(), v: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3() };
     // піщаний берег
     const sand = new THREE.Mesh(new THREE.RingGeometry(r * 0.92, r + 1.6, 26), toonMat(0xe8d9a0));
     sand.rotation.x = -Math.PI / 2;
@@ -1952,6 +1973,13 @@ export class World {
     if (this.stars) this.stars.material.opacity = k * 0.9;
     // ліхтарі розгораються
     if (this.lampHeadM) this.lampHeadM.emissiveIntensity = b.lampGlow + k * 2.2;
+    // ☁️ хмари темнішають і тануть у ночі
+    if (this.cloudM) {
+      this.cloudM.color.copy(this._cloudDay).lerp(this._cloudNight, k);
+      this.cloudM.opacity = 0.92 - k * 0.42;
+    }
+    // ✨ блискітки на ставку гаснуть уночі
+    if (this.pondGlints) this.pondGlints.mesh.material.opacity = 0.75 * (1 - k * 0.8);
   }
 
   // сонце-тінь слідує за гравцем (з кроком, щоб тіні не мерехтіли)
@@ -2077,6 +2105,9 @@ export class World {
     const cRock = new THREE.Color(this.biome.rock || 0x8d8377);
     const cPeak = new THREE.Color(this.biome.peak || this.biome.rock || 0x8d8377);
     const cBed = new THREE.Color(this.biome.riverbed || 0x9a8a64);
+    // 🌼 пастельні відтінки: «луки»-плями і висвітлена трава на пагорбах
+    const cMeadow = cGrass3.clone().lerp(new THREE.Color(0xf2ecb0), 0.3);
+    const cSunlit = cGrass1.clone().lerp(new THREE.Color(0xfff2c2), 0.55);
     const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
@@ -2086,6 +2117,11 @@ export class World {
       tmp.copy(cGrass1);
       if (n > 0.25) tmp.lerp(cGrass3, smoothstep(0.25, 0.6, n));
       else if (n < -0.2) tmp.lerp(cGrass2, smoothstep(-0.2, -0.6, n));
+      // 🌼 друга незалежна FBM-розмірність (ширший масштаб, інше зміщення) — плямисті луки
+      const n2 = this.fbmHi(x * 0.021 - 160, z * 0.021 + 240);
+      if (n2 > 0.28) tmp.lerp(cMeadow, smoothstep(0.28, 0.72, n2) * 0.3);
+      // ☀️ вершини пагорбів трохи світліші й тепліші (вище = сонячніше); скеля перекриє нижче
+      tmp.lerp(cSunlit, smoothstep(2.0, 7.5, h) * 0.18);
       // 🏔️ високо — скеля, ще вище — вершина (сніг/світла порода)
       if (this._terrainMod) {
         const rockW = smoothstep(8.5, 13.5, h);
@@ -3619,6 +3655,10 @@ export class World {
   _buildClouds() {
     this.clouds = [];
     const cloudM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap, transparent: true, opacity: 0.92 });
+    // 🌙 спільний матеріал усіх хмар: setNight темнить його, щоб хмари не світились білим уночі
+    this.cloudM = cloudM;
+    this._cloudDay = new THREE.Color(0xffffff);
+    this._cloudNight = new THREE.Color(0x39466a);
     for (let i = 0; i < 11; i++) {
       const g = new THREE.Group();
       const n = this.rng.int(3, 5);
@@ -3883,6 +3923,18 @@ export class World {
         pos.setY(i, by + Math.sin(this.pond.t * 1.7 + bx * 0.55 + bz * 0.4) * 0.16);
       }
       pos.needsUpdate = true;
+      // ✨ блискітки: спалахують лише на піку синуса (більшість часу невидимі)
+      const G = this.pondGlints;
+      if (G) {
+        for (let i = 0; i < G.pts.length; i++) {
+          const p = G.pts[i];
+          const tw = Math.sin(this.pond.t * p.spd + p.ph);
+          const s = tw > 0.62 ? (tw - 0.62) * 2.4 : 0;
+          G.m4.compose(G.v.set(p.x, p.y, p.z), G.q, G.s.set(s * 2.2, 1, s * 2.2));
+          G.mesh.setMatrixAt(i, G.m4);
+        }
+        G.mesh.instanceMatrix.needsUpdate = true;
+      }
     }
     // ⛲ фонтан на площі: струмінь-маківка пульсує вгору-вниз
     if (this.fountain) {

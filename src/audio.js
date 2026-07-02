@@ -2,6 +2,9 @@
 
 const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
+// усі реплики озвучки — файли assets/voice/<id>.m4a
+const VOICE_IDS = ['wave', 'victory', 'defeat', 'levelup', 'boss', 'heal', 'combo', 'golden', 'airdrop', 'horde'];
+
 export class AudioMan {
   constructor() {
     this.ctx = null;
@@ -11,6 +14,10 @@ export class AudioMan {
     this.musStep = 0;
     this.nextT = 0;
     this._groanCd = 0;
+    // озвучка (українською, голос Lesya)
+    this._voiceBufs = new Map();
+    this._voiceBusyUntil = 0;
+    this._voiceCd = new Map(); // кулдаун на кожну репліку окремо
   }
 
   ensure() {
@@ -33,6 +40,8 @@ export class AudioMan {
       const d = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       setInterval(() => this._schedule(), 80);
+      // передзавантаження всіх реплік (fire-and-forget, помилки ковтаємо)
+      VOICE_IDS.forEach((id) => this._loadVoice(id));
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
   }
@@ -100,7 +109,8 @@ export class AudioMan {
 
   step() {
     if (!this.ctx) return;
-    this._noise(this.t, 0.05, 0.07, 'lowpass', 350 + Math.random() * 150);
+    // гучніше і з випадковою висотою, щоб кроки не були монотонними
+    this._noise(this.t, 0.05, 0.14 + Math.random() * 0.04, 'lowpass', 300 + Math.random() * 300);
   }
 
   shriek(vol = 1, pitch = 1) {
@@ -149,6 +159,7 @@ export class AudioMan {
   }
 
   goldenJingle() {
+    this.voiceOnce('golden', 15);
     const t = this.t;
     [79, 83, 86, 91, 95].forEach((m, i) => {
       this._osc('triangle', midi(m), t + i * 0.09, 0.25, 0.28);
@@ -160,6 +171,7 @@ export class AudioMan {
   }
 
   comboDing(level = 1) {
+    if (level >= 3) this.voiceOnce('combo', 14);
     const t = this.t;
     const base = 72 + Math.min(level, 6) * 2;
     this._osc('triangle', midi(base), t, 0.12, 0.25);
@@ -179,6 +191,7 @@ export class AudioMan {
   hit(crit) {
     const t = this.t;
     this._osc('square', crit ? 1500 : 1000, t, 0.05, 0.18, crit ? 2200 : 1200);
+    if (crit) this.headshotDing(); // ✨ крит одразу чути
   }
 
   // 🛡 дзвін щита: куля відскочила
@@ -231,6 +244,7 @@ export class AudioMan {
 
   // 🎖️ новий зірковий рівень — урочистий фанфар
   levelUp() {
+    this.voiceOnce('levelup', 8);
     const t = this.t;
     [60, 64, 67, 72, 76, 79, 84].forEach((m, i) => {
       this._osc('triangle', midi(m), t + i * 0.07, 0.22, 0.18);
@@ -277,6 +291,7 @@ export class AudioMan {
 
   // ⛈️ сирена шторму — коло звужується
   stormSiren() {
+    this.voiceOnce('wave', 18);
     const t = this.t;
     for (let i = 0; i < 2; i++) {
       this._osc('sawtooth', 380, t + i * 0.5, 0.4, 0.1, 560);
@@ -357,6 +372,7 @@ export class AudioMan {
   }
 
   horde() {
+    this.voiceOnce('horde', 25);
     const t = this.t;
     this._osc('sawtooth', 80, t, 1.2, 0.4, 50);
     this._osc('sawtooth', 84, t, 1.2, 0.3, 52);
@@ -364,6 +380,7 @@ export class AudioMan {
   }
 
   bossRoar() {
+    this.voiceOnce('boss', 45);
     const t = this.t;
     this._osc('sawtooth', 70, t, 1.6, 0.55, 40);
     this._osc('sawtooth', 95, t + 0.1, 1.4, 0.4, 55);
@@ -387,11 +404,32 @@ export class AudioMan {
   }
 
   denied() { this._osc('square', 200, this.t, 0.2, 0.2, 140); }
-  click() { this._osc('sine', 700, this.t, 0.05, 0.12); }
+  // «поп» бульбашки: два короткі синуси
+  click() {
+    const t = this.t;
+    this._osc('sine', 660, t, 0.045, 0.12, 880);
+    this._osc('sine', 880, t + 0.045, 0.06, 0.1, 1100);
+  }
+
+  // ✨ яскравий дзвін за хедшот/крит
+  headshotDing() {
+    const t = this.t;
+    this._osc('triangle', 1320, t, 0.12, 0.22);
+    this._osc('triangle', 1760, t + 0.02, 0.1, 0.14);
+  }
+
+  // 🎈 мультяшний «поп» — смерть звичайного зомбі
+  killPop(vol = 1) {
+    const t = this.t;
+    const v = Math.min(1, vol);
+    this._osc('sine', 300, t, 0.12, 0.3 * v, 80);
+    this._noise(t, 0.04, 0.15 * v, 'bandpass', 2500, 2);
+  }
   door() { this._noise(this.t, 0.4, 0.3, 'lowpass', 400, 1, 150); }
   repairTick() { this._osc('square', 1200 + Math.random() * 600, this.t, 0.04, 0.08); }
 
   victory() {
+    this.voiceOnce('victory', 6);
     const t = this.t;
     const seq = [60, 64, 67, 72, 67, 72, 76, 79];
     seq.forEach((m, i) => {
@@ -402,8 +440,46 @@ export class AudioMan {
   }
 
   defeat() {
+    this.voiceOnce('defeat', 6);
     const t = this.t;
     [55, 51, 48].forEach((m, i) => this._osc('triangle', midi(m), t + i * 0.3, 0.5, 0.3));
+  }
+
+  // ---------- озвучка ----------
+  // завантажити й закешувати буфер репліки (кешуємо промис, щоб не грузити двічі)
+  async _loadVoice(id) {
+    if (this._voiceBufs.has(id)) return this._voiceBufs.get(id);
+    const p = fetch(`./assets/voice/${id}.m4a`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+      .then((ab) => this.ctx.decodeAudioData(ab))
+      .catch(() => null); // offline-запобіжник: тихо ковтаємо
+    this._voiceBufs.set(id, p);
+    return p;
+  }
+
+  // проиграти репліку; якщо інша ще звучить — пропустити (не черга!)
+  voice(id, vol = 1) {
+    if (this.muted || !this.ctx) return;
+    const p = this._voiceBufs.get(id);
+    if (!p) { this._loadVoice(id); return; }
+    p.then((buf) => {
+      if (!buf || this.muted || this._voiceBusyUntil > this.ctx.currentTime) return;
+      const s = this.ctx.createBufferSource();
+      s.buffer = buf;
+      const g = this.ctx.createGain();
+      g.gain.value = vol * 0.9;
+      s.connect(g).connect(this.sfxGain);
+      s.start();
+      this._voiceBusyUntil = this.ctx.currentTime + buf.duration + 0.4;
+    });
+  }
+
+  // репліка з персональним кулдауном — щоб Леся не тараторила одну й ту саму фразу
+  voiceOnce(id, cdSec = 20, vol = 1) {
+    const now = this.ctx ? this.ctx.currentTime : 0;
+    if ((this._voiceCd.get(id) ?? -1e9) + cdSec > now) return;
+    this._voiceCd.set(id, now);
+    this.voice(id, vol);
   }
 
   // ---------- музика ----------

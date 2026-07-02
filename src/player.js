@@ -32,6 +32,8 @@ export const WEAPONS = {
 export const WEAPON_SLOTS = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff'];
 const ALL_WEAPON_IDS = Object.keys(WEAPONS);
 const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower', Digit0: 'staff' };
+// 🟡 зброя з гільзами (лазер/вогнемет/посох/меч/молот/базука гільз не викидають)
+const SHELL_WEAPONS = new Set(['pistol', 'rifle', 'smg', 'shotgun', 'magnum', 'sniper']);
 
 export class Player {
   constructor(level) {
@@ -141,6 +143,7 @@ export class Player {
     this.bobAmp = 0;
     this.gunKick = 0;
     this.camShake = 0;
+    this.landDip = 0; // 🦶 squash приземлення: 1 у момент торкання землі → 0 за ~0.12с
     this.fovTarget = 75;
     this._camPos = new THREE.Vector3();
     this._camO = new THREE.Vector3();
@@ -385,6 +388,7 @@ export class Player {
     this.bobPhase += dt * (4 + hSpeed * 1.15);
     this.gunKick = Math.max(0, this.gunKick - dt * 7);
     this.camShake = Math.max(0, this.camShake - dt * 3);
+    this.landDip = Math.max(0, this.landDip - dt / 0.12); // squash приземлення відновлюється за ~0.12с
     this.fovTarget = this.scoped ? 24 : sprint ? 82 : 75;
     this.camera.fov = damp(this.camera.fov, this.fovTarget, 8, dt);
     this.camera.updateProjectionMatrix();
@@ -481,6 +485,8 @@ export class Player {
 
     const gh = Math.max(world.groundH(this.pos.x, this.pos.z), world.floorAt(this.pos.x, this.pos.z, this.pos.y));
     if (this.pos.y <= gh) {
+      // 🦶 приземлення з падіння: короткий squash (провал камери в 1-й особі / сплюск тіла в 3-й)
+      if (!this.onGround && this.vel.y < -4) this.landDip = 1;
       this.pos.y = gh;
       this.vel.y = 0;
       this.onGround = true;
@@ -576,17 +582,17 @@ export class Player {
     if (this.firstPerson) {
       const bobY = Math.sin(this.bobPhase * 2) * 0.035 * this.bobAmp;
       const bobX = Math.cos(this.bobPhase) * 0.025 * this.bobAmp;
-      cam.position.set(this.pos.x + bobX * Math.cos(this.yaw), this.pos.y + 1.62 + bobY, this.pos.z - bobX * Math.sin(this.yaw));
+      cam.position.set(this.pos.x + bobX * Math.cos(this.yaw), this.pos.y + 1.62 + bobY - this.landDip * 0.06, this.pos.z - bobX * Math.sin(this.yaw));
       cam.rotation.set(this.pitch, this.yaw, 0);
       this._camInit = false;
       // зброя: боб + віддача
       this.weaponRoot.position.set(
         this.weaponBase.x + Math.cos(this.bobPhase) * 0.013 * this.bobAmp,
         this.weaponBase.y + Math.abs(Math.sin(this.bobPhase)) * 0.018 * this.bobAmp - (this.reloading > 0 ? 0.16 : 0),
-        this.weaponBase.z + this.gunKick * 0.09
+        this.weaponBase.z + this.gunKick * 0.13
       );
       this.weaponRoot.rotation.set(
-        this.gunKick * 0.16 + (this.reloading > 0 ? -0.5 : 0),
+        this.gunKick * 0.22 + (this.reloading > 0 ? -0.5 : 0),
         0.06, Math.sin(this.bobPhase) * 0.008 * this.bobAmp
       );
     } else {
@@ -627,14 +633,17 @@ export class Player {
       cam.rotation.set(this.pitch, this.yaw, 0);
     }
     if (this.camShake > 0) {
-      cam.position.x += (Math.random() - 0.5) * this.camShake * 0.14;
-      cam.position.y += (Math.random() - 0.5) * this.camShake * 0.14;
+      cam.position.x += (Math.random() - 0.5) * this.camShake * 0.09;
+      cam.position.y += (Math.random() - 0.5) * this.camShake * 0.09;
     }
   }
 
   _updateRigs(dt, hSpeed, moving, sprint) {
     if (!this.firstPerson) {
       this.rig.group.position.set(this.pos.x, this.pos.y, this.pos.z);
+      // 🦶 squash приземлення: через anim.extSquash — сам масштаб виставляє updateRig
+      // (він щокадру пише body.scale для squash-and-stretch, пряме scale.y тут би затерлось)
+      this.rig.anim.extSquash = 1 - this.landDip * 0.08;
       if (this.riding) {
         // 🛴 стоїть на дошці, руки на кермі, нахил у поворот
         this.rig.group.rotation.y = this.yaw;
@@ -711,6 +720,8 @@ export class Player {
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
     level.effects.muzzleFlash(this._muzzlePos);
+    // 🟡 гільза вилітає праворуч-вгору від дула
+    if (SHELL_WEAPONS.has(this.cur)) level.effects.ejectShell(this._muzzlePos, Math.cos(this.yaw), -Math.sin(this.yaw));
 
     if (w.melee) {
       const origin = this._shootOrigin.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
@@ -866,6 +877,8 @@ export class Player {
       else level.net.onLocalShot(this.cur, netEnd);
     }
     for (const [, acc] of dmgByZombie) {
+      // ⭐ хедшот: сніп золотих зірочок у точці влучання
+      if (acc.crit) level.effects.burst(acc.point, 0xffd23f, 6, { speed: 3.2, up: 3.5, life: 0.55, size: 1.7 });
       level.effects.damageNumber(acc.point, acc.total, acc.crit);
     }
     if (anyHit) {

@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v236';
+const CACHE = 'zr-cache-v238';
 
 const SHELL = [
   './',
@@ -78,6 +78,17 @@ const SHELL = [
   './src/i18n/en.js',
   './src/i18n/ru.js',
   './worker/nick.mjs',
+  // 🎙️ українська озвучка (Lesya)
+  './assets/voice/wave.m4a',
+  './assets/voice/victory.m4a',
+  './assets/voice/defeat.m4a',
+  './assets/voice/levelup.m4a',
+  './assets/voice/boss.m4a',
+  './assets/voice/heal.m4a',
+  './assets/voice/combo.m4a',
+  './assets/voice/golden.m4a',
+  './assets/voice/airdrop.m4a',
+  './assets/voice/horde.m4a',
 ];
 
 self.addEventListener('install', (e) => {

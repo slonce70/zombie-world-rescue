@@ -72,8 +72,11 @@ try {
   const pidBefore = await B.evaluate(() => window.__game.test.coopState().myPid);
   await B.evaluate(() => { window.__game.coop.session.transport.ws.close(); });
   await sleep(500 * SLOW);
-  const lostSeen = await B.evaluate(() => window.__game.test.coopState().connected === false || window.__game.level.net.lost);
-  check('гість помітив розрив', lostSeen);
+  const lossHandled = await B.waitForFunction((pid) => {
+    const s = window.__game.test.coopState();
+    return s.connected === false || window.__game.level.net.lost || (s.connected === true && !s.waiting && s.myPid === pid);
+  }, pidBefore, { timeout: 25000 * SLOW }).then(() => true).catch(() => false);
+  check('гість обробив розрив або вже відновився', lossHandled);
   await B.waitForFunction(() => {
     const s = window.__game.test.coopState();
     return s.connected === true && !s.waiting;

@@ -161,10 +161,24 @@ export function makeHumanoid(spec) {
     nose.position.set(0, 0.12, fz - 0.05);
     headG.add(nose);
   }
+  // вуха — маленькі, для силуету; opt-in (ears:true), бо шоломи/каптури/навушники конфліктують
+  if (s.ears === true) {
+    for (const side of [-1, 1]) {
+      const ear = sphere(0.055, skinM, 8, 6);
+      ear.position.set((s.headR - 0.01) * side, 0.13, 0);
+      ear.scale.set(0.5, 1, 0.75);
+      headG.add(ear);
+    }
+  }
   const mouthM = toonMat(s.mouthColor);
   if (s.mouth === 'smile') {
-    const m = box(0.14, 0.03, 0.02, mouthM);
-    m.position.set(0, 0.02, fz - 0.02);
+    // вигнута усмішка-дуга по поверхні обличчя (а не плаский брусок)
+    const pts = [];
+    for (let i = 0; i <= 6; i++) {
+      const u = i / 6 - 0.5;
+      pts.push(new THREE.Vector3(u * 0.15, 0.045 - Math.cos(u * Math.PI) * 0.045, fz - 0.018 + Math.abs(u) * 0.02));
+    }
+    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, 0.014, 6), mouthM);
     headG.add(m);
   } else if (s.mouth === 'crooked') {
     const m = box(0.15, 0.055, 0.025, mouthM);
@@ -241,6 +255,7 @@ export function updateRig(rig, dt) {
 
   let legL = 0, legR = 0, armL = b.armL, armR = b.armR;
   let bodyRotX = b.bodyRotX, bodyRotZ = 0, bodyY = 0, headRotZ = 0, headRotX = 0;
+  let headRotY = 0, squash = 1; // squash-and-stretch тіла (мультяшна пружність)
 
   switch (a.mode) {
     case 'idle': {
@@ -249,7 +264,9 @@ export function updateRig(rig, dt) {
       armL += Math.sin(a.phase) * 0.06;
       armR += Math.sin(a.phase + 1.3) * 0.06;
       headRotZ = Math.sin(a.phase * 0.7) * 0.05;
+      headRotY = Math.sin(a.phase * 0.33) * 0.22; // роззирається довкола
       bodyY = Math.sin(a.phase * 2) * 0.01;
+      squash = 1 + Math.sin(a.phase * 2) * 0.008; // ледь помітне «дихання»
       break;
     }
     case 'walk':
@@ -272,6 +289,8 @@ export function updateRig(rig, dt) {
       bodyY = Math.abs(Math.cos(a.phase)) * 0.05 * amp;
       bodyRotZ = Math.sin(a.phase) * (rig.spec.belly > 1.2 ? 0.09 : 0.03);
       headRotZ = Math.sin(a.phase) * 0.04;
+      // squash-and-stretch: присідає на кроці, витягується у стрибку
+      squash = 1 + Math.cos(a.phase * 2) * 0.03 * amp;
       break;
     }
     case 'attack': {
@@ -281,6 +300,8 @@ export function updateRig(rig, dt) {
       armL = raise;
       armR = raise * 0.95;
       bodyRotX = b.bodyRotX - Math.sin(t * Math.PI) * 0.3;
+      headRotX = Math.sin(t * Math.PI) * 0.28; // голова пірнає в удар
+      squash = t < 0.4 ? 1 + t * 0.12 : 1 + (1 - t) * 0.08 - 0.04; // замах-витяг, удар-присід
       a.phase += dt * 2;
       legL = Math.sin(a.phase) * 0.15;
       legR = -Math.sin(a.phase) * 0.15;
@@ -289,7 +310,8 @@ export function updateRig(rig, dt) {
     case 'die': {
       a.dieT += dt / 0.85;
       const t = Math.min(1, a.dieT);
-      bodyRotX = b.bodyRotX + sstep(0, 0.75, t) * 1.62;
+      // падає з мультяшним відскоком наприкінці
+      bodyRotX = b.bodyRotX + sstep(0, 0.75, t) * 1.62 + Math.sin(sstep(0.72, 1, t) * Math.PI) * 0.14;
       bodyRotZ = sstep(0, 1, t) * rig.dieSpin;
       armL = b.armL + t * 1.2;
       armR = b.armR + t * 0.8;
@@ -416,6 +438,16 @@ export function updateRig(rig, dt) {
     }
   }
 
+  // здригання від влучання (виставляється у zombies._damage через a.flinchT)
+  if (a.flinchT > 0) {
+    a.flinchT = Math.max(0, a.flinchT - dt);
+    const f = a.flinchT / 0.18;
+    bodyRotX += f * 0.22;   // сіпається назад
+    headRotX -= f * 0.5;
+    headRotZ += f * rig.dieSpin * 0.6;
+    squash *= 1 - f * 0.06;
+  }
+
   p.legL.rotation.x = legL;
   p.legR.rotation.x = legR;
   p.armL.rotation.x = armL;
@@ -435,6 +467,10 @@ export function updateRig(rig, dt) {
   rig.body.position.y = bodyY;
   p.head.rotation.z = headRotZ;
   p.head.rotation.x = headRotX;
+  p.head.rotation.y = headRotY;
+  // squash-and-stretch: об'єм зберігається (ширшає, коли присідає); extSquash — зовнішній імпульс (приземлення)
+  const sq = squash * (a.extSquash || 1);
+  rig.body.scale.set(1 + (1 - sq) * 0.5, sq, 1 + (1 - sq) * 0.5);
 }
 
 // ============================================================
@@ -788,8 +824,9 @@ function buildZombie(type, rng) {
     brow: 0.3,
     sleeves: 'skin',
     nose: false,
+    ears: true, // зелені зомбі-вушка стирчать — кумедний силует
   };
-  // пошарпаність: латки на одязі і чубчик волосся — додаються після збирання
+  // пошарпаність: латки на одязі, чубчик волосся і рвана бахрома сорочки — додаються після збирання
   const addZombieWear = (r) => {
     const patchM = toonMat(0x3a3430);
     for (let i = 0; i < 2; i++) {
@@ -802,6 +839,17 @@ function buildZombie(type, rng) {
     tuft.position.set(rng.range(-0.1, 0.1), 0.4, rng.range(-0.05, 0.05));
     tuft.rotation.z = rng.range(-0.4, 0.4);
     r.parts.head.add(tuft);
+    // рваний край сорочки: зубці-трикутники по низу (запікаються в торс)
+    const hemM = toonMat(r.spec.shirt);
+    const hemR = 0.24 * r.spec.belly;
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2 + rng.range(-0.2, 0.2);
+      const tooth = cone(0.045, 0.1 + rng.next() * 0.06, hemM, 4);
+      tooth.rotation.x = Math.PI; // гострим кінцем донизу
+      tooth.position.set(Math.sin(ang) * hemR, 0.06, Math.cos(ang) * hemR * 0.9);
+      r.parts.torso.add(tooth);
+    }
   };
   let rig;
   if (type === 'runner') {
@@ -813,6 +861,7 @@ function buildZombie(type, rng) {
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.02, belly: 0.95, armsForward: 0.7, shirt: 0x5a7fb0,
       eyeL: 0.07, eyeR: 0.07, brow: 0.35,
+      ears: false, // навушники сидять на вухах
     }));
     const cupM = toonMat(0x202633);
     const padM = toonMat(0x4fd8ff, 0x2288cc, 0.35);
@@ -998,6 +1047,7 @@ function buildZombie(type, rng) {
       skin: 0x6e5a52, shirt: 0x4a3a34, pants: 0x37302a, shoes: 0x232020,
       eyeWhite: 0xffd24a, eyeL: 0.07, eyeR: 0.07, pupilColor: 0xc62828, brow: 0.55,
       bellySkin: true, nose: false, mouth: 'open', teeth: true,
+      ears: false, // у торо власні бичачі вуха
     }));
     const hornM = toonMat(0xe8dcc4);   // кістяні роги
     const noseM = toonMat(0x2a2422);
@@ -1049,6 +1099,7 @@ function buildZombie(type, rng) {
       skin: 0x7a6354, shirt: 0x8a5a32, pants: 0x6e4a2a, shoes: 0x3a2a1c,
       eyeWhite: 0xffe08a, pupilColor: 0xc62828, brow: 0.5,
       sleeves: 'skin', mouth: 'open', teeth: true, nose: false,
+      ears: false, // шолом із нащічниками закриває вуха
     }));
     const bronzeM = toonMat(0xc89b4a, 0x8a6a2a, 0.25);   // бронза/латунь
     const bronzeD = toonMat(0xb0863a);
@@ -1151,6 +1202,7 @@ function buildZombie(type, rng) {
       skin: 0xc08a5a, shirt: 0x9a6a3c, pants: 0x7a5230, shoes: 0x4a3320,
       eyeWhite: 0xffe9b8, pupilColor: 0x3a2a1a, brow: 0.5,
       mouth: 'open', teeth: true, nose: false,
+      ears: false, // глиняний шолом закриває вуха
     }));
     const clayM = toonMat(0xb87f4e, 0x8a5a32, 0.12);
     const helmM = toonMat(0x8a5a32, 0x5a3a22, 0.14);
@@ -1290,6 +1342,7 @@ function buildZombie(type, rng) {
       skin: 0x5fae4a, shirt: 0x394150, pants: 0x2a313c, shoes: 0x20262e,
       eyeWhite: 0xd8ffcf, eyeL: 0.06, eyeR: 0.06, pupilColor: 0x2fae57, brow: 0.5,
       mouth: 'open', teeth: true, nose: false,
+      ears: false, // голова в сталевій кабіні
     }));
     const steelM = toonMat(0x9aa3ad, 0x3a4148, 0.08);  // основний корпус
     const steelD = toonMat(0x5c636b);                  // темна сталь (стики/таз)
@@ -1481,6 +1534,7 @@ export function makeBoss(style = 'king') {
     eyeL: 0.075, eyeR: 0.075,
     mouth: 'open', teeth: true, brow: 0.45,
     bellySkin: style !== 'iron', sleeves: 'skin', nose: false,
+    ears: false, // у босів свій головний декор — вушка конфліктували б
   }, colors));
   if (style === 'chef') {
     // ковпак шеф-кухаря замість корони

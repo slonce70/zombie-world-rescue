@@ -109,6 +109,52 @@ export class Effects {
     this.flashLight = new THREE.PointLight(0xffc966, 0, 9);
     scene.add(this.flashLight);
     this.flashT = 0;
+
+    // 💥 мультяшна зірка-спалах біля дула: пул спрайтів, нуль алокацій на постріл
+    const starCv = document.createElement('canvas');
+    starCv.width = starCv.height = 64;
+    const starCtx = starCv.getContext('2d');
+    const starGrad = starCtx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    starGrad.addColorStop(0, 'rgba(255,255,255,1)');
+    starGrad.addColorStop(0.35, 'rgba(255,214,90,0.95)');
+    starGrad.addColorStop(1, 'rgba(255,140,0,0)');
+    starCtx.fillStyle = starGrad;
+    starCtx.beginPath();
+    // 4-променева зірка: гострі промені з вузькою «талією» між ними
+    const starPts = [[32, 0], [39, 25], [64, 32], [39, 39], [32, 64], [25, 39], [0, 32], [25, 25]];
+    starCtx.moveTo(starPts[0][0], starPts[0][1]);
+    for (let i = 1; i < starPts.length; i++) starCtx.lineTo(starPts[i][0], starPts[i][1]);
+    starCtx.closePath();
+    starCtx.fill();
+    const starTex = new THREE.CanvasTexture(starCv);
+    starTex.userData.shared = true;
+    this.flashSprites = [];
+    this._flashIdx = 0;
+    for (let i = 0; i < 4; i++) {
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: starTex, color: 0xffcf6e, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+      }));
+      spr.visible = false;
+      spr.frustumCulled = false;
+      scene.add(spr);
+      this.flashSprites.push({ spr, life: 0 });
+    }
+
+    // 🟡 гільзи: пул циліндриків зі спільними геометрією/матеріалом, перезапис найстарішої
+    this.shellGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.06, 5);
+    this.shellGeo.userData.shared = true;
+    this.shellMat = toonMat(0xe0b64a);
+    this.shells = [];
+    this._shellIdx = 0;
+    for (let i = 0; i < 12; i++) {
+      const m = new THREE.Mesh(this.shellGeo, this.shellMat);
+      m.visible = false;
+      m.frustumCulled = false;
+      scene.add(m);
+      this.shells.push({ mesh: m, v: new THREE.Vector3(), life: 0, spin: 0 });
+    }
+
     this._meteors = []; // ☄️ метеорити в польоті (гаджет): {rock, tx, tz, ty, t, dur, onLand}
 
     // монети та підбирання
@@ -453,6 +499,7 @@ export class Effects {
     this.scene.add(g);
     const beam = this.makeBeam(x, z, 0x6fc3ff, '🪂');
     this.airdrop = { g, chute, x, z, gy, beam, landed: false, lifeAfter: 60 };
+    if (this.audio && this.audio.voiceOnce) this.audio.voiceOnce('airdrop', 30); // 🪂 «Посилка з неба!»
     const L = this.levelRef;
     if (L && L.net && L.net.authority) L.netEv('ad', Math.round(x * 10) / 10, Math.round(z * 10) / 10);
     if (this.onAirdrop) this.onAirdrop();
@@ -733,6 +780,29 @@ export class Effects {
     this.flashLight.color.setHex(0xffc966);
     this.flashLight.intensity = 14;
     this.flashT = 0.05;
+    // 💥 зірка-спалах: короткоживучий спрайт із випадковим поворотом
+    const f = this.flashSprites[this._flashIdx];
+    this._flashIdx = (this._flashIdx + 1) % this.flashSprites.length;
+    f.spr.position.copy(pos);
+    f.spr.material.rotation = Math.random() * Math.PI * 2;
+    f.spr.material.opacity = 1;
+    f.spr.scale.setScalar(0.28 + Math.random() * 0.14);
+    f.spr.visible = true;
+    f.life = 0.05;
+  }
+
+  // 🟡 гільза: вилітає вбік-вгору від дула (rx,rz — правий вектор гравця),
+  // крутиться, падає з гравітацією і зникає через ~0.7с
+  ejectShell(pos, rx, rz) {
+    const s = this.shells[this._shellIdx];
+    this._shellIdx = (this._shellIdx + 1) % this.shells.length;
+    s.mesh.visible = true;
+    s.mesh.position.copy(pos);
+    s.mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    const k = 1.2 + Math.random() * 1.2;
+    s.v.set(rx * k + (Math.random() - 0.5) * 0.6, 2.2 + Math.random() * 1.2, rz * k + (Math.random() - 0.5) * 0.6);
+    s.life = 0.7;
+    s.spin = 6 + Math.random() * 8;
   }
 
   // 🔫 ЛАЗЕР (v46): яскравий ціановий промінь від ствола до точки влучання.
@@ -1037,6 +1107,32 @@ export class Effects {
       else this.flashLight.intensity *= 0.6;
     }
 
+    // 💥 зірки-спалахи дула: гаснуть за мить
+    for (const f of this.flashSprites) {
+      if (!f.spr.visible) continue;
+      f.life -= dt;
+      if (f.life <= 0) { f.spr.visible = false; f.spr.material.opacity = 0; }
+      else f.spr.material.opacity = f.life / 0.05;
+    }
+
+    // 🟡 гільзи: гравітація, обертання, легкий відскок від землі
+    for (const s of this.shells) {
+      if (!s.mesh.visible) continue;
+      s.life -= dt;
+      if (s.life <= 0) { s.mesh.visible = false; continue; }
+      s.v.y -= 12 * dt;
+      s.mesh.position.addScaledVector(s.v, dt);
+      s.mesh.rotation.x += s.spin * dt;
+      s.mesh.rotation.z += s.spin * 0.7 * dt;
+      const sy = this.world.groundH(s.mesh.position.x, s.mesh.position.z) + 0.03;
+      if (s.mesh.position.y < sy) {
+        s.mesh.position.y = sy;
+        s.v.y *= -0.3;
+        s.v.x *= 0.6;
+        s.v.z *= 0.6;
+      }
+    }
+
     // кільця
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
@@ -1122,10 +1218,11 @@ export class Effects {
       // 🚀 зведення: у перші ~3 м ракета НЕ детонує від землі/стіни/повітря (щоб дитина не
       // підірвала себе зблизька, F10), АЛЕ пряме влучання у ворога детонує завжди (ревью).
       if (boom && !hitZombie && rk.traveled < 3) boom = false;
-      // димний слід
+      // 🔥 вогняно-димний слід: помаранчеві іскри + сірий дим позаду ракети
       rk.smokeT -= dt;
       if (rk.smokeT <= 0) {
         rk.smokeT = 0.04;
+        this.burst(rp, 0xff8a2a, 2, { speed: 0.6, up: 0.4, life: 0.3, size: 1.0 });
         this.burst(rp, 0xd8d8d8, 1, { speed: 0.4, up: 0.8, life: 0.5, size: 0.8 });
       }
       if (boom || rk.life <= 0) {
