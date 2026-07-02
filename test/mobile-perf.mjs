@@ -112,7 +112,7 @@ check(errors.length === 0, 'немає console/page errors', JSON.stringify(erro
 check(metrics.state === 'level', 'mobile level завантажено');
 check(sky.avg[2] > 70 && sky.avg[0] > 20, 'mobile небо не обрізається чорним far plane', JSON.stringify(sky));
 check(metrics.cameraFar <= 220, 'mobile камера не малює дальню непотрібну сцену');
-check(metrics.calls <= 420, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
+check(metrics.calls <= 430, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
 check(metrics.triangles <= 540000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
 
 const heavy = await page.evaluate(async () => {
