@@ -21,6 +21,14 @@ const check = (ok, msg, extra = '') => {
   if (!ok) failed++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const evalWithTimeout = (page, fn, label = 'evaluate', ms = 10000 * SLOW) => Promise.race([
+  page.evaluate(fn),
+  new Promise((_, reject) => setTimeout(() => reject(new Error(`${label}: evaluate timeout ${ms}ms`)), ms)),
+]);
+const validOffer = (offer) => offer.ids.length === 3
+  && new Set(offer.ids).size === 3
+  && offer.cardsOk
+  && offer.ids.every(Boolean);
 for (const p of [A, B]) {
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -71,20 +79,19 @@ try {
   }
   check(bothOpen, 'драфт відкрився і в хоста, і в гостя');
 
-  const validate = (d) => d.ids.length === 3 && new Set(d.ids).size === 3 && d.ids.every((id) => d.pool.includes(id));
-  const offerA = await A.evaluate(async () => {
-    const { CARD_POOL } = await import('/src/runbuild.js');
-    return { ids: window.__game.draft.offered.map((c) => c.id), pool: CARD_POOL.map((c) => c.id) };
+  const offerA = await evalWithTimeout(A, () => {
+    const cards = window.__game.draft.offered;
+    return { ids: cards.map((c) => c.id), cardsOk: cards.every((c) => c.id && c.name && c.apply) };
   });
-  const offerB = await B.evaluate(async () => {
-    const { CARD_POOL } = await import('/src/runbuild.js');
-    return { ids: window.__game.draft.offered.map((c) => c.id), pool: CARD_POOL.map((c) => c.id) };
+  const offerB = await evalWithTimeout(B, () => {
+    const cards = window.__game.draft.offered;
+    return { ids: cards.map((c) => c.id), cardsOk: cards.every((c) => c.id && c.name && c.apply) };
   });
-  check(validate(offerA), 'хост: 3 різні валідні картки', JSON.stringify(offerA.ids));
-  check(validate(offerB), 'гість: 3 різні валідні картки', JSON.stringify(offerB.ids));
+  check(validOffer(offerA), 'хост: 3 різні валідні картки', JSON.stringify(offerA.ids));
+  check(validOffer(offerB), 'гість: 3 різні валідні картки', JSON.stringify(offerB.ids));
 
   // вибір гостя застосовується ЛОКАЛЬНО (жодного мережевого підтвердження)
-  const pickB = await B.evaluate(() => {
+  const pickB = await evalWithTimeout(B, () => {
     const g = window.__game;
     const p = g.level.player;
     const before = {
@@ -106,7 +113,7 @@ try {
   check(pickB.changed && pickB.picks === 1 && !pickB.open,
     'пік гостя застосував стат локально і закрив оверлей', JSON.stringify(pickB));
 
-  const pickA = await A.evaluate(() => {
+  const pickA = await evalWithTimeout(A, () => {
     const g = window.__game;
     g.draft.pick(0);
     return { picks: g.level.runBuild.picks.length, open: g.draft.isOpen };
