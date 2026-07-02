@@ -16,28 +16,25 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 await page.goto(`${BASE}/?test&fresh&seed=25`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Перегружена зомбі проти людей відкривається після 12 країн');
+console.log('▸ Перегружена зомбі проти людей: тумблер 💀 зʼявляється після 12 країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
   const eleven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true };
   const twelve = { ...eleven, DIN: true };
   g.save.liberated = eleven;
   g.renderSoloMenu();
-  const before = document.querySelector('.solo-mode[data-mode="overloaded-humans"]');
+  const before = document.querySelector('.sm-skull[data-hard="overloaded-humans"]');
   g.save.liberated = twelve;
   g.renderSoloMenu();
-  const after = document.querySelector('.solo-mode[data-mode="overloaded-humans"]');
+  const after = document.querySelector('.sm-skull[data-hard="overloaded-humans"]');
   return {
     beforeExists: !!before,
-    beforeLocked: before && before.classList.contains('locked'),
     afterExists: !!after,
-    afterLocked: after && after.classList.contains('locked'),
-    tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
-    name: after && after.querySelector('.sm-name').textContent,
+    humansCard: !!document.querySelector('.solo-mode[data-mode="humans"]'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 12 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && menu.tabs.includes('ПЕРЕГРУЖЕНІ РЕЖИМИ'), 'після 12 країн режим доступний', JSON.stringify(menu));
+check(!menu.beforeExists, 'до 12 країн тумблера 💀 немає', JSON.stringify(menu));
+check(menu.afterExists && menu.humansCard, 'після 12 країн картка humans має тумблер 💀 Складно', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: 45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот');
 await page.evaluate(() => window.__game.test.startOverloadedHumans());

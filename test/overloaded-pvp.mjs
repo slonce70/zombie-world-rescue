@@ -16,32 +16,28 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 await page.goto(`${BASE}/?test&fresh&seed=11`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Перегружене ПВП відкривається після 8 звільнених країн');
+console.log('▸ Тумблер 💀 Перегруженого ПВП зʼявляється після 8 звільнених країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
   const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
   const eight = { ...seven, TUR: true };
   g.save.liberated = seven;
   g.renderSoloMenu();
-  const before = document.querySelector('.solo-mode[data-mode="overloaded-pvp"]');
+  const before = document.querySelector('.sm-skull[data-hard="overloaded-pvp"]');
   g.save.liberated = eight;
   g.renderSoloMenu();
-  const after = document.querySelector('.solo-mode[data-mode="overloaded-pvp"]');
+  const after = document.querySelector('.sm-skull[data-hard="overloaded-pvp"]');
   const normal = document.querySelector('.solo-mode[data-mode="pvp"]');
   return {
     beforeExists: !!before,
-    beforeLocked: before && before.classList.contains('locked'),
     afterExists: !!after,
-    afterLocked: after && after.classList.contains('locked'),
-    afterName: after && after.querySelector('.sm-name').textContent,
     normalExists: !!normal,
     normalLockedAt8: normal && normal.classList.contains('locked'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 8 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && /Перегружене ПВП/.test(menu.afterName),
-  'після 8 країн є окрема картка Перегружене ПВП', JSON.stringify(menu));
-check(menu.normalExists && menu.normalLockedAt8, 'звичайне ПВП лишається окремим і відкривається пізніше', JSON.stringify(menu));
+check(!menu.beforeExists, 'до 8 країн тумблера 💀 немає', JSON.stringify(menu));
+check(menu.afterExists, 'після 8 країн картка ПВП має тумблер 💀 Складно', JSON.stringify(menu));
+check(menu.normalExists && !menu.normalLockedAt8, 'звичайне ПВП відкрите разом із тумблером (з 8 країн)', JSON.stringify(menu));
 
 console.log('▸ Старт Перегруженого ПВП: 35x35, 2500 HP, гармата+меч, зомбі 3000 HP');
 await page.evaluate(() => window.__game.test.startOverloadedPvp());

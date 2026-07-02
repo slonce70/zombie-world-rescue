@@ -136,18 +136,23 @@ function buildTips() {
   ];
 }
 
+// 6 вкладок замість 10: «перегружені» варіанти живуть тумблером 💀 на базовій картці
 const SOLO_MODE_GROUPS = [
   { id: 'campaign', title: () => t('КАМПАНІЯ'), ids: ['campaign', 'infected'] },
   { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss'] },
-  { id: 'overloaded', title: () => t('ПЕРЕГРУЖЕНІ РЕЖИМИ'), ids: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
   { id: 'duels', title: () => t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
   { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
-  { id: 'trials', title: () => t('ВИПРОБУВАННЯ'), ids: ['zone-defense'] },
+  { id: 'trials', title: () => t('ВИПРОБУВАННЯ'), ids: ['zone-defense', 'defense', 'bank', 'maze'] },
   { id: 'souls', title: () => t('ШЛЯХ ДУШ'), ids: ['soul-collector'] },
-  { id: 'maze', title: () => t('ЛАБІРИНТ'), ids: ['maze'] },
-  { id: 'bank', title: () => t('БАНК'), ids: ['bank'] },
-  { id: 'defense', title: () => t('ОБОРОНА'), ids: ['defense'] },
 ];
+
+// 💀 базовий режим → його «перегружений» варіант (кнопка на картці)
+const HARD_VARIANTS = {
+  knockout: 'overloaded-knockout',
+  defense: 'overloaded-defense',
+  pvp: 'overloaded-pvp',
+  humans: 'overloaded-humans',
+};
 
 const SOLO_MODES = [
   {
@@ -1065,12 +1070,22 @@ class Game {
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const daily = this.dailyChallengeId();
     const fmtBest = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+    // 💀 кнопка складного варіанта — коли і базовий, і перегружений розлочені
+    const hardBtn = (m) => {
+      const hardId = HARD_VARIANTS[m.id];
+      if (m.locked || !hardId) return '';
+      const hard = byId.get(hardId);
+      if (!hard || hard.locked) return '';
+      // span, НЕ button: вкладений button у button — невалідний HTML, браузер його «випльовує»
+      return `<span role="button" class="sm-skull" data-hard="${hardId}" title="${hard.desc}">💀 ${t('Складно')}</span>`;
+    };
     const modeHtml = (m) => `
       <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}${!m.locked && m.id === daily ? ' daily' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
         <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ` <span class="sm-daily">🎯 ${t('СЬОГОДНІ ×2')}</span>` : ''}</div>
         <div class="sm-desc">${m.desc}</div>
         ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}</div>
+        ${hardBtn(m)}
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
     root.innerHTML = `
@@ -1094,6 +1109,15 @@ class Game {
         root.querySelectorAll('.solo-mode').forEach((x) => x.classList.remove('sel'));
         cRoot.style.display = 'none';
         cRoot.innerHTML = '';
+      });
+    });
+    // 💀 складний варіант стартує одразу, не розгортаючи базову картку
+    root.querySelectorAll('.sm-skull').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.audio.click();
+        this._hideOverlay('overlay-solo');
+        this._startSoloMode(el.dataset.hard);
       });
     });
     root.querySelectorAll('.solo-mode').forEach((el) => {

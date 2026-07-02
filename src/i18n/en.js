@@ -1221,6 +1221,7 @@ export const EN = {
 "🎖️ НОВИЙ ТИТУЛ!": "🎖️ NEW TITLE!",
 "Дивись у Гардеробі 🎒": "Check the Wardrobe 🎒",
 "СЬОГОДНІ ×2": "TODAY ×2",
+"Складно": "Hard",
 "Рекорд: {t}": "Best: {t}",
 "Випробування дня": "Daily challenge",
 "{i} {m} — нагорода ×2 сьогодні!": "{i} {m} — ×2 reward today!",

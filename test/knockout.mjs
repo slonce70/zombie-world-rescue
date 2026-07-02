@@ -39,31 +39,28 @@ check(menuLock.beforeExists && menuLock.beforeLocked, 'до 20 рівня реж
 check(menuLock.afterExists && !menuLock.afterLocked && menuLock.passLevel >= 20,
   'на 20 рівні режим у меню доступний', JSON.stringify(menuLock));
 
-console.log('▸ Перегружений Нокаут відкривається після 8 звільнених країн');
+console.log('▸ Тумблер 💀 Перегруженого Нокауту зʼявляється після 8 звільнених країн');
 const overloadedMenu = await page.evaluate(() => {
   const g = window.__game;
   const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
   const eight = { ...seven, TUR: true };
   g.save.liberated = seven;
   g.renderSoloMenu();
-  const before = document.querySelector('.solo-mode[data-mode="overloaded-knockout"]');
+  const before = document.querySelector('.sm-skull[data-hard="overloaded-knockout"]');
   g.save.liberated = eight;
   g.renderSoloMenu();
-  const after = document.querySelector('.solo-mode[data-mode="overloaded-knockout"]');
+  const after = document.querySelector('.sm-skull[data-hard="overloaded-knockout"]');
   const normal = document.querySelector('.solo-mode[data-mode="knockout"]');
   return {
     beforeExists: !!before,
-    beforeLocked: before && before.classList.contains('locked'),
     afterExists: !!after,
-    afterLocked: after && after.classList.contains('locked'),
-    afterName: after && after.querySelector('.sm-name').textContent,
     normalExists: !!normal,
   };
 });
-check(overloadedMenu.beforeExists && overloadedMenu.beforeLocked,
-  'до 8 країн перегружений режим заблокований', JSON.stringify(overloadedMenu));
-check(overloadedMenu.afterExists && !overloadedMenu.afterLocked && /Перегружений нокаут/i.test(overloadedMenu.afterName) && overloadedMenu.normalExists,
-  'після 8 країн є окрема картка Перегружений нокаут', JSON.stringify(overloadedMenu));
+check(!overloadedMenu.beforeExists,
+  'до 8 країн тумблера 💀 немає', JSON.stringify(overloadedMenu));
+check(overloadedMenu.afterExists && overloadedMenu.normalExists,
+  'після 8 країн картка Нокауту має тумблер 💀 Складно', JSON.stringify(overloadedMenu));
 
 console.log('▸ Старт Нокауту: кімната, 10 зомбі, тільки пістолет');
 await page.evaluate(() => window.__game.test.startKnockout());

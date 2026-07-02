@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 
-export const PVP_UNLOCK_COUNTRIES = 10;
+export const PVP_UNLOCK_COUNTRIES = 8;
 export const OVERLOADED_PVP_UNLOCK_COUNTRIES = 8;
 export const PVP_ROOM_SIZE = 30;
 export const PVP_ZOMBIE_HP = 250;

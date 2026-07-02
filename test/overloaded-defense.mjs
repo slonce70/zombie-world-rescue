@@ -23,25 +23,21 @@ const menu = await page.evaluate(() => {
   const eight = { ...seven, TUR: true };
   g.save.liberated = seven;
   g.renderSoloMenu();
-  const before = document.querySelector('.solo-mode[data-mode="overloaded-defense"]');
+  const before = document.querySelector('.sm-skull[data-hard="overloaded-defense"]');
   g.save.liberated = eight;
   g.renderSoloMenu();
-  const after = document.querySelector('.solo-mode[data-mode="overloaded-defense"]');
+  const after = document.querySelector('.sm-skull[data-hard="overloaded-defense"]');
   const normal = document.querySelector('.solo-mode[data-mode="defense"]');
   return {
     beforeExists: !!before,
-    beforeLocked: before && before.classList.contains('locked'),
     afterExists: !!after,
-    afterLocked: after && after.classList.contains('locked'),
-    afterName: after && after.querySelector('.sm-name').textContent,
     normalExists: !!normal,
     normalLockedAt8: normal && normal.classList.contains('locked'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 8 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && /Перегружена оборона/.test(menu.afterName),
-  'після 8 країн є окрема картка Перегружена оборона', JSON.stringify(menu));
-check(menu.normalExists && !menu.normalLockedAt8, 'звичайна Оборона лишається окремою', JSON.stringify(menu));
+check(!menu.beforeExists, 'до 8 країн тумблера 💀 немає', JSON.stringify(menu));
+check(menu.afterExists, 'після 8 країн картка Оборони має тумблер 💀 Складно', JSON.stringify(menu));
+check(menu.normalExists && !menu.normalLockedAt8, 'звичайна Оборона відкрита разом із тумблером', JSON.stringify(menu));
 
 console.log('▸ Старт Перегруженої оборони: 500 HP вежі, 250 HP гравця, 3 хвилі');
 await page.evaluate(() => window.__game.test.startOverloadedDefense());
