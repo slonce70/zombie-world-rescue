@@ -4,7 +4,7 @@ import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
+const { base: BASE, close: closeServer } = await ensureWebServer({ port: 8761 });
 const RELAY_PORT = 8747;
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~4× повільніше, тож фіксовані очікування мають чекати пропорційно довше.

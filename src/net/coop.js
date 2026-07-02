@@ -352,7 +352,11 @@ export class CoopSession {
     for (let i = 0; i < 5; i++) {
       await new Promise((r) => setTimeout(r, 1200 + i * 800));
       try {
-        await this.transport.connect(this.room, { resume: this.myPid });
+        const expectedPid = this.myPid;
+        await this.transport.connect(this.room, { resume: expectedPid });
+        // грейс минув або relay не прийняв resumeKey → нам видали інший pid.
+        // Як і хост, fail-closed: інакше гість продовжить бій під чужою ідентичністю.
+        if (this.transport.you !== expectedPid) { this._roomOver('lost'); return; }
         this.transport.send(1, {
           t: 'hello', ...this.myInfo(),
           build: window.__APP_VERSION, proto: PROTO_VERSION, resume: 1,

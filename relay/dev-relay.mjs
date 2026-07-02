@@ -23,6 +23,10 @@ const league = new Map(); // `${cid}|${mode}|${country}` -> {nick, score, team, 
 const saves = new Map();     // cid -> {data, ts}
 const saveLinks = new Map(); // code -> cid (постійний код відновлення)
 const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789';
+const SAVE_PUT_COOLDOWN = parseInt(process.env.SAVE_PUT_COOLDOWN || '15000', 10);
+const SAVE_PUT_IP_MAX = parseInt(process.env.SAVE_PUT_IP_MAX || '30', 10);
+const saveLastPut = new Map(); // cid -> ts
+const savePutIp = new Map();   // ip -> {n,t0}
 
 // 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
 const LOBBY_TTL = 40_000;
@@ -136,6 +140,14 @@ function jsonRes(res, obj, status = 200) {
   res.end(JSON.stringify(obj));
 }
 
+function savePutAllowed(ip) {
+  const now = Date.now();
+  let r = savePutIp.get(ip);
+  if (!r || now - r.t0 > 60_000) { r = { n: 0, t0: now }; savePutIp.set(ip, r); }
+  if (savePutIp.size > 2000) savePutIp.clear();
+  return ++r.n <= SAVE_PUT_IP_MAX;
+}
+
 const httpServer = createServer((req, res) => {
   if (req.url && req.url.startsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -151,11 +163,18 @@ const httpServer = createServer((req, res) => {
   // 💾 хмарний сейв (як SaveVault у воркері)
   if (url.pathname === '/save/put' && req.method === 'POST') {
     readBody(req, (d) => {
+      const ip = req.socket.remoteAddress || 'x';
+      if (!savePutAllowed(ip)) return jsonRes(res, { error: 'rate' }, 429);
       const cid = String(d.cid || '').slice(0, 40);
       if (cid.length < 8 || typeof d.data !== 'string' || !d.data) return jsonRes(res, { error: 'bad' }, 400);
       try { JSON.parse(d.data); } catch (e) { return jsonRes(res, { error: 'bad' }, 400); }
-      saves.set(cid, { data: d.data, ts: Date.now() });
-      jsonRes(res, { ok: true, ts: Date.now() });
+      const now = Date.now();
+      const last = saveLastPut.get(cid) || 0;
+      if (now - last < SAVE_PUT_COOLDOWN) return jsonRes(res, { error: 'slow' }, 429);
+      saveLastPut.set(cid, now);
+      if (saveLastPut.size > 5000) saveLastPut.clear();
+      saves.set(cid, { data: d.data, ts: now });
+      jsonRes(res, { ok: true, ts: now });
     }, res);
     return;
   }

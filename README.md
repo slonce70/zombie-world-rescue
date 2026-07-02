@@ -317,6 +317,7 @@ npm run serve
 
 - Швидкі перевірки: `npm test`, `node test/version-sync.mjs`, `node test/runbuild.mjs`, `node test/draft.mjs`, `node test/draft-storm.mjs`
 - Релізний гейт: `npm run test:release`
+- Мінімальний кооп/reconnect subgate: `npm run test:coop-release`
 - Сценарні тести: `test/update2.mjs` (Польща), `test/update3.mjs` (щит/зброя/магазин), `test/update4.mjs` (XP/завдання/скіни/Шторм), `test/update5.mjs` (баланс/оптика/гаджети), `test/update6.mjs` (динамічні місії), `test/update8.mjs` (Туреччина/Єгипет), `test/update9.mjs` (турель/щит/Ліга/Арена), `test/campaign.mjs` (повна кампанія)
 - `test/e2e.mjs` — довгий legacy-сценарій України; зараз відомо падає на ремонті радіовежі, не використовуй як release-gate до ремонту.
 - Кооп-тести: `node test/coop.mjs` (кімната/лобі/синхронізація/кіл-кредити), `test/coop2.mjs` (місії/гранати/мегабокс/перемога/лобі-цикл), `test/coop3.mjs` (mid-join і реконект), `test/coop4.mjs` (підняття тіммейта і песик), `test/coop5.mjs` (кооп-Шторм), `test/coop6.mjs` (лобі-сервіс/публічні кімнати/батчинг), `test/update9.mjs` (турель/щит/Ліга/пасс-30/Арена), `test/cloudsave.mjs` (хмарний сейв/код відновлення/фільтр ніків/аварійний екран), `test/update11.mjs` (нові місії v16: ролли, activate/fetch-двигуни), `test/i18n.mjs` (локалізація uk/en/ru) — самі піднімають relay (із вбудованими dev-Лігою, dev-Лобі і dev-SaveVault)

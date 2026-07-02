@@ -108,11 +108,11 @@
 
     <div id="horde-counter">🧟 Орда: <span id="horde-value">0</span></div>
 
-    <div id="banner">
+    <div id="banner" role="status" aria-live="polite" aria-atomic="true">
       <div id="banner-title"></div>
       <div id="banner-sub"></div>
     </div>
-    <div id="toasts"></div>
+    <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
     <div id="team-panel"></div>
     <div id="kid-chip">🎯 Авто-приціл</div>
   </div>
@@ -167,9 +167,9 @@
     </div>
     <button id="tb-scope" class="tb" aria-label="Приціл">🔭</button>
     <!-- 🔫 Колесо зброї (довге утримання кнопки зміни зброї) -->
-    <div id="weapon-wheel" aria-hidden="true">
+    <div id="weapon-wheel" role="dialog" aria-modal="true" aria-labelledby="weapon-wheel-title" aria-hidden="true">
       <div id="weapon-wheel-title">🔫 Обери зброю</div>
-      <div id="weapon-wheel-grid"></div>
+      <div id="weapon-wheel-grid" role="list"></div>
     </div>
   </div>
 

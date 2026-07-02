@@ -89,7 +89,7 @@ check(shopBoxesEn.tabs.includes('Boxes') && shopBoxesEn.tabs.includes('Hyperchar
   'en: shop boxes translated', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
 check(!/Бокси|Гіперзаряди|Великий бокс|Скін-бокс|Мегабокс|кристалів|монет/.test(shopBoxesEn.text + shopBoxesEn.tabs.join(' ')),
   'en: shop boxes are not Ukrainian', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
-await page.goto(`${BASE}/?test&fresh&lang=en`);
+await page.goto(`${BASE}/?test&fresh&lang=en`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 30000 });
 await page.evaluate(() => {
   const g = window.__game;

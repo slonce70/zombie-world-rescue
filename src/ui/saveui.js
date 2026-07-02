@@ -88,6 +88,14 @@ export class SaveUI {
   _renderStatus() {
     const g = this.game;
     if (!g.cloud.enabled) { this._status(t('☁️ Хмара вимкнена (тестовий режим)')); return; }
+    if (g.cloud.lastFailTs && g.cloud.lastFailTs >= g.cloud.lastOkTs) {
+      if (g.cloud.lastFailStatus === 429) {
+        this._status(t('☁️ Хмара тимчасово зайнята — прогрес лишився на пристрої, спробуй ще раз трохи пізніше'));
+      } else {
+        this._status(t('😕 хмара недоступна'));
+      }
+      return;
+    }
     if (g.cloud.lastOkTs) {
       // не t: затінило б функцію перекладу нижче
       const d = new Date(g.cloud.lastOkTs);

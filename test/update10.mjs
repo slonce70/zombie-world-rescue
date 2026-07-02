@@ -34,7 +34,7 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('☰ меню: 9 другорядних кнопок у висувному меню', menu.side === 9, `${menu.side}`);
+  check('☰ меню: 10 другорядних кнопок у висувному меню', menu.side === 10, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');
@@ -75,26 +75,27 @@ try {
       })),
     };
   });
-  check('16 режимів; спецрежими замкнені, Кампанія відкрита',
-    fresh.modes === 16 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('18 режимів; спецрежими замкнені, Кампанія відкрита',
+    fresh.modes === 18 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.overloadedKnockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked && fresh.overloadedDefenseLocked
       && fresh.overloadedLocked && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.overloadedHumansLocked && fresh.pvpLocked && !fresh.campLocked,
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
     JSON.stringify(fresh.tabs) === JSON.stringify([
       'КАМПАНІЯ', 'БОСИ', 'ПЕРЕГРУЖЕНІ РЕЖИМИ', 'ДУЕЛІ', 'ВІЙНА',
-      'ВИПРОБУВАННЯ', 'ЛАБІРИНТ', 'БАНК', 'ОБОРОНА',
+      'ВИПРОБУВАННЯ', 'ШЛЯХ ДУШ', 'ЛАБІРИНТ', 'БАНК', 'ОБОРОНА',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
-      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign'])
-      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign'])
+      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected'])
+      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign', 'infected'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
-        { title: 'КАМПАНІЯ', modes: ['campaign'] },
+        { title: 'КАМПАНІЯ', modes: ['campaign', 'infected'] },
         { title: 'БОСИ', modes: ['arena', 'worldboss'] },
         { title: 'ПЕРЕГРУЖЕНІ РЕЖИМИ', modes: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
         { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
         { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
         { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense'] },
+        { title: 'ШЛЯХ ДУШ', modes: ['soul-collector'] },
         { title: 'ЛАБІРИНТ', modes: ['maze'] },
         { title: 'БАНК', modes: ['bank'] },
         { title: 'ОБОРОНА', modes: ['defense'] },
@@ -115,12 +116,13 @@ try {
   await page.click('.solo-tab:has-text("КАМПАНІЯ")');
   check('кожен pane-розділ містить свої режими',
     JSON.stringify(fresh.sections) === JSON.stringify([
-      { title: 'КАМПАНІЯ', modes: ['campaign'] },
+      { title: 'КАМПАНІЯ', modes: ['campaign', 'infected'] },
       { title: 'БОСИ', modes: ['arena', 'worldboss'] },
       { title: 'ПЕРЕГРУЖЕНІ РЕЖИМИ', modes: ['overloaded-knockout', 'overloaded-defense', 'overloaded-pvp', 'overloaded-humans'] },
       { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
       { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
       { title: 'ВИПРОБУВАННЯ', modes: ['zone-defense'] },
+      { title: 'ШЛЯХ ДУШ', modes: ['soul-collector'] },
       { title: 'ЛАБІРИНТ', modes: ['maze'] },
       { title: 'БАНК', modes: ['bank'] },
       { title: 'ОБОРОНА', modes: ['defense'] },
