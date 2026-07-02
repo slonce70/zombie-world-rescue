@@ -33,7 +33,7 @@ const meta = await page.evaluate(async () => {
   };
 });
 check(meta.meta && meta.meta.cd === 45 && meta.meta.icon === '☄️', 'мета гаджета: 45с cd, ☄️', JSON.stringify(meta.meta));
-check(meta.cap === 40, 'Зоряний шлях продовжено до 40', String(meta.cap));
+check(meta.cap === 65, 'Зоряний шлях продовжено до 65 (v236)', String(meta.cap));
 check(!meta.inShop, 'метеорит НЕ продається в магазині (лише нагорода шляху)');
 check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'meteor' && meta.hyper.needsGadget === 'meteor',
   'гіперзаряд метеорита коштує 5000 і потребує базовий метеорит', JSON.stringify(meta.hyper));

@@ -25,6 +25,7 @@ import {
   OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES,
 } from './knockout.js';
 import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
+import { TurretWarMode, TURRETWAR_UNLOCK_COUNTRIES } from './turretwar.js';
 import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
 import { BankMode, BANK_UNLOCK_COUNTRIES } from './bank.js';
 import { PortalMode, PORTAL_UNLOCK_COUNTRIES } from './portal.js';
@@ -44,7 +45,7 @@ import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
 import { LivingHQ } from './hqbase.js';
-import { Chapter, CHAPTER2, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
+import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
@@ -76,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 235;
+const APP_VERSION = 236;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -138,12 +139,12 @@ function buildTips() {
 
 // 6 вкладок замість 10: «перегружені» варіанти живуть тумблером 💀 на базовій картці
 const SOLO_MODE_GROUPS = [
-  { id: 'campaign', title: () => t('КАМПАНІЯ'), ids: ['campaign', 'infected'] },
+  { id: 'campaign', title: () => t('КАМПАНІЯ'), ids: ['campaign', 'infected', 'chapter3'] },
   { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss'] },
   { id: 'duels', title: () => t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
   { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
   // «ВИКЛИКИ», не «ВИПРОБУВАННЯ»: довше слово не влазить у 2 ряди табів на 375px
-  { id: 'trials', title: () => t('ВИКЛИКИ'), ids: ['zone-defense', 'defense', 'bank', 'maze'] },
+  { id: 'trials', title: () => t('ВИКЛИКИ'), ids: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
   { id: 'souls', title: () => t('ДУШІ'), ids: ['soul-collector'] },
 ];
 
@@ -165,8 +166,11 @@ export const MODE_RULES = {
   'friendly-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
   'overloaded-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
   defense: { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
+  'friendly-defense': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
   'overloaded-defense': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'zone-defense': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  'friendly-zone-defense': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  turretwar: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   pvp: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'overloaded-pvp': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   bank: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
@@ -177,18 +181,37 @@ export const MODE_RULES = {
   'soul-collector': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
 };
 
+// 🎲 подієвий мутатор тижня — діє в соло-реплеях кампанії (звільнені країни):
+// там живуть день/ніч, магазин і орди, тож кожен мутатор реально відчувається.
+// rules — спред у modeRules; night/horde — точкові хуки (_updateDayNight / _updateHordeWaves).
+// «бос-сюрприз» свідомо ВИКИНУТО: смерть будь-якого 'boss' у кампанії тригерить
+// перемогу країни (_onBossDied → _showVictory) — потрібна окрема механіка міні-боса.
+export const MODIFIERS = {
+  night: { icon: '🌙', name: () => t('Нічний рейд'), night: true },
+  noshop: { icon: '🚫', name: () => t('Без магазину'), rules: { noShop: true } },
+  horde: { icon: '🧟', name: () => t('Навала'), horde: true },
+};
+const WEEKLY_MODIFIER_POOL = ['night', 'noshop', 'horde'];
+
 function modeIdFromOpts(opts, worldBossId) {
   if (worldBossId) return 'worldboss';
   if (opts.storm) return 'storm';
   if (opts.arena) return 'arena';
   if (opts.knockout) return opts.knockout === 'overloaded' ? 'overloaded-knockout' : opts.knockout === 'friendly' ? 'friendly-knockout' : 'knockout';
-  if (opts.defense) return opts.defense === 'overloaded' ? 'overloaded-defense' : opts.defense === 'zone' ? 'zone-defense' : 'defense';
+  if (opts.defense) {
+    if (opts.defense === 'overloaded') return 'overloaded-defense';
+    if (opts.defense === 'zone') return 'zone-defense';
+    if (opts.defense === 'friendly') return 'friendly-defense';
+    if (opts.defense === 'zone-friendly') return 'friendly-zone-defense';
+    return 'defense';
+  }
   if (opts.pvp) return opts.pvp === 'overloaded' ? 'overloaded-pvp' : 'pvp';
   if (opts.bank) return 'bank';
   if (opts.portal) return 'portal';
   if (opts.maze) return 'maze';
   if (opts.humans) return opts.humans === 'overloaded' ? 'overloaded-humans' : 'humans';
   if (opts.soulCollector) return 'soul-collector';
+  if (opts.turretwar) return 'turretwar';
   return opts.infected ? 'infected' : 'campaign';
 }
 
@@ -202,8 +225,10 @@ const MODE_START_OPTS = {
   'friendly-knockout': () => ({ knockout: 'friendly' }),
   'overloaded-knockout': () => ({ knockout: 'overloaded' }),
   defense: () => ({ defense: true }),
+  'friendly-defense': () => ({ defense: 'friendly' }),
   'overloaded-defense': () => ({ defense: 'overloaded' }),
   'zone-defense': () => ({ defense: 'zone' }),
+  'friendly-zone-defense': () => ({ defense: 'zone-friendly' }),
   pvp: () => ({ pvp: true }),
   'overloaded-pvp': () => ({ pvp: 'overloaded' }),
   bank: () => ({ bank: true }),
@@ -212,6 +237,7 @@ const MODE_START_OPTS = {
   humans: () => ({ humans: true }),
   'overloaded-humans': () => ({ humans: 'overloaded' }),
   'soul-collector': () => ({ soulCollector: true }),
+  turretwar: () => ({ turretwar: true }),
 };
 
 const SOLO_MODES = [
@@ -228,6 +254,16 @@ const SOLO_MODES = [
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: CHAPTER2_UNLOCK_COUNTRIES, c: libN })
       : t('Заражені країни: темніше, складніше, нагорода за очищення.'),
     start: (game, countryId) => game.startInfected(countryId),
+  },
+  {
+    id: 'chapter3', icon: '🧪', name: () => t('ГЛАВА 3'),
+    locked: ({ game }) => !(game.save.infected && game.save.infected.done && hasLiberated(game.save.liberated, 'LOST')),
+    desc: ({ game }) => (game.save.infected && game.save.infected.done && hasLiberated(game.save.liberated, 'LOST'))
+      ? (hasLiberated(game.save.liberated, 'LAB')
+        ? t('Лігво Вірусу зачинено! Можна перепройти — Слизняк скучив 🟢')
+        : t('Знайди Лігво Вірусу: неонова лабораторія і МЕГА-СЛИЗНЯК!'))
+      : t('Відкриється після Глави 2 і Острова Динозаврів'),
+    start: (game) => game.startChapter3(),
   },
   {
     id: 'storm', icon: '⛈️', name: () => t('ШТОРМ'), picker: 'storm',
@@ -288,6 +324,14 @@ const SOLO_MODES = [
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: DEFENSE_UNLOCK_COUNTRIES, c: libN })
       : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
     start: (game) => game.startDefense(),
+  },
+  {
+    id: 'turretwar', icon: '🗼', name: () => t('ОБОРОНА ТУРЕЛІ'),
+    locked: ({ libN }) => libN < TURRETWAR_UNLOCK_COUNTRIES,
+    desc: ({ libN }) => libN < TURRETWAR_UNLOCK_COUNTRIES
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: TURRETWAR_UNLOCK_COUNTRIES, c: libN })
+      : t('Твоя турель проти зомбі-турелі: роботи 1000 HP, хвилі зомбі, тільки 🔨 молот!'),
+    start: (game) => game.startTurretWar(),
   },
   {
     id: 'overloaded-defense', icon: '🏰', name: () => t('Перегружена оборона'),
@@ -647,13 +691,13 @@ class Game {
     return {
       coins: NEW_SAVE_COINS, crystals: 0, upgrades: {}, liberated: {}, weapons: [], records: {},
       weaponLoadout: ['pistol'],
-      xp: 0, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
+      xp: 0, passLvl: 1, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
       souls: 0, soulLevel: 1,
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
       titles: [], activeTitle: null,
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {}, worldBosses: {},
-      modeBest: {}, modeWins: {}, modeRewards: {},
+      modeBest: {}, modeWins: {}, modeRewards: {}, weekly: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
@@ -728,7 +772,7 @@ class Game {
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
-        for (const k of ['modeBest', 'modeWins', 'modeRewards']) {
+        for (const k of ['modeBest', 'modeWins', 'modeRewards', 'weekly']) {
           if (!out[k] || typeof out[k] !== 'object') out[k] = {};
         }
         if (!out.stats || typeof out.stats !== 'object') out.stats = {};
@@ -763,6 +807,9 @@ class Game {
         if (typeof out.crystals !== 'number' || !isFinite(out.crystals)) out.crystals = 0;
         if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
+        // легасі-сейв БЕЗ passLvl (Object.assign підставив дефолт 1 — НЕ вір йому:
+        // видача 2..40 повторилась би) → null: grantBacklog ініціалізує «до 40 видано»
+        if (!('passLvl' in s) || typeof out.passLvl !== 'number' || !isFinite(out.passLvl)) out.passLvl = null;
       }
     } catch (e) { /* зіпсований сейв — почнемо заново */ }
     // міграція: зброя за вже звільнені країни (старі сейви без weapons).
@@ -962,6 +1009,8 @@ class Game {
     this.state = 'globe';
     // 🎖️ catch-up: гравці, які ВЖЕ на зірковому рівні ≥25/≥28, одразу отримують вогнемет/лазер
     this.progress._checkWeaponUnlocks();
+    // 🎁 catch-up продовженого Зоряного шляху (40→65): пропущені по XP рівні видаються разом
+    this.progress.grantBacklog();
     this._showGlobeUI(true);
     this._initVersionCheck();
     this.cloud.bootSync(); // тихо: пуш прогресу або підхоплення хмарного сейва
@@ -1056,7 +1105,19 @@ class Game {
     if (!lib.LOST) {
       return { icon: '🦖', title: t('Далі'), text: t('Острів Динозаврів чекає фінальний бій') };
     }
-    // 🎯 світ врятовано → щодня кличемо у «випробування дня» з подвійною нагородою
+    if (!lib.LAB) {
+      return { icon: '🧪', title: t('Далі'), text: t('Глава 3: знайди Лігво Вірусу') };
+    }
+    // 🗓️ світ врятовано → спершу кличемо у «випробування тижня», поки недільну нагороду не взято
+    const wkMode = SOLO_MODES.find((m) => m.id === this.weeklyChallengeId());
+    if (wkMode && !this.save.weekly['W' + this._weekIndex() + ':mode']) {
+      return {
+        icon: '🗓️',
+        title: t('Випробування тижня'),
+        text: t('{i} {m} — нагорода ×3 цього тижня!', { i: wkMode.icon, m: wkMode.name() }),
+      };
+    }
+    // 🎯 …далі щодня кличемо у «випробування дня» з подвійною нагородою
     const dailyMode = SOLO_MODES.find((m) => m.id === this.dailyChallengeId());
     if (dailyMode) {
       return { icon: '🎯', title: t('Випробування дня'), text: t('{i} {m} — нагорода ×2 сьогодні!', { i: dailyMode.icon, m: dailyMode.name() }) };
@@ -1139,6 +1200,8 @@ class Game {
     const groups = SOLO_MODE_GROUPS.map((g) => ({ ...g, title: g.title() }));
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const daily = this.dailyChallengeId();
+    const weekly = this.weeklyChallengeId();
+    const wkMod = MODIFIERS[this.weeklyModifierId()];
     const fmtBest = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     // 💀 кнопка складного варіанта — коли і базовий, і перегружений розлочені
     const hardBtn = (m) => {
@@ -1150,9 +1213,9 @@ class Game {
       return `<span role="button" class="sm-skull" data-hard="${hardId}" title="${hard.desc}">💀 ${t('Складно')}</span>`;
     };
     const modeHtml = (m) => `
-      <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}${!m.locked && m.id === daily ? ' daily' : ''}" data-mode="${m.id}">
+      <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}${!m.locked && m.id === daily ? ' daily' : ''}${!m.locked && m.id === weekly ? ' weekly' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
-        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ' <span class="sm-daily">🎯 ×2</span>' : ''}</div>
+        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ' <span class="sm-daily">🎯 ×2</span>' : ''}${!m.locked && m.id === weekly ? ' <span class="sm-daily sm-weekly">🗓️ ×3</span>' : ''}${!m.locked && m.id === 'campaign' && wkMod ? ` <span class="sm-daily sm-weekly">${wkMod.icon} ${wkMod.name()}</span>` : ''}</div>
         <div class="sm-desc">${m.desc}</div>
         ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}
         ${hardBtn(m)}</div>
@@ -1239,8 +1302,9 @@ class Game {
             + WORLD_BOSSES.map((b) => {
               const ok = worldBossUnlocked(b.id, libN);
               const done = !!(this.save.worldBosses && this.save.worldBosses[b.id]);
+              const isWk = this.weeklyBossId() === b.id;
               const label = ok
-                ? `${b.icon} ${b.shortName()}${done ? ' ✅' : ''}`
+                ? `${b.icon} ${b.shortName()}${done ? ' ✅' : ''}${isWk ? ' 🗓️' : ''}`
                 : `${b.icon} ${b.shortName()} 🔒 ${b.unlockCountries}`;
               return `<button class="btn solo-cty ${ok ? '' : 'locked'}" data-id="${b.id}">${label}</button>`;
             }).join('');
@@ -1762,6 +1826,16 @@ class Game {
     return this.startLevel(countryId, { infected: true });
   }
 
+  // ---------- 🧪 Глава 3: Лігво Вірусу ----------
+  startChapter3() {
+    if (!(this.save.infected && this.save.infected.done && hasLiberated(this.save.liberated, 'LOST'))) {
+      this.audio.denied();
+      this.hud.toast(t('🧪 Глава 3 відкриється після Глави 2 і Острова Динозаврів!'));
+      return false;
+    }
+    return this.startLevel('LAB');
+  }
+
   // ---------- 👑 Арена босів ----------
   startArena() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -1849,6 +1923,23 @@ class Game {
     }
     this.audio.click();
     return this.startMode('defense');
+  }
+
+  // ---------- 🗼 Оборона турелі (дизайн Влада, v236) ----------
+  startTurretWar() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('🗼🤝 Оборона турелі поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < TURRETWAR_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('🗼 Оборона турелі відкриється після {n} звільнених країн!', { n: TURRETWAR_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startMode('turretwar');
   }
 
   startOverloadedDefense() {
@@ -2094,7 +2185,10 @@ class Game {
     const isOverloadedKnockout = isKnockout && knockoutVariant === 'overloaded';
     const isFriendlyKnockout = isKnockout && knockoutVariant === 'friendly';
     const isDefense = !!opts.defense;
-    const defenseVariant = opts.defense === 'overloaded' ? 'overloaded' : opts.defense === 'zone' ? 'zone' : 'normal';
+    // friendly-варіанти (кооп) грають на конфігах normal/zone — «дружність» лише у
+    // доступності з кооп-лобі; соло-рекорди в коопі й так не пишуться (_soloModeFinish)
+    const defenseVariant = opts.defense === 'overloaded' ? 'overloaded'
+      : (opts.defense === 'zone' || opts.defense === 'zone-friendly') ? 'zone' : 'normal';
     const isOverloadedDefense = isDefense && defenseVariant === 'overloaded';
     const isZoneDefense = isDefense && defenseVariant === 'zone';
     const isPvp = !!opts.pvp;
@@ -2104,13 +2198,22 @@ class Game {
     const isMaze = !!opts.maze;
     const isHumans = !!opts.humans;
     const isSoulCollector = !!opts.soulCollector;
+    const isTurretWar = !!opts.turretwar;
     const isInfected = !!opts.infected;
     const humansVariant = opts.humans === 'overloaded' ? 'overloaded' : 'normal';
     const isOverloadedHumans = isHumans && humansVariant === 'overloaded';
     const worldBossId = opts.worldBoss || null;
     const isWorldBoss = !!worldBossId;
     const modeId = modeIdFromOpts(opts, worldBossId);
-    const modeRules = MODE_RULES[modeId] || MODE_RULES.campaign;
+    const baseRules = MODE_RULES[modeId] || MODE_RULES.campaign;
+    // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
+    // без сюрпризів); у коопі — лише явно зі spec (хост = джерело істини)
+    const wkModId = opts.coop
+      ? (opts.weeklyMod || null)
+      : (modeId === 'campaign' && !opts.playground && hasLiberated(this.save.liberated, countryId)
+        ? this.weeklyModifierId() : null);
+    const wkMod = (wkModId && MODIFIERS[wkModId]) || null;
+    const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
     document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
@@ -2131,6 +2234,8 @@ class Game {
       ? (isOverloadedHumans ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ'))
       : isSoulCollector
       ? t('👻 ЗБИРАЧ ДУШ')
+      : isTurretWar
+      ? t('🗼 ОБОРОНА ТУРЕЛІ')
       : isDefense
       ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
@@ -2143,7 +2248,9 @@ class Game {
           ? t('🧪 ПОЛІГОН ГАДЖЕТІВ')
           : `${country.flag} ${country.name.toUpperCase()}`;
     const tips = buildTips();
-    document.getElementById('ll-tip').textContent = '💡 ' + tips[Math.floor(Math.random() * tips.length)];
+    // у noShop-режимах не радимо магазин, якого нема
+    const tipPool = modeRules.noShop ? tips.filter((s) => !/🛒|магазин|shop/i.test(s)) : tips;
+    document.getElementById('ll-tip').textContent = '💡 ' + tipPool[Math.floor(Math.random() * tipPool.length)];
     this._showOverlay('overlay-level-loading');
     this._showGlobeUI(false);
     // даємо браузеру намалювати екран завантаження
@@ -2192,6 +2299,9 @@ class Game {
       playground: isPlayground,
       infected: isInfected,
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
+      weeklyMod: wkMod,
+      weeklyModId: wkModId,
+      weekly: opts.weekly || null,
       noGadgets: !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: !!modeRules.noShop,
@@ -2204,7 +2314,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -2228,9 +2338,9 @@ class Game {
     level.player.applyGear(u);
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector) {
-      level.player.weapons = isSoulCollector ? ['staff', 'sword'] : isHumans ? ['pistol', 'staff', 'sword'] : isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
-      level.player.cur = isSoulCollector ? 'staff' : isHumans ? 'pistol' : isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
+    if (isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar) {
+      level.player.weapons = isTurretWar ? ['hammer'] : isSoulCollector ? ['staff', 'sword'] : isHumans ? ['pistol', 'staff', 'sword'] : isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isTurretWar ? 'hammer' : isSoulCollector ? 'staff' : isHumans ? 'pistol' : isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       if (isPortal) level.player.addRockets(WEAPONS.bazooka.cap);
       if (isPvp) {
@@ -2294,6 +2404,9 @@ class Game {
     } else if (isSoulCollector) {
       level.soulCollector = new SoulCollectorMode(level);
       level.missions = level.soulCollector;
+    } else if (isTurretWar) {
+      level.turretwar = new TurretWarMode(level);
+      level.missions = level.turretwar;
     } else if (isWorldBoss) {
       level.worldBoss = new WorldBossMode(level, worldBossId);
       level.missions = level.worldBoss;
@@ -2305,8 +2418,9 @@ class Game {
       // ⛈️ шторм: без місій, тільки хвилі і коло
       level.storm = new StormMode(level);
       level.missions = level.storm;
-      // 🎲 «Прокачка» — внутрі-забігова прокачка лише в СОЛО-Штормі (кооп — окремий beat)
-      if (!level.net) level.runBuild = new RunBuild();
+      // 🎲 «Прокачка» у Штормі: соло І кооп (v236) — у коопі хост роздає набори подією
+      // dro, а apply() кожен робить локально в себе (стати гостя не авторитарні)
+      level.runBuild = new RunBuild();
     } else {
       if (!isGuest) level.zombies.populate();
       level.missions = new DynamicMissions(level);
@@ -2315,15 +2429,15 @@ class Game {
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
-    level.pet = (isPvp || isBank || isHumans || isSoulCollector) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
+    level.pet = (isPvp || isBank || isHumans || isSoulCollector || isTurretWar) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isGuest && !isPlayground) {
+    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isGuest && !isPlayground) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -2335,7 +2449,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isPlayground) ? [] : level.world.lootSpots)) {
+    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isPlayground) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -2344,7 +2458,7 @@ class Game {
         level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
       }
     }
-    if (!isGuest && !isKnockout && !isDefense && !isPvp && !isPortal && !isMaze && !isHumans && !isSoulCollector) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+    if (!isGuest && !isKnockout && !isDefense && !isPvp && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
 
     // приколи карти: бочки, м'яч, тварини, аеродроп
     const fun = country.map.fun || {};
@@ -2367,7 +2481,7 @@ class Game {
       if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
       return 'grenade';
     };
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector) level.effects.airdropT = Infinity;
+    if (isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar) level.effects.airdropT = Infinity;
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
@@ -2630,11 +2744,12 @@ class Game {
     }
 
     this.level = level;
-    if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;
+    if (level.weeklyMod) this.hud.toast(t('🗓️ Подія тижня: {i} {n}!', { i: level.weeklyMod.icon, n: level.weeklyMod.name() }));
     this.paused = false;
     this.deathT = -1;
     this._hitstopT = 0;
@@ -2651,8 +2766,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -2780,6 +2895,7 @@ class Game {
   }
 
   endLevel() {
+    if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
     if (this.level && this.level.net && this.coop) {
       const sess = this.coop.session;
@@ -2873,6 +2989,10 @@ class Game {
     }
     if (this.level.defense) {
       this._endDefenseRun(false);
+      return;
+    }
+    if (this.level.turretwar) {
+      this._endTurretWarRun(false);
       return;
     }
     if (this.level.pvp) {
@@ -2976,6 +3096,44 @@ class Game {
     return DAILY_CHALLENGE_POOL[key % DAILY_CHALLENGE_POOL.length];
   }
 
+  // 🗓️ номер тижня від тієї ж лінійної дати, що й daily
+  _weekIndex() {
+    const d = new Date();
+    return Math.floor((d.getFullYear() * 372 + d.getMonth() * 31 + (d.getDate() - 1)) / 7);
+  }
+
+  weeklyChallengeId() {
+    return DAILY_CHALLENGE_POOL[this._weekIndex() % DAILY_CHALLENGE_POOL.length];
+  }
+
+  weeklyModifierId() {
+    return WEEKLY_MODIFIER_POOL[this._weekIndex() % WEEKLY_MODIFIER_POOL.length];
+  }
+
+  weeklyBossId() {
+    return WORLD_BOSSES[this._weekIndex() % WORLD_BOSSES.length].id;
+  }
+
+  // 🗓️🤝 командне випробування тижня — свій пул з КООП-здатних режимів
+  // (недільний соло-режим може бути solo-only, як-от bank/maze)
+  weeklyCoopModeId() {
+    const pool = ['storm', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense'];
+    return pool[this._weekIndex() % pool.length];
+  }
+
+  // одноразова недільна нагорода за командну перемогу; кожен клієнт нараховує
+  // собі ЛОКАЛЬНО (патерн нагород кооп-Шторму), ключ тижня w — зі spec хоста
+  _grantWeeklyCoop(level, won) {
+    if (!won || !level || !level.weekly || level.weekly.w == null) return;
+    const wk = 'W' + level.weekly.w + ':coop';
+    if (this.save.weekly[wk]) return;
+    this.save.weekly[wk] = true;
+    this.save.crystals = (this.save.crystals || 0) + 25;
+    this.hud.banner(t('🗓️ КОМАНДНЕ ВИПРОБУВАННЯ ТИЖНЯ!'), t('💎 +25 — раз на тиждень'), 4.5);
+    this.audio.levelUp();
+    this.saveGame();
+  }
+
   // 🏁 спільний фінал кімнатних режимів: перемоги, віхи, рекорд часу, множник дня.
   // Викликати ДО нарахування нагород; mult множить монети/XP режиму.
   // Кооп-варіанти (friendly-нокаут) рекорди/віхи не чіпають — це соло-прогрес.
@@ -2983,8 +3141,20 @@ class Game {
     const out = { mult: 1, recBadge: '', bestRow: '' };
     if (this.level && this.level.net) return out;
     const daily = this.dailyChallengeId() === modeId;
+    const weekly = this.weeklyChallengeId() === modeId;
     if (won) {
-      if (daily) {
+      if (weekly) {
+        out.mult = 3;
+        const wk = 'W' + this._weekIndex() + ':mode';
+        if (!this.save.weekly[wk]) {
+          this.save.weekly[wk] = true;
+          this.save.crystals = (this.save.crystals || 0) + 25;
+          this.hud.banner(t('🗓️ ВИПРОБУВАННЯ ТИЖНЯ!'), t('Нагорода ×3 · 💎 +25 — раз на тиждень'), 4.5);
+          this.audio.levelUp();
+        } else {
+          this.hud.banner(t('🗓️ ВИПРОБУВАННЯ ТИЖНЯ!'), t('Нагороду потроєно ×3'), 4);
+        }
+      } else if (daily) {
         out.mult = 2;
         this.hud.banner(t('🎯 ВИПРОБУВАННЯ ДНЯ!'), t('Нагороду подвоєно ×2'), 4);
       }
@@ -3037,6 +3207,8 @@ class Game {
     const isRecord = !prev || res.wave > prev.wave || (res.wave === prev.wave && res.time > prev.time);
     if (isRecord) this.save.stormBest[level.countryId] = { wave: res.wave, time: res.time };
     this.progress.addXp(20 + res.wave * 5);
+    // 🗓️🤝 шторм нескінченний — «перемога» командного тижня = дожити до 5-ї хвилі
+    this._grantWeeklyCoop(level, res.wave >= 5);
     // ⛈️ нагороди за досягнуті хвилі (раз назавжди)
     this.save.stormRewards = this.save.stormRewards || {};
     const STORM_MILESTONES = [
@@ -3144,6 +3316,7 @@ class Game {
     level.knockout.completed = !!won;
     const res = level.knockout.results();
     level.knockout.over = true;
+    this._grantWeeklyCoop(level, !!won);
     level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
@@ -3200,6 +3373,9 @@ class Game {
   _endDefenseRun(won = true) {
     const level = this.level;
     if (!level || !level.defense || level.defense.over) return;
+    // 🌐 кооп: фінал вирішує хост і сповіщає гостей (дзеркало stormend)
+    if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
+    this._grantWeeklyCoop(level, !!won);
     level.defense.completed = !!won;
     const res = level.defense.results();
     level.defense.over = true;
@@ -3238,6 +3414,45 @@ class Game {
       : `
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('HP вежі')}</span><span class="stat-val">${res.towerHp} / ${level.defense.towerMaxHp}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}`;
+    this._showOverlay('overlay-arena-end');
+  }
+
+  _endTurretWarRun(won = true) {
+    const level = this.level;
+    if (!level || !level.turretwar || level.turretwar.over) return;
+    level.turretwar.completed = !!won;
+    const res = level.turretwar.results();
+    level.turretwar.over = true;
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('🗼 Ще раз!');
+    }
+    const fin = this._soloModeFinish('turretwar', !!won, res.timeMs);
+    if (won) {
+      this.progress.addXp(100 * fin.mult);
+      level.addCoins(150 * fin.mult);
+      this.saveGame();
+    }
+    this._lastEndMode = 'turretwar';
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🗼 ЗОМБІ-ТУРЕЛЬ ЗНЕСЕНО!') : t('💀 ТВОЮ ТУРЕЛЬ ЗРУЙНОВАНО');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('Твоя турель')}</span><span class="stat-val">${res.playerHp} / 500</span></div>
+      <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">${t('Зомбі-турель')}</span><span class="stat-val">${res.enemyHp} / 500</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${fin.bestRow}`;
     this._showOverlay('overlay-arena-end');
@@ -3523,6 +3738,7 @@ class Game {
 
     let rewardTitle = t('Нагороду вже отримано');
     const firstClear = won && !(this.save.worldBosses && this.save.worldBosses[mode.id]);
+    const wkBossKey = 'W' + this._weekIndex() + ':boss';
     if (firstClear) {
       this.save.worldBosses = this.save.worldBosses || {};
       this.save.worldBosses[mode.id] = true;
@@ -3530,6 +3746,18 @@ class Game {
       this.save.crystals = (this.save.crystals || 0) + mode.cfg.reward.crystals;
       this.progress.addXp(mode.cfg.reward.xp);
       rewardTitle = t('🪙 +{c} · 💎 +{k} · ⭐ +{x} XP', {
+        c: mode.cfg.reward.coins,
+        k: mode.cfg.reward.crystals,
+        x: mode.cfg.reward.xp,
+      });
+      this.saveGame();
+    } else if (won && this.weeklyBossId() === mode.id && !this.save.weekly[wkBossKey]) {
+      // 🗓️ бос тижня: повторна нагорода — раз на тиждень
+      this.save.weekly[wkBossKey] = true;
+      this.save.coins += mode.cfg.reward.coins;
+      this.save.crystals = (this.save.crystals || 0) + mode.cfg.reward.crystals;
+      this.progress.addXp(mode.cfg.reward.xp);
+      rewardTitle = t('🗓️ Бос тижня: 🪙 +{c} · 💎 +{k} · ⭐ +{x} XP', {
         c: mode.cfg.reward.coins,
         k: mode.cfg.reward.crystals,
         x: mode.cfg.reward.xp,
@@ -3624,6 +3852,14 @@ class Game {
       // 🇪🇸/🇮🇹 більше не дають зброю — натомість монети (вогнемет/лазер тепер за зірковий рівень)
       this.save.coins += country.coinReward;
       this.hud.toast(t('🏆 {n} звільнено! +{c} монет 💰', { n: country.name, c: country.coinReward }));
+    }
+    // 🧪 Глава 3: перша перемога в Лігві Вірусу — медаль, пет і кристали
+    if (country.id === 'LAB' && !wasLiberated) {
+      if (!Array.isArray(this.save.medals)) this.save.medals = [];
+      if (!this.save.medals.includes(CHAPTER3.id)) this.save.medals.push(CHAPTER3.id);
+      if (!this.save.pets.includes('slimepet')) this.save.pets.push('slimepet');
+      this.save.crystals = (this.save.crystals || 0) + 25;
+      this.hud.banner(t('🎖️ ГЛАВУ 3 ПРОЙДЕНО!'), t('{m} · 💎 +25 · Доктор Слизняк тепер твій пет! 🐾', { m: CHAPTER3.medalName }), 5);
     }
     // наступне проходження цієї країни отримає НОВИЙ набір місій
     this.save.missionRuns[country.id] = (this.save.missionRuns[country.id] || 0) + 1;
@@ -3861,6 +4097,7 @@ class Game {
     else if (ct < 215) k = 1 - (ct - 195) / 20;
     k = k * k * (3 - 2 * k); // плавні переходи
     if (level.infected) k = Math.max(k, 0.45);
+    if (level.weeklyMod && level.weeklyMod.night) k = Math.max(k, 0.75);
     level.nightK = k;
     level.world.setNight(k);
     level.player.setLamp(k);

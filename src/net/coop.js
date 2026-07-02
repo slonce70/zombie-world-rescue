@@ -169,15 +169,22 @@ export class CoopSession {
     const game = this.game;
     const countryId = this.countryId;
     const runIndex = (game.save.missionRuns && game.save.missionRuns[countryId]) || 0;
-    const storm = this.mode === 'storm';
-    const arena = this.mode === 'arena';
-    const knockout = this.mode === 'friendly-knockout' ? 'friendly' : null;
-    const realCountry = (arena || knockout) ? 'UKR' : countryId;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout };
+    // 🗓️ weekly-кооп: реальний режим тижня обирає ХОСТ і кладе ключ тижня у spec —
+    // гість нічого не рахує сам (границя тижня опівночі не розсинхронить команду)
+    let mode = this.mode;
+    const weekly = mode === 'weekly-coop' ? { w: game._weekIndex() } : null;
+    if (weekly) mode = game.weeklyCoopModeId();
+    const storm = mode === 'storm';
+    const arena = mode === 'arena';
+    const knockout = mode === 'friendly-knockout' ? 'friendly' : null;
+    const defense = mode === 'friendly-defense' ? 'friendly'
+      : mode === 'friendly-zone-defense' ? 'zone-friendly' : null;
+    const realCountry = (arena || knockout || defense) ? 'UKR' : countryId;
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, weekly };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, weekly });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -233,7 +240,7 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, weekly: d.weekly || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {

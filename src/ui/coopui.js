@@ -9,9 +9,13 @@ import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
 import { liberatedCount, hasLiberated } from '../net/cloudsave.js';
 import { FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES } from '../knockout.js';
+import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defense.js';
 
 const PUBLIC_KEY = 'zr-public';
-const MODE_ICON = { campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝' };
+const MODE_ICON = {
+  campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝',
+  'friendly-defense': '🛡️', 'friendly-zone-defense': '⭕', 'weekly-coop': '🗓️',
+};
 
 export class CoopUI {
   constructor(game) {
@@ -493,16 +497,24 @@ export class CoopUI {
     const anyLib = liberatedCount(save.liberated) > 0;
     let mh = '';
     const libCount = liberatedCount(save.liberated);
+    // 🗓️ командне випробування тижня: реальний режим цього тижня — у назві рядка
+    const wkCoopMode = this.game.weeklyCoopModeId ? this.game.weeklyCoopModeId() : null;
     for (const [mid, label] of [
       ['campaign', t('🎯 Кампанія')],
       ['storm', t('⛈️ Шторм')],
       ['friendly-knockout', t('🤝 Дружній нокаут')],
+      ['friendly-defense', t('🛡️ Дружня оборона')],
+      ['friendly-zone-defense', t('⭕ Дружня оборона в зоні')],
       ['arena', t('👑 Арена')],
+      ['weekly-coop', t('🗓️ Командний тиждень: {i} 💎', { i: MODE_ICON[wkCoopMode] || '🎲' })],
     ]) {
       const sel = s.mode === mid;
       const locked = isHost && ((mid === 'storm' && !anyLib)
         || (mid === 'arena' && libCount < 2)
-        || (mid === 'friendly-knockout' && libCount < FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES));
+        || (mid === 'friendly-knockout' && libCount < FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES)
+        || (mid === 'friendly-defense' && libCount < DEFENSE_UNLOCK_COUNTRIES)
+        || (mid === 'friendly-zone-defense' && libCount < ZONE_DEFENSE_UNLOCK_COUNTRIES)
+        || (mid === 'weekly-coop' && !anyLib));
       mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
     }
     this.el.modes.innerHTML = mh;
@@ -512,7 +524,9 @@ export class CoopUI {
           this.game.audio.click();
           s.setMode(el.dataset.mode);
           // шторм лише на звільнених — перескакуємо, якщо поточна не пасує
-          if (s.mode === 'storm' && !hasLiberated(save.liberated, s.countryId)) {
+          // (weekly-coop у тиждень Шторму — те саме правило)
+          const stormish = s.mode === 'storm' || (s.mode === 'weekly-coop' && wkCoopMode === 'storm');
+          if (stormish && !hasLiberated(save.liberated, s.countryId)) {
             const lib = CAMPAIGN_ORDER.filter((c) => hasLiberated(save.liberated, c));
             if (lib.length) s.setCountry(lib[lib.length - 1]);
           }
@@ -522,8 +536,11 @@ export class CoopUI {
       });
     }
 
-    // вибір країни (в Арени і Дружнього нокауту своя кімната — пікер ховаємо)
-    const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout';
+    // вибір країни (кімнатні режими мають свою кімнату — пікер ховаємо;
+    // weekly-coop показує пікер лише коли режим тижня — Шторм)
+    const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout'
+      || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
+      || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
     document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
     this.el.countries.style.display = hideCountries ? 'none' : '';
     let ch = '';

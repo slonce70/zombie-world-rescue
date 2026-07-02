@@ -1,6 +1,18 @@
 import { t } from './i18n.js';
+import { xpForLevel, PASS_MAX_LEVEL } from './progress.js';
+
+// сумарний XP, потрібний для фінального рівня Зоряного шляху (титул «Зоряний гравець»)
+let XP_PASS_CAP = 0;
+for (let l = 1; l < PASS_MAX_LEVEL; l++) XP_PASS_CAP += xpForLevel(l);
 
 export const TITLES = {
+  star_player: {
+    icon: '🌟',
+    name: () => t('Зоряний гравець'),
+    desc: () => t('Пройди Зоряний шлях до кінця'),
+    detail: () => t('Відкривається на {n} рівні Зоряного шляху', { n: PASS_MAX_LEVEL }),
+    unlocked: (s) => ((s.xp | 0) >= XP_PASS_CAP),
+  },
   zombie_killer: {
     icon: '🧟',
     name: () => t('Зомбі кілер'),
@@ -62,6 +74,7 @@ const MODE_TITLES = [
   ['portal_closer', 'portal', '🌀', 'Закривач порталів', 'Портал'],
   ['maze_master', 'maze', '🧩', 'Майстер лабіринту', 'Лабіринт'],
   ['clone_general', 'humans', '🧍', 'Генерал клонів', 'Зомбі проти людей'],
+  ['turret_marshal', 'turretwar', '🔨', 'Маршал турелі', 'Оборона турелі'],
 ];
 for (const [id, modeId, icon, name, modeName] of MODE_TITLES) {
   TITLES[id] = {

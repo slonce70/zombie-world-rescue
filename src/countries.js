@@ -12,6 +12,7 @@ import egyptMap from './maps/egypt.js';
 import japanMap from './maps/japan.js';
 import chinaMap from './maps/china.js';
 import lostIslandMap from './maps/lostisland.js';
+import labMap from './maps/lab.js';
 
 export const BIOMES = {
   summer: {
@@ -238,6 +239,27 @@ export const BIOMES = {
     lampGlow: 1.25, // помітні червоні ліхтарі
     signText: t('ГІРСЬКЕ СЕЛО'),
   },
+  // 🧪 підземна лабораторія Слизняка — кислотно-зелений неоновий туман, темні стіни печери,
+  // але ЯСКРАВІ кислотні акценти (не страшно): світні чани, зелене світіння з підлоги
+  slimeLab: {
+    skyTop: 0x142218, skyHorizon: 0x1e3a24, skyBottom: 0x0e1a12,
+    fogColor: 0x2c6e3a, fogNear: 80, fogFar: 320, // зелений неоновий серпанок печери
+    hemiSky: 0x6effa0, hemiGround: 0x1a3a22, hemiIntensity: 1.05,
+    sunColor: 0xb6ff7a, sunIntensity: 1.4, sunPos: [60, 90, 50],
+    sunDisc: 0x9dff5a, sunDiscPos: [300, 360, 240],
+    grass1: 0x3a7a44, grass2: 0x2e6238, grass3: 0x4f9a56, // мохо-слизова підлога
+    rock: 0x2e3830, peak: 0x1e2820, water: 0x5affa0, riverbed: 0x2a5a38, // світна зелена рідина
+    dirt: 0x384038, plaza: 0x4a5a48, arenaGround: 0x2e4030,
+    roadMain: 0x445046, roadEdge: 0x28322a,
+    treeGreens: [0x5fe07a, 0x7aff8a, 0x4fc266, 0x8affa0, 0x66d472], // світні гриби-«дерева»
+    pineGreens: [0x2e7a44, 0x357e4a, 0x266238],
+    pineRatio: 0.2, snow: false, snowfall: false, dustfall: true, // світні спори в повітрі
+    housePalette: [0x3a4a44, 0x44544a, 0x30403a, 0x4a5850, 0x2e3c36], // металеві бокси-модулі
+    roofPalette: [0x2a3a30, 0x22322a, 0x30443a, 0x1e2c24],
+    flowers: false, hay: false,
+    lampGlow: 1.6, // яскраве неонове світло
+    signText: t('ЛІГВО ВІРУСУ'),
+  },
 };
 
 export const COUNTRIES = {
@@ -433,6 +455,22 @@ export const COUNTRIES = {
     banner: t('Джунглі, димучий ВУЛКАН і ЗОМБІ-ТИРАНОЗАВР! Останній бій за світ! 🦖🌋'),
     food: t('кокос'),
   },
+  // 🧪 ГЛАВА 3: Лігво Вірусу — підземна лабораторія поза CAMPAIGN_ORDER. Тут почалися всі
+  // зомбі-віруси. Фінальний бос — МЕГА-СЛИЗНЯК (весела зелена клякса в окулярах).
+  LAB: {
+    id: 'LAB', name: t('Лігво Вірусу'), flag: '🧪', seed: 3141,
+    lat: 48.9, lon: 2.35,
+    victoryTitle: t('🧪 ЛІГВО ВІРУСУ ЗАЧИНЕНО!'),
+    biome: 'slimeLab',
+    map: labMap,
+    difficulty: { hp: 2.7, dmg: 1.6, counts: 1.75 },
+    coinReward: 1000,
+    extraZombie: 'spitter',
+    shieldGuards: 4,
+    boss: { name: t('🧪 МЕГА-СЛИЗНЯК'), hp: 9000, frost: false, style: 'slime' },
+    banner: t('Неонова лабораторія, чани зі слизом і МЕГА-СЛИЗНЯК! Він робив зомбі, бо хотів друзів. Обійми його кулями! 🟢'),
+    food: t('желейка'),
+  },
 };
 
 export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
@@ -456,5 +494,7 @@ export function isCountryOpen(liberated, id) {
   if (!COUNTRIES[id]) return false;
   // 🦖 фінал-острів: відкритий ЛИШЕ коли звільнено весь світ (усі 12 країн кампанії)
   if (id === 'LOST') return CAMPAIGN_ORDER.every((c) => !!(liberated && liberated[c]));
+  // 🧪 Глава 3: після Острова Динозаврів (вимогу Глави 2 гейтить меню — тут лише liberated)
+  if (id === 'LAB') return !!(liberated && liberated.LOST);
   return id === 'UKR' || !!(liberated && liberated.UKR);
 }

@@ -19,6 +19,10 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 console.log('▸ ПВП відкривається після 10 звільнених країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
+  // пін дня/тижня: тижня з weeklyChallengeId()==='pvp' множник ×3 і одноразові
+  // +25💎 ламають точні ассерти нагород нижче (реальний недетермінізм)
+  g.dailyChallengeId = () => '__none';
+  g.weeklyChallengeId = () => '__none';
   const ten = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true };
   g.save.liberated = {};
   g.renderSoloMenu();

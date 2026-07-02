@@ -1450,6 +1450,11 @@ const BOSS_SPECS = {
     skin: 0xc08a5a, shirt: 0x2f6b4a, pants: 0x8a2f2f, shoes: 0x5a3a22,
     eyeWhite: 0xffe9b8, pupilColor: 0x3a2a1a, browColor: 0x4a2e1c,
   },
+  // 🧪 Мега-Слизняк (фінал Глави 3): весела напівпрозора зелена клякса в окулярах
+  slime: {
+    skin: 0x5fe07a, shirt: 0x3aa858, pants: 0x2e8a46, shoes: 0x246e38,
+    eyeWhite: 0xffffff, pupilColor: 0x1a3a22, browColor: 0x2e6238,
+  },
   // 🌍 Світовий бос: заражений реактором мутант
   radiation: {
     skin: 0x78c957, shirt: 0x263b26, pants: 0x31422e, shoes: 0x222820,
@@ -1836,6 +1841,61 @@ export function makeBoss(style = 'king') {
       pad.position.set(0.4 * side, 1.56, 0);
       rig.body.add(pad);
     }
+  } else if (style === 'slime') {
+    // 🧪 МЕГА-СЛИЗНЯК: велика напівпрозора зелена крапля-тіло на скелеті боса.
+    // Кумедна клякса в окулярах — весела, НЕ страшна. Капають краплі слизу.
+    const jellyM = new THREE.MeshToonMaterial({
+      color: 0x5fe07a, emissive: 0x2ecf5a, emissiveIntensity: 0.55,
+      transparent: true, opacity: 0.72, depthWrite: false,
+    });
+    const dripM = toonMat(0x66ff8a, 0x2ecf5a, 0.5);
+    // велике напівпрозоре тіло-крапля поверх торса
+    const blob = sphere(0.62, jellyM, 18, 14);
+    blob.position.set(0, 0.32, 0);
+    blob.scale.set(1.15, 1.3, 1.05);
+    rig.parts.torso.add(blob);
+    // менша краплина-«голова» зверху (окуляри чіпляємо на неї нижче через rig.parts.head)
+    const dome = sphere(0.34, jellyM, 16, 12);
+    dome.position.set(0, 0.05, 0);
+    dome.scale.set(1.1, 1.15, 1.05);
+    rig.parts.head.add(dome);
+    // обличчя — НА САМОМУ ТІЛІ-краплі (слизень = клякса з лицем на пузі), і воно
+    // МУСИТЬ стирчати назовні краплі (r≈0.71 після scale) — інакше напівпрозорий
+    // слиз його ковтає і бос читається як нудна зелена куля (зловлено скріншотом)
+    const eyeM = toonMat(0xffffff, 0xffffff, 0.25);
+    const pupilM = toonMat(0x18251c);
+    const frameM = toonMat(0x2e3a30);
+    for (const side of [-1, 1]) {
+      // великі білі очі, що випинаються з краплі
+      const eye = sphere(0.2, eyeM, 12, 10);
+      eye.position.set(0.26 * side, 0.6, -0.5);
+      rig.parts.torso.add(eye);
+      const pupil = sphere(0.08, pupilM, 8, 6);
+      pupil.position.set(0.26 * side, 0.6, -0.68);
+      rig.parts.torso.add(pupil);
+      // кругла оправа окулярів вченого — ПОВЕРХ очей
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.035, 6, 16), frameM);
+      ring.position.set(0.26 * side, 0.6, -0.62);
+      rig.parts.torso.add(ring);
+    }
+    const bridge = box(0.16, 0.04, 0.04, frameM);
+    bridge.position.set(0, 0.6, -0.66);
+    rig.parts.torso.add(bridge);
+    // широка добродушна усмішка
+    const smile = box(0.42, 0.08, 0.06, pupilM);
+    smile.position.set(0, 0.22, -0.62);
+    rig.parts.torso.add(smile);
+    // краплі слизу, що стікають по тілу
+    for (const [dx, dy, dz] of [[-0.4, -0.1, -0.2], [0.42, 0.0, -0.15], [-0.2, -0.3, 0.3], [0.3, -0.35, 0.1]]) {
+      const drip = sphere(0.08, dripM, 8, 6);
+      drip.position.set(dx, dy, dz);
+      drip.scale.set(1, 1.5, 1);
+      rig.parts.torso.add(drip);
+    }
+    // калюжка слизу біля ніг
+    const puddle = cylinder(0.5, 0.5, 0.04, dripM, 16);
+    puddle.position.set(0, -0.02, 0);
+    rig.body.add(puddle);
   } else if (style === 'radiation') {
     const toxicM = toonMat(0x79ff4d, 0x39ff18, 0.9);
     const darkM = toonMat(0x1f2a22);
@@ -3165,6 +3225,26 @@ export function makeGunMesh(kind) {
     marker.position.copy(blade.position);
     g.add(blade, ridge, tip, guard, grip, pommel, marker);
     muzzle.position.set(0, 0.035, -0.78);
+  } else if (kind === 'hammer') {
+    // 🔨 бойовий молот: важка голова на держаку (режим «Оборона турелі»)
+    const headM = toonMat(0x8a94a0, 0xffffff, 0.2);
+    const bandM = toonMat(0xffd23f, 0xd19918, 0.35);
+    const shaftM = toonMat(0x5a3a26);
+    // компактний, щоб від 1-ї особи не затуляв пів-екрана (зловлено скріншотом)
+    const shaft = cylinder(0.03, 0.035, 0.55, shaftM, 8);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.set(0, 0.02, -0.14);
+    const head = box(0.16, 0.14, 0.22, headM);
+    head.position.set(0, 0.03, -0.4);
+    const band1 = box(0.18, 0.04, 0.05, bandM);
+    band1.position.set(0, 0.03, -0.33);
+    const band2 = box(0.18, 0.04, 0.05, bandM);
+    band2.position.set(0, 0.03, -0.47);
+    const grip = box(0.05, 0.1, 0.12, toonMat(0x3a2422));
+    grip.position.set(0, -0.05, 0.12);
+    grip.rotation.x = -0.18;
+    g.add(shaft, head, band1, band2, grip);
+    muzzle.position.set(0, 0.03, -0.44);
   } else if (kind === 'bazooka') {
     const oliveM = toonMat(0x6b7a4a);
     const tube = cylinder(0.075, 0.075, 0.85, oliveM, 12);
@@ -3223,11 +3303,16 @@ export function makeFPArms(gunKind) {
   const g = new THREE.Group();
   const skinM = toonMat(0xffc9a3);
   const sleeveM = toonMat(0x2f80c3);
-  const sword = gunKind === 'sword';
+  const sword = gunKind === 'sword' || gunKind === 'hammer'; // молот тримаємо як меч
   const gun = makeGunMesh(gunKind);
   if (sword) {
     gun.group.position.set(0.06, -0.04, 0.08);
     gun.group.rotation.set(Math.PI / 2 - 0.22, 0.16, -0.52);
+    if (gunKind === 'hammer') {
+      // молот масивніший за меч — зменшуємо і опускаємо, щоб не затуляв пів-екрана
+      gun.group.scale.setScalar(0.62);
+      gun.group.position.set(0.1, -0.12, 0.1);
+    }
   } else {
     gun.group.position.set(0, 0, 0);
   }
@@ -3668,6 +3753,34 @@ export function makeRoboPet() {
 }
 
 // реєстр улюбленців (id → метадані + білдер + тип руху для Pet.update)
+// 🧪 Доктор Слизняк: маленька весела зелена клякса в окулярах (стрибає — hop)
+export function makeSlimePet() {
+  const root = new THREE.Group();
+  const jellyM = new THREE.MeshToonMaterial({
+    color: 0x5fe07a, emissive: 0x2ecf5a, emissiveIntensity: 0.5,
+    transparent: true, opacity: 0.78, depthWrite: false,
+  });
+  const frameM = toonMat(0x2e3a30);
+  // тіло-крапля
+  const body = sphere(0.2, jellyM, 16, 12); body.position.y = 0.2; body.scale.set(1.05, 1.15, 1); body.castShadow = true; root.add(body);
+  const headG = new THREE.Group(); headG.position.set(0, 0.24, 0);
+  // очі
+  for (const side of [-1, 1]) {
+    const eye = sphere(0.05, toonMat(0xffffff), 8, 6); eye.position.set(0.07 * side, 0.06, -0.14); headG.add(eye);
+    const pupil = sphere(0.022, toonMat(0x1a3a22), 6, 5); pupil.position.set(0.07 * side, 0.06, -0.18); headG.add(pupil);
+    // окуляри вченого
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 14), frameM); ring.position.set(0.07 * side, 0.06, -0.16); headG.add(ring);
+  }
+  const bridge = box(0.05, 0.012, 0.012, frameM); bridge.position.set(0, 0.06, -0.16); headG.add(bridge);
+  // усмішка
+  const mouth = box(0.1, 0.015, 0.015, toonMat(0x1a3a22)); mouth.position.set(0, -0.02, -0.15); headG.add(mouth);
+  root.add(headG);
+  // ніжки-краплі (для hop-анімації)
+  const legs = [];
+  for (const lx of [-0.1, 0.1]) { const leg = new THREE.Group(); leg.position.set(lx, 0.08, 0); const lm = sphere(0.06, jellyM, 8, 6); lm.scale.set(1, 0.7, 1.1); lm.position.y = -0.05; leg.add(lm); root.add(leg); legs.push(leg); }
+  return { group: root, head: headG, legs, tail: null, phase: Math.random() * 6 };
+}
+
 export const PETS = {
   dog: { name: t('Песик Дружок'), icon: '🐶', desc: t('Збирає монети і гавкає на сюрпризи!'), make: makeDog, move: 'quad' },
   cat: { name: t('Кошеня Мурчик'), icon: '🐱', desc: t('Спритне кошеня — мчить по монетки.'), make: makeCat, move: 'quad' },
@@ -3682,6 +3795,7 @@ export const PETS = {
   dragon: { name: t('Дракончик Іскра'), icon: '🐉', desc: t('Махає крильцями — справжній дракон!'), make: makeDragon, move: 'quad' },
   unicorn: { name: t('Єдиноріг Зоря'), icon: '🦄', desc: t('Чарівний ріг і веселкова грива.'), make: makeUnicorn, move: 'quad' },
   robo: { name: t('Робо-пес Болт'), icon: '🤖', desc: t('Залізний друг зі світними очима.'), make: makeRoboPet, move: 'quad' },
+  slimepet: { name: t('Доктор Слизняк'), icon: '🧪', desc: t('Маленька зелена клякса в окулярах — хоче дружити!'), make: makeSlimePet, move: 'hop' },
 };
 
 // ============================================================

@@ -305,6 +305,10 @@ export class GuestNet {
       }
       case 'vict': game.netVictory(); break;
       case 'stormend': game._endStormRun(); break;
+      // 🎲 кооп-драфт: хост роздав набір карток — відкриваємо оверлей лише СВОЄМУ pid
+      case 'dro': if (a[0] === me && game.draft) game.draft.openNet(a[1]); break;
+      // 🛡️ кооп-оборона: фінал вирішив хост
+      case 'dfend': game._endDefenseRun(!!a[0]); break;
       case 'arenaend': game._endArenaRun(); break;
       case 'hw': level.bus.emit('hordeWarning', 5); break;
       case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;

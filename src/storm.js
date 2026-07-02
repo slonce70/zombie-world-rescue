@@ -148,10 +148,23 @@ export class StormMode {
       level.netEv('sbb', bonus);
       level.audio.mission();
       this._spawnWaveSoon = 6;
-      // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3 (лише соло-Шторм).
+      // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3.
       // !this.over — гонка кадра смерті: якщо гравець помер цим же апдейтом (шкода поза колом
       // вище), _endStormRun уже показав екран кінця → не відкриваємо драфт поверх нього.
-      if (!level.net && level.runBuild && level.game.draft && !this.over) level.game.draft.open();
+      if (level.runBuild && level.game.draft && !this.over) {
+        if (!level.net) level.game.draft.open();
+        else if (level.net.authority) {
+          // 🌐 кооп-драфт (v236): хост генерує набір КОЖНОМУ гравцю зі свого rng і шле
+          // подією dro; apply() — локально у власника (damageMult/speedMult/lifeSteal
+          // гостя не авторитарні — живуть у його симуляції). offer() не мутує taken
+          // (його рухає лише apply) — повтор чужої картки можливий і безпечний (бафи стакаються).
+          const rng = level.zombies.rng;
+          level.game.draft.openNet(level.runBuild.offer(rng).map((c) => c.id));
+          for (const pid of level.net.remotes.keys()) {
+            level.netEv('dro', pid, level.runBuild.offer(rng).map((c) => c.id));
+          }
+        }
+      }
     }
     if (this._spawnWaveSoon !== undefined) {
       this._spawnWaveSoon -= dt;

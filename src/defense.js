@@ -86,7 +86,9 @@ export class DefenseMode {
         { icon: '🔫', title: t(this.cfg.loadoutText), done: false },
       ];
     }
-    const left = Math.max(0, this.target - Math.min(this.target, this.level.stats.kills));
+    const left = this.level.mirror && this._netLeft != null
+      ? this._netLeft
+      : Math.max(0, this.target - Math.min(this.target, this.level.stats.kills));
     const list = [
       { icon: '🛡️', title: t(this.cfg.title), done: false },
       { icon: '🗼', title: t('Вежа: {n}/{t} HP', { n: Math.max(0, Math.ceil(this.towerHp)), t: this.towerMaxHp }), done: this.towerHp > 0 },
@@ -109,7 +111,28 @@ export class DefenseMode {
     return this.level.zombies.list.filter((z) => z.defense && z.state !== 'dead').length;
   }
 
+  // 🌐 кооп (v236): стан режиму їде снапшотом snap.m (канал місій хоста);
+  // початкова хвиля спавниться ДО підключення мережі детерміновано в обох
+  // (патерн knockout), пізніші хвилі — лише у хоста, гостю прилітають puppets.
+  netState() {
+    const left = this.zone ? 0 : Math.max(0, this.remaining() + Math.max(0, this.target - this.spawned));
+    return [Math.ceil(this.towerHp), Math.max(0, Math.ceil(this.timer)), this.wave, left];
+  }
+
+  applyNet(m) {
+    if (!this.level.mirror || !m) return;
+    this.towerHp = m[0];
+    this.timer = m[1];
+    this.wave = m[2];
+    this._netLeft = m[3];
+  }
+
   update(dt) {
+    if (this.level.mirror) {
+      // гість: хвилі/вежу/таймер веде хост (applyNet) — у себе лише клемп у кімнаті/колі
+      this._clampActor(this.level.player);
+      return;
+    }
     if (this.zone) {
       this._updateZone(dt);
       return;
@@ -370,13 +393,19 @@ export class DefenseMode {
   }
 
   _damagePlayerIfClose(z, dt) {
-    const p = this.level.player;
     z.defenseHitCd = Math.max(0, (z.defenseHitCd || 0) - dt);
-    if (!p || p.health <= 0 || z.defenseHitCd > 0 || p.pos.y - this.floorY > 3) return;
+    if (z.defenseHitCd > 0) return;
+    // кооп: б'ємо будь-кого з команди в радіусі; _hurt сам маршрутизує (соло — напряму,
+    // кооп — hurtPlayer хоста гостю). У соло players нема — фолбек на власного гравця.
+    const players = this.level.players || [this.level.player];
     const reach = (z.stats?.attackR || 1.8) * 1.25;
-    if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > reach) return;
-    z.defenseHitCd = 0.9;
-    p.takeDamage(z.stats?.dmg || 10, z.x, z.z);
+    for (const p of players) {
+      if (!p || p.health <= 0 || p.pos.y - this.floorY > 3) continue;
+      if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > reach) continue;
+      z.defenseHitCd = 0.9;
+      this.level.zombies._hurt(p, z.stats?.dmg || 10, z.x, z.z);
+      break;
+    }
   }
 
   results() {

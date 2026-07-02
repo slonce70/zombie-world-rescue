@@ -507,6 +507,10 @@ export class HostNet {
       if (zb.elite) o.e = 1;
       if (zb.sleeping) o.sl = 1;
       if (zb.horde) o.h = 1;
+      // прапори кімнатних режимів: без них гість після state-синку рахував
+      // remaining()=0 і миттєво «перемагав» (реальний баг friendly-нокауту)
+      if (zb.knockout) o.k = 1;
+      if (zb.defense) o.d = 1;
       if (zb.bossStyle) o.st = zb.bossStyle;
       o.mhp = zb.maxHp;
       o.hp = zb.hp;

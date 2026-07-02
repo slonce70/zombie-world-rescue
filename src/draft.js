@@ -1,6 +1,6 @@
 // 🎲 Оверлей «Прокачка»: пауза + 3 картки, один тап. Патерн як у Shop.
 import { t } from './i18n.js';
-import { COMBOS } from './runbuild.js';
+import { CARD_POOL, COMBOS } from './runbuild.js';
 
 export class Draft {
   constructor(game) {
@@ -22,8 +22,32 @@ export class Draft {
     this.game.audio.click();
   }
 
+  // 🌐 кооп: набір карток приходить від хоста (id з CARD_POOL). Гра НЕ завмирає
+  // (draft.isOpen не входить у blocked коопу) — 15с на вибір, далі авто-пік
+  // першої картки, щоб оверлей не висів у наступну хвилю.
+  openNet(ids) {
+    const level = this.game.level;
+    if (!level || !level.runBuild || this.isOpen) return;
+    this.offered = ids.map((id) => CARD_POOL.find((c) => c.id === id)).filter(Boolean);
+    if (!this.offered.length) return;
+    this.isOpen = true;
+    this.el.classList.add('show');
+    this.game.input.exitLock();
+    this._render();
+    this.game.audio.click();
+    this._expire = setTimeout(() => this.pick(0), 15000);
+  }
+
+  // закрити без вибору (кінець рівня в коопі, поки оверлей ще висів)
+  close() {
+    if (this._expire) { clearTimeout(this._expire); this._expire = null; }
+    this.isOpen = false;
+    this.el.classList.remove('show');
+  }
+
   pick(idx) {
     if (!this.isOpen) return;
+    if (this._expire) { clearTimeout(this._expire); this._expire = null; }
     const level = this.game.level;
     const card = this.offered[idx];
     if (!card || !level) return;

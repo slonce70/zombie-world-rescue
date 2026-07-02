@@ -19,6 +19,10 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 console.log('▸ Нокаут відкривається на 20 рівні Зоряного шляху');
 const menuLock = await page.evaluate(async () => {
   const g = window.__game;
+  // пін випробувань дня/тижня: інакше тижня, коли weeklyChallengeId()==='knockout',
+  // множник ×3 ламає точні монетні ассерти (реальний недетермінізм)
+  g.dailyChallengeId = () => '__none';
+  g.weeklyChallengeId = () => '__none';
   const { xpForLevel } = await import('/src/progress.js');
   g.renderSoloMenu();
   const before = document.querySelector('.solo-mode[data-mode="knockout"]');

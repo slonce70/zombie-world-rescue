@@ -28,6 +28,7 @@ await page.evaluate(() => {
   g.save.xp = 999999; // за 40 рівнем пасса XP не дає монетних нагород — тест лічить лише монети режиму
   g.saveGame();
   g.dailyChallengeId = () => 'bank';
+  g.weeklyChallengeId = () => '__none'; // щоб ×3 тижня не перекрив ×2 дня, коли пул збіжиться
   g.test.startBank();
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.bank, null, { timeout: 30000 });

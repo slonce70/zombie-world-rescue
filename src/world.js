@@ -120,6 +120,7 @@ export class World {
     };
     for (const id of lm) if (build[id]) build[id]();
     if (lm.includes('obelisks')) for (const o of P.obelisks || []) this._lmObelisk(o);
+    if (lm.includes('slimeVats')) for (const v of P.slimeVats || []) this._lmSlimeVat(v);
   }
 
   // ⛩️ Ворота торії на вʼїзді в село: дві червоні колони + дві поперечні балки.
@@ -245,6 +246,34 @@ export class World {
       this.scene.add(puff);
     }
     this._addCollider(x, z, 22, gy + 36, 20); // велика гора — крізь неї не пройти
+  }
+
+  // 🧪 неоновий чан слизу: металевий циліндр + світна зелена сфера булькаючого слизу зверху
+  _lmSlimeVat({ x, z }) {
+    const gy = this.groundH(x, z);
+    const tankM = toonMat(0x3a4a44);
+    const rimM = toonMat(0x566056);
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 3.4, 16), tankM);
+    tank.position.set(x, gy + 1.7, z);
+    tank.castShadow = true;
+    tank.receiveShadow = true;
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.4, 16), rimM);
+    rim.position.set(x, gy + 3.5, z);
+    this.staticGroup.add(tank, rim);
+    // emissive слиз НЕ в staticGroup — запікання з'їло б світіння (як лава/ліхтарі)
+    const slimeM = toonMat(0x5aff8a, 0x2ecf5a, 1.6);
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(1.7, 14, 10), slimeM);
+    blob.position.set(x, gy + 3.9, z);
+    blob.scale.set(1, 0.7, 1);
+    this.scene.add(blob);
+    // краплі-бульбашки навколо
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.4;
+      const drip = new THREE.Mesh(new THREE.SphereGeometry(0.3 + i * 0.08, 8, 6), slimeM);
+      drip.position.set(x + Math.cos(a) * 2.2, gy + 4.4 + i * 0.5, z + Math.sin(a) * 2.2);
+      this.scene.add(drip);
+    }
+    this._addCollider(x, z, 2.1, gy + 3.2, 1.9); // суцільний чан — крізь нього не пройти
   }
 
   _drapeXZGeometry(geo, cx, cz, offset = 0) {

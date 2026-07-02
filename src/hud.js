@@ -228,7 +228,7 @@ export class HUD {
       }
     } else {
       const a = p.curAmmo;
-      this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : a.mag;
+      this.el.ammoMag.textContent = p.reloading > 0 ? '⟳' : (a.mag === Infinity ? '∞' : a.mag);
       this.el.ammoReserve.textContent = a.reserve === Infinity ? '∞' : a.reserve;
       this.el.ammoMag.classList.toggle('low', a.mag <= 4 && p.reloading <= 0);
       this.el.ammoReserve.classList.remove('low');

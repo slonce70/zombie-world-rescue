@@ -22,6 +22,14 @@ export const CHAPTER2 = {
   target: 3,
 };
 
+// 🧪 Глава 3: одна спец-локація LAB (патерн Загубленого Острова) — прогрес =
+// save.liberated.LAB, окремого save-поля НЕ треба
+export const CHAPTER3 = {
+  id: 'chapter3',
+  title: t('Глава 3: Лігво Вірусу'),
+  medalName: t('Медаль «Приборкувач слизу»'),
+};
+
 export class Chapter {
   constructor(game) { this.game = game; }
   get state() {

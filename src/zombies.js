@@ -1023,8 +1023,11 @@ export class Zombies {
       this._hordeIdleT = 0; // поки є незаспавнені — таймер простою не рахуємо
       this.hordeSpawnT -= dt;
       if (this.hordeSpawnT <= 0) {
-        this.hordeSpawnT = 1.3;
-        const batch = Math.min(4, this.hordePending);
+        // 🧟 модифікатор тижня «Навала»: частіші/більші пачки того САМОГО пулу
+        // (hordePending не росте — одночасних акторів і draw calls не більшає)
+        const rush = level.weeklyMod && level.weeklyMod.horde;
+        this.hordeSpawnT = rush ? 0.8 : 1.3;
+        const batch = Math.min(rush ? 6 : 4, this.hordePending);
         const alivePl = players.filter((p) => p.health > 0);
         for (let i = 0; i < batch; i++) {
           const cp = alivePl.length ? alivePl[Math.floor(this.rng.next() * alivePl.length)].pos : player.pos;
@@ -1204,13 +1207,26 @@ export class Zombies {
                         : st === 'sumo' ? (i % 2 ? 'samurai' : 'runner')
                           : st === 'rex' ? (i % 2 ? 'toro' : 'imp')
                             : st === 'emperor' ? (i % 2 ? 'terracotta' : 'runner')
-                              : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
+                              : st === 'slime' ? (i % 2 ? 'imp' : 'spitter')
+                                : (i % 3 === 0 ? 'tank' : i % 2 ? 'runner' : 'walker');
           const mz = this.spawn(mtype, z.x + Math.cos(a) * 4.5, z.z + Math.sin(a) * 4.5,
             { horde: false, noCoopScale: !!z._stormWave });
           mz.aggroed = true;
           mz.state = 'chase';
           if (z._stormWave) mz._stormWave = true;
         }
+      }
+    }
+    // 🧪 МЕГА-СЛИЗНЯК: слизовий щит фазами (патерн крижаного генерала worldboss.js):
+    // 4с щит ×0.25 шкоди → 8с вікно «стріляй!». Стан на z — переживає клон-кеш не треба (бос свіжий риг)
+    if (z.bossStyle === 'slime') {
+      z._slimeT = (z._slimeT === undefined ? 6 : z._slimeT) - dt;
+      if (z._slimeT <= 0) {
+        const on = !z.worldBossShield;
+        z.worldBossShield = on;
+        z._slimeT = on ? 4.0 : 8.0;
+        level.effects.ring(new THREE.Vector3(z.x, z.y + 1, z.z), on ? 0x79ff4d : 0xd6ff6e, on ? 5.5 : 3.2);
+        level.bus.emit('toast', on ? t('🟢 Слиз затвердів! Шкода тимчасово слабша.') : t('💥 Слиз розм\'як — стріляй зараз!'));
       }
     }
     z.chargeCd -= dt;
@@ -1526,6 +1542,8 @@ export class Zombies {
       golden: !!o.g, elite: !!o.e, sleeping: !!o.sl, horde: !!o.h,
       style: o.st || undefined,
     });
+    if (o.k) z_.knockout = true;
+    if (o.d) z_.defense = true;
     if (o.mhp) { z_.maxHp = o.mhp; z_.hp = o.hp !== undefined ? o.hp : o.mhp; }
     if (o.sh !== undefined && z_.shieldMax > 0) this._applyShieldPct(z_, o.sh);
     if (o.ch !== undefined && z_.chestMax > 0) this._applyChestPct(z_, o.ch);

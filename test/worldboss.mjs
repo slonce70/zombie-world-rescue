@@ -19,6 +19,9 @@ await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
 console.log('▸ Світові боси: моделі');
 const expectedSkins = { radiation: 0x78c957, iceGeneral: 0xa8e8ff, mechTitan: 0x9aa3ad };
 const modelInfo = await page.evaluate(async () => {
+  // пін боса тижня: коли weeklyBossId() збігається з тестовим босом, повтор
+  // ЛЕГІТИМНО дає недільну нагороду і ламає ассерт «повтор без нагороди»
+  window.__game.weeklyBossId = () => '__none';
   const mod = await import('/src/characters.js');
   return ['radiation', 'iceGeneral', 'mechTitan'].map((style) => {
     const rig = mod.makeBoss(style);

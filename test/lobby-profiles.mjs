@@ -24,7 +24,7 @@ try {
   const borya = (v.profiles || []).find((p) => p.nick === 'Боря');
   check(!!anya && anya.countries === 2 && anya.coins === 75 && anya.crystals === 4 && anya.kills === 9 && anya.star === 8 && anya.prestige === 2 && anya.title === 'Зомбі кілер',
     'профіль віддає статистику гравця', JSON.stringify(anya));
-  check(!!borya && borya.countries === 99 && borya.coins === 0 && borya.crystals === 2 && borya.kills === 4 && borya.star === 40 && borya.prestige === 999 && borya.title === '0 монет',
+  check(!!borya && borya.countries === 99 && borya.coins === 0 && borya.crystals === 2 && borya.kills === 4 && borya.star === 65 && borya.prestige === 999 && borya.title === '0 монет',
     'числа профілю чистяться до безпечних меж', JSON.stringify(borya));
 } finally {
   relay.kill();

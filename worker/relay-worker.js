@@ -314,7 +314,7 @@ export class Lobby {
       coins: this._safeInt(raw.coins, 0, 999999),
       crystals: this._safeInt(raw.crystals, 0, 99999),
       kills: this._safeInt(raw.kills, 0, 999999),
-      star: this._safeInt(raw.star || 1, 1, 40),
+      star: this._safeInt(raw.star || 1, 1, 65), // стеля Зоряного шляху (v236)
       prestige: this._safeInt(raw.prestige, 0, 999),
       title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
       ts,

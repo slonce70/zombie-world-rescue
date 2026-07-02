@@ -15,6 +15,8 @@ export const WEAPONS = {
   staff: { name: 'Посох', icon: '🪄', dmg: 95, rpm: 55, mag: 1, spread: 0.002, auto: false, reloadT: 3.0, recoil: 0.04, infinite: true, pierce: 2 },
   cannon: { name: 'Гармата', icon: '💣', dmg: 350, rpm: 24, mag: 1, spread: 0.002, auto: false, reloadT: 2.5, recoil: 0.09, infinite: true },
   sword: { name: 'Меч', icon: '🗡️', dmg: 300, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.04, infinite: true, melee: true, range: 3.0 },
+  // 🔨 молот — єдина зброя режиму «Оборона турелі»: 35 шкоди, 1 удар/с
+  hammer: { name: 'Молот', icon: '🔨', dmg: 35, rpm: 60, mag: Infinity, spread: 0, auto: false, reloadT: 1.0, recoil: 0.06, infinite: true, melee: true, range: 3.2 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
   // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.

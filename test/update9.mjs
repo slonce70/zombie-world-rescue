@@ -135,7 +135,7 @@ console.log('▸ Зоряний шлях до стелі і косметика')
 const pass = await page.evaluate(async () => {
   const g = window.__game;
   const { PASS_MAX_LEVEL } = await import('/src/progress.js');
-  g.test.addXp(50000); // вистачає на стелю шляху
+  g.test.addXp(100000); // вистачає на стелю шляху (65 рівень ≈ 85760 XP)
   return {
     level: g.progress.level,
     cap: PASS_MAX_LEVEL, // звіряємо з джерелом, не з літералом — не флакає при зміні стелі

@@ -32,9 +32,9 @@ const prestigeProfile = await page.evaluate(async () => {
   let xp = 0;
   for (let n = 1; n < PASS_MAX_LEVEL; n++) xp += xpForLevel(n);
   g.save.xp = xp + 1200;
-  return g.coop.lobbyNet._profile();
+  return { ...g.coop.lobbyNet._profile(), cap: PASS_MAX_LEVEL };
 });
-check(prestigeProfile.star === 40 && prestigeProfile.prestige === 2,
+check(prestigeProfile.star === prestigeProfile.cap && prestigeProfile.prestige === 2,
   'coop profile sends Star Path prestige after max level', JSON.stringify(prestigeProfile));
 
 const prestigeText = await page.evaluate(() => {

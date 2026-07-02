@@ -47,8 +47,34 @@ export const PASS_REWARDS = {
   38: { type: 'coins', n: 1200, icon: '💰', name: t('1200 монет') },
   39: { type: 'coins', n: 1300, icon: '💰', name: t('1300 монет') },
   40: { type: 'coins', n: 1500, icon: '💰', name: t('1500 монет') },
+  // v236: шлях продовжено до 65 — фінал: титул «Зоряний гравець»
+  41: { type: 'coins', n: 1500, icon: '💰', name: t('1500 монет') },
+  42: { type: 'coins', n: 1600, icon: '💰', name: t('1600 монет') },
+  43: { type: 'coins', n: 1700, icon: '💰', name: t('1700 монет') },
+  44: { type: 'coins', n: 1800, icon: '💰', name: t('1800 монет') },
+  45: { type: 'crystals', n: 20, icon: '💎', name: t('20 кристалів') },
+  46: { type: 'coins', n: 1900, icon: '💰', name: t('1900 монет') },
+  47: { type: 'coins', n: 2000, icon: '💰', name: t('2000 монет') },
+  48: { type: 'coins', n: 2100, icon: '💰', name: t('2100 монет') },
+  49: { type: 'coins', n: 2200, icon: '💰', name: t('2200 монет') },
+  50: { type: 'crystals', n: 25, icon: '💎', name: t('25 кристалів') },
+  51: { type: 'coins', n: 2300, icon: '💰', name: t('2300 монет') },
+  52: { type: 'coins', n: 2400, icon: '💰', name: t('2400 монет') },
+  53: { type: 'coins', n: 2500, icon: '💰', name: t('2500 монет') },
+  54: { type: 'coins', n: 2600, icon: '💰', name: t('2600 монет') },
+  55: { type: 'crystals', n: 30, icon: '💎', name: t('30 кристалів') },
+  56: { type: 'coins', n: 2700, icon: '💰', name: t('2700 монет') },
+  57: { type: 'coins', n: 2800, icon: '💰', name: t('2800 монет') },
+  58: { type: 'coins', n: 2900, icon: '💰', name: t('2900 монет') },
+  59: { type: 'coins', n: 3000, icon: '💰', name: t('3000 монет') },
+  60: { type: 'crystals', n: 35, icon: '💎', name: t('35 кристалів') },
+  61: { type: 'coins', n: 3200, icon: '💰', name: t('3200 монет') },
+  62: { type: 'coins', n: 3400, icon: '💰', name: t('3400 монет') },
+  63: { type: 'coins', n: 3600, icon: '💰', name: t('3600 монет') },
+  64: { type: 'coins', n: 3800, icon: '💰', name: t('3800 монет') },
+  65: { type: 'title', id: 'star_player', icon: '🌟', name: t('Титул «Зоряний гравець»') },
 };
-export const PASS_MAX_LEVEL = 40;
+export const PASS_MAX_LEVEL = 65;
 export const MEGA_QUEST_MIN_LEVEL = 32;
 
 // скільки XP треба, щоб перейти з рівня n на n+1
@@ -111,6 +137,7 @@ export class Progress {
     game.save.xp = (game.save.xp || 0) + n;
     const after = this.level;
     for (let lvl = before + 1; lvl <= after; lvl++) this._grantLevel(lvl);
+    if (after > before) game.save.passLvl = Math.max(game.save.passLvl || 0, after);
     const prestigeAfter = this.prestigeStars;
     if (prestigeAfter > prestigeBefore) {
       game.hud.banner(t('🎖️ РАНГ РЯТІВНИКА {n}!', { n: prestigeAfter }), t('Так тримати, легендо!'), 4.2);
@@ -144,12 +171,30 @@ export class Progress {
     }
   }
 
-  _grantLevel(lvl) {
+  // 🎁 catch-up продовженого шляху (40→65): гравець, що ВЖЕ перескочив стелю по XP,
+  // при boot отримує нагороди пропущених рівнів разом — тихо + один підсумковий банер.
+  // save.passLvl = останній ВИДАНИЙ рівень; легасі-сейв без поля: до старої стелі 40 все видано.
+  grantBacklog() {
+    const g = this.game;
+    if (g.save.passLvl == null) g.save.passLvl = Math.min(this.level, 40);
+    const lvl = this.level;
+    if (lvl <= g.save.passLvl) return;
+    // catch-up ЛИШЕ для продовження 40→65: рівні ≤40 завжди видавав addXp,
+    // а «xp виставлено напряму» (тести/імпорт) не має ретро-сипати старі нагороди
+    const from = Math.max(g.save.passLvl + 1, 41);
+    if (lvl < from) { g.save.passLvl = lvl; return; }
+    for (let l = from; l <= lvl; l++) this._grantLevel(l, { silent: true });
+    g.save.passLvl = lvl;
+    if (g.hud) g.hud.banner(t('🎖️ ЗОРЯНИЙ ШЛЯХ ПРОДОВЖЕНО!'), t('Рівні {a}–{b}: нагороди видано 🎁', { a: from, b: lvl }), 5);
+    g.saveGame();
+  }
+
+  _grantLevel(lvl, opts = {}) {
     const game = this.game;
     const r = PASS_REWARDS[lvl];
-    game.audio.levelUp();
+    if (!opts.silent) game.audio.levelUp();
     if (!r) {
-      game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), t('Так тримати!'));
+      if (!opts.silent) game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), t('Так тримати!'));
       return;
     }
     let sub = t('Нагорода: {i} {n}', { i: r.icon, n: r.name });
@@ -176,8 +221,13 @@ export class Progress {
       if (!game.save.tracers.includes(r.id)) game.save.tracers.push(r.id);
       game.save.activeTracer = r.id;
       if (game.level) game.level.effects.tracerStyle = r.id;
+    } else if (r.type === 'title') {
+      // титул також захищений предикатом у titles.js (xp ≥ поріг рівня) —
+      // syncTitles відновить його при клауд-імпорті навіть без цього push
+      if (!game.save.titles.includes(r.id)) game.save.titles.push(r.id);
+      sub += t(' — одягни в Гардеробі 🎒');
     }
-    game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), sub, 4.2);
+    if (!opts.silent) game.hud.banner(t('🎖️ ЗІРКОВИЙ РІВЕНЬ {lvl}!', { lvl }), sub, 4.2);
   }
 }
 

@@ -53,8 +53,9 @@ export const SHOP_ITEMS = [
   { id: 'goldapple-hyper', icon: '⚡', name: t('Гіперзаряд: Золоте яблуко'), desc: t('Постійне покращення яблука: +40 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'goldapple', needsGadget: 'goldapple' },
   { id: 'meteor-hyper', icon: '⚡', name: t('Гіперзаряд: Метеорит'), desc: t('Після падіння лишає вогонь: 5 HP кожні 0.5с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'meteor', needsGadget: 'meteor' },
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
-  // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500
-  ...Object.entries(PETS).map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
+  // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500.
+  // slimepet НЕ продається — унікальна нагорода Глави 3 (Лігво Вірусу)
+  ...Object.entries(PETS).filter(([id]) => id !== 'slimepet').map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
   // 🏅 золотий скін для гаджета-башти (камʼяний дається за Францію — не в магазині)
   { id: 'tower_gold', icon: TOWER_SKINS.gold.icon, name: TOWER_SKINS.gold.name, desc: t('Золотий скін для гаджета-башти'), price: 2344, max: 1, cat: t('Гаджети й друзі'), towerSkin: 'gold' },
   // --- зброя ---
