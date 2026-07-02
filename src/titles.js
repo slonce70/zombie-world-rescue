@@ -52,6 +52,27 @@ export const TITLES = {
   },
 };
 
+// 🏅 титули за 10 перемог у соло-режимах (лічильник — save.modeWins)
+const MODE_TITLES = [
+  ['knockout_champ', 'knockout', '🥊', 'Король рингу', 'Нокаут'],
+  ['defense_wall', 'defense', '🗼', 'Незламний захисник', 'Оборона'],
+  ['zone_master', 'zone-defense', '⭕', 'Господар зони', 'Оборона в зоні'],
+  ['duelist', 'pvp', '⚔️', 'Дуелянт', 'ПВП'],
+  ['bank_guard', 'bank', '🏦', 'Охоронець банку', 'Банк'],
+  ['portal_closer', 'portal', '🌀', 'Закривач порталів', 'Портал'],
+  ['maze_master', 'maze', '🧩', 'Майстер лабіринту', 'Лабіринт'],
+  ['clone_general', 'humans', '🧍', 'Генерал клонів', 'Зомбі проти людей'],
+];
+for (const [id, modeId, icon, name, modeName] of MODE_TITLES) {
+  TITLES[id] = {
+    icon,
+    name: () => t(name),
+    desc: () => t('10 перемог: {m}', { m: t(modeName) }),
+    detail: () => t('Відкривається за 10 перемог у режимі «{m}»', { m: t(modeName) }),
+    unlocked: (s) => ((s.modeWins && s.modeWins[modeId]) | 0) >= 10,
+  };
+}
+
 export function syncTitles(save) {
   if (!save || typeof save !== 'object') return false;
   if (!Array.isArray(save.titles)) save.titles = [];

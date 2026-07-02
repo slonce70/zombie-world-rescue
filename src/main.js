@@ -290,6 +290,14 @@ const SOLO_MODES = [
   },
 ];
 
+// 🎯 «Випробування дня»: один кімнатний режим на день дає подвійну нагороду
+const DAILY_CHALLENGE_POOL = ['knockout', 'defense', 'zone-defense', 'pvp', 'bank', 'portal', 'maze', 'humans', 'soul-collector'];
+// 🏅 віхи перемог у кожному режимі (титул на 10 перемог відкриває syncTitles сам)
+const MODE_MILESTONES = [
+  { wins: 3, crystals: 10 },
+  { wins: 25, crystals: 30 },
+];
+
 class Game {
   constructor() {
     this.params = new URLSearchParams(location.search);
@@ -580,6 +588,7 @@ class Game {
       titles: [], activeTitle: null,
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {}, worldBosses: {},
+      modeBest: {}, modeWins: {}, modeRewards: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, cloudTs: 0, goal: null,
@@ -652,6 +661,9 @@ class Game {
         if (!out.skins.includes(out.activeSkin)) out.activeSkin = 'classic';
         if (!out.dances.includes(out.activeDance)) out.activeDance = 'shuffle';
         out.stormBest = out.stormBest || {};
+        for (const k of ['modeBest', 'modeWins', 'modeRewards']) {
+          if (!out[k] || typeof out[k] !== 'object') out[k] = {};
+        }
         if (!out.stats || typeof out.stats !== 'object') out.stats = {};
         for (const k of ['killed', 'headshots', 'bosses', 'megaboxes', 'golden', 'bestCombo', 'coinsSpent', 'cloneUses', 'gadgetUses', 'damageDealt']) {
           if (typeof out.stats[k] !== 'number' || !isFinite(out.stats[k])) out.stats[k] = 0;
@@ -976,6 +988,11 @@ class Game {
     if (!lib.LOST) {
       return { icon: '🦖', title: t('Далі'), text: t('Острів Динозаврів чекає фінальний бій') };
     }
+    // 🎯 світ врятовано → щодня кличемо у «випробування дня» з подвійною нагородою
+    const dailyMode = SOLO_MODES.find((m) => m.id === this.dailyChallengeId());
+    if (dailyMode) {
+      return { icon: '🎯', title: t('Випробування дня'), text: t('{i} {m} — нагорода ×2 сьогодні!', { i: dailyMode.icon, m: dailyMode.name() }) };
+    }
     return { icon: '⭐', title: t('Далі'), text: t('Світ врятовано! Спробуй Шторм або рекорди') };
   }
 
@@ -1046,11 +1063,14 @@ class Game {
     const byId = new Map(modes.map((m) => [m.id, m]));
     const groups = SOLO_MODE_GROUPS.map((g) => ({ ...g, title: g.title() }));
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
+    const daily = this.dailyChallengeId();
+    const fmtBest = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     const modeHtml = (m) => `
-      <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}" data-mode="${m.id}">
+      <button type="button" class="solo-mode ${m.locked ? 'locked' : ''}${!m.locked && m.id === daily ? ' daily' : ''}" data-mode="${m.id}">
         <div class="sm-ico">${m.icon}</div>
-        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}</div>
-        <div class="sm-desc">${m.desc}</div></div>
+        <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ` <span class="sm-daily">🎯 ${t('СЬОГОДНІ ×2')}</span>` : ''}</div>
+        <div class="sm-desc">${m.desc}</div>
+        ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}</div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
     root.innerHTML = `
@@ -2846,6 +2866,57 @@ class Game {
     }
   }
 
+  // 🎯 режим «випробування дня» — детерміновано від локальної дати
+  dailyChallengeId() {
+    const d = new Date();
+    const key = d.getFullYear() * 372 + d.getMonth() * 31 + (d.getDate() - 1);
+    return DAILY_CHALLENGE_POOL[key % DAILY_CHALLENGE_POOL.length];
+  }
+
+  // 🏁 спільний фінал кімнатних режимів: перемоги, віхи, рекорд часу, множник дня.
+  // Викликати ДО нарахування нагород; mult множить монети/XP режиму.
+  // Кооп-варіанти (friendly-нокаут) рекорди/віхи не чіпають — це соло-прогрес.
+  _soloModeFinish(modeId, won, timeMs = null) {
+    const out = { mult: 1, recBadge: '', bestRow: '' };
+    if (this.level && this.level.net) return out;
+    const daily = this.dailyChallengeId() === modeId;
+    if (won) {
+      if (daily) {
+        out.mult = 2;
+        this.hud.banner(t('🎯 ВИПРОБУВАННЯ ДНЯ!'), t('Нагороду подвоєно ×2'), 4);
+      }
+      this.save.modeWins[modeId] = (this.save.modeWins[modeId] || 0) + 1;
+      const wins = this.save.modeWins[modeId];
+      for (const ms of MODE_MILESTONES) {
+        const key = modeId + ':' + ms.wins;
+        if (wins < ms.wins || this.save.modeRewards[key]) continue;
+        this.save.modeRewards[key] = true;
+        this.save.crystals = (this.save.crystals || 0) + ms.crystals;
+        this.hud.banner(t('🏅 ВІХА РЕЖИМУ!'), t('{n} перемог — 💎 +{c} кристалів', { n: ms.wins, c: ms.crystals }), 4.5);
+        this.audio.levelUp();
+      }
+      // титули за перемоги відкриває syncTitles за предикатами — тут лише сповіщаємо
+      const titlesBefore = (this.save.titles || []).length;
+      syncTitles(this.save);
+      if ((this.save.titles || []).length > titlesBefore) {
+        this.hud.banner(t('🎖️ НОВИЙ ТИТУЛ!'), t('Дивись у Гардеробі 🎒'), 4.5);
+        this.audio.levelUp();
+      }
+      if (timeMs != null) {
+        const prev = this.save.modeBest[modeId];
+        if (!prev || timeMs < prev) {
+          this.save.modeBest[modeId] = timeMs;
+          if (prev) out.recBadge = t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>');
+        }
+      }
+    }
+    const best = this.save.modeBest[modeId];
+    if (best != null) {
+      out.bestRow = `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>`;
+    }
+    return out;
+  }
+
   _endStormRun() {
     const level = this.level;
     if (!level || !level.storm || level.storm.over) return;
@@ -2984,6 +3055,8 @@ class Game {
       retryBtn.textContent = t('🥊 Ще раз!');
     }
 
+    const koModeId = level.knockout.variant === 'overloaded' ? 'overloaded-knockout' : 'knockout';
+    const fin = this._soloModeFinish(koModeId, !!won, res.timeMs);
     let roll = Math.random();
     if (this._knockoutForce !== undefined) {
       roll = this._knockoutForce;
@@ -2991,8 +3064,8 @@ class Game {
     }
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.progress.addXp(80);
-      rewardTitle = t('🪙 +100 монет');
+      this.progress.addXp(80 * fin.mult);
+      rewardTitle = t('🪙 +{n} монет', { n: 100 * fin.mult });
       if (roll < KNOCKOUT_STAFF_CHANCE && !this.save.weapons.includes('staff')) {
         this.save.weapons.push('staff');
         this._weaponLoadout();
@@ -3004,8 +3077,8 @@ class Game {
         rewardTitle = t('💎 +5 кристалів');
         this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+5 кристалів з ящика'), 4.5);
       } else {
-        level.addCoins(100);
-        this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+100 монет з ящика'), 4.5);
+        level.addCoins(100 * fin.mult);
+        this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('+{n} монет з ящика', { n: 100 * fin.mult }), 4.5);
       }
       this.saveGame();
     }
@@ -3015,7 +3088,8 @@ class Game {
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🥊 НОКАУТ ПРОЙДЕНО!') : t('💀 НОКАУТ ПРОГРАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.knockout.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Ящик зі зброєю')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3039,13 +3113,15 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('🛡️ Ще раз!');
     }
+    const isZone = level.defense.variant === 'zone';
+    const defModeId = isZone ? 'zone-defense' : level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
+    const fin = this._soloModeFinish(defModeId, !!won, isZone ? null : res.timeMs);
     if (won) {
-      this.progress.addXp(100);
-      level.addCoins(150);
+      this.progress.addXp(100 * fin.mult);
+      level.addCoins(150 * fin.mult);
       this.saveGame();
     }
-    const isZone = level.defense.variant === 'zone';
-    this._lastEndMode = isZone ? 'zone-defense' : level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
+    this._lastEndMode = defModeId;
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
@@ -3059,7 +3135,8 @@ class Game {
       : `
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('HP вежі')}</span><span class="stat-val">${res.towerHp} / ${level.defense.towerMaxHp}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`;
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}`;
     this._showOverlay('overlay-arena-end');
   }
 
@@ -3083,6 +3160,8 @@ class Game {
       retryBtn.textContent = t('⚔️ Ще раз!');
     }
 
+    const pvpModeId = level.pvp.variant === 'overloaded' ? 'overloaded-pvp' : 'pvp';
+    const fin = this._soloModeFinish(pvpModeId, !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
       let roll = Math.random();
@@ -3091,8 +3170,8 @@ class Game {
         this._pvpForce = undefined;
       }
       if (roll < 0.5) {
-        level.addCoins(100);
-        rewardTitle = t('🪙 +100 монет');
+        level.addCoins(100 * fin.mult);
+        rewardTitle = t('🪙 +{n} монет', { n: 100 * fin.mult });
       } else {
         this.save.crystals = (this.save.crystals || 0) + 3;
         rewardTitle = t('💎 +3 кристали');
@@ -3106,7 +3185,8 @@ class Game {
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('⚔️ ПВП ПЕРЕМОГА!') : t('💀 ПВП ПРОГРАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.pvp.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3130,11 +3210,12 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('🏦 Ще раз!');
     }
+    const fin = this._soloModeFinish('bank', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.progress.addXp(90);
-      level.addCoins(125);
-      rewardTitle = t('🪙 +125 монет');
+      this.progress.addXp(90 * fin.mult);
+      level.addCoins(125 * fin.mult);
+      rewardTitle = t('🪙 +{n} монет', { n: 125 * fin.mult });
       this.saveGame();
     }
     this._lastEndMode = 'bank';
@@ -3145,7 +3226,8 @@ class Game {
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🏦</span><span class="stat-name">${t('Банків лишилось')}</span><span class="stat-val">${res.safesLeft} / 2</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3169,11 +3251,12 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('🌀 Ще раз!');
     }
+    const fin = this._soloModeFinish('portal', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.progress.addXp(110);
-      level.addCoins(150);
-      rewardTitle = t('🪙 +150 монет');
+      this.progress.addXp(110 * fin.mult);
+      level.addCoins(150 * fin.mult);
+      rewardTitle = t('🪙 +{n} монет', { n: 150 * fin.mult });
       this.saveGame();
     }
     this._lastEndMode = 'portal';
@@ -3184,7 +3267,8 @@ class Game {
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">${t('Портали закрито')}</span><span class="stat-val">${res.closed} / 3</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3208,11 +3292,12 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('🧩 Ще раз!');
     }
+    const fin = this._soloModeFinish('maze', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.progress.addXp(120);
-      level.addCoins(175);
-      rewardTitle = t('🪙 +175 монет');
+      this.progress.addXp(120 * fin.mult);
+      level.addCoins(175 * fin.mult);
+      rewardTitle = t('🪙 +{n} монет', { n: 175 * fin.mult });
       this.saveGame();
     }
     this._lastEndMode = 'maze';
@@ -3223,7 +3308,8 @@ class Game {
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🔑</span><span class="stat-name">${t('Ключі знайдено')}</span><span class="stat-val">${res.keys} / 3</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3247,13 +3333,15 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('⚔️ Ще раз!');
     }
+    const humansModeId = level.humans.variant === 'overloaded' ? 'overloaded-humans' : 'humans';
+    const fin = this._soloModeFinish(humansModeId, !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.progress.addXp(130);
-      rewardTitle = t('⭐ +130 XP');
+      this.progress.addXp(130 * fin.mult);
+      rewardTitle = t('⭐ +{n} XP', { n: 130 * fin.mult });
       this.saveGame();
     }
-    this._lastEndMode = level.humans.variant === 'overloaded' ? 'overloaded-humans' : 'humans';
+    this._lastEndMode = humansModeId;
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
@@ -3261,7 +3349,8 @@ class Game {
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі лишилось')}</span><span class="stat-val">${res.remaining} / ${res.target}</span></div>
       <div class="stat"><span class="stat-icon">🧍</span><span class="stat-name">${t('Клони живі')}</span><span class="stat-val">${res.clones} / ${res.cloneTotal}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Наслідок')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
@@ -3285,11 +3374,12 @@ class Game {
       retryBtn.style.display = '';
       retryBtn.textContent = t('👻 Ще раз!');
     }
+    const fin = this._soloModeFinish('soul-collector', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.save.souls = (this.save.souls || 0) + SOUL_WIN_REWARD;
+      this.save.souls = (this.save.souls || 0) + SOUL_WIN_REWARD * fin.mult;
       if (!this.save.soulLevel) this.save.soulLevel = 1;
-      rewardTitle = t('👻 +{n} душі', { n: SOUL_WIN_REWARD });
+      rewardTitle = t('👻 +{n} душі', { n: SOUL_WIN_REWARD * fin.mult });
       this.saveGame();
     }
     this._lastEndMode = 'soul-collector';
@@ -3300,7 +3390,8 @@ class Game {
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">👻</span><span class="stat-name">${t('Привидів лишилось')}</span><span class="stat-val">${res.remaining} / ${res.target}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
   }
