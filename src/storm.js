@@ -2,7 +2,7 @@
 // Реалізує той самий інтерфейс, що й Missions (update/getHudList/getMarkers/...),
 // тому HUD і main працюють без змін.
 import * as THREE from 'three';
-import { t, keyHint } from './i18n.js';
+import { t } from './i18n.js';
 
 export class StormMode {
   constructor(level) {
@@ -146,11 +146,6 @@ export class StormMode {
       // гостям: банер + той самий бонус монет (подія sbb)
       level.netEv('banner', t('🎉 ХВИЛЮ {n} ВІДБИТО!', { n: this.wave }), t('+{b} монет · хвиля {w} за 6с…', { b: bonus, w: this.wave + 1 }), 3.5);
       level.netEv('sbb', bonus);
-      if (this.wave % 3 === 2) {
-        const restockTip = t('🛒 Поповни запаси ({k}) — з кожною хвилею дорожче!', { k: keyHint('кнопка 🛒', 'B') });
-        level.bus.emit('toast', restockTip);
-        level.netEv('toast', restockTip);
-      }
       level.audio.mission();
       this._spawnWaveSoon = 6;
       // 🎲 «Прокачка»: пауза між хвилями — вибір 1 з 3 (лише соло-Шторм).

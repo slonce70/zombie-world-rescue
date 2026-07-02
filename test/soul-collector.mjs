@@ -16,19 +16,20 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 await page.goto(`${BASE}/?test&fresh&seed=35`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Збирач душ відкривається на 35 рівні Зоряного шляху');
+console.log('▸ Збирач душ відкривається на рівні SOUL_COLLECTOR_UNLOCK_LEVEL Зоряного шляху');
 const menu = await page.evaluate(async () => {
   const { xpForLevel } = await import('/src/progress.js');
+  const { SOUL_COLLECTOR_UNLOCK_LEVEL: UNLOCK } = await import('/src/souls.js');
   const xpTo = (lvl) => {
     let n = 0;
     for (let i = 1; i < lvl; i++) n += xpForLevel(i);
     return n;
   };
   const g = window.__game;
-  g.save.xp = xpTo(35) - 1;
+  g.save.xp = xpTo(UNLOCK) - 1;
   g.renderSoloMenu();
   const before = document.querySelector('.solo-mode[data-mode="soul-collector"]');
-  g.save.xp = xpTo(35);
+  g.save.xp = xpTo(UNLOCK);
   g.renderSoloMenu();
   const after = document.querySelector('.solo-mode[data-mode="soul-collector"]');
   return {
@@ -40,8 +41,8 @@ const menu = await page.evaluate(async () => {
     soulPathButton: !!document.getElementById('btn-souls'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 35 рівня режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && /Збирач душ/i.test(menu.name), 'на 35 рівні режим доступний', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked, 'до рівня анлоку режим заблокований', JSON.stringify(menu));
+check(menu.afterExists && !menu.afterLocked && /Збирач душ/i.test(menu.name), 'на рівні анлоку режим доступний', JSON.stringify(menu));
 check(menu.soulPathButton, 'у меню є кнопка Шлях душ', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: кімната 100x100, 20 білих привидів, 50 HP і тільки посох');

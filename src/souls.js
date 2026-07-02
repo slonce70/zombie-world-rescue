@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 
-export const SOUL_COLLECTOR_UNLOCK_LEVEL = 35;
+export const SOUL_COLLECTOR_UNLOCK_LEVEL = 15;
 export const SOUL_ROOM_SIZE = 100;
 export const SOUL_GHOSTS = 20;
 export const SOUL_GHOST_HP = 125;

@@ -147,13 +147,14 @@ const gadget = await page.evaluate(() => {
 check(!gadget.used && gadget.shield === 0 && gadget.cd === 0 && gadget.active === null,
   'щит-гаджет у режимі зомбі проти людей прибраний', JSON.stringify(gadget));
 
-console.log('▸ Програш забирає 100 монет, перемога після знищення армії');
+console.log('▸ Програш НЕ карає монетами, перемога після знищення армії');
 const lose = await page.evaluate(() => {
   const g = window.__game;
+  const coinsBefore = g.save.coins;
   g._endHumansRun(false);
-  return { coins: g.save.coins, over: g.level.humans.over, completed: g.level.humans.completed };
+  return { coinsBefore, coins: g.save.coins, over: g.level.humans.over, completed: g.level.humans.completed };
 });
-check(lose.coins === 100 && lose.over && !lose.completed, 'за поразку -100 монет', JSON.stringify(lose));
+check(lose.coins === lose.coinsBefore && lose.over && !lose.completed, 'за поразку монети не забираються', JSON.stringify(lose));
 
 await page.evaluate(() => {
   window.__game.endLevel();

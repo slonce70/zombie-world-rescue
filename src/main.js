@@ -160,7 +160,7 @@ const SOLO_MODES = [
     id: 'infected', icon: '🧟', name: () => t('ГЛАВА 2'), picker: 'infected',
     locked: ({ libN }) => libN < CHAPTER2_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < CHAPTER2_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: CHAPTER2_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: CHAPTER2_UNLOCK_COUNTRIES, c: libN })
       : t('Заражені країни: темніше, складніше, нагорода за очищення.'),
     start: (game, countryId) => game.startInfected(countryId),
   },
@@ -180,7 +180,7 @@ const SOLO_MODES = [
     id: 'worldboss', icon: '🌋', name: () => t('СВІТОВІ БОСИ'), picker: 'worldboss',
     locked: ({ libN }) => libN < WORLD_BOSS_MIN_COUNTRIES,
     desc: ({ libN }) => libN < WORLD_BOSS_MIN_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: WORLD_BOSS_MIN_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: WORLD_BOSS_MIN_COUNTRIES, c: libN })
       : t('Великі боси з окремими механіками і разовими нагородами.'),
     start: (game, id) => game.startWorldBoss(id),
   },
@@ -188,7 +188,7 @@ const SOLO_MODES = [
     id: 'knockout', icon: '🥊', name: () => t('НОКАУТ'),
     locked: ({ game }) => game.progress.level < KNOCKOUT_UNLOCK_LEVEL,
     desc: ({ game }) => game.progress.level < KNOCKOUT_UNLOCK_LEVEL
-      ? t('Відкриється на {n} рівні Зоряного шляху', { n: KNOCKOUT_UNLOCK_LEVEL })
+      ? t('Відкриється на {n} рівні Зоряного шляху (твій: {c})', { n: KNOCKOUT_UNLOCK_LEVEL, c: game.progress.level })
       : t('Кімната 33×33, 10 зомбі, тільки пістолет. Перемога може дати Посох!'),
     start: (game) => game.startKnockout(),
   },
@@ -196,7 +196,7 @@ const SOLO_MODES = [
     id: 'soul-collector', icon: '👻', name: () => t('Збирач душ'),
     locked: ({ game }) => game.progress.level < SOUL_COLLECTOR_UNLOCK_LEVEL,
     desc: ({ game }) => game.progress.level < SOUL_COLLECTOR_UNLOCK_LEVEL
-      ? t('Відкриється на {n} рівні Зоряного шляху', { n: SOUL_COLLECTOR_UNLOCK_LEVEL })
+      ? t('Відкриється на {n} рівні Зоряного шляху (твій: {c})', { n: SOUL_COLLECTOR_UNLOCK_LEVEL, c: game.progress.level })
       : t('Кімната 100×100, 20 привидів, тільки посох. Перемога: +3 душі.'),
     start: (game) => game.startSoulCollector(),
   },
@@ -204,7 +204,7 @@ const SOLO_MODES = [
     id: 'overloaded-knockout', icon: '💥', name: () => t('Перегружений нокаут'),
     locked: ({ libN }) => libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES, c: libN })
       : t('Кімната 33×33, 20 зомбі, у тебе 150 HP і тільки пістолет.'),
     start: (game) => game.startOverloadedKnockout(),
   },
@@ -212,7 +212,7 @@ const SOLO_MODES = [
     id: 'zone-defense', icon: '⭕', name: () => t('Оборона в зоні'),
     locked: ({ libN }) => libN < ZONE_DEFENSE_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < ZONE_DEFENSE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES, c: libN })
       : t('Коло 30 метрів: протримайся 125 секунд із посохом і пістолетом.'),
     start: (game) => game.startZoneDefense(),
   },
@@ -220,7 +220,7 @@ const SOLO_MODES = [
     id: 'defense', icon: '🛡️', name: () => t('ОБОРОНА'),
     locked: ({ libN }) => libN < DEFENSE_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < DEFENSE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: DEFENSE_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: DEFENSE_UNLOCK_COUNTRIES, c: libN })
       : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
     start: (game) => game.startDefense(),
   },
@@ -228,7 +228,7 @@ const SOLO_MODES = [
     id: 'overloaded-defense', icon: '🏰', name: () => t('Перегружена оборона'),
     locked: ({ libN }) => libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, c: libN })
       : t('3 хвилі: вежа 500 HP, гравець 250 HP, зомбі 234 HP.'),
     start: (game) => game.startOverloadedDefense(),
   },
@@ -236,7 +236,7 @@ const SOLO_MODES = [
     id: 'overloaded-pvp', icon: '💣', name: () => t('Перегружене ПВП'),
     locked: ({ libN }) => libN < OVERLOADED_PVP_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_PVP_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES, c: libN })
       : t('Дуель 35×35: гармата, меч і щити проти зомбі 3000 HP.'),
     start: (game) => game.startOverloadedPvp(),
   },
@@ -244,7 +244,7 @@ const SOLO_MODES = [
     id: 'bank', icon: '🏦', name: () => t('БАНК'),
     locked: ({ libN }) => libN < BANK_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < BANK_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: BANK_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: BANK_UNLOCK_COUNTRIES, c: libN })
       : t('Кімната 200×50: захисти свій банк і знищ банк зомбі.'),
     start: (game) => game.startBank(),
   },
@@ -252,7 +252,7 @@ const SOLO_MODES = [
     id: 'portal', icon: '🌀', name: () => t('ПОРТАЛ'),
     locked: ({ libN }) => libN < PORTAL_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < PORTAL_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: PORTAL_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: PORTAL_UNLOCK_COUNTRIES, c: libN })
       : t('Закрий 3 портали, поки вони випускають хвилі зомбі.'),
     start: (game) => game.startPortal(),
   },
@@ -260,7 +260,7 @@ const SOLO_MODES = [
     id: 'maze', icon: '🧩', name: () => t('ЛАБІРИНТ'),
     locked: ({ libN }) => libN < MAZE_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < MAZE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: MAZE_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: MAZE_UNLOCK_COUNTRIES, c: libN })
       : t('Знайди 3 ключі, відкрий вихід і виживи у коридорах.'),
     start: (game) => game.startMaze(),
   },
@@ -268,15 +268,15 @@ const SOLO_MODES = [
     id: 'humans', icon: '⚔️', name: () => t('ЗОМБІ ПРОТИ ЛЮДЕЙ'),
     locked: ({ libN }) => libN < HUMANS_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < HUMANS_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: HUMANS_UNLOCK_COUNTRIES })
-      : t('30 клонів проти 65 зомбі і робота. Поразка: -100 монет.'),
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: HUMANS_UNLOCK_COUNTRIES, c: libN })
+      : t('30 клонів проти 65 зомбі і робота. Командуй армією!'),
     start: (game) => game.startHumans(),
   },
   {
     id: 'overloaded-humans', icon: '💥', name: () => t('Перегружена зомбі проти людей'),
     locked: ({ libN }) => libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES, c: libN })
       : t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.'),
     start: (game) => game.startOverloadedHumans(),
   },
@@ -284,7 +284,7 @@ const SOLO_MODES = [
     id: 'pvp', icon: '⚔️', name: () => t('ПВП'),
     locked: ({ libN }) => libN < PVP_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < PVP_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн', { n: PVP_UNLOCK_COUNTRIES })
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: PVP_UNLOCK_COUNTRIES, c: libN })
       : t('Дуель 30×30: посох проти зомбі на 250 HP.'),
     start: (game) => game.startPvp(),
   },
@@ -3239,10 +3239,6 @@ class Game {
     if (won) {
       this.progress.addXp(130);
       rewardTitle = t('⭐ +130 XP');
-      this.saveGame();
-    } else {
-      this.save.coins = Math.max(0, (this.save.coins || 0) - 100);
-      rewardTitle = t('🪙 -100 монет');
       this.saveGame();
     }
     this._lastEndMode = level.humans.variant === 'overloaded' ? 'overloaded-humans' : 'humans';
