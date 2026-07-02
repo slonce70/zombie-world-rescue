@@ -11,7 +11,7 @@ const page = await (await browser.newContext({ viewport: { width: 1280, height: 
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
-await page.goto(`${BASE}/?test&fresh&seed=1&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.goto(`${BASE}/?test&fresh&seed=1&country=UKR&draft`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level' && window.__game.level && !!window.__game.level.missions, null, { timeout: 30000 });
 await page.waitForTimeout(400);
 

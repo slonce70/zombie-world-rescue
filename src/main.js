@@ -76,7 +76,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 233;
+const APP_VERSION = 234;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2461,8 +2461,12 @@ class Game {
       if (level.playground) return;
       this.progress.addXp(XP_VALUES.mission);
       if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('mission');
-      // 🎲 кампанія: місію здано → драфт «Прокачки» (лише соло; Шторм відкриває свій після хвилі)
-      if (!level.net && level.runBuild && !level.storm && !this.victoryShown && this.draft) this.draft.open();
+      // 🎲 кампанія: місію здано → драфт «Прокачки» (лише соло; Шторм відкриває свій після хвилі).
+      // Гард на смерть: draft.isOpen морозить сим — відкритий над мертвим гравцем завісив би респавн.
+      // У ?test вимкнено (сценарні тести здають місії пачками; вмикається &draft — test/draft-campaign.mjs),
+      // такий самий патерн, як ?test-вимкнення хмари з опцією &cloud.
+      if (!level.net && level.runBuild && !level.storm && !this.victoryShown && this.draft
+        && level.player.health > 0 && (!this.testMode || this.params.has('draft'))) this.draft.open();
     });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
