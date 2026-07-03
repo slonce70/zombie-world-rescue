@@ -50,7 +50,7 @@ const shape = await page.evaluate(() => {
     cur: g.level.player.cur,
     playerHp: tw.playerHp,
     enemyHp: tw.enemyHp,
-    robot: robot && { hp: robot.maxHp, dmg: robot.stats.dmg },
+    robot: robot && { hp: robot.maxHp, dmg: robot.stats.dmg, shieldHp: robot.shieldHp || 0, shieldObj: !!robot.shieldObj },
     roomW: tw.roomW,
     roomD: tw.roomD,
     nearOwnTurret: Math.hypot(g.level.player.pos.x - tw.px, g.level.player.pos.z - tw.cz) < 10,
@@ -60,6 +60,7 @@ check(shape.modeId === 'turretwar' && shape.noShop && shape.noGadgets && shape.n
 check(shape.weapons.length === 1 && shape.cur === 'hammer', 'єдина зброя — молот', JSON.stringify(shape.weapons));
 check(shape.playerHp === 500 && shape.enemyHp === 500 && shape.roomW === 200 && shape.roomD === 50, 'кімната 200×50, турелі по 500 HP', JSON.stringify({ w: shape.roomW, d: shape.roomD }));
 check(shape.robot && shape.robot.hp === 1000 && shape.robot.dmg === 20, 'ворожий робот: 1000 HP, 20 шкоди', JSON.stringify(shape.robot));
+check(shape.robot && shape.robot.shieldHp === 0 && !shape.robot.shieldObj, 'зомбі-робот у режимі без щита', JSON.stringify(shape.robot));
 check(shape.nearOwnTurret, 'гравця телепортовано до своєї турелі');
 
 // молот: 35 шкоди, 1 удар/с
@@ -163,6 +164,24 @@ const ally = await page.evaluate(() => {
 });
 check(ally.spawned && ally.d === 20 && ally.allyHp === 1000, 'союзник 1000 HP прибув на 30с і б\'є турель по 20', JSON.stringify(ally));
 
+const allyTarget = await page.evaluate(() => {
+  const g = window.__game;
+  const tw = g.level.turretwar;
+  const z = g.level.zombies.list.find((zz) => zz.turretwar && zz.type !== 'robot' && zz.state !== 'dead');
+  tw.ally.x = tw.px + 20;
+  tw.ally.z = tw.cz;
+  tw.ally.hp = 1000;
+  z.x = tw.ally.x + 0.8;
+  z.z = tw.ally.z;
+  z.y = tw.floorY;
+  z.defenseHitCd = 0;
+  const hp0 = tw.ally.hp;
+  tw.fireT = 99;
+  tw.update(0.016);
+  return { hp0, hp: tw.ally.hp };
+});
+check(allyTarget.hp < allyTarget.hp0, 'зомбі атакують робота-союзника, якщо він поруч', JSON.stringify(allyTarget));
+
 // перемога: ворожа турель падає → екран, монети, рекорд
 const win = await page.evaluate(() => {
   const g = window.__game;
@@ -172,6 +191,8 @@ const win = await page.evaluate(() => {
   tw.enemyHp = 1;
   tw.fireT = 99;
   tw._lastCd = 99; // без випадкового удару
+  tw.ally.x = tw.ex - 2;
+  tw.ally.z = tw.cz;
   tw.ally.hitT = 0;
   tw.update(0.016);
   return {
@@ -208,6 +229,24 @@ const loseRes = await page.evaluate(() => {
   };
 });
 check(loseRes.over && !loseRes.completed && loseRes.title.includes('ЗРУЙНОВАНО'), 'падіння своєї турелі — поразка', JSON.stringify(loseRes));
+
+const playerDeath = await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  await g.startTurretWar();
+  const tw = g.level.turretwar;
+  tw.playerHp = 500;
+  g.level.player.health = 0;
+  g._onPlayerDied();
+  return {
+    over: tw.over,
+    completed: tw.completed,
+    playerHp: tw.playerHp,
+    title: document.querySelector('#overlay-arena-end h1').textContent,
+  };
+});
+check(playerDeath.over && !playerDeath.completed && playerDeath.playerHp > 0 && !playerDeath.title.includes('ЗРУЙНОВАНО'),
+  'смерть гравця показує окрему причину, не падіння турелі', JSON.stringify(playerDeath));
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 2).join(' | '));
 console.log(fail === 0 ? '\n🎉 TURRETWAR OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);

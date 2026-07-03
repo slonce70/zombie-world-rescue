@@ -132,6 +132,12 @@ const golden = await page.evaluate(() => {
   const g = window.__game;
   const gz = g.level.zombies.list.find((z) => z.golden);
   if (!gz) return null;
+  g.__goldenVoiceHits = 0;
+  const oldVoiceOnce = g.level.audio.voiceOnce.bind(g.level.audio);
+  g.level.audio.voiceOnce = (id, cd) => {
+    if (id === 'golden') g.__goldenVoiceHits++;
+    return oldVoiceOnce(id, cd);
+  };
   g.test.teleport(gz.x + 8, gz.z);
   return { x: gz.x, z: gz.z };
 });
@@ -147,6 +153,8 @@ await waitFor(async () => {
   return fled === 'flee';
 }, 10000, 'золотий тікає');
 check(fled === 'flee', `золотий тікає (стан: ${fled})`);
+const goldenVoiceNear = await page.evaluate(() => window.__game.__goldenVoiceHits || 0);
+check(goldenVoiceNear === 1, `озвучка золотого спрацьовує при наближенні (${goldenVoiceNear})`);
 const coinsBefore = await page.evaluate(() => window.__game.level.effects.coins.length);
 await page.evaluate(() => {
   const gz = window.__game.level.zombies.list.find((z) => z.golden);
@@ -155,6 +163,8 @@ await page.evaluate(() => {
 await page.waitForTimeout(600);
 const coinsAfter = await page.evaluate(() => window.__game.level.effects.coins.length);
 check(coinsAfter >= coinsBefore + 10, `джекпот: +${coinsAfter - coinsBefore} монет на землі`);
+const goldenVoiceAfterKill = await page.evaluate(() => window.__game.__goldenVoiceHits || 0);
+check(goldenVoiceAfterKill === 1, `після смерті золотого озвучка не повторюється (${goldenVoiceAfterKill})`);
 
 // батут
 console.log('▸ Батут');

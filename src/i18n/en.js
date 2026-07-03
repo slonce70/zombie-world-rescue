@@ -1359,6 +1359,7 @@ export const EN = {
 "💥 Твого робота розбито!": "💥 Your robot is destroyed!",
 "🗼 ЗОМБІ-ТУРЕЛЬ ЗНЕСЕНО!": "🗼 ZOMBIE TURRET DESTROYED!",
 "💀 ТВОЮ ТУРЕЛЬ ЗРУЙНОВАНО": "💀 YOUR TURRET IS DESTROYED",
+"💀 ГЕРОЯ ПЕРЕМОЖЕНО": "💀 HERO DEFEATED",
 "🗼 Ще раз!": "🗼 Again!",
 "Твоя турель": "Your turret",
 "Зомбі-турель": "Zombie turret",

@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 244;
+const APP_VERSION = 245;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2995,7 +2995,7 @@ class Game {
       return;
     }
     if (this.level.turretwar) {
-      this._endTurretWarRun(false);
+      this._endTurretWarRun(false, 'player');
       return;
     }
     if (this.level.pvp) {
@@ -3422,7 +3422,7 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
-  _endTurretWarRun(won = true) {
+  _endTurretWarRun(won = true, reason = 'turret') {
     const level = this.level;
     if (!level || !level.turretwar || level.turretwar.over) return;
     level.turretwar.completed = !!won;
@@ -3451,7 +3451,9 @@ class Game {
     const mins = Math.floor(res.timeMs / 60000);
     const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
-    document.querySelector('#overlay-arena-end h1').textContent = won ? t('🗼 ЗОМБІ-ТУРЕЛЬ ЗНЕСЕНО!') : t('💀 ТВОЮ ТУРЕЛЬ ЗРУЙНОВАНО');
+    document.querySelector('#overlay-arena-end h1').textContent = won
+      ? t('🗼 ЗОМБІ-ТУРЕЛЬ ЗНЕСЕНО!')
+      : reason === 'player' ? t('💀 ГЕРОЯ ПЕРЕМОЖЕНО') : t('💀 ТВОЮ ТУРЕЛЬ ЗРУЙНОВАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('Твоя турель')}</span><span class="stat-val">${res.playerHp} / 500</span></div>
       <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">${t('Зомбі-турель')}</span><span class="stat-val">${res.enemyHp} / 500</span></div>

@@ -724,7 +724,7 @@ export class Zombies {
         const a = (i / 12) * Math.PI * 2;
         level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
       }
-      level.audio.goldenJingle();
+      level.audio.goldenJingle(false);
       level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
       level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
     }
@@ -851,7 +851,13 @@ export class Zombies {
       const nightAggro = 1 + (level.nightK || 0) * 0.5;
       // золотий зомбі: побачив гравця — тікає
       if (z.golden && z.state !== 'dead') {
-        if (playerAlive && distP < 26) z.state = 'flee';
+        if (playerAlive && distP < 26) {
+          z.state = 'flee';
+          if (!z._goldenVoice) {
+            z._goldenVoice = true;
+            level.audio.goldenJingle();
+          }
+        }
         else if (z.state === 'flee' && distP > 42) z.state = 'wander';
       }
 
@@ -1603,7 +1609,7 @@ export class Zombies {
       level.stats.kills++;
       level.bus.emit('zombieKilled', z);
     }
-    if (golden) level.audio.goldenJingle();
+    if (golden) level.audio.goldenJingle(false);
     if (z.type === 'boss') this.boss = null;
   }
 

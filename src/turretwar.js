@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { makeZombie, updateRig, setAnim } from './characters.js';
-import { RNG } from './utils.js';
+import { RNG, disposeObject } from './utils.js';
 
 export const TURRETWAR_UNLOCK_COUNTRIES = 12;
 const TURRET_HP = 500;
@@ -103,8 +103,12 @@ export class TurretWarMode {
     for (const z of level.zombies.list) {
       if (!z.turretwar || z.state === 'dead') continue;
       this._clampZombie(z);
-      const dx = this.px - z.x;
-      const dz = this.cz - z.z;
+      const targetAlly = z.type !== 'robot' && this.ally && this.ally.hp > 0
+        && Math.hypot(this.ally.x - z.x, this.ally.z - z.z) < 12;
+      const tx = targetAlly ? this.ally.x : this.px;
+      const tz = targetAlly ? this.ally.z : this.cz;
+      const dx = tx - z.x;
+      const dz = tz - z.z;
       const d = Math.hypot(dx, dz) || 1;
       if (d > 2.6) {
         const step = Math.min(d - 2.6, dt * (z.stats?.speed || 2.2) * 0.55);
@@ -113,8 +117,11 @@ export class TurretWarMode {
         z.aggroed = false;
         z.state = 'wander';
       } else {
+        if (targetAlly) {
+          z._twHitT = (z._twHitT || 0) - dt;
+          if (z._twHitT <= 0) { z._twHitT = 0.9; this.ally.hp -= z.stats?.dmg || 10; this._hitFx(this.ally.x, this.ally.z); }
         // біля турелі: робот б'є 20 раз/с, зомбі гризуть 6 dps
-        if (z.type === 'robot') {
+        } else if (z.type === 'robot') {
           z._twHitT = (z._twHitT || 0) - dt;
           if (z._twHitT <= 0) { z._twHitT = 1; this.playerHp -= ROBOT_DMG; this._hitFx(this.px, this.cz); }
         } else this.playerHp -= dt * 6;
@@ -140,7 +147,7 @@ export class TurretWarMode {
     }
     this._lastCd = p.shootCd;
 
-    if (!this.over && this.playerHp <= 0) level.game._endTurretWarRun(false);
+    if (!this.over && this.playerHp <= 0) level.game._endTurretWarRun(false, 'turret');
     if (!this.over && this.enemyHp <= 0) {
       this.completed = true;
       level.game._endTurretWarRun(true);
@@ -199,7 +206,10 @@ export class TurretWarMode {
     });
     zb.maxHp = ROBOT_HP;
     zb.hp = ROBOT_HP;
-    zb.stats = { ...zb.stats, dmg: ROBOT_DMG, coins: 0 };
+    if (zb.shieldObj) { zb.rig.body.remove(zb.shieldObj.group); disposeObject(zb.shieldObj.group); }
+    zb.shieldHp = zb.shieldMax = zb.shieldRecastCd = 0;
+    zb.shieldObj = null;
+    zb.stats = { ...zb.stats, dmg: ROBOT_DMG, coins: 0, shieldHp: 0 };
     zb.turretwar = true;
     zb.aggroed = false;
     zb.state = 'wander';

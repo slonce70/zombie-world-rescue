@@ -159,8 +159,8 @@ export class AudioMan {
     this._osc('square', 700, t + 0.09, 0.08, 0.08, 420);
   }
 
-  goldenJingle() {
-    this.voiceOnce('golden', 15);
+  goldenJingle(speak = true) {
+    if (speak) this.voiceOnce('golden', 15);
     const t = this.t;
     [79, 83, 86, 91, 95].forEach((m, i) => {
       this._osc('triangle', midi(m), t + i * 0.09, 0.25, 0.28);
