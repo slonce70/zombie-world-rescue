@@ -73,6 +73,9 @@ export const SHOP_ITEMS = [
   { id: 'angel-action-1', icon: '🪽', name: t('Ангел: Німб'), desc: t('Акція 1/3 для набору Ангела'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 1 },
   { id: 'angel-action-2', icon: '✨', name: t('Ангел: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 2 },
   { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 завершує набір і відкриває скін Ангел'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
+  { id: 'demon-action-1', icon: '😈', name: t('Демон: Роги'), desc: t('Акція 1/3 для набору Демона'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 1 },
+  { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 2 },
+  { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 завершує набір і відкриває скін Демон'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -85,6 +88,12 @@ export const SHOP_ITEMS = [
 
 function itemAvailable(item) {
   return !item.availableUntil || Date.now() <= item.availableUntil;
+}
+
+function offerChain(item) {
+  if (item.angelStep) return { skin: 'angel', step: item.angelStep, icon: '🪽', name: t('Ангел'), fx: t('Білі іскри після вбивства') };
+  if (item.demonStep) return { skin: 'demon', step: item.demonStep, icon: '😈', name: t('Демон'), fx: t('Червоні іскри після вбивства') };
+  return null;
 }
 
 // Поточна «Моя ціль»: товар, на який гравець збирає монети (або null).
@@ -197,24 +206,25 @@ export class Shop {
       const maxed = count >= item.max;
       const locked = item.needsBazooka && !hasBazooka;
       const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
-      const lockedAngel = item.angelStep > 1 && !(save.upgrades[`angel-action-${item.angelStep - 1}`] > 0);
+      const chain = offerChain(item);
+      const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
       const price = this.priceOf(item);
       const afford = save.coins >= price && (!item.crystalPrice || (save.crystals || 0) >= item.crystalPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = (locked || lockedGadget || lockedAngel) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin ? t('Є!') : t('МАКС'))
+      const priceLabel = (locked || lockedGadget || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin ? t('Є!') : t('МАКС'))
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.crystalPrice ? `${item.crystalPrice} 💎` : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
-        : lockedAngel ? t('Спершу купи попередню акцію')
+        : lockedChain ? t('Спершу купи попередню акцію')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedAngel;
+      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedChain;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
-        <div class="shop-item ${maxed || locked || lockedGadget || lockedAngel ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
+        <div class="shop-item ${maxed || locked || lockedGadget || lockedChain ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
           ${goalBtn}
           <div class="shop-icon">${item.icon}</div>
           <div class="shop-name">${item.name}${lvl}</div>
@@ -258,11 +268,12 @@ export class Shop {
     if (!item || !player || !itemAvailable(item)) return;
     const count = this.getCount(item);
     const price = this.priceOf(item);
-    const lockedAngel = item.angelStep > 1 && !(save.upgrades[`angel-action-${item.angelStep - 1}`] > 0);
+    const chain = offerChain(item);
+    const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
     if (count >= item.max || save.coins < price || (item.crystalPrice && (save.crystals || 0) < item.crystalPrice)
       || (item.needsBazooka && !save.weapons.includes('bazooka'))
       || (item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget))
-      || lockedAngel) {
+      || lockedChain) {
       game.audio.denied();
       return;
     }
@@ -301,13 +312,13 @@ export class Shop {
       if (!save.gadgetHypers.includes(item.hyper)) save.gadgetHypers.push(item.hyper);
       game.hud.toast(t('{i} {n} активовано назавжди!', { i: item.icon, n: item.name }));
     }
-    if (item.angelStep) {
-      if (item.angelStep >= 3) {
-        if (!save.skins.includes('angel')) save.skins.push('angel');
-        save.activeSkin = 'angel';
-        game.hud.toast(t('🪽 Скін Ангел відкрито! Білі іскри після вбивства'));
+    if (chain) {
+      if (chain.step >= 3) {
+        if (!save.skins.includes(chain.skin)) save.skins.push(chain.skin);
+        save.activeSkin = chain.skin;
+        game.hud.toast(t('{i} Скін {n} відкрито! {fx}', { i: chain.icon, n: chain.name, fx: chain.fx }));
       } else {
-        game.hud.toast(t('🪽 Акція Ангел {n}/3 куплена', { n: item.angelStep }));
+        game.hud.toast(t('{i} Акція {name} {n}/3 куплена', { i: chain.icon, name: chain.name, n: chain.step }));
       }
     }
     switch (id) {

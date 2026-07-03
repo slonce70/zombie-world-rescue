@@ -2372,6 +2372,7 @@ export const HERO_SKINS = {
   gardener: { name: t('Садівник'), icon: '🪴', desc: t('Випадає зі скін-бокса') },
   zombie: { name: t('Зомбі'), icon: '🧟', desc: t('Випадає зі скін-бокса') },
   angel: { name: t('Ангел'), icon: '🪽', desc: t('Збери всі акції Ангела в магазині') },
+  demon: { name: t('Демон'), icon: '😈', desc: t('Збери всі акції Демона в магазині') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2963,6 +2964,29 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       }
       return rig;
     },
+    demon() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xd07a5a, shirt: 0x2a1518, pants: 0x4a1118, shoes: 0x151015,
+        eyeL: 0.065, eyeR: 0.065, eyeWhite: 0xffe0d8, pupilColor: 0xff2b2b,
+        mouth: 'crooked', mouthColor: 0x5a1010, brow: -0.16, cast: 'all', sleeves: 'shirt',
+      });
+      const redM = toonMat(0xff2b2b, 0x991111, 0.5);
+      const darkM = toonMat(0x1a1118, 0x090608, 0.25);
+      for (const side of [-1, 1]) {
+        const horn = cone(0.07, 0.24, redM, 8);
+        horn.position.set(0.13 * side, 0.43, 0.02);
+        horn.rotation.z = -side * 0.28;
+        rig.parts.head.add(horn);
+      }
+      const chest = sphere(0.07, redM, 8, 6);
+      chest.position.set(0, 0.38, -0.27);
+      rig.parts.torso.add(chest);
+      const cape = box(0.5, 0.78, 0.045, darkM);
+      cape.position.set(0, 0.08, 0.28);
+      cape.rotation.x = -0.1;
+      rig.parts.torso.add(cape);
+      return rig;
+    },
     custom() {
       const hc = heroColors || {};
       const f = faceSpec(hc.face || 'smile');
@@ -2992,7 +3016,7 @@ export function makeHero(skinId = 'classic', heroColors = null) {
   const rig = (builders[skinId] || builders.classic)();
   rig.heroSkin = builders[skinId] ? skinId : 'classic';
   // спільне для всіх скінів: рюкзачок (крім скінів зі своїм предметом на спині)
-  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel') {
+  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel' && skinId !== 'demon') {
     const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
     const pack = box(0.34, 0.4, 0.16, packM);
     pack.position.set(0, 0.34, 0.3);
