@@ -78,7 +78,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 261;
+const APP_VERSION = 262;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];

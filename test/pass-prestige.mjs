@@ -45,10 +45,12 @@ const backlog = await page.evaluate(() => {
     dCoins: g.save.coins - coins0,
     dCr: (g.save.crystals || 0) - cr0,
     passLvl: g.save.passLvl,
+    mineHyper: (g.save.gadgetHypers || []).includes('mine'),
   };
 });
-// монети 41..64: 1500+1600+...+3800 (без 45/50/55/60 — там кристали) = 50000; кристали 20+25+30+35 = 110
-check(backlog.dCoins === 50000 && backlog.dCr === 110 && backlog.passLvl === 65,
+// монети 41..64: 1500+1600+...+3800 (без 45/50/55/60) = 50000;
+// 45 = гіперзаряд міни (v246), кристали 50/55/60: 25+30+35 = 90
+check(backlog.dCoins === 50000 && backlog.dCr === 90 && backlog.mineHyper && backlog.passLvl === 65,
   'catch-up видає нагороди 41..65 разом і фіксує passLvl', JSON.stringify(backlog));
 
 // повторний виклик — нічого не дублює
