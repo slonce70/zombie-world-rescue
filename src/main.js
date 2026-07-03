@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 242;
+const APP_VERSION = 243;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2618,7 +2618,10 @@ class Game {
       if (this.touch) this.touch.vibeKill(z.type === 'boss');
       // 🧛 картка драфта «+1 HP за вбивство» (run-only, лише соло — runBuild нема в коопі)
       const lp = level.player;
-      if (lp.lifeSteal > 0 && lp.health > 0) lp.health = Math.min(lp.maxHealth, lp.health + lp.lifeSteal);
+      if (lp.lifeSteal > 0 && lp.health > 0) {
+        lp.maxHealth += lp.lifeSteal;
+        lp.health += lp.lifeSteal;
+      }
       this.save.stats.killed++;
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;

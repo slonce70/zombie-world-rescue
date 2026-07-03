@@ -11,7 +11,8 @@ const { CARD_POOL, COMBOS, RunBuild } =
 
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
-const mkPlayer = () => ({ damageMult: 1, speedMult: 1, maxHealth: 100, health: 100, grenades: 2 });
+const mkPlayer = () => ({ damageMult: 1, speedMult: 1, maxHealth: 100, health: 100, grenades: 2, maxArmor: 50, armor: 0 });
+const combatSnapshot = (p) => [p.damageMult, p.speedMult, p.maxHealth, p.health, p.grenades, p.armor, p.lifeSteal || 0];
 
 // пул має ≥3 картки і покриває 3 теги
 check(CARD_POOL.length >= 3, 'у пулі ≥3 карток', CARD_POOL.length);
@@ -49,6 +50,15 @@ check(CARD_POOL.length >= 15, 'у пулі ≥15 карток', CARD_POOL.length
 check(new Set(CARD_POOL.map((c) => c.id)).size === CARD_POOL.length, 'id карток унікальні');
 check(CARD_POOL.every((c) => ['common', 'rare', 'epic'].includes(c.rarity)), 'усі рідкості валідні');
 check(['common', 'rare', 'epic'].every((r) => CARD_POOL.some((c) => c.rarity === r)), 'є common, rare і epic');
+
+for (const card of CARD_POOL) {
+  const pc = mkPlayer();
+  const beforeCard = combatSnapshot(pc).join('|');
+  card.apply(pc);
+  const afterCard = combatSnapshot(pc);
+  check(afterCard.join('|') !== beforeCard, `картка ${card.id} змінює бойовий стан`);
+  check(afterCard.every(Number.isFinite), `картка ${card.id} не ламає числові стати`, JSON.stringify(afterCard));
+}
 
 // взяті картки не пропонуються повторно (поки колода не скінчилась)
 const rb3 = new RunBuild();

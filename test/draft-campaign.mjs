@@ -42,18 +42,19 @@ const picked = await page.evaluate(() => {
 });
 check(!picked.open && picked.picks === 1, 'картку взято, драфт закрито', JSON.stringify(picked));
 
-// 🧛 вампіризм: +HP за вбивство (хук у zombieKilled)
+// 🧛 +HP за вбивство: збільшує запас здоров'я, а не тільки лікує до старої стелі
 const vamp = await page.evaluate(() => {
   const g = window.__game;
   const p = g.level.player;
-  p.lifeSteal = 5;
-  p.health = 40;
+  p.lifeSteal = 1;
+  p.maxHealth = 100;
+  p.health = 100;
   const z = g.test.spawnZombie('walker', p.pos.x + 3, p.pos.z);
   z.hp = 1;
   z.damage(999, null, false);
-  return { health: p.health };
+  return { health: p.health, maxHealth: p.maxHealth };
 });
-check(vamp.health === 45, 'вампіризм лікує +5 HP за вбивство', JSON.stringify(vamp));
+check(vamp.health === 101 && vamp.maxHealth === 101, '+1 HP за вбивство збільшує max/current HP', JSON.stringify(vamp));
 
 // екран перемоги показує рядок «Твоя збірка»
 const victory = await page.evaluate(() => {
