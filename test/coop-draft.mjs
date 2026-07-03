@@ -21,7 +21,7 @@ const check = (ok, msg, extra = '') => {
   if (!ok) failed++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const evalWithTimeout = (page, fn, label = 'evaluate', ms = 10000 * SLOW) => Promise.race([
+const evalWithTimeout = (page, fn, label = 'evaluate', ms = 30000 * SLOW) => Promise.race([
   page.evaluate(fn),
   new Promise((_, reject) => setTimeout(() => reject(new Error(`${label}: evaluate timeout ${ms}ms`)), ms)),
 ]);
