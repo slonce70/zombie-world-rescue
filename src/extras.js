@@ -984,7 +984,9 @@ export class Gadgets {
       const x = pos.x + Math.cos(this.level.player.yaw) * off;
       const z = pos.z - Math.sin(this.level.player.yaw) * off;
       const y = this._floorY(x, z, pos.y) + CLONE_FOOT_LIFT;
-      const rig = makeHero('ninja');
+      const save = this.level.game.save || {};
+      const cloneSkin = save.activeCloneSkin === 'radiation' && (save.cloneSkins || []).includes('radiation') ? 'radiation' : 'ninja';
+      const rig = makeHero(cloneSkin);
       const shieldMesh = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.72, 1),
         new THREE.MeshBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false })

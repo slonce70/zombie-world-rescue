@@ -35,7 +35,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'chapter', 'infected', 'megaQuests', 'medals', 'stats',
   'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
   'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
-  'towerSkins', 'diffStar', 'weapons',
+  'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -80,6 +80,8 @@ export function saveHasProgress(s) {
     || (s.pets || []).length > 0                            // куплені улюбленці
     || (s.towerSkins || []).length > 1                      // куплені скіни башти
     || (s.diffStar | 0) > 1                                 // піднята складність
+    || (s.radiationCoins | 0) > 0                            // валюта режиму Радіація
+    || (s.cloneSkins || []).length > 0 || (!!s.activeCloneSkin && s.activeCloneSkin !== 'ninja')
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

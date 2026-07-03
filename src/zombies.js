@@ -731,7 +731,7 @@ export class Zombies {
     if (z.type === 'boss') {
       this.boss = null;
       // фонтан монет за боса
-      if (!z.worldBoss) {
+      if (!z.worldBoss && !level.noCoinDrops) {
         for (let i = 0; i < 12; i++) {
           const a = (i / 12) * Math.PI * 2;
           level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(1, 4), z.z + Math.sin(a) * this.rng.range(1, 4), 25);

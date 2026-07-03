@@ -36,6 +36,7 @@ import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
   worldBossUnlocked,
 } from './worldboss.js';
+import { RadiationMode, RADIATION_UNLOCK_COUNTRIES, RADIATION_WIN_COINS } from './radiationmode.js';
 import {
   HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, setAnim, updateRig,
@@ -77,7 +78,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 257;
+const APP_VERSION = 258;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -140,7 +141,7 @@ function buildTips() {
 // 6 вкладок замість 10: «перегружені» варіанти живуть тумблером 💀 на базовій картці
 const SOLO_MODE_GROUPS = [
   { id: 'campaign', title: () => t('КАМПАНІЯ'), ids: ['campaign', 'infected', 'chapter3'] },
-  { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss'] },
+  { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss', 'radiation'] },
   { id: 'duels', title: () => t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
   { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
   // «ВИКЛИКИ», не «ВИПРОБУВАННЯ»: довше слово не влазить у 2 ряди табів на 375px
@@ -162,6 +163,7 @@ export const MODE_RULES = {
   storm: { noShop: true },
   arena: {},
   worldboss: { noShop: true },
+  radiation: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   knockout: { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
   'friendly-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
   'overloaded-knockout': { noGadgets: true, noShop: true, noBuffs: true, noZombiePickups: true },
@@ -195,6 +197,7 @@ const WEEKLY_MODIFIER_POOL = ['night', 'noshop', 'horde'];
 
 function modeIdFromOpts(opts, worldBossId) {
   if (worldBossId) return 'worldboss';
+  if (opts.radiation) return 'radiation';
   if (opts.storm) return 'storm';
   if (opts.arena) return 'arena';
   if (opts.knockout) return opts.knockout === 'overloaded' ? 'overloaded-knockout' : opts.knockout === 'friendly' ? 'friendly-knockout' : 'knockout';
@@ -221,6 +224,7 @@ const MODE_START_OPTS = {
   storm: () => ({ storm: true }),
   arena: () => ({ arena: true }),
   worldboss: (id) => ({ worldBoss: id }),
+  radiation: () => ({ radiation: true }),
   knockout: () => ({ knockout: true }),
   'friendly-knockout': () => ({ knockout: 'friendly' }),
   'overloaded-knockout': () => ({ knockout: 'overloaded' }),
@@ -284,6 +288,14 @@ const SOLO_MODES = [
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: WORLD_BOSS_MIN_COUNTRIES, c: libN })
       : t('Великі боси з окремими механіками і разовими нагородами.'),
     start: (game, id) => game.startWorldBoss(id),
+  },
+  {
+    id: 'radiation', icon: '☢️', name: () => t('РАДІАЦІЯ'),
+    locked: ({ libN }) => libN < RADIATION_UNLOCK_COUNTRIES,
+    desc: ({ libN }) => libN < RADIATION_UNLOCK_COUNTRIES
+      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: RADIATION_UNLOCK_COUNTRIES, c: libN })
+      : t('Кімната 50×50: 50 HP, дробовик з 10 патронами, один радіаційний зомбі. Перемога: +50 монет радіації.'),
+    start: (game) => game.startRadiation(),
   },
   {
     id: 'knockout', icon: '🥊', name: () => t('НОКАУТ'),
@@ -692,8 +704,9 @@ class Game {
       coins: NEW_SAVE_COINS, crystals: 0, upgrades: {}, liberated: {}, weapons: [], records: {},
       weaponLoadout: ['pistol'],
       xp: 0, passLvl: 1, skins: ['classic', 'custom'], dances: ['shuffle'], tracers: ['classic'],
-      souls: 0, soulLevel: 1,
+      souls: 0, soulLevel: 1, radiationCoins: 0,
       activeSkin: 'classic', activeDance: 'shuffle', activeTracer: 'classic',
+      cloneSkins: [], activeCloneSkin: 'ninja',
       titles: [], activeTitle: null,
       hero: { ...DEFAULT_HERO },
       gadgetsOwned: [], gadgetHypers: [], activeGadget: null, megaPity: 0, quests: null, megaQuests: {}, stormBest: {}, worldBosses: {},
@@ -785,6 +798,11 @@ class Game {
         if (typeof out.soulLevel !== 'number' || !isFinite(out.soulLevel) || out.soulLevel < 1) out.soulLevel = 1;
         out.souls = Math.floor(out.souls);
         out.soulLevel = Math.floor(out.soulLevel);
+        if (typeof out.radiationCoins !== 'number' || !isFinite(out.radiationCoins) || out.radiationCoins < 0) out.radiationCoins = 0;
+        out.radiationCoins = Math.floor(out.radiationCoins);
+        if (!Array.isArray(out.cloneSkins)) out.cloneSkins = [];
+        out.cloneSkins = out.cloneSkins.filter((id, i, arr) => id === 'radiation' && arr.indexOf(id) === i);
+        if (out.activeCloneSkin !== 'radiation' || !out.cloneSkins.includes('radiation')) out.activeCloneSkin = 'ninja';
         syncTitles(out);
         if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
         if (!out.chapter || typeof out.chapter !== 'object') out.chapter = { p: {}, done: false };
@@ -1876,6 +1894,23 @@ class Game {
     return this.startMode('worldboss', id);
   }
 
+  // ---------- ☢️ Радіація ----------
+  startRadiation() {
+    if (this.coop && this.coop.session.state !== 'idle') {
+      this.hud.toast(t('☢️🤝 Радіація поки доступна тільки у соло.'));
+      this.audio.denied();
+      return;
+    }
+    const lib = liberatedCount(this.save.liberated);
+    if (lib < RADIATION_UNLOCK_COUNTRIES) {
+      this.audio.denied();
+      this.hud.toast(t('☢️ Радіація відкриється після {n} звільнених країн!', { n: RADIATION_UNLOCK_COUNTRIES }));
+      return;
+    }
+    this.audio.click();
+    return this.startMode('radiation');
+  }
+
   // ---------- 🥊 Нокаут ----------
   startKnockout() {
     if (this.coop && this.coop.session.state !== 'idle') {
@@ -2199,6 +2234,7 @@ class Game {
     const isHumans = !!opts.humans;
     const isSoulCollector = !!opts.soulCollector;
     const isTurretWar = !!opts.turretwar;
+    const isRadiation = !!opts.radiation;
     const isInfected = !!opts.infected;
     const humansVariant = opts.humans === 'overloaded' ? 'overloaded' : 'normal';
     const isOverloadedHumans = isHumans && humansVariant === 'overloaded';
@@ -2236,6 +2272,8 @@ class Game {
       ? t('👻 ЗБИРАЧ ДУШ')
       : isTurretWar
       ? t('🗼 ОБОРОНА ТУРЕЛІ')
+      : isRadiation
+      ? t('☢️ РАДІАЦІЯ')
       : isDefense
       ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
@@ -2274,6 +2312,7 @@ class Game {
      *   maze     — тільки в режимі Лабіринт; інакше — undefined.
      *   humans   — тільки в режимі Зомбі проти людей; інакше — undefined.
      *   worldBoss — тільки в режимі Світового боса; інакше — undefined.
+     *   radiation — тільки в режимі Радіація; інакше — undefined.
      *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
      *
      * Правило: перед доступом до режимо-умовних полів завжди перевіряй наявність (level.storm?.foo).
@@ -2314,7 +2353,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
+    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -2338,12 +2377,20 @@ class Game {
     level.player.applyGear(u);
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar) {
-      level.player.weapons = isTurretWar ? ['hammer'] : isSoulCollector ? ['staff', 'sword'] : isHumans ? ['pistol', 'staff', 'sword'] : isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
-      level.player.cur = isTurretWar ? 'hammer' : isSoulCollector ? 'staff' : isHumans ? 'pistol' : isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
+    if (isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation) {
+      level.player.weapons = isRadiation ? ['shotgun'] : isTurretWar ? ['hammer'] : isSoulCollector ? ['staff', 'sword'] : isHumans ? ['pistol', 'staff', 'sword'] : isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
+      level.player.cur = isRadiation ? 'shotgun' : isTurretWar ? 'hammer' : isSoulCollector ? 'staff' : isHumans ? 'pistol' : isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;
       if (isPortal) level.player.addRockets(WEAPONS.bazooka.cap);
-      if (isPvp) {
+      if (isRadiation) {
+        level.player.maxHealth = 50;
+        level.player.health = 50;
+        level.player.maxArmor = 0;
+        level.player.armor = 0;
+        level.player.damageMult = 1;
+        level.player.ammo.shotgun.mag = Math.min(WEAPONS.shotgun.mag, 10);
+        level.player.ammo.shotgun.reserve = Math.max(0, 10 - level.player.ammo.shotgun.mag);
+      } else if (isPvp) {
         level.player.maxHealth = pvpVariant === 'overloaded' ? 2500 : 50;
         level.player.health = level.player.maxHealth;
         level.player.maxArmor = 0;
@@ -2407,6 +2454,9 @@ class Game {
     } else if (isTurretWar) {
       level.turretwar = new TurretWarMode(level);
       level.missions = level.turretwar;
+    } else if (isRadiation) {
+      level.radiation = new RadiationMode(level);
+      level.missions = level.radiation;
     } else if (isWorldBoss) {
       level.worldBoss = new WorldBossMode(level, worldBossId);
       level.missions = level.worldBoss;
@@ -2429,15 +2479,15 @@ class Game {
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
-    level.pet = (isPvp || isBank || isHumans || isSoulCollector || isTurretWar) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
+    level.pet = (isPvp || isBank || isHumans || isSoulCollector || isTurretWar || isRadiation) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isGuest && !isPlayground) {
+    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isGuest && !isPlayground) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -2449,7 +2499,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isPlayground) ? [] : level.world.lootSpots)) {
+    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isPlayground) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -2458,7 +2508,7 @@ class Game {
         level.effects.spawnPickup(ls.x, ls.z, ls.type, 9999, ls.y);
       }
     }
-    if (!isGuest && !isKnockout && !isDefense && !isPvp && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
+    if (!isGuest && !isKnockout && !isDefense && !isPvp && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation) for (const sp of level.world.surpriseSpots) level.zombies.spawnSurprise(sp.x, sp.z);
 
     // приколи карти: бочки, м'яч, тварини, аеродроп
     const fun = country.map.fun || {};
@@ -2481,7 +2531,7 @@ class Game {
       if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
       return 'grenade';
     };
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar) level.effects.airdropT = Infinity;
+    if (isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation) level.effects.airdropT = Infinity;
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
@@ -2635,16 +2685,16 @@ class Game {
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
       if (z.golden) this.save.stats.golden++;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
-      const killXp = level.worldBoss && z.type === 'boss'
+      const killXp = (level.worldBoss || level.radiation) && z.type === 'boss'
         ? 0
         : z.golden ? XP_VALUES.killGolden : z.type === 'boss' ? XP_VALUES.killBoss : big ? XP_VALUES.killBig : XP_VALUES.kill;
       if (killXp) this.progress.addXp(killXp);
-      if (!(level.worldBoss && z.type === 'boss')) this.quests.onEvent('kill', { weapon: level.player.cur });
-      if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('kill');
+      if (!((level.worldBoss || level.radiation) && z.type === 'boss')) this.quests.onEvent('kill', { weapon: level.player.cur });
+      if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('kill');
       if (z.golden) this.quests.onEvent('golden');
-      if (z.type === 'boss' && !level.storm && !level.worldBoss) {
+      if (z.type === 'boss' && !level.storm && !level.radiation && !level.worldBoss) {
         this.quests.onEvent('boss');
-        if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('boss');
+        if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
     });
@@ -2657,7 +2707,7 @@ class Game {
     level.bus.on('missionDone', () => {
       if (level.playground) return;
       this.progress.addXp(XP_VALUES.mission);
-      if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('mission');
+      if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('mission');
       // 🎲 кампанія: місію здано → драфт «Прокачки» (лише соло; Шторм відкриває свій після хвилі).
       // Гард на смерть: draft.isOpen морозить сим — відкритий над мертвим гравцем завісив би респавн.
       // У ?test вимкнено (сценарні тести здають місії пачками; вмикається &draft — test/draft-campaign.mjs),
@@ -2670,7 +2720,7 @@ class Game {
         this.save.stats.gadgetUses++;
         if (id === 'clone') this.save.stats.cloneUses++;
         this.quests.onEvent('gadget');
-        if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.worldBoss) this.chapter.onEvent('gadget');
+        if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('gadget');
         return;
       }
       const ch = level.gadgetChallenge;
@@ -2689,7 +2739,7 @@ class Game {
     level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
     level.bus.on('zombieKilled', (z) => {
-      if (level.playground || level.knockout || level.defense || level.pvp || level.bank || level.portal || level.maze || level.humans || level.soulCollector || level.worldBoss) return;
+      if (level.playground || level.knockout || level.defense || level.pvp || level.bank || level.portal || level.maze || level.humans || level.soulCollector || level.radiation || level.worldBoss) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
@@ -2741,9 +2791,9 @@ class Game {
       level.net.attach(coop.spec);
     }
 
-    if (isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isWorldBoss) {
+    if (isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isRadiation || isWorldBoss) {
       const a = level.world.layout.arena;
-      const z = isWorldBoss ? a.z + 16 : isKnockout ? a.z : isPvp ? a.z + 4 : isPortal ? a.z + 18 : isMaze ? a.z + 30 : isHumans ? a.z + 130 : isSoulCollector ? a.z + 18 : isDefense ? a.z + 8 : a.z + 12;
+      const z = isWorldBoss ? a.z + 16 : isRadiation ? a.z + 12 : isKnockout ? a.z : isPvp ? a.z + 4 : isPortal ? a.z + 18 : isMaze ? a.z + 30 : isHumans ? a.z + 130 : isSoulCollector ? a.z + 18 : isDefense ? a.z + 8 : a.z + 12;
       const gy = level.world.groundH(a.x, z);
       level.player.pos.set(a.x, gy, z);
       if (level.defense && level.defense.zone) level.defense._placePlayerInZone();
@@ -2755,7 +2805,7 @@ class Game {
     }
 
     this.level = level;
-    if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.worldBoss) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
@@ -2777,8 +2827,8 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
-    const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
+    const bannerTitle = level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.radiation ? t('50 HP, дробовик з 10 патронами і один зомбі на 500 HP. Перемога: +50 монет радіації.') : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
     if (level.diffStar > 1) {
@@ -3028,6 +3078,10 @@ class Game {
     }
     if (this.level.soulCollector) {
       this._endSoulCollectorRun(false);
+      return;
+    }
+    if (this.level.radiation) {
+      this._endRadiationRun(false);
       return;
     }
     if (this.level.worldBoss) {
@@ -3737,6 +3791,46 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
+  _endRadiationRun(won = true) {
+    const level = this.level;
+    if (!level || !level.radiation || level.radiation.over) return;
+    level.radiation.completed = !!won;
+    const res = level.radiation.results();
+    level.radiation.over = true;
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = t('☢️ Ще раз!');
+    }
+    const fin = this._soloModeFinish('radiation', !!won, res.timeMs);
+    let rewardTitle = t('Без нагороди');
+    if (won) {
+      this.save.radiationCoins = (this.save.radiationCoins || 0) + RADIATION_WIN_COINS;
+      rewardTitle = t('☢️ +{n} монет радіації', { n: RADIATION_WIN_COINS });
+      this.saveGame();
+    }
+    this._lastEndMode = 'radiation';
+    const mins = Math.floor(res.timeMs / 60000);
+    const secs = Math.floor((res.timeMs % 60000) / 1000);
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('☢️ РАДІАЦІЮ ОЧИЩЕНО!') : t('💀 РАДІАЦІЯ ПЕРЕМОГЛА');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">☢️</span><span class="stat-name">${t('Радіаційний зомбі')}</span><span class="stat-val">${won ? t('переможено') : t('вижив')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.radiation.target}</span></div>
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${fin.bestRow}
+      <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
+    this._showOverlay('overlay-arena-end');
+  }
+
   _endWorldBossRun(won = true) {
     const level = this.level;
     if (!level || !level.worldBoss) return;
@@ -3807,6 +3901,10 @@ class Game {
   _onBossDied() {
     if (this.level && this.level.bossRush) {
       this.level.bossRush.onBossDied();
+      return;
+    }
+    if (this.level && this.level.radiation) {
+      this.level.radiation.update(0);
       return;
     }
     if (this.level && this.level.worldBoss) {
@@ -4216,6 +4314,9 @@ class Game {
         megaPity: g.save.megaPity,
         souls: g.save.souls || 0,
         soulLevel: g.save.soulLevel || 1,
+        radiationCoins: g.save.radiationCoins || 0,
+        cloneSkins: [...(g.save.cloneSkins || [])],
+        activeCloneSkin: g.save.activeCloneSkin || 'ninja',
         quests: g.quests.list.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
         megaQuests: g.quests.megaList.map((q) => ({ id: q.id, ev: q.ev, progress: q.progress, target: q.target, done: q.done })),
         megabox: g.level && g.level.megabox ? { x: g.level.megabox.x, z: g.level.megabox.z, opened: g.level.megabox.opened } : null,
@@ -4405,6 +4506,10 @@ class Game {
         g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
         return g.startWorldBoss(id);
       },
+      startRadiation: () => {
+        g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true, DIN: true };
+        return g.startRadiation();
+      },
       knockoutForce: (roll) => { g._knockoutForce = roll; },
       pvpForce: (roll) => { g._pvpForce = roll; },
       finishKnockout: () => {
@@ -4447,6 +4552,13 @@ class Game {
           if (z.soulGhost && z.state !== 'dead') z.damage(99999, null, false);
         }
         g.level.soulCollector.update(0.05);
+      },
+      finishRadiation: () => {
+        if (!g.level.radiation) return;
+        for (const z of [...g.level.zombies.list]) {
+          if (z.radiationMode && z.state !== 'dead') z.damage(99999, null, false);
+        }
+        g.level.radiation.update(0.05);
       },
       questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),
       regenQuests: (dateKey) => {

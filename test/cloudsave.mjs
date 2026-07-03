@@ -131,11 +131,13 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     const knownProgressKeys = new Set(SAVE_PROGRESS_KEYS);
     const guardedTopLevelKeys = new Set([
       'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
+      'activeCloneSkin',
       'bestiary', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
       'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'liberated', 'medals',
       'megaPity', 'megaQuests', 'missionRuns', 'modeBest', 'modeRewards', 'modeWins', 'passLvl', 'pets', 'quests', 'records', 'skins', 'soulLevel',
+      'cloneSkins',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
-      'weapons', 'weekly', 'worldBosses', 'xp',
+      'weapons', 'weekly', 'worldBosses', 'xp', 'radiationCoins',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -143,7 +145,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses', 'coins', 'crystals', 'upgrades',
       'bestiary', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
-      'towerSkins', 'diffStar', 'weapons',
+      'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -172,6 +174,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.gadgetHyper = saveHasProgress({ ...fresh, gadgetHypers: ['meteor'] }) === true;
     out.pet = saveHasProgress({ ...fresh, pets: ['dog'], activePet: 'dog' }) === true;
     out.towerSkin = saveHasProgress({ ...fresh, towerSkins: ['default', 'gold'], activeTowerSkin: 'gold' }) === true;
+    out.radiationCoins = saveHasProgress({ ...fresh, radiationCoins: 50 }) === true;
+    out.cloneSkin = saveHasProgress({ ...fresh, cloneSkins: ['radiation'], activeCloneSkin: 'radiation' }) === true;
     out.worldBoss = saveHasProgress({ ...fresh, worldBosses: { radiation: true } }) === true;
     out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
     out.infected = saveHasProgress({ ...fresh, infected: { cleared: { UKR: true }, done: false } }) === true;
@@ -203,6 +207,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('гіперзаряд гаджета → прогрес=true', res.gadgetHyper);
   check('куплений улюбленець → прогрес=true', res.pet);
   check('куплений скін башти → прогрес=true', res.towerSkin);
+  check('монети радіації → прогрес=true', res.radiationCoins);
+  check('скін клонів → прогрес=true', res.cloneSkin);
   check('переможений світовий бос → прогрес=true', res.worldBoss);
   check('прогрес глави → прогрес=true', res.chapter);
   check('прогрес Глави 2 → прогрес=true', res.infected);
