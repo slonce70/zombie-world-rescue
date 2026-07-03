@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 251;
+const APP_VERSION = 252;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2608,6 +2608,7 @@ class Game {
       }
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
+    level.bus.on('playerRevived', () => this._onPlayerRevivedFx());
     level.bus.on('bossDied', () => this._onBossDied());
     level.bus.on('hordeEnd', () => {
       if (level.playground) return;
@@ -3056,7 +3057,15 @@ class Game {
     p.vel.set(0, 0, 0);
     this.audio.heal();
     this.level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 14, { speed: 2.5, up: 3, life: 0.8 });
+    this.level.bus.emit('playerRevived', { kind: 'coop' });
     this.hud.banner(t('💚 ТЕБЕ ПІДНЯЛИ!'), byNick ? t('{n} прийшов на допомогу — до бою!', { n: byNick }) : t('Дякуй другу і до бою!'));
+  }
+
+  _onPlayerRevivedFx() {
+    if (!this.level || this.save.activeSkin !== 'angel') return;
+    const p = this.level.player;
+    if (!p || p.health <= 0 || !this.level.effects || !this.level.effects.angelRevive) return;
+    this.level.effects.angelRevive(p.pos.clone());
   }
 
   // 🤝 підняття пораненого тіммейта: тримай E біля тіла 3 секунди

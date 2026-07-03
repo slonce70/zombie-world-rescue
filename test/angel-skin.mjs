@@ -108,6 +108,34 @@ const killFx = await page.evaluate(() => {
 check(killFx.some((fx) => fx.color === 0xffffff && fx.count >= 18 && fx.life >= 3),
   'у скіні Ангел після kill лишаються білі іскри на 3с', JSON.stringify(killFx));
 
+console.log('▸ Ангел: анімація відродження');
+const reviveFx = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.save.activeSkin = 'angel';
+  const floors = [];
+  const bursts = [];
+  const oldGround = g.level.effects.groundGlow.bind(g.level.effects);
+  const oldBurst = g.level.effects.burst.bind(g.level.effects);
+  g.level.effects.groundGlow = (pos, color, size, life) => {
+    floors.push({ color, size, life, y: Math.round(pos.y * 10) / 10 });
+    return oldGround(pos, color, size, life);
+  };
+  g.level.effects.burst = (pos, color, count, opts = {}) => {
+    bursts.push({ color, count, life: opts.life || 0, y: Math.round(pos.y * 10) / 10 });
+    return oldBurst(pos, color, count, opts);
+  };
+  p.health = 0;
+  p.respawn();
+  g.level.effects.groundGlow = oldGround;
+  g.level.effects.burst = oldBurst;
+  return { floors, bursts, health: p.health };
+});
+check(reviveFx.health > 0
+  && reviveFx.floors.some((fx) => fx.color === 0xffffff && fx.size === 7 && fx.life === 5)
+  && reviveFx.bursts.some((fx) => fx.color === 0xffffff && fx.count >= 24 && fx.life >= 5),
+  'у скіні Ангел після відродження є біла підлога 7x7 і білі іскри 5с', JSON.stringify(reviveFx));
+
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
   for (const e of errors.slice(0, 10)) console.log('  ', e);

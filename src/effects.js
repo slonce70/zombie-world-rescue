@@ -174,6 +174,7 @@ export class Effects {
     }
 
     this._meteors = []; // ☄️ метеорити в польоті (гаджет): {rock, tx, tz, ty, t, dur, onLand}
+    this.groundGlows = [];
 
     // монети та підбирання
     this.coins = [];
@@ -251,6 +252,11 @@ export class Effects {
     for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry, this.ringGeo]) g.dispose();
     for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat, this.laserMat, this.laserCoreMat, this.laserGlow.material]) m.dispose();
     // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
+    for (const g of this.groundGlows) {
+      sc.remove(g.mesh);
+      g.mesh.geometry.dispose();
+      g.mesh.material.dispose();
+    }
   }
 
   // предмет створено: дати мережевий id і (на хості) розіслати гостям
@@ -770,6 +776,23 @@ export class Effects {
     }
   }
 
+  groundGlow(pos, colorHex = 0xffffff, size = 7, life = 5) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.55, depthWrite: false })
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(pos.x, this.world.groundH(pos.x, pos.z) + 0.025, pos.z);
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.groundGlows.push({ mesh, life, maxLife: life });
+  }
+
+  angelRevive(pos) {
+    this.groundGlow(pos, 0xffffff, 7, 5);
+    this.burst(pos.clone().setY(pos.y + 1.2), 0xffffff, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
+  }
+
   tracer(from, to) {
     const dir = this._tmpDir.copy(to).sub(from);
     const len = dir.length();
@@ -1131,6 +1154,18 @@ export class Effects {
       f.life -= dt;
       if (f.life <= 0) { f.spr.visible = false; f.spr.material.opacity = 0; }
       else f.spr.material.opacity = f.life / 0.05;
+    }
+
+    for (let i = this.groundGlows.length - 1; i >= 0; i--) {
+      const g = this.groundGlows[i];
+      g.life -= dt;
+      g.mesh.material.opacity = Math.max(0, 0.55 * (g.life / g.maxLife));
+      if (g.life <= 0) {
+        this.scene.remove(g.mesh);
+        g.mesh.geometry.dispose();
+        g.mesh.material.dispose();
+        this.groundGlows.splice(i, 1);
+      }
     }
 
     // 🟡 гільзи: гравітація, обертання, легкий відскок від землі

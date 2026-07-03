@@ -1090,6 +1090,7 @@ export class Player {
         if (this.level.effects) this.level.effects.totemBurst(this.pos.clone().setY(this.pos.y + 1.0));
         this.level.audio.powerup();
         this.level.bus.emit('toast', t('🪬 Тотем урятував тебе!'));
+        this.level.bus.emit('playerRevived', { kind: 'totem' });
         return;
       }
       this.health = 0;
@@ -1127,5 +1128,6 @@ export class Player {
     this.ammo[this.cur].mag = this.weapon.mag;
     this.reloading = 0;
     this._camInit = false;
+    this.level.bus.emit('playerRevived', { kind: 'respawn' });
   }
 }

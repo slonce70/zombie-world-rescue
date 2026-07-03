@@ -72,7 +72,7 @@ export const SHOP_ITEMS = [
   { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Скіни'), skin: 'gold' },
   { id: 'angel-action-1', icon: '🪽', name: t('Ангел: Німб'), desc: t('Акція 1/3 для набору Ангела'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 1 },
   { id: 'angel-action-2', icon: '✨', name: t('Ангел: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 2 },
-  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 завершує набір і відкриває скін Ангел'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
+  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 відкриває скін, білі kill-іскри і біле відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
   { id: 'demon-action-1', icon: '😈', name: t('Демон: Роги'), desc: t('Акція 1/3 для набору Демона'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 1 },
   { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 2 },
   { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 завершує набір і відкриває скін Демон'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
@@ -91,7 +91,7 @@ function itemAvailable(item) {
 }
 
 function offerChain(item) {
-  if (item.angelStep) return { skin: 'angel', step: item.angelStep, icon: '🪽', name: t('Ангел'), fx: t('Білі іскри після вбивства') };
+  if (item.angelStep) return { skin: 'angel', step: item.angelStep, icon: '🪽', name: t('Ангел'), fx: t('Білі іскри після вбивства і відродження') };
   if (item.demonStep) return { skin: 'demon', step: item.demonStep, icon: '😈', name: t('Демон'), fx: t('Червоні іскри після вбивства') };
   return null;
 }
