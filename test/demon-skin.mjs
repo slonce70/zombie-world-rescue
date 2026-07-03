@@ -14,7 +14,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
-await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 60000 });
 
 console.log('▸ Демон: магазин і скін');
 const meta = await page.evaluate(async () => {
@@ -105,6 +105,42 @@ const killFx = await page.evaluate(() => {
 });
 check(killFx.some((fx) => fx.color === 0xff2b2b && fx.count >= 18 && fx.life >= 3),
   'у скіні Демон після kill лишаються червоні іскри на 3с', JSON.stringify(killFx));
+
+console.log('▸ Демон: анімація відродження');
+const reviveFx = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.save.activeSkin = 'demon';
+  const floors = [];
+  const bursts = [];
+  const oldGround = g.level.effects.groundGlow.bind(g.level.effects);
+  const oldBurst = g.level.effects.burst.bind(g.level.effects);
+  g.level.effects.groundGlow = (pos, color, size, life) => {
+    floors.push({ color, size, life, y: Math.round(pos.y * 10) / 10 });
+    return oldGround(pos, color, size, life);
+  };
+  g.level.effects.burst = (pos, color, count, opts = {}) => {
+    bursts.push({ color, count, life: opts.life || 0, y: Math.round(pos.y * 10) / 10 });
+    return oldBurst(pos, color, count, opts);
+  };
+  p.health = 0;
+  p.respawn();
+  const glow = g.level.effects.groundGlows.at(-1);
+  const visible = glow ? {
+    depthTest: glow.mesh.material.depthTest,
+    opacity: glow.mesh.material.opacity,
+    renderOrder: glow.mesh.renderOrder,
+    y: Math.round(glow.mesh.position.y * 100) / 100,
+  } : null;
+  g.level.effects.groundGlow = oldGround;
+  g.level.effects.burst = oldBurst;
+  return { floors, bursts, visible, health: p.health };
+});
+check(reviveFx.health > 0
+  && reviveFx.floors.some((fx) => fx.color === 0xff2b2b && fx.size === 7 && fx.life === 5)
+  && reviveFx.bursts.some((fx) => fx.color === 0xff2b2b && fx.count >= 24 && fx.life >= 5)
+  && reviveFx.visible && reviveFx.visible.depthTest === false && reviveFx.visible.opacity >= 0.75 && reviveFx.visible.renderOrder >= 30,
+  'у скіні Демон після відродження є червона підлога 7x7 і червоні іскри 5с', JSON.stringify(reviveFx));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

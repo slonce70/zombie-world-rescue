@@ -804,6 +804,11 @@ export class Effects {
     this.burst(pos.clone().setY(pos.y + 1.2), 0xffffff, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
   }
 
+  demonRevive(pos) {
+    this.groundGlow(pos, 0xff2b2b, 7, 5);
+    this.burst(pos.clone().setY(pos.y + 1.2), 0xff2b2b, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
+  }
+
   tracer(from, to) {
     const dir = this._tmpDir.copy(to).sub(from);
     const len = dir.length();

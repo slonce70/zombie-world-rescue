@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 253;
+const APP_VERSION = 254;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3062,10 +3062,11 @@ class Game {
   }
 
   _onPlayerRevivedFx() {
-    if (!this.level || this.save.activeSkin !== 'angel') return;
+    if (!this.level) return;
     const p = this.level.player;
-    if (!p || p.health <= 0 || !this.level.effects || !this.level.effects.angelRevive) return;
-    this.level.effects.angelRevive(p.pos.clone());
+    if (!p || p.health <= 0 || !this.level.effects) return;
+    if (this.save.activeSkin === 'angel' && this.level.effects.angelRevive) this.level.effects.angelRevive(p.pos.clone());
+    else if (this.save.activeSkin === 'demon' && this.level.effects.demonRevive) this.level.effects.demonRevive(p.pos.clone());
   }
 
   // 🤝 підняття пораненого тіммейта: тримай E біля тіла 3 секунди
