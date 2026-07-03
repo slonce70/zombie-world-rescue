@@ -3780,16 +3780,16 @@ export function makeParrot() {
 }
 
 // 🦖 динозаврик: зелений Т-рекс, велика голова з зубами, шипи, довгий хвіст
-export function makeDino() {
+export function makeDino(skin = 0x5bbf6a, belly = 0xcfe89a, dark = 0x214a2a, eyeColor = 0xf2c20a) {
   const root = new THREE.Group();
-  const skinM = toonMat(0x5bbf6a), bellyM = toonMat(0xcfe89a), darkM = toonMat(0x214a2a);
+  const skinM = toonMat(skin), bellyM = toonMat(belly), darkM = toonMat(dark);
   const body = capsule(0.14, 0.22, skinM); body.rotation.x = Math.PI / 2 - 0.3; body.position.y = 0.34; body.castShadow = true; root.add(body);
   const headG = new THREE.Group(); headG.position.set(0, 0.56, -0.2);
   const head = sphere(0.14, skinM, 14, 10); head.scale.set(1, 0.95, 1.2); head.castShadow = true; headG.add(head);
   const jaw = box(0.16, 0.06, 0.16, skinM); jaw.position.set(0, -0.08, -0.06); headG.add(jaw);
   // зуби
   for (const tx of [-0.05, 0, 0.05]) { const tooth = cone(0.015, 0.05, toonMat(0xffffff), 4); tooth.rotation.x = Math.PI; tooth.position.set(tx, -0.04, -0.14); headG.add(tooth); }
-  petEyes(headG, 0.07, 0.06, -0.1, 0.026, 0xf2c20a);
+  petEyes(headG, 0.07, 0.06, -0.1, 0.026, eyeColor);
   root.add(headG);
   // спинні шипи
   for (let i = 0; i < 5; i++) { const sp = cone(0.03, 0.09, darkM, 4); sp.position.set(0, 0.5 - i * 0.02, -0.1 + i * 0.09); root.add(sp); }
@@ -3808,6 +3808,15 @@ export function makeDino() {
   const t2 = cone(0.05, 0.14, skinM, 8); t2.rotation.x = Math.PI / 2 - 0.2; t2.position.set(0, -0.05, 0.28); tail.add(t2);
   root.add(tail);
   return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
+}
+
+export function makeRadiationLizard() {
+  const rig = makeDino(0x77ff55, 0xd6ff48, 0x1e3528, 0x77ff55);
+  rig.group.scale.set(0.82, 0.82, 0.82);
+  const glow = sphere(0.045, toonMat(0xd6ff48, 0x77ff55, 0.8), 8, 6);
+  glow.position.set(0, 0.58, 0.08);
+  rig.group.add(glow);
+  return rig;
 }
 
 // 🐉 дракончик: роги, крильця (легкий мах), шипи, лусочка
@@ -3944,6 +3953,7 @@ export const PETS = {
   dragon: { name: t('Дракончик Іскра'), icon: '🐉', desc: t('Махає крильцями — справжній дракон!'), make: makeDragon, move: 'quad' },
   unicorn: { name: t('Єдиноріг Зоря'), icon: '🦄', desc: t('Чарівний ріг і веселкова грива.'), make: makeUnicorn, move: 'quad' },
   robo: { name: t('Робо-пес Болт'), icon: '🤖', desc: t('Залізний друг зі світними очима.'), make: makeRoboPet, move: 'quad' },
+  radiationlizard: { name: t('Радіаційна ящірка'), icon: '🦎', desc: t('Неонова ящірка з радіаційним сяйвом.'), make: makeRadiationLizard, move: 'quad' },
   slimepet: { name: t('Доктор Слизняк'), icon: '🧪', desc: t('Маленька зелена клякса в окулярах — хоче дружити!'), make: makeSlimePet, move: 'hop' },
 };
 

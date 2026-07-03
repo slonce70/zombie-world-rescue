@@ -55,7 +55,7 @@ export const SHOP_ITEMS = [
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
   // 🐾 улюбленці генеруються з реєстру PETS: собака 350 (стартовий), решта 1500.
   // slimepet НЕ продається — унікальна нагорода Глави 3 (Лігво Вірусу)
-  ...Object.entries(PETS).filter(([id]) => id !== 'slimepet').map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
+  ...Object.entries(PETS).filter(([id]) => id !== 'slimepet' && id !== 'radiationlizard').map(([id, m]) => ({ id, icon: m.icon, name: m.name, desc: m.desc, price: id === 'dog' ? 350 : 1500, max: 1, cat: t('Гаджети й друзі'), pet: true })),
   // 🏅 золотий скін для гаджета-башти (камʼяний дається за Францію — не в магазині)
   { id: 'tower_gold', icon: TOWER_SKINS.gold.icon, name: TOWER_SKINS.gold.name, desc: t('Золотий скін для гаджета-башти'), price: 2344, max: 1, cat: t('Гаджети й друзі'), towerSkin: 'gold' },
   // --- зброя ---
@@ -79,6 +79,7 @@ export const SHOP_ITEMS = [
   { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: 'Радіація', skin: 'radiation' },
   { id: 'radiationupgrade', icon: '☢️', name: t('Радіаційні калюжі'), desc: t('Покращення Радіаційного: калюжі бʼють 5 HP/с, а влучання сиплять краплі радіації'), price: 0, crystalPrice: 45, max: 1, cat: 'Радіація', needsSkin: 'radiation' },
   { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: 'Радіація' },
+  { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', pet: true },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
