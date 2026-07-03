@@ -2371,6 +2371,7 @@ export const HERO_SKINS = {
   rainbow: { name: t('Веселковий'), icon: '🌈', desc: t('Випадає зі скін-бокса') },
   gardener: { name: t('Садівник'), icon: '🪴', desc: t('Випадає зі скін-бокса') },
   zombie: { name: t('Зомбі'), icon: '🧟', desc: t('Випадає зі скін-бокса') },
+  angel: { name: t('Ангел'), icon: '🪽', desc: t('Збери всі акції Ангела в магазині') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2932,6 +2933,36 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       rig.parts.torso.add(tear, patch);
       return rig;
     },
+    angel() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0xffd9b8, shirt: 0xf8fbff, pants: 0xdfe8ff, shoes: 0xffd23f,
+        eyeL: 0.06, eyeR: 0.06, eyeWhite: 0xf7fbff, pupilColor: 0x5d88c9,
+        mouth: 'smile', mouthColor: 0x8a4b3a, brow: -0.05, cast: 'all', sleeves: 'shirt',
+      });
+      const goldM = toonMat(0xffd23f, 0xd19918, 0.45);
+      const whiteM = toonMat(0xffffff, 0xdcecff, 0.35);
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.022, 6, 18), goldM);
+      halo.position.y = 0.48;
+      halo.rotation.x = Math.PI / 2;
+      rig.parts.head.add(halo);
+      const gem = sphere(0.065, goldM, 8, 6);
+      gem.position.set(0, 0.38, -0.27);
+      rig.parts.torso.add(gem);
+      for (const side of [-1, 1]) {
+        const wing = new THREE.Group();
+        wing.position.set(0.18 * side, 0.36, 0.29);
+        wing.rotation.y = side * 0.45;
+        wing.rotation.z = side * 0.16;
+        for (let i = 0; i < 3; i++) {
+          const feather = box(0.11, 0.34 - i * 0.055, 0.045, whiteM);
+          feather.position.set(side * (0.05 + i * 0.055), -i * 0.06, 0.03);
+          feather.rotation.z = side * (0.35 + i * 0.18);
+          wing.add(feather);
+        }
+        rig.parts.torso.add(wing);
+      }
+      return rig;
+    },
     custom() {
       const hc = heroColors || {};
       const f = faceSpec(hc.face || 'smile');
@@ -2960,8 +2991,8 @@ export function makeHero(skinId = 'classic', heroColors = null) {
   };
   const rig = (builders[skinId] || builders.classic)();
   rig.heroSkin = builders[skinId] ? skinId : 'classic';
-  // спільне для всіх скінів: рюкзачок (крім астронавта — у нього ранець) і пояс
-  if (skinId !== 'astro' && skinId !== 'custom') {
+  // спільне для всіх скінів: рюкзачок (крім скінів зі своїм предметом на спині)
+  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel') {
     const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
     const pack = box(0.34, 0.4, 0.16, packM);
     pack.position.set(0, 0.34, 0.3);

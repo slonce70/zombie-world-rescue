@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 247;
+const APP_VERSION = 248;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2601,6 +2601,9 @@ class Game {
       if (level.mirror) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this._hitstopT = Math.max(this._hitstopT, z.type === 'boss' ? 0.07 : 0.045);
+      if (this.save.activeSkin === 'angel') {
+        level.effects.burst(new THREE.Vector3(z.x, z.y + 0.8, z.z), 0xffffff, 24, { speed: 2.4, up: 2.8, life: 3, size: 0.55 });
+      }
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('bossDied', () => this._onBossDied());
