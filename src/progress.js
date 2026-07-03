@@ -337,6 +337,15 @@ const MEGA_QUESTS = [
       label: () => t('🪙 5000 монет'),
     },
   },
+  {
+    id: 'radiationBoss5', icon: '☢️', ev: 'radiationBoss', bossId: 'radiation', target: 5,
+    title: () => t('МЕГА: переможи Боса Радіації {n} разів', { n: 5 }),
+    reward: {
+      title: 'radiation_player',
+      crystals: 3,
+      label: () => t('☢️ Титул «Радіаційний гравець» · 💎 3'),
+    },
+  },
 ];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
@@ -486,6 +495,7 @@ export class DailyQuests {
       for (const q of this.megaList) {
         const state = this.game.save.megaQuests[q.id];
         if (state.done || q.ev !== ev) continue;
+        if (q.bossId && data.bossId !== q.bossId) continue;
         state.progress += (data.n || 1);
         changed = true;
         if (state.progress >= q.target) {
@@ -515,6 +525,7 @@ export class DailyQuests {
     }
     game.save.coins = (game.save.coins || 0) + (reward.coins || 0);
     game.save.crystals = (game.save.crystals || 0) + (reward.crystals || 0);
+    if (reward.title && !game.save.titles.includes(reward.title)) game.save.titles.push(reward.title);
     game.audio.questDone();
     game.hud.toast(t('⚡ Мега-квест виконано: {q}! {r}', { q: q.title, r: q.rewardText }));
     game.hud.banner(t('⚡ МЕГА-КВЕСТ!'), q.rewardText, 4.4);

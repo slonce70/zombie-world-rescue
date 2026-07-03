@@ -62,6 +62,13 @@ export const TITLES = {
     detail: () => t('Відкривається на 5 рівні Шляху душ'),
     unlocked: (s) => ((s.soulLevel || 1) | 0) >= 5,
   },
+  radiation_player: {
+    icon: '☢️',
+    name: () => t('Радіаційний гравець'),
+    desc: () => t('Мега-квест: переможи Боса Радіації 5 разів'),
+    detail: () => t('Нагорода за мега-квест Боса Радіації'),
+    unlocked: (s) => (s.titles || []).includes('radiation_player'),
+  },
 };
 
 // 🏅 титули за 10 перемог у соло-режимах (лічильник — save.modeWins)

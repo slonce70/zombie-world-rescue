@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 256;
+const APP_VERSION = 257;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3788,6 +3788,7 @@ class Game {
       this.saveGame();
     }
 
+    if (won) this.quests.onEvent('radiationBoss', { bossId: mode.id });
     this._lastEndMode = 'worldboss';
     this._lastWorldBossId = mode.id;
     const res = mode.results();
