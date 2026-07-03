@@ -72,7 +72,7 @@ export const SHOP_ITEMS = [
   { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Скіни'), skin: 'gold' },
   { id: 'angel-action-1', icon: '🪽', name: t('Ангел: Німб'), desc: t('Акція 1/3 для набору Ангела'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 1 },
   { id: 'angel-action-2', icon: '✨', name: t('Ангел: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 2 },
-  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Скін'), desc: t('Акція 3/3 відкриває скін Ангел безкоштовно'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
+  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 завершує набір і відкриває скін Ангел'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },

@@ -29,7 +29,7 @@ const meta = await page.evaluate(async () => {
   } catch (e) { built = false; }
   return {
     skin: HERO_SKINS.angel || null,
-    items: items.map((i) => ({ id: i.id, step: i.angelStep, crystalPrice: i.crystalPrice, max: i.max })),
+    items: items.map((i) => ({ id: i.id, name: i.name, step: i.angelStep, crystalPrice: i.crystalPrice, max: i.max })),
     built,
     looksAngel,
   };
@@ -38,6 +38,8 @@ check(meta.skin && meta.skin.icon === '🪽', 'angel є у HERO_SKINS', JSON.str
 check(meta.built && meta.looksAngel, 'makeHero("angel") будується окремим скіном', JSON.stringify(meta));
 check(meta.items.length === 3 && meta.items.every((i, idx) => i.id === `angel-action-${idx + 1}` && i.step === idx + 1 && i.crystalPrice === 20 && i.max === 1),
   'у вкладці Ангел є 3 послідовні акції по 20 кристалів', JSON.stringify(meta.items));
+check(meta.items[2] && meta.items[2].name === 'Ангел: Крила',
+  'третя акція Ангела називається Крила', JSON.stringify(meta.items[2]));
 
 const shopFlow = await page.evaluate(() => {
   const g = window.__game;
