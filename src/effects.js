@@ -809,6 +809,16 @@ export class Effects {
     this.burst(pos.clone().setY(pos.y + 1.2), 0xff2b2b, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
   }
 
+  radiationPuddle(pos) {
+    this.groundGlow(pos, 0x77ff55, 3.2, 3);
+    this.burst(pos.clone().setY(pos.y + 0.4), 0x77ff55, 18, { speed: 1.4, up: 1.2, life: 3, size: 0.55 });
+  }
+
+  radiationRevive(pos) {
+    this.groundGlow(pos, 0x77ff55, 7, 5);
+    this.burst(pos.clone().setY(pos.y + 1.2), 0x77ff55, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
+  }
+
   tracer(from, to) {
     const dir = this._tmpDir.copy(to).sub(from);
     const len = dir.length();

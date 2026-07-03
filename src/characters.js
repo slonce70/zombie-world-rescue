@@ -2373,6 +2373,7 @@ export const HERO_SKINS = {
   zombie: { name: t('Зомбі'), icon: '🧟', desc: t('Випадає зі скін-бокса') },
   angel: { name: t('Ангел'), icon: '🪽', desc: t('Збери всі акції Ангела в магазині') },
   demon: { name: t('Демон'), icon: '😈', desc: t('Збери всі акції Демона в магазині') },
+  radiation: { name: t('Радіаційний'), icon: '☢️', desc: t('Комплект з маскою, kill-калюжею і радіаційним відродженням') },
   custom: { name: t('Мій герой'), icon: '🎨', desc: t('Твої кольори') },
 };
 
@@ -2987,6 +2988,45 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       rig.parts.torso.add(cape);
       return rig;
     },
+    radiation() {
+      const rig = makeHumanoid({
+        scale: 1.0, skin: 0x9bcf7a, shirt: 0x203421, pants: 0x16251a, shoes: 0x101812,
+        eyeL: 0.058, eyeR: 0.058, eyeWhite: 0xd7ffd0, pupilColor: 0x77ff55,
+        mouth: 'crooked', mouthColor: 0x163018, brow: -0.1, cast: 'all', sleeves: 'shirt',
+      });
+      const suitM = toonMat(0x203421);
+      const glowM = toonMat(0x77ff55, 0x44aa33, 0.65);
+      const darkM = toonMat(0x101812);
+      const hood = sphere(0.295, suitM, 16, 12);
+      hood.position.set(0, 0.15, 0.04);
+      hood.scale.set(1.03, 1.05, 1.03);
+      rig.parts.head.add(hood);
+      const mask = box(0.26, 0.16, 0.075, darkM);
+      mask.position.set(0, 0.08, -0.255);
+      rig.parts.head.add(mask);
+      for (const side of [-1, 1]) {
+        const lens = sphere(0.055, glowM, 8, 6);
+        lens.position.set(0.08 * side, 0.17, -0.29);
+        rig.parts.head.add(lens);
+        const filter = cylinder(0.04, 0.05, 0.12, darkM, 8);
+        filter.position.set(0.08 * side, -0.02, -0.29);
+        filter.rotation.x = Math.PI / 2;
+        rig.parts.head.add(filter);
+      }
+      const chest = sphere(0.07, glowM, 8, 6);
+      chest.position.set(0, 0.38, -0.27);
+      rig.parts.torso.add(chest);
+      for (let i = 0; i < 3; i++) {
+        const ray = box(0.045, 0.18, 0.035, glowM);
+        ray.position.set(0, 0.38, -0.29);
+        ray.rotation.z = i * (Math.PI * 2 / 3);
+        rig.parts.torso.add(ray);
+      }
+      const tank = cylinder(0.11, 0.11, 0.45, toonMat(0x324a33), 10);
+      tank.position.set(0, 0.36, 0.35);
+      rig.parts.torso.add(tank);
+      return rig;
+    },
     custom() {
       const hc = heroColors || {};
       const f = faceSpec(hc.face || 'smile');
@@ -3016,7 +3056,7 @@ export function makeHero(skinId = 'classic', heroColors = null) {
   const rig = (builders[skinId] || builders.classic)();
   rig.heroSkin = builders[skinId] ? skinId : 'classic';
   // спільне для всіх скінів: рюкзачок (крім скінів зі своїм предметом на спині)
-  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel' && skinId !== 'demon') {
+  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel' && skinId !== 'demon' && skinId !== 'radiation') {
     const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
     const pack = box(0.34, 0.4, 0.16, packM);
     pack.position.set(0, 0.34, 0.3);

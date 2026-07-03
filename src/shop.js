@@ -76,6 +76,7 @@ export const SHOP_ITEMS = [
   { id: 'demon-action-1', icon: '😈', name: t('Демон: Роги'), desc: t('Акція 1/3 для набору Демона'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 1 },
   { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 2 },
   { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 відкриває скін, червоні kill-іскри і червоне відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
+  { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: 'Радіаційний', skin: 'radiation' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },

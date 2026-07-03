@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 254;
+const APP_VERSION = 255;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2605,6 +2605,8 @@ class Game {
         level.effects.burst(new THREE.Vector3(z.x, z.y + 0.8, z.z), 0xffffff, 24, { speed: 2.4, up: 2.8, life: 3, size: 0.55 });
       } else if (this.save.activeSkin === 'demon') {
         level.effects.burst(new THREE.Vector3(z.x, z.y + 0.8, z.z), 0xff2b2b, 24, { speed: 2.4, up: 2.8, life: 3, size: 0.55 });
+      } else if (this.save.activeSkin === 'radiation' && level.effects.radiationPuddle) {
+        level.effects.radiationPuddle(new THREE.Vector3(z.x, z.y, z.z));
       }
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
@@ -3067,6 +3069,7 @@ class Game {
     if (!p || p.health <= 0 || !this.level.effects) return;
     if (this.save.activeSkin === 'angel' && this.level.effects.angelRevive) this.level.effects.angelRevive(p.pos.clone());
     else if (this.save.activeSkin === 'demon' && this.level.effects.demonRevive) this.level.effects.demonRevive(p.pos.clone());
+    else if (this.save.activeSkin === 'radiation' && this.level.effects.radiationRevive) this.level.effects.radiationRevive(p.pos.clone());
   }
 
   // 🤝 підняття пораненого тіммейта: тримай E біля тіла 3 секунди
