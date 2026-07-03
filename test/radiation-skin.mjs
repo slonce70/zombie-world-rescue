@@ -36,13 +36,13 @@ const meta = await page.evaluate(async () => {
 });
 check(meta.skin && meta.skin.icon === '☢️', 'radiation є у HERO_SKINS', JSON.stringify(meta.skin));
 check(meta.built && meta.looksRadiation, 'makeHero("radiation") будується окремим скіном з маскою', JSON.stringify(meta));
-check(meta.item && meta.item.cat === 'Радіаційний' && meta.item.crystalPrice === 100 && meta.item.max === 1 && meta.item.skin === 'radiation',
+check(meta.item && meta.item.cat === 'Радіація' && meta.item.crystalPrice === 100 && meta.item.max === 1 && meta.item.skin === 'radiation',
   'у магазині є комплект Радіаційний за 100 кристалів', JSON.stringify(meta.item));
 
 const shopFlow = await page.evaluate(() => {
   const g = window.__game;
   g.shop.open();
-  const tab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Радіаційний');
+  const tab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Радіація');
   const tabOk = !!tab;
   if (tab) tab.click();
   const rendered = [...document.querySelectorAll('.shop-item')].map((i) => i.dataset.id);
@@ -62,7 +62,7 @@ const shopFlow = await page.evaluate(() => {
   return { tabOk, rendered, afterBuy, afterRepeat };
 });
 check(shopFlow.tabOk && shopFlow.rendered.join(',') === 'radiationskin',
-  'магазин має вкладку Радіаційний з одним комплектом', JSON.stringify(shopFlow.rendered));
+  'магазин має вкладку Радіація з одним комплектом Радіаційний', JSON.stringify(shopFlow.rendered));
 check(shopFlow.afterBuy.crystals === 0 && shopFlow.afterBuy.owned && shopFlow.afterBuy.active === 'radiation',
   'купівля за 100 кристалів відкриває і одягає Радіаційний', JSON.stringify(shopFlow.afterBuy));
 check(shopFlow.afterRepeat.crystals === 0 && shopFlow.afterRepeat.ownedCount === 1,
