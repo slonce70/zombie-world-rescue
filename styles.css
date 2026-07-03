@@ -1247,6 +1247,16 @@ body.touch-mode #touch-coach.show { display: block; }
   .shop-name { font-size: 14px; margin-top: 3px; }
   .shop-desc { font-size: 11px; min-height: 22px; }
   .shop-price { font-size: 14px; margin-top: 3px; }
+}
+
+/* Надмалий landscape (320px): картка товару має влазити ЦІЛА — інакше не тапається */
+@media (max-height: 360px) {
+  .shop-card h2 { display: none; }
+  .shop-item { padding: 6px 8px; }
+  .shop-icon { font-size: 22px; }
+  .shop-name { font-size: 13px; margin-top: 2px; }
+  .shop-desc { font-size: 10px; min-height: 0; }
+  .shop-cat { font-size: 11px; margin-top: 2px; }
   #overlay-wardrobe .overlay-card { display: flex; flex-direction: column; max-height: calc(100dvh - 16px); padding: 10px 16px; }
   #overlay-wardrobe .panel-header h2 { font-size: 26px; }
   #wardrobe-content { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 4px; }
