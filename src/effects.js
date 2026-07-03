@@ -175,6 +175,7 @@ export class Effects {
 
     this._meteors = []; // ☄️ метеорити в польоті (гаджет): {rock, tx, tz, ty, t, dur, onLand}
     this.groundGlows = [];
+    this.radiationPuddles = [];
 
     // монети та підбирання
     this.coins = [];
@@ -809,9 +810,14 @@ export class Effects {
     this.burst(pos.clone().setY(pos.y + 1.2), 0xff2b2b, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
   }
 
-  radiationPuddle(pos) {
+  radiationPuddle(pos, damaging = false) {
     this.groundGlow(pos, 0x77ff55, 3.2, 3);
     this.burst(pos.clone().setY(pos.y + 0.4), 0x77ff55, 18, { speed: 1.4, up: 1.2, life: 3, size: 0.55 });
+    if (damaging) this.radiationPuddles.push({ x: pos.x, z: pos.z, life: 3 });
+  }
+
+  radiationDrops(pos) {
+    this.burst(pos.clone().setY(pos.y + 1.1), 0x77ff55, 5, { speed: 1.1, up: 0.15, life: 0.65, size: 0.45 });
   }
 
   radiationRevive(pos) {
@@ -1192,6 +1198,18 @@ export class Effects {
         g.mesh.material.dispose();
         this.groundGlows.splice(i, 1);
       }
+    }
+
+    const L = this.levelRef;
+    for (let i = this.radiationPuddles.length - 1; i >= 0; i--) {
+      const p = this.radiationPuddles[i];
+      p.life -= dt;
+      if (L && L.zombies) {
+        for (const z of L.zombies.list) {
+          if (z.state !== 'dead' && Math.hypot(z.x - p.x, z.z - p.z) < 2.1) z.damage(5 * dt, null, false, { radiationPuddle: true });
+        }
+      }
+      if (p.life <= 0) this.radiationPuddles.splice(i, 1);
     }
 
     // 🟡 гільзи: гравітація, обертання, легкий відскок від землі

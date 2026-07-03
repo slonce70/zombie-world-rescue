@@ -77,6 +77,7 @@ export const SHOP_ITEMS = [
   { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 2 },
   { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 відкриває скін, червоні kill-іскри і червоне відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
   { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: 'Радіація', skin: 'radiation' },
+  { id: 'radiationupgrade', icon: '☢️', name: t('Радіаційні калюжі'), desc: t('Покращення Радіаційного: калюжі бʼють 5 HP/с, а влучання сиплять краплі радіації'), price: 0, crystalPrice: 45, max: 1, cat: 'Радіація', needsSkin: 'radiation' },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
@@ -209,6 +210,7 @@ export class Shop {
       const maxed = count >= item.max;
       const locked = item.needsBazooka && !hasBazooka;
       const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
+      const lockedSkin = item.needsSkin && !save.skins.includes(item.needsSkin);
       const chain = offerChain(item);
       const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
       const price = this.priceOf(item);
@@ -216,16 +218,17 @@ export class Shop {
         && (!item.radiationPrice || (save.radiationCoins || 0) >= item.radiationPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = (locked || lockedGadget || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
+      const priceLabel = (locked || lockedGadget || lockedSkin || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.radiationPrice ? `${item.radiationPrice} ☢️`
         : item.crystalPrice ? `${item.crystalPrice} 💎` : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
+        : lockedSkin ? t('Спершу купи скін Радіаційний')
         : lockedChain ? t('Спершу купи попередню акцію')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedChain;
+      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedSkin && !lockedChain;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
@@ -275,10 +278,12 @@ export class Shop {
     const price = this.priceOf(item);
     const chain = offerChain(item);
     const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
+    const lockedSkin = item.needsSkin && !save.skins.includes(item.needsSkin);
     if (count >= item.max || save.coins < price || (item.crystalPrice && (save.crystals || 0) < item.crystalPrice)
       || (item.radiationPrice && (save.radiationCoins || 0) < item.radiationPrice)
       || (item.needsBazooka && !save.weapons.includes('bazooka'))
       || (item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget))
+      || lockedSkin
       || lockedChain) {
       game.audio.denied();
       return;

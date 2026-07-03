@@ -78,7 +78,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 258;
+const APP_VERSION = 259;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2656,7 +2656,7 @@ class Game {
       } else if (this.save.activeSkin === 'demon') {
         level.effects.burst(new THREE.Vector3(z.x, z.y + 0.8, z.z), 0xff2b2b, 24, { speed: 2.4, up: 2.8, life: 3, size: 0.55 });
       } else if (this.save.activeSkin === 'radiation' && level.effects.radiationPuddle) {
-        level.effects.radiationPuddle(new THREE.Vector3(z.x, z.y, z.z));
+        level.effects.radiationPuddle(new THREE.Vector3(z.x, z.y, z.z), (this.save.upgrades.radiationupgrade || 0) > 0);
       }
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
@@ -2703,6 +2703,9 @@ class Game {
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this.save.stats.damageDealt += Math.round(n);
       this.quests.onEvent('damage', { n: Math.round(n) });
+      if (n >= 8 && this.save.activeSkin === 'radiation' && (this.save.upgrades.radiationupgrade || 0) > 0 && z && z.state !== 'dead' && level.effects.radiationDrops) {
+        level.effects.radiationDrops(new THREE.Vector3(z.x, z.y + (z.rig?.height || 1.6) * 0.45, z.z));
+      }
     });
     level.bus.on('missionDone', () => {
       if (level.playground) return;
