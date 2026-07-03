@@ -78,11 +78,36 @@ export class TurretWarMode {
     return out;
   }
 
+  // 🌐 кооп (v262): стан їде снапшотом snap.m (канал місій хоста, патерн DefenseMode);
+  // хвилі/роботів/турелі рахує лише хост, гостю прилітають puppets + цей стан.
+  netState() {
+    const a = this.ally;
+    return [Math.ceil(this.playerHp), Math.ceil(this.enemyHp),
+      a ? [Math.round(a.x * 10) / 10, Math.round(a.z * 10) / 10, Math.ceil(a.hp)] : 0];
+  }
+
+  applyNet(m) {
+    if (!this.level.mirror || !m) return;
+    this.playerHp = m[0];
+    this.enemyHp = m[1];
+    this._allyNet = m[2] || null;
+  }
+
+  hitEnemyTurret(dmg) {
+    this.enemyHp -= dmg;
+  }
+
   update(dt) {
     const level = this.level;
     if (this.over) return;
     this.time += dt;
     this._clampActor(level.player);
+    this._hammerHit(level.player);
+    if (level.mirror) {
+      // гість: бій веде хост — у себе лише клемп, молот (їде хосту) і візуал союзника
+      this._syncNetAlly(dt);
+      return;
+    }
 
     // робот-союзник: на 30-й секунді, йде до ворожої турелі й довбе її
     if (!this.allySpawned && this.time >= ALLY_AT) {
@@ -136,22 +161,45 @@ export class TurretWarMode {
       this._turretFire();
     }
 
-    // 🔨 молот по ворожій турелі: гравець щойно вдарив (shootCd стрибнув угору) поруч із нею
-    const p = level.player;
-    if (p.shootCd > this._lastCd && Math.hypot(p.pos.x - this.ex, p.pos.z - this.cz) < 4.5) {
-      const dmg = 35 * (p.damageMult || 1);
-      this.enemyHp -= dmg;
-      level.effects.damageNumber(new THREE.Vector3(this.ex, this.floorY + 3, this.cz), dmg, false);
-      this._hitFx(this.ex, this.cz);
-      level.audio.hit(false);
-    }
-    this._lastCd = p.shootCd;
-
     if (!this.over && this.playerHp <= 0) level.game._endTurretWarRun(false, 'turret');
     if (!this.over && this.enemyHp <= 0) {
       this.completed = true;
       level.game._endTurretWarRun(true);
     }
+  }
+
+  // 🔨 молот по ворожій турелі: гравець щойно вдарив (shootCd стрибнув угору) поруч із нею.
+  // Гість шкоду не пише сам — шле хосту (twh), а ефект показує одразу (оптимістично).
+  _hammerHit(p) {
+    if (p.shootCd > this._lastCd && Math.hypot(p.pos.x - this.ex, p.pos.z - this.cz) < 4.5) {
+      const dmg = 35 * (p.damageMult || 1);
+      if (this.level.mirror) this.level.net.sendTurretHit(dmg);
+      else this.hitEnemyTurret(dmg);
+      this.level.effects.damageNumber(new THREE.Vector3(this.ex, this.floorY + 3, this.cz), dmg, false);
+      this._hitFx(this.ex, this.cz);
+      this.level.audio.hit(false);
+    }
+    this._lastCd = p.shootCd;
+  }
+
+  // гість: союзник — чиста маріонетка зі snap.m (позиція/HP від хоста)
+  _syncNetAlly(dt) {
+    const n = this._allyNet;
+    if (!n) {
+      if (this.ally) {
+        this.level.scene.remove(this.ally.rig.group);
+        this.ally = null;
+      }
+      return;
+    }
+    if (!this.ally) this._spawnAlly();
+    const a = this.ally;
+    a.x = n[0];
+    a.z = n[1];
+    a.hp = n[2];
+    a.rig.group.position.set(a.x, this.floorY, a.z);
+    a.rig.group.rotation.y = Math.atan2(this.ex - a.x, this.cz - a.z) + Math.PI;
+    updateRig(a.rig, dt);
   }
 
   _turretFire() {
@@ -167,12 +215,15 @@ export class TurretWarMode {
       }
     }
     if (firedP) level.effects.ring(new THREE.Vector3(this.px, this.floorY + 4.5, this.cz), 0xffd23f, 4);
-    // зомбі-турель б'є гравця і робота-союзника у своїй зоні
+    // зомбі-турель б'є всю команду і робота-союзника у своїй зоні
+    // (_hurt сам маршрутизує: соло/хост — напряму, гостю — hurtPlayer)
     let firedE = false;
-    const p = level.player;
-    if (p.health > 0 && inZone(p.pos.x, p.pos.z, this.ex)) {
-      p.takeDamage(TURRET_DMG, this.ex, this.cz);
-      firedE = true;
+    const players = level.players || [level.player];
+    for (const p of players) {
+      if (p && p.health > 0 && inZone(p.pos.x, p.pos.z, this.ex)) {
+        level.zombies._hurt(p, TURRET_DMG, this.ex, this.cz);
+        firedE = true;
+      }
     }
     if (this.ally && inZone(this.ally.x, this.ally.z, this.ex)) {
       this.ally.hp -= TURRET_DMG;
@@ -341,12 +392,16 @@ export class TurretWarMode {
   _damagePlayerIfClose(z, dt) {
     z.defenseHitCd = Math.max(0, (z.defenseHitCd || 0) - dt);
     if (z.defenseHitCd > 0) return;
-    const p = this.level.player;
-    if (!p || p.health <= 0 || p.pos.y - this.floorY > 3) return;
+    // кооп: б'ємо будь-кого з команди в радіусі (патерн DefenseMode)
+    const players = this.level.players || [this.level.player];
     const reach = (z.stats?.attackR || 1.8) * 1.25;
-    if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > reach) return;
-    z.defenseHitCd = 0.9;
-    p.takeDamage(z.stats?.dmg || 10, z.x, z.z);
+    for (const p of players) {
+      if (!p || p.health <= 0 || p.pos.y - this.floorY > 3) continue;
+      if (Math.hypot(p.pos.x - z.x, p.pos.z - z.z) > reach) continue;
+      z.defenseHitCd = 0.9;
+      this.level.zombies._hurt(p, z.stats?.dmg || 10, z.x, z.z);
+      break;
+    }
   }
 
   results() {

@@ -57,6 +57,8 @@ export class GuestNet {
   sendUse(kind, extra = {}) { this.send({ t: 'use', kind, ...extra }); }
   sendGadget(kind, x, z, yaw, hyper = false) { this.send({ t: 'gadget', kind, x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, yaw: Math.round(yaw * 100) / 100, hyper: hyper ? 1 : 0 }); }
   sendRespawned() { this.send({ t: 'respawned' }); }
+  // 🔨 удар молотом по зомбі-турелі: шкоду зараховує хост
+  sendTurretHit(dmg) { this.send({ t: 'twh', dmg: Math.round(dmg) }); }
   sendRevive(pid) { this.send({ t: 'revdone', target: pid }); }
   sendFountain(x, z) { this.send({ t: 'fountain', x: Math.round(x), z: Math.round(z) }); }
 
@@ -309,6 +311,8 @@ export class GuestNet {
       case 'dro': if (a[0] === me && game.draft) game.draft.openNet(a[1]); break;
       // 🛡️ кооп-оборона: фінал вирішив хост
       case 'dfend': game._endDefenseRun(!!a[0]); break;
+      // 🗼 кооп-турельна війна: фінал вирішив хост
+      case 'twend': game._endTurretWarRun(!!a[0], a[1] || 'turret'); break;
       case 'arenaend': game._endArenaRun(); break;
       case 'hw': level.bus.emit('hordeWarning', 5); break;
       case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;

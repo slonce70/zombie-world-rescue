@@ -1587,6 +1587,8 @@ export class Zombies {
     });
     if (o.k) z_.knockout = true;
     if (o.d) z_.defense = true;
+    if (o.rm) z_.radiationMode = true;
+    if (o.tw) z_.turretwar = true;
     if (o.mhp) { z_.maxHp = o.mhp; z_.hp = o.hp !== undefined ? o.hp : o.mhp; }
     if (o.sh !== undefined && z_.shieldMax > 0) this._applyShieldPct(z_, o.sh);
     if (o.ch !== undefined && z_.chestMax > 0) this._applyChestPct(z_, o.ch);

@@ -3195,7 +3195,7 @@ class Game {
   // 🗓️🤝 командне випробування тижня — свій пул з КООП-здатних режимів
   // (недільний соло-режим може бути solo-only, як-от bank/maze)
   weeklyCoopModeId() {
-    const pool = ['storm', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense'];
+    const pool = ['storm', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'radiation', 'turretwar'];
     return pool[this._weekIndex() % pool.length];
   }
 
@@ -3500,6 +3500,9 @@ class Game {
   _endTurretWarRun(won = true, reason = 'turret') {
     const level = this.level;
     if (!level || !level.turretwar || level.turretwar.over) return;
+    // 🌐 кооп: бій веде хост (update гостя дзеркальний) — фінал сповіщаємо подією (патерн dfend)
+    if (level.net && level.net.authority) level.netEv('twend', won ? 1 : 0, reason);
+    this._grantWeeklyCoop(level, !!won);
     level.turretwar.completed = !!won;
     const res = level.turretwar.results();
     level.turretwar.over = true;
@@ -3797,6 +3800,8 @@ class Game {
   _endRadiationRun(won = true) {
     const level = this.level;
     if (!level || !level.radiation || level.radiation.over) return;
+    // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн нокауту)
+    this._grantWeeklyCoop(level, !!won);
     level.radiation.completed = !!won;
     const res = level.radiation.results();
     level.radiation.over = true;

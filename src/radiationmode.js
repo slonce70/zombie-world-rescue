@@ -29,9 +29,11 @@ export class RadiationMode {
   get(id) { void id; return null; }
 
   getHudList() {
+    // живий пошук: у коопі state-ресинк гостя заміняє об'єкт боса на puppet
+    const boss = this.level.zombies.list.find((z) => z.radiationMode) || this.zombie;
     return [
       { icon: '☢️', title: t('РАДІАЦІЯ'), done: false },
-      { icon: '🧟', title: t('Радіаційний зомбі: {n} HP', { n: Math.max(0, Math.ceil(this.zombie?.hp || 0)) }), done: this.remaining() <= 0 },
+      { icon: '🧟', title: t('Радіаційний зомбі: {n} HP', { n: Math.max(0, Math.ceil(boss?.hp || 0)) }), done: this.remaining() <= 0 },
       { icon: '💥', title: t('50 HP, тільки дробовик і 10 патронів. Перемога: +50 монет радіації.'), done: false },
     ];
   }

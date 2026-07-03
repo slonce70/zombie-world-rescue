@@ -197,6 +197,16 @@ export class HostNet {
         }
         return true;
       }
+      case 'twh': {
+        // 🔨 молот гостя по зомбі-турелі: гість поруч із нею? шкоду клампимо —
+        // стати гостя не авторитарні (той самий принцип, що й кооп-драфт)
+        const tw = level.turretwar;
+        const rp = this.remotes.get(from);
+        if (tw && !tw.over && rp && Math.hypot(rp.pos.x - tw.ex, rp.pos.z - tw.cz) < 7) {
+          tw.hitEnemyTurret(Math.min(60, Math.max(0, d.dmg | 0)));
+        }
+        return true;
+      }
       case 'fountain': {
         // F23: декор-монети від гостя — кламп координат у межі карти + кулдаун ≥3с на pid.
         // Без цього гість міг би спамити фонтанами (лаг/сміття в снапшоті) або
@@ -356,6 +366,8 @@ export class HostNet {
     if (z.elite) o.e = 1;
     if (z.sleeping) o.sl = 1;
     if (z.horde) o.h = 1;
+    if (z.radiationMode) o.rm = 1;
+    if (z.turretwar) o.tw = 1;
     if (z.bossStyle) o.st = z.bossStyle;
     if (z.maxHp !== Math.round(z.stats.hp * (z.type === 'boss' ? 1 : this.level.zombies.diff.hp))) o.mhp = z.maxHp;
     this.ev('zs', z.nid, z.type, r1(z.x), r1(z.z), o);
@@ -511,6 +523,8 @@ export class HostNet {
       // remaining()=0 і миттєво «перемагав» (реальний баг friendly-нокауту)
       if (zb.knockout) o.k = 1;
       if (zb.defense) o.d = 1;
+      if (zb.radiationMode) o.rm = 1;
+      if (zb.turretwar) o.tw = 1;
       if (zb.bossStyle) o.st = zb.bossStyle;
       o.mhp = zb.maxHp;
       o.hp = zb.hp;
