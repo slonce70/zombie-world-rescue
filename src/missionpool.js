@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { t, interactKey } from './i18n.js';
 import { makeCivilian, updateRig, setAnim, toonMat } from './characters.js';
 import { dampAngle, RNG } from './utils.js';
+import { livingWorldReward, pickLivingWorldEvent, shouldOfferLivingWorld } from './livingworld.js';
 
 // назви «пристрою для ремонту» за країною — смак без зміни механіки
 const REPAIR_NAMES = {
@@ -152,6 +153,8 @@ export class DynamicMissions {
     this.bossHpLeft = null;
     this.allDone = false;
     this.crateReady = false; // для мінімапи (актуально лише з місією «зачистка»)
+    this.livingWorld = null;
+    this.livingWorldOffered = false;
 
     // якщо гравець загинув у бою з босом — бій перезапускається з арени
     level.bus.on('playerDied', () => {
@@ -561,6 +564,7 @@ export class DynamicMissions {
       mk.push({ x: m.site.x, z: m.site.z, color: '#4cff7a', icon: m.icon });
     }
     if (this.bossUnlocked && !this.bossStarted) mk.push({ x: this.L.arena.x, z: this.L.arena.z, color: '#ff44aa', icon: '👑' });
+    if (this.livingWorld) mk.push({ x: this.livingWorld.x, z: this.livingWorld.z, color: '#ffd84d', icon: '🌍' });
     return mk;
   }
 
@@ -585,6 +589,114 @@ export class DynamicMissions {
     else this.pendingHorde = { t: 5, count };
     level.bus.emit('hordeWarning', 5);
     level.netEv('hw'); // кооп: попередження про орду і гостю
+    this._maybeStartLivingWorld(m);
+  }
+
+  _maybeStartLivingWorld(m) {
+    const level = this.level;
+    if (this.livingWorld || this.livingWorldOffered || level.mirror || level.storm || level.bossRush || level.infected) return;
+    if (!shouldOfferLivingWorld({
+      countryId: level.countryId,
+      runIndex: this.runIndex,
+      missionIndex: m.slotIndex,
+      modeId: level.modeId,
+    })) return;
+    const ev = pickLivingWorldEvent({
+      countryId: level.countryId,
+      seed: level.country.seed,
+      runIndex: this.runIndex,
+      missionIndex: m.slotIndex,
+    });
+    this.livingWorldOffered = true;
+    const base = this.L.village || m.site || this.L.tower;
+    const x = base.x + 10, z = base.z - 10;
+    const y = level.world.groundH(x, z);
+    const live = {
+      id: ev.id, x, z, y, state: 'active', spawned: [],
+      beam: level.effects.makeBeam(x, z, 0xffd84d, ev.id === 'survivor' ? '🆘' : ev.id === 'crate' ? '🎁' : '🏆'),
+    };
+    if (ev.id === 'survivor') {
+      const rig = makeCivilian('kid', level.rng);
+      rig.group.position.set(x, y, z);
+      level.scene.add(rig.group);
+      live.rig = rig;
+      live.title = t('🆘 SOS! Знайди загубленого малого рятівника');
+      live.prompt = t('Натисни {k} — врятуй малого рятівника', { k: interactKey() });
+    } else if (ev.id === 'crate') {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), toonMat(0x8d5cff));
+      mesh.position.set(x, y + 0.55, z);
+      mesh.castShadow = true;
+      level.scene.add(mesh);
+      live.mesh = mesh;
+      live.title = t('🎁 Заражений ящик! Відкрий і відбий охорону');
+      live.prompt = t('Натисни {k} — відкрити заражений ящик', { k: interactKey() });
+    } else {
+      live.title = t('🏆 Золота орда! Перемож хвилю за бонус');
+      this._spawnLivingWorldWave(live, 7, true);
+      live.state = 'fight';
+    }
+    this.livingWorld = live;
+    level.bus.emit('toast', live.title);
+    level.audio.mission();
+  }
+
+  _spawnLivingWorldWave(live, n, golden = false) {
+    const level = this.level;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const type = i % 4 === 0 ? 'runner' : 'walker';
+      const z = level.zombies.spawn(type, live.x + Math.cos(a) * 12, live.z + Math.sin(a) * 12, { horde: false, golden: golden && i === 0 });
+      z.aggroed = true;
+      z.state = 'chase';
+      live.spawned.push(z);
+    }
+    level.audio.horde();
+  }
+
+  _completeLivingWorld() {
+    const live = this.livingWorld;
+    if (!live || live.state === 'done') return;
+    live.state = 'done';
+    if (live.beam) live.beam.remove();
+    if (live.mesh) this.level.scene.remove(live.mesh);
+    if (live.rig) this.level.scene.remove(live.rig.group);
+    const reward = livingWorldReward(live.id, this.level.diffStar || 1);
+    this.level.addCoins(reward.coins);
+    this.level.game.progress.addXp(reward.xp);
+    this.level.bus.emit('toast', t('🌍 Живий світ: +{c} монет, +{xp} XP', { c: reward.coins, xp: reward.xp }));
+    this.level.audio.levelUp();
+    this.livingWorld = null;
+  }
+
+  _updateLivingWorld(dt, input, allowControl) {
+    const live = this.livingWorld;
+    if (!live) return;
+    const level = this.level;
+    const player = level.player;
+    if (live.beam) live.beam.update(dt);
+    if (live.mesh) live.mesh.rotation.y += dt * 1.2;
+    if (live.rig) {
+      setAnim(live.rig, 'cheer');
+      updateRig(live.rig, dt);
+    }
+    if (live.state === 'fight') {
+      if (live.spawned.every((z) => z.state === 'dead' || z.gone)) this._completeLivingWorld();
+      return;
+    }
+    const near = Math.hypot(player.pos.x - live.x, player.pos.z - live.z) < 4;
+    if (!near) return;
+    this.prompt = { text: live.prompt || t('Натисни {k} — допомогти', { k: interactKey() }), hold: false };
+    if (!allowControl || !input.pressed('KeyE')) return;
+    input.justPressed.delete('KeyE');
+    if (live.id === 'survivor') {
+      this._spawnLivingWorldWave(live, 4);
+      this._completeLivingWorld();
+    } else {
+      if (live.mesh) { level.scene.remove(live.mesh); live.mesh = null; }
+      this._spawnLivingWorldWave(live, 6);
+      live.state = 'fight';
+      level.bus.emit('toast', t('🎁 Охорона ящика прокинулась — зачисти її!'));
+    }
   }
 
   // цивільні з хліва (порятунок) — як і раніше
@@ -729,6 +841,8 @@ export class DynamicMissions {
     const fired = this.pendingWaves.filter((pw) => pw.t <= 0);
     this.pendingWaves = this.pendingWaves.filter((pw) => pw.t > 0);
     for (const pw of fired) this._towerWave(pw.n, pw.onlyWalkers, pw.site);
+
+    this._updateLivingWorld(dt, input, allowControl);
 
     for (const m of this.missions) {
       if (m.state !== 'active') continue;
