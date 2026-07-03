@@ -779,10 +779,21 @@ export class Effects {
   groundGlow(pos, colorHex = 0xffffff, size = 7, life = 5) {
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(size, size),
-      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.55, depthWrite: false })
+      new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      })
     );
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(pos.x, this.world.groundH(pos.x, pos.z) + 0.025, pos.z);
+    const y = Math.max(this.world.groundH(pos.x, pos.z), this.world.floorAt(pos.x, pos.z, pos.y));
+    mesh.position.set(pos.x, y + 0.12, pos.z);
+    mesh.renderOrder = 30;
     mesh.frustumCulled = false;
     this.scene.add(mesh);
     this.groundGlows.push({ mesh, life, maxLife: life });
@@ -1159,7 +1170,7 @@ export class Effects {
     for (let i = this.groundGlows.length - 1; i >= 0; i--) {
       const g = this.groundGlows[i];
       g.life -= dt;
-      g.mesh.material.opacity = Math.max(0, 0.55 * (g.life / g.maxLife));
+      g.mesh.material.opacity = Math.max(0, 0.8 * (g.life / g.maxLife));
       if (g.life <= 0) {
         this.scene.remove(g.mesh);
         g.mesh.geometry.dispose();

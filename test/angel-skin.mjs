@@ -14,7 +14,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
-await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 60000 });
 
 console.log('▸ Ангел: магазин і скін');
 const meta = await page.evaluate(async () => {
@@ -127,13 +127,21 @@ const reviveFx = await page.evaluate(() => {
   };
   p.health = 0;
   p.respawn();
+  const glow = g.level.effects.groundGlows.at(-1);
+  const visible = glow ? {
+    depthTest: glow.mesh.material.depthTest,
+    opacity: glow.mesh.material.opacity,
+    renderOrder: glow.mesh.renderOrder,
+    y: Math.round(glow.mesh.position.y * 100) / 100,
+  } : null;
   g.level.effects.groundGlow = oldGround;
   g.level.effects.burst = oldBurst;
-  return { floors, bursts, health: p.health };
+  return { floors, bursts, visible, health: p.health };
 });
 check(reviveFx.health > 0
   && reviveFx.floors.some((fx) => fx.color === 0xffffff && fx.size === 7 && fx.life === 5)
-  && reviveFx.bursts.some((fx) => fx.color === 0xffffff && fx.count >= 24 && fx.life >= 5),
+  && reviveFx.bursts.some((fx) => fx.color === 0xffffff && fx.count >= 24 && fx.life >= 5)
+  && reviveFx.visible && reviveFx.visible.depthTest === false && reviveFx.visible.opacity >= 0.75 && reviveFx.visible.renderOrder >= 30,
   'у скіні Ангел після відродження є біла підлога 7x7 і білі іскри 5с', JSON.stringify(reviveFx));
 
 if (errors.length) {
