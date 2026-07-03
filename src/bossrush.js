@@ -84,7 +84,7 @@ export class BossRush {
     document.getElementById('boss-name').textContent = cfg.name;
     level.game.hud.banner(t('👑 БОС {a}/{b}', { a: this.idx + 1, b: this.total }), name, 3.5);
     level.netEv('banner', t('👑 БОС {a}/{b}', { a: this.idx + 1, b: this.total }), name, 3.5);
-    level.audio.bossRoar();
+    level.audio.bossRoar(CAMPAIGN_ORDER[this.idx]); // сценка саме цього боса
   }
 
   // викликає main._onBossDied

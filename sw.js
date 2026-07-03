@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v248';
+const CACHE = 'zr-cache-v249';
 
 const SHELL = [
   './',
@@ -95,6 +95,20 @@ const SHELL = [
   './assets/voice/uk/quest.m4a',
   './assets/voice/uk/powerup.m4a',
   './assets/voice/uk/mission.m4a',
+  './assets/voice/uk/boss-ukr.m4a',
+  './assets/voice/uk/boss-pol.m4a',
+  './assets/voice/uk/boss-deu.m4a',
+  './assets/voice/uk/boss-fra.m4a',
+  './assets/voice/uk/boss-esp.m4a',
+  './assets/voice/uk/boss-prt.m4a',
+  './assets/voice/uk/boss-ita.m4a',
+  './assets/voice/uk/boss-tur.m4a',
+  './assets/voice/uk/boss-swe.m4a',
+  './assets/voice/uk/boss-egy.m4a',
+  './assets/voice/uk/boss-jpn.m4a',
+  './assets/voice/uk/boss-chn.m4a',
+  './assets/voice/uk/boss-lost.m4a',
+  './assets/voice/uk/boss-lab.m4a',
   './assets/voice/en/wave.m4a',
   './assets/voice/en/victory.m4a',
   './assets/voice/en/defeat.m4a',
@@ -109,6 +123,20 @@ const SHELL = [
   './assets/voice/en/quest.m4a',
   './assets/voice/en/powerup.m4a',
   './assets/voice/en/mission.m4a',
+  './assets/voice/en/boss-ukr.m4a',
+  './assets/voice/en/boss-pol.m4a',
+  './assets/voice/en/boss-deu.m4a',
+  './assets/voice/en/boss-fra.m4a',
+  './assets/voice/en/boss-esp.m4a',
+  './assets/voice/en/boss-prt.m4a',
+  './assets/voice/en/boss-ita.m4a',
+  './assets/voice/en/boss-tur.m4a',
+  './assets/voice/en/boss-swe.m4a',
+  './assets/voice/en/boss-egy.m4a',
+  './assets/voice/en/boss-jpn.m4a',
+  './assets/voice/en/boss-chn.m4a',
+  './assets/voice/en/boss-lost.m4a',
+  './assets/voice/en/boss-lab.m4a',
   './assets/voice/ru/wave.m4a',
   './assets/voice/ru/victory.m4a',
   './assets/voice/ru/defeat.m4a',
@@ -123,6 +151,20 @@ const SHELL = [
   './assets/voice/ru/quest.m4a',
   './assets/voice/ru/powerup.m4a',
   './assets/voice/ru/mission.m4a',
+  './assets/voice/ru/boss-ukr.m4a',
+  './assets/voice/ru/boss-pol.m4a',
+  './assets/voice/ru/boss-deu.m4a',
+  './assets/voice/ru/boss-fra.m4a',
+  './assets/voice/ru/boss-esp.m4a',
+  './assets/voice/ru/boss-prt.m4a',
+  './assets/voice/ru/boss-ita.m4a',
+  './assets/voice/ru/boss-tur.m4a',
+  './assets/voice/ru/boss-swe.m4a',
+  './assets/voice/ru/boss-egy.m4a',
+  './assets/voice/ru/boss-jpn.m4a',
+  './assets/voice/ru/boss-chn.m4a',
+  './assets/voice/ru/boss-lost.m4a',
+  './assets/voice/ru/boss-lab.m4a',
 ];
 
 self.addEventListener('install', (e) => {

@@ -866,7 +866,7 @@ export class DynamicMissions {
         this.bossStarted = true;
         if (this.bossBeam) { this.bossBeam.remove(); this.bossBeam = null; }
         level.zombies.spawnBoss(this.bossHpLeft);
-        level.audio.bossRoar();
+        level.audio.bossRoar(level.country && level.country.id); // сценка «Леся + бос» цієї країни
         level.bus.emit('bossStart');
         level.netEv('bstart');
         for (let i = 0; i < 6; i++) {

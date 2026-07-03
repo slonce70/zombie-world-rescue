@@ -300,7 +300,7 @@ export class GuestNet {
       }
       case 'bstart': {
         level.bus.emit('bossStart');
-        level.audio.bossRoar();
+        level.audio.bossRoar(level.country && level.country.id); // гість чує ту саму сценку боса
         break;
       }
       case 'vict': game.netVictory(); break;

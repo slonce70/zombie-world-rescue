@@ -5,6 +5,9 @@ const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
 // усі реплики озвучки — файли assets/voice/<мова>/<id>.m4a (Gemini TTS, голос Zephyr)
 const VOICE_IDS = ['wave', 'victory', 'defeat', 'levelup', 'boss', 'heal', 'combo', 'golden', 'airdrop', 'horde', 'megabox', 'quest', 'powerup', 'mission'];
+// країни з персональною сценкою боса «Леся + бос» (двоголосий Gemini TTS):
+// assets/voice/<мова>/boss-<id>.m4a; НЕ в VOICE_IDS — вантажаться ліниво при появі боса
+const BOSS_VOICE_IDS = new Set(['ukr', 'pol', 'deu', 'fra', 'esp', 'prt', 'ita', 'tur', 'swe', 'egy', 'jpn', 'chn', 'lost', 'lab']);
 
 export class AudioMan {
   constructor() {
@@ -385,8 +388,10 @@ export class AudioMan {
     this._noise(t, 1.0, 0.2, 'lowpass', 300);
   }
 
-  bossRoar() {
-    this.voiceOnce('boss', 45);
+  // countryId (напр. 'UKR') → персональна сценка цього боса, інакше загальна репліка
+  bossRoar(countryId) {
+    const cid = countryId ? String(countryId).toLowerCase() : '';
+    this.voiceOnce(BOSS_VOICE_IDS.has(cid) ? 'boss-' + cid : 'boss', 45);
     const t = this.t;
     this._osc('sawtooth', 70, t, 1.6, 0.55, 40);
     this._osc('sawtooth', 95, t + 0.1, 1.4, 0.4, 55);
@@ -469,10 +474,10 @@ export class AudioMan {
   }
 
   // проиграти репліку; якщо інша ще звучить — пропустити (не черга!)
+  // незавантажена репліка (сценки босів поза VOICE_IDS) граєтся одразу після довантаження
   voice(id, vol = 1) {
     if (this.muted || !this.ctx) return;
-    const p = this._voiceBufs.get(id);
-    if (!p) { this._loadVoice(id); return; }
+    const p = this._voiceBufs.get(id) || this._loadVoice(id);
     p.then((buf) => {
       if (!buf || this.muted || this._voiceBusyUntil > this.ctx.currentTime) return;
       const s = this.ctx.createBufferSource();
