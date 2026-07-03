@@ -151,14 +151,21 @@ export class Pet {
     let tx = p.pos.x + Math.sin(p.yaw + 2.4) * 1.7;
     let tz = p.pos.z + Math.cos(p.yaw + 2.4) * 1.7;
     // шукаємо монету в радіусі — пес побіжить по неї
-    if (!this.grabbing && this.grabCd <= 0) {
+    if (this.grabCd <= 0) {
       let best = null, bd = 9;
       for (const c of level.effects.coins) {
         if (c.type !== 'coin') continue;
         const d = Math.hypot(c.mesh.position.x - this.x, c.mesh.position.z - this.z);
-        if (d < bd) { bd = d; best = c; }
+        if (d < 0.8) {
+          level.effects.collectCoinNow(c);
+          this.grabbing = null;
+          this.grabCd = 0.4;
+          if (this.model.tail) this.model.tail.rotation.z = 1;
+          break;
+        }
+        if (!this.grabbing && d < bd) { bd = d; best = c; }
       }
-      this.grabbing = best;
+      if (!this.grabbing) this.grabbing = best;
     }
     if (this.grabCd > 0) this.grabCd -= dt;
     if (this.grabbing) {

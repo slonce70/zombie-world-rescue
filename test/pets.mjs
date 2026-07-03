@@ -78,6 +78,23 @@ const swap = await page.evaluate(() => {
 });
 check(swap.a === 'dragon' && swap.b === 'penguin' && swap.oneLevelPet, 'перемикання типів працює', JSON.stringify(swap));
 
+console.log('▸ Підбір монети прямо біля улюбленця');
+const nearCoin = await page.evaluate(() => {
+  const g = window.__game;
+  g.test.setActivePet('dog');
+  const pet = g.level.pet;
+  const effects = g.level.effects;
+  effects.coins.length = 0;
+  effects.spawnCoin(pet.x + 8, pet.z, 5);
+  const far = effects.coins[effects.coins.length - 1];
+  effects.spawnCoin(pet.x + 0.2, pet.z, 7);
+  pet.grabbing = far;
+  const coins0 = g.save.coins;
+  pet.update(0.016);
+  return { gained: g.save.coins - coins0, left: effects.coins.length, grabbingNear: pet.grabbing && pet.grabbing.value === 7 };
+});
+check(nearCoin.gained === 7 && nearCoin.left === 1, 'улюбленець підбирає монету біля себе навіть якщо мав дальню ціль', JSON.stringify(nearCoin));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');
