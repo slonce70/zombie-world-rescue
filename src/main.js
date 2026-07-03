@@ -77,7 +77,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 239;
+const APP_VERSION = 240;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3343,9 +3343,9 @@ class Game {
       this.progress.addXp(80 * fin.mult);
       rewardTitle = t('🪙 +{n} монет', { n: 100 * fin.mult });
       if (roll < KNOCKOUT_STAFF_CHANCE && !this.save.weapons.includes('staff')) {
+        level.player.giveWeapon('staff');
         this.save.weapons.push('staff');
         this._weaponLoadout();
-        level.player.giveWeapon('staff');
         rewardTitle = t('🪄 Випав Посох!');
         this.hud.banner(t('🥊 НОКАУТ ПРОЙДЕНО!'), t('З ящика випав Посох!'), 4.5);
       } else if (roll < 0.98) {
