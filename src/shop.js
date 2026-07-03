@@ -78,6 +78,7 @@ export const SHOP_ITEMS = [
   { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 відкриває скін, червоні kill-іскри і червоне відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
   { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: 'Радіація', skin: 'radiation' },
   { id: 'radiationupgrade', icon: '☢️', name: t('Радіаційні калюжі'), desc: t('Покращення Радіаційного: калюжі бʼють 5 HP/с, а влучання сиплять краплі радіації'), price: 0, crystalPrice: 45, max: 1, cat: 'Радіація', needsSkin: 'radiation' },
+  { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: 'Радіація' },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
@@ -220,6 +221,7 @@ export class Shop {
       const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
       const priceLabel = (locked || lockedGadget || lockedSkin || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
+        : item.crystalPrice && item.radiationPrice ? `${item.crystalPrice} 💎 + ${item.radiationPrice} ☢️`
         : item.radiationPrice ? `${item.radiationPrice} ☢️`
         : item.crystalPrice ? `${item.crystalPrice} 💎` : price + surge + ' <span class="coin-icon">₴</span>';
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
@@ -348,6 +350,9 @@ export class Shop {
         player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1);
         break;
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
+      case 'radiationturretpack':
+        game.hud.toast(t('☢️🤖 Радіаційна турель: +5 шкоди і зелені кулі'));
+        break;
       case 'grenade': player.grenades++; break;
       case 'rocket': player.addRockets(1); break;
       case 'armorplate': player.addArmor(40); break;

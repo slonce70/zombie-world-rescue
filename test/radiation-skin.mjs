@@ -61,8 +61,8 @@ const shopFlow = await page.evaluate(() => {
   g.shop.close();
   return { tabOk, rendered, afterBuy, afterRepeat };
 });
-check(shopFlow.tabOk && shopFlow.rendered.includes('radiationskin') && shopFlow.rendered.includes('radiationupgrade') && shopFlow.rendered.includes('radiationcloneskin'),
-  'магазин має вкладку Радіація з комплектом, покращенням і скінами клонів', JSON.stringify(shopFlow.rendered));
+check(shopFlow.tabOk && shopFlow.rendered.includes('radiationskin') && shopFlow.rendered.includes('radiationupgrade') && shopFlow.rendered.includes('radiationturretpack') && shopFlow.rendered.includes('radiationcloneskin'),
+  'магазин має вкладку Радіація з комплектом, покращеннями і скінами клонів', JSON.stringify(shopFlow.rendered));
 check(shopFlow.afterBuy.crystals === 0 && shopFlow.afterBuy.owned && shopFlow.afterBuy.active === 'radiation',
   'купівля за 100 кристалів відкриває і одягає Радіаційний', JSON.stringify(shopFlow.afterBuy));
 check(shopFlow.afterRepeat.crystals === 0 && shopFlow.afterRepeat.ownedCount === 1,

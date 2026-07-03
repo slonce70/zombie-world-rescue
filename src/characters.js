@@ -4044,11 +4044,12 @@ export function makeMegaboxMesh() {
 // Гаджети: 🦘 кишеньковий батут і 🧱 барикада
 // ============================================================
 // 🤖 сторожова турель: тринога + обертова голова з дулом
-export function makeTurretMesh() {
+export function makeTurretMesh(style = 'default') {
   const g = new THREE.Group();
-  const metalM = toonMat(0x5a6470);
-  const darkM = toonMat(0x37404f);
-  const accentM = toonMat(0x4fd8ff, 0x2288cc, 0.4);
+  const radiation = style === 'radiation';
+  const metalM = toonMat(radiation ? 0x426b4d : 0x5a6470);
+  const darkM = toonMat(radiation ? 0x1e3528 : 0x37404f);
+  const accentM = toonMat(radiation ? 0x77ff55 : 0x4fd8ff, radiation ? 0x42d935 : 0x2288cc, 0.4);
   // тринога
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2;
@@ -4076,7 +4077,7 @@ export function makeTurretMesh() {
   barrelTip.position.set(0.12, -0.04, -0.66);
   const antenna = cylinder(0.015, 0.015, 0.3, darkM, 5);
   antenna.position.set(-0.14, 0.28, 0.1);
-  const antTip = sphere(0.035, toonMat(0xff5d5d, 0xff2222, 0.6), 6, 5);
+  const antTip = sphere(0.035, toonMat(radiation ? 0xd6ff48 : 0xff5d5d, radiation ? 0x77ff55 : 0xff2222, 0.6), 6, 5);
   antTip.position.set(-0.14, 0.44, 0.1);
   head.add(body, eye, barrel, barrelTip, antenna, antTip);
   g.add(head);

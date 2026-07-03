@@ -1576,27 +1576,27 @@ export class Gadgets {
       this.level.bus.emit('toast', t('Тут не можна поставити турель 🙈'));
       return false;
     }
-    this.placeTurretAt(pos.x, pos.z, 1, (this.level.game.save.gadgetHypers || []).includes('turret'));
+    this.placeTurretAt(pos.x, pos.z, 1, (this.level.game.save.gadgetHypers || []).includes('turret'), (this.level.game.save.upgrades.radiationturretpack || 0) > 0);
     return true;
   }
 
-  placeTurretAt(x, z, ownerPid, hyper = false) {
+  placeTurretAt(x, z, ownerPid, hyper = false, radiation = false) {
     const level = this.level;
     const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
-    this._buildTurret(nid, x, z, ownerPid, hyper);
+    this._buildTurret(nid, x, z, ownerPid, hyper, radiation);
     if (level.net && level.net.authority) {
       level.netEv('turr', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10);
     }
     return true;
   }
 
-  _buildTurret(nid, x, z, ownerPid, hyper = false) {
+  _buildTurret(nid, x, z, ownerPid, hyper = false, radiation = false) {
     const level = this.level;
     // одна активна турель на гравця — нова замінює стару
     const oldIdx = this.turrets.findIndex((t) => t.ownerPid === ownerPid);
     if (oldIdx >= 0) this._removeTurret(oldIdx, false);
     const y = level.world.groundH(x, z);
-    const m = makeTurretMesh();
+    const m = makeTurretMesh(radiation ? 'radiation' : 'default');
     m.group.position.set(x, y, z);
     level.scene.add(m.group);
     const collider = { x, z, r: 0.45, top: y + 1.3 };
@@ -1605,9 +1605,9 @@ export class Gadgets {
     this.turrets.push({
       nid, ownerPid, x, z, y,
       hp: hyper ? TURRET_HYPER.hp : TURRET.hp,
-      dmg: hyper ? TURRET_HYPER.dmg : TURRET.dmg,
+      dmg: (hyper ? TURRET_HYPER.dmg : TURRET.dmg) + (radiation ? 5 : 0),
       life: TURRET.life, fireT: 0.6,
-      mesh: m, collider, idleSpin: 0,
+      mesh: m, collider, idleSpin: 0, radiation,
     });
     level.audio.powerup();
     level.effects.ring(new THREE.Vector3(x, y, z), 0x4fd8ff, 2.2);
@@ -1650,7 +1650,10 @@ export class Gadgets {
     tu.mesh.head.rotation.y = Math.atan2(-(tx - tu.x), -(tz - tu.z));
     const muzzle = new THREE.Vector3();
     tu.mesh.muzzle.getWorldPosition(muzzle);
+    const oldStyle = this.level.effects.tracerStyle;
+    if (tu.radiation) this.level.effects.tracerStyle = 'neon';
     this.level.effects.tracer(muzzle, new THREE.Vector3(tx, ty, tz));
+    this.level.effects.tracerStyle = oldStyle;
     const p = this.level.player.pos;
     if (Math.hypot(tu.x - p.x, tu.z - p.z) < 55) this.level.audio.shot('pistol');
   }
@@ -1688,7 +1691,10 @@ export class Gadgets {
       t.mesh.head.rotation.y = Math.atan2(-(best.x - t.x), -(best.z - t.z));
       const muzzle = new THREE.Vector3();
       t.mesh.muzzle.getWorldPosition(muzzle);
+      const oldStyle = level.effects.tracerStyle;
+      if (t.radiation) level.effects.tracerStyle = 'neon';
       level.effects.tracer(muzzle, new THREE.Vector3(best.x, ty, best.z));
+      level.effects.tracerStyle = oldStyle;
       const p = level.player.pos;
       if (Math.hypot(t.x - p.x, t.z - p.z) < 55) level.audio.shot('pistol');
       const dir = new THREE.Vector3(best.x - t.x, 0, best.z - t.z).normalize();
