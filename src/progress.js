@@ -52,7 +52,7 @@ export const PASS_REWARDS = {
   42: { type: 'coins', n: 1600, icon: '💰', name: t('1600 монет') },
   43: { type: 'coins', n: 1700, icon: '💰', name: t('1700 монет') },
   44: { type: 'coins', n: 1800, icon: '💰', name: t('1800 монет') },
-  45: { type: 'crystals', n: 20, icon: '💎', name: t('20 кристалів') },
+  45: { type: 'hyper', id: 'mine', icon: '⚡', name: t('Гіперзаряд міни') },
   46: { type: 'coins', n: 1900, icon: '💰', name: t('1900 монет') },
   47: { type: 'coins', n: 2000, icon: '💰', name: t('2000 монет') },
   48: { type: 'coins', n: 2100, icon: '💰', name: t('2100 монет') },
@@ -211,6 +211,9 @@ export class Progress {
         if (!game.save.activeGadget) game.save.activeGadget = r.id;
         sub += t(' — {k}!', { k: keyHint('кнопка 🦘', 'клавіша F') });
       }
+    } else if (r.type === 'hyper') {
+      if (!Array.isArray(game.save.gadgetHypers)) game.save.gadgetHypers = [];
+      if (!game.save.gadgetHypers.includes(r.id)) game.save.gadgetHypers.push(r.id);
     } else if (r.type === 'skin') {
       if (!game.save.skins.includes(r.id)) game.save.skins.push(r.id);
       sub += t(' — одягни в Гардеробі 🎒');

@@ -20,12 +20,14 @@ console.log('▸ Гаджет «Міна»');
 const meta = await page.evaluate(async () => {
   const { GADGETS } = await import('/src/extras.js');
   const { SHOP_ITEMS } = await import('/src/shop.js');
+  const { PASS_REWARDS } = await import('/src/progress.js');
   const item = SHOP_ITEMS.find((i) => i.id === 'mine');
   const hyper = SHOP_ITEMS.find((i) => i.id === 'mine-hyper');
   return {
     gadget: GADGETS.mine && { cd: GADGETS.mine.cd, price: GADGETS.mine.price, icon: GADGETS.mine.icon },
     item: item && { price: item.price, max: item.max, gadget: item.gadget },
-    hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper, needsGadget: hyper.needsGadget },
+    hyper: hyper && { price: hyper.price, max: hyper.max, hyper: hyper.hyper, needsGadget: hyper.needsGadget, desc: hyper.desc },
+    pass45: PASS_REWARDS[45],
   };
 });
 check(meta.gadget && meta.gadget.cd === 35 && meta.gadget.price === 1000 && meta.gadget.icon === '💥',
@@ -34,6 +36,8 @@ check(meta.item && meta.item.price === 1000 && meta.item.max === 1 && meta.item.
   'міна продається як гаджет за 1000 монет', JSON.stringify(meta.item));
 check(meta.hyper && meta.hyper.price === 5000 && meta.hyper.max === 1 && meta.hyper.hyper === 'mine' && meta.hyper.needsGadget === 'mine',
   'гіперзаряд міни коштує 5000 і потребує базову міну', JSON.stringify(meta.hyper));
+check(meta.pass45 && meta.pass45.type === 'hyper' && meta.pass45.id === 'mine',
+  '45-й зірковий рівень видає гіперзаряд міни', JSON.stringify(meta.pass45));
 
 const buy = await page.evaluate(() => {
   const g = window.__game;
@@ -88,14 +92,37 @@ const hyper = await page.evaluate(() => {
   g.test.gadgetCdReset();
   g.test.teleport(12, 145);
   const used = g.test.useGadget();
+  const minesBefore = g.level.gadgets.mines.map((m) => ({ x: m.x, z: m.z }));
   const mine = g.level.gadgets.mines[0];
   const z = g.test.spawnZombie('tank', mine.x + 1.4, mine.z);
   z.hp = z.maxHp = 1000;
   g.level.gadgets._updateMines(0.1);
-  return { used, dmg: 1000 - z.hp, fires: g.level.gadgets._meteorFires.length };
+  return {
+    used,
+    minesBefore: minesBefore.length,
+    spread: minesBefore.map((m) => Math.round(Math.hypot(m.x - g.level.player.pos.x, m.z - g.level.player.pos.z) * 10) / 10),
+    minesAfter: g.level.gadgets.mines.length,
+    dmg: 1000 - z.hp,
+    stun: Math.round((z.stunT || 0) * 10) / 10,
+    fires: g.level.gadgets._meteorFires.length,
+  };
 });
-check(hyper.used && hyper.dmg > effect.nearDmg && hyper.fires === 1,
-  'гіпер-міна має сильніший вибух і лишає вогонь', JSON.stringify(hyper));
+check(hyper.used && hyper.minesBefore === 3 && hyper.minesAfter === 2,
+  'гіпер-міна ставить 3 міни і спрацьовує тільки одна з них', JSON.stringify(hyper));
+check(hyper.dmg > 0 && hyper.dmg < 1000 && hyper.stun === 1 && hyper.fires === 0,
+  'гіпер-міна оглушує вижившого зомбі на 1с без старої вогняної зони', JSON.stringify(hyper));
+
+const passReward = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.xp = 0;
+  g.save.passLvl = 44;
+  g.save.gadgetHypers = [];
+  const need45 = Array.from({ length: 44 }, (_, i) => i + 1).reduce((s, lvl) => s + (80 + 40 * (lvl - 1)), 0);
+  g.test.addXp(need45);
+  return { level: g.progress.level, hypers: g.save.gadgetHypers || [] };
+});
+check(passReward.level >= 45 && passReward.hypers.includes('mine'),
+  'досягнення 45 рівня додає mine у gadgetHypers', JSON.stringify(passReward));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

@@ -1099,16 +1099,23 @@ export class Gadgets {
 
   _placeMine() {
     const p = this.level.player;
-    const x = p.pos.x;
-    const z = p.pos.z;
-    const y = Math.max(this.level.world.groundH(x, z), this.level.world.floorAt(x, z, p.pos.y));
-    const mesh = makeMineMesh();
-    mesh.position.set(x, y + 0.03, z);
-    this.level.scene.add(mesh);
-    this.mines.push({ x, z, y, mesh, life: 45, hyper: (this.level.game.save.gadgetHypers || []).includes('mine') });
+    const hyper = (this.level.game.save.gadgetHypers || []).includes('mine');
+    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+    const spots = hyper ? [[0, 0], [-4.5, 1.2], [4.5, 1.2]] : [[0, 0]];
+    for (const [side, fwd] of spots) {
+      const solved = this.level.world.collide(p.pos.x + rx * side + fx * fwd, p.pos.z + rz * side + fz * fwd, 0.35, p.pos.y);
+      const x = solved.x;
+      const z = solved.z;
+      const y = Math.max(this.level.world.groundH(x, z), this.level.world.floorAt(x, z, p.pos.y));
+      const mesh = makeMineMesh();
+      mesh.position.set(x, y + 0.03, z);
+      this.level.scene.add(mesh);
+      this.mines.push({ x, z, y, mesh, life: 45, hyper });
+    }
     this.level.audio.powerup();
-    this.level.effects.ring(new THREE.Vector3(x, y, z), 0xffd23f, 1.8);
-    this.level.bus.emit('toast', t('💥 Міну поставлено!'));
+    this.level.effects.ring(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), 0xffd23f, hyper ? 2.8 : 1.8);
+    this.level.bus.emit('toast', hyper ? t('💥⚡ Поставлено 3 міни!') : t('💥 Міну поставлено!'));
     return true;
   }
 
@@ -1118,12 +1125,16 @@ export class Gadgets {
     this.mines.splice(i, 1);
     this.level.scene.remove(m.mesh);
     disposeObject(m.mesh);
-    const r = m.hyper ? 6 : 5;
-    const dmg = m.hyper ? 260 : 180;
+    const r = 5;
+    const dmg = 180;
     this.level.audio.explosion();
     this.level.effects.burst(new THREE.Vector3(m.x, m.y + 0.3, m.z), 0xff6a18, 24, { speed: 6, up: 4, life: 0.8 });
     this.level.effects.onExplosion(m.x, m.y + 0.2, m.z, r, dmg, 1, { finalDamage: true });
-    if (m.hyper) this._addMeteorFire(m.x, m.z, true, 8, 2.6);
+    if (m.hyper) {
+      for (const z of this.level.zombies.list) {
+        if (z.state !== 'dead' && !z.gone && !(z.stats && z.stats.stunImmune) && Math.hypot(z.x - m.x, z.z - m.z) < r) z.stunT = Math.max(z.stunT || 0, 1);
+      }
+    }
   }
 
   _updateMines(dt) {
