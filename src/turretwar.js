@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { makeZombie, updateRig, setAnim } from './characters.js';
 import { RNG, disposeObject } from './utils.js';
+import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const TURRETWAR_UNLOCK_COUNTRIES = 12;
 const TURRET_HP = 500;
@@ -370,24 +371,9 @@ export class TurretWarMode {
     return y + 7;
   }
 
-  _clampActor(p) {
-    const x = Math.max(this.cx - this._halfW + 1, Math.min(this.cx + this._halfW - 1, p.pos.x));
-    const z = Math.max(this.cz - this._halfD + 1, Math.min(this.cz + this._halfD - 1, p.pos.z));
-    if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
-    if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY) {
-      p.pos.y = this.floorY;
-      if (p.vel.y < 0) p.vel.y = 0;
-      p.onGround = true;
-    }
-  }
+  _clampActor(p) { clampActorToRect(p, this.cx, this.cz, this._halfW, this._halfD, this.floorY); }
 
-  _clampZombie(z) {
-    z.x = Math.max(this.cx - this._halfW + 1, Math.min(this.cx + this._halfW - 1, z.x));
-    z.z = Math.max(this.cz - this._halfD + 1, Math.min(this.cz + this._halfD - 1, z.z));
-    z.y = this.floorY;
-    if (z.rig && z.rig.group) z.rig.group.position.y = this.floorY;
-  }
+  _clampZombie(z) { clampZombieToRect(z, this.cx, this.cz, this._halfW, this._halfD, this.floorY); }
 
   _damagePlayerIfClose(z, dt) {
     z.defenseHitCd = Math.max(0, (z.defenseHitCd || 0) - dt);

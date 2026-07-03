@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
+import { clampActorToRect } from './roomkit.js';
 
 export const MAZE_UNLOCK_COUNTRIES = 11;
 export const MAZE_ROOM_SIZE = 76;
@@ -175,17 +176,7 @@ export class MazeMode {
     }
   }
 
-  _clampActor(p) {
-    const x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, p.pos.x));
-    const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
-    if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
-    if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY || p.pos.y > this.floorY + 4) {
-      p.pos.y = this.floorY;
-      if (p.vel.y < 0) p.vel.y = 0;
-      p.onGround = true;
-    }
-  }
+  _clampActor(p) { clampActorToRect(p, this.cx, this.cz, this._half, this._half, this.floorY, { ceil: true }); }
 
   _calcFloorY() {
     let y = -Infinity;

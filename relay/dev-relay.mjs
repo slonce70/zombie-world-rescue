@@ -8,6 +8,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { cleanNickSrv } from '../worker/nick.mjs';
+import { routeBatch } from '../worker/route.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
 const HOST = process.env.RELAY_HOST || '127.0.0.1';
@@ -324,27 +325,9 @@ wss.on('connection', (ws, req) => {
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах (як у воркері)
     if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
-      const per = new Map();
-      for (const it of msg.m.slice(0, MAX_BATCH_ITEMS)) {
-        if (!it || it.d === undefined) continue;
-        if (it.to === 0) {
-          for (const pid of room.sockets.keys()) {
-            if (pid === id) continue;
-            if (!per.has(pid)) per.set(pid, []);
-            per.get(pid).push(it.d);
-          }
-        } else {
-          const pid = it.to | 0;
-          if (pid === id || !room.sockets.has(pid)) continue;
-          if (!per.has(pid)) per.set(pid, []);
-          per.get(pid).push(it.d);
-        }
-      }
-      for (const [pid, list] of per) {
+      for (const { pid, msg: env2 } of routeBatch(msg.m, id, [...room.sockets.keys()], (p) => room.sockets.has(p), MAX_BATCH_ITEMS)) {
         const sock = room.sockets.get(pid);
-        if (sock && sock.readyState === 1) {
-          sock.send(JSON.stringify(list.length === 1 ? { from: id, d: list[0] } : { from: id, b: list }));
-        }
+        if (sock && sock.readyState === 1) sock.send(JSON.stringify(env2));
       }
       return;
     }

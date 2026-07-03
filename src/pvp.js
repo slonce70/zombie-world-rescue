@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
+import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const PVP_UNLOCK_COUNTRIES = 8;
 export const OVERLOADED_PVP_UNLOCK_COUNTRIES = 8;
@@ -130,17 +131,9 @@ export class PvpMode {
     this.zombie = zb;
   }
 
-  _clampActor(p) {
-    const x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, p.pos.x));
-    const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
-    if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
-    if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-  }
+  _clampActor(p) { clampActorToRect(p, this.cx, this.cz, this._half, this._half); }
 
-  _clampZombie(z) {
-    z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
-    z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
-  }
+  _clampZombie(z) { clampZombieToRect(z, this.cx, this.cz, this._half, this._half); }
 
   results() {
     return {

@@ -46,6 +46,7 @@ const SHELL = [
   './src/souls.js',
   './src/worldboss.js',
   './src/radiationmode.js',
+  './src/roomkit.js',
   './src/renderkit.js',
   './src/characters.js',
   './src/maps/ukraine.js',

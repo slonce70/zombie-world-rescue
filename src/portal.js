@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
+import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const PORTAL_UNLOCK_COUNTRIES = 9;
 export const PORTAL_HP = 1222;
@@ -184,24 +185,9 @@ export class PortalMode {
     }
   }
 
-  _clampActor(p) {
-    const x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, p.pos.x));
-    const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
-    if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
-    if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY || p.pos.y > this.floorY + 4) {
-      p.pos.y = this.floorY;
-      if (p.vel.y < 0) p.vel.y = 0;
-      p.onGround = true;
-    }
-  }
+  _clampActor(p) { clampActorToRect(p, this.cx, this.cz, this._half, this._half, this.floorY, { ceil: true }); }
 
-  _clampZombie(z) {
-    z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
-    z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
-    z.y = this.floorY;
-    if (z.rig && z.rig.group) z.rig.group.position.set(z.x, z.y, z.z);
-  }
+  _clampZombie(z) { clampZombieToRect(z, this.cx, this.cz, this._half, this._half, this.floorY, { posMode: 'xyz' }); }
 
   _clearRoomBlockers() {
     const inside = (c) => Math.abs(c.x - this.cx) < this._half - 1 && Math.abs(c.z - this.cz) < this._half - 1;

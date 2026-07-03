@@ -4,6 +4,7 @@ import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, updateRig, setAnim, t
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
 import { t } from './i18n.js';
+import { ZS_MASK, ZF } from './net/protocol.js';
 
 const TYPE_STATS = {
   walker: { hp: 70, speed: 1.7, chaseSpeed: 3.4, aggro: 20, dmg: 10, attackR: 1.8, coins: 5, pitch: 1.0 },
@@ -1694,7 +1695,7 @@ export class Zombies {
         if (v >= 0 && z.shieldMax > 0 && z.shieldObj) this._applyShieldPct(z, v);
         else if (v < 0 && z.chestMax > 0) this._applyChestPct(z, -(v + 1));
       }
-      z.sleeping = !!(t[4] & 64);
+      z.sleeping = !!(t[4] & ZF.SLEEPING);
     }
   }
 
@@ -1733,9 +1734,9 @@ export class Zombies {
         continue;
       }
       const b = z.netB || 0;
-      const state = b & 7; // 0 wander 1 chase 2 attack 3 dead 4 flee
-      const charging = (b & 16) !== 0;
-      const telegraph = (b & 32) !== 0;
+      const state = b & ZS_MASK; // 0 wander 1 chase 2 attack 3 dead 4 flee
+      const charging = (b & ZF.CHARGING) !== 0;
+      const telegraph = (b & ZF.TELEGRAPH) !== 0;
       if (z.netT) {
         const ddx = z.netT.x - z.x, ddz = z.netT.z - z.z;
         const snapDist = Math.hypot(ddx, ddz);

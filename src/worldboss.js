@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { disposeObject } from './utils.js';
+import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const WORLD_BOSSES = [
   {
@@ -301,22 +302,7 @@ export class WorldBossMode {
     }
   }
 
-  _clampActor(p) {
-    const x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, p.pos.x));
-    const z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, p.pos.z));
-    if (x !== p.pos.x) { p.pos.x = x; p.vel.x = 0; }
-    if (z !== p.pos.z) { p.pos.z = z; p.vel.z = 0; }
-    if (p.pos.y < this.floorY) {
-      p.pos.y = this.floorY;
-      if (p.vel.y < 0) p.vel.y = 0;
-      p.onGround = true;
-    }
-  }
+  _clampActor(p) { clampActorToRect(p, this.cx, this.cz, this._half, this._half, this.floorY); }
 
-  _clampZombie(z) {
-    z.x = Math.max(this.cx - this._half + 1, Math.min(this.cx + this._half - 1, z.x));
-    z.z = Math.max(this.cz - this._half + 1, Math.min(this.cz + this._half - 1, z.z));
-    z.y = this.floorY;
-    if (z.rig && z.rig.group) z.rig.group.position.y = this.floorY;
-  }
+  _clampZombie(z) { clampZombieToRect(z, this.cx, this.cz, this._half, this._half, this.floorY); }
 }

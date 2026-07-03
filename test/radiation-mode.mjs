@@ -33,7 +33,13 @@ check(meta.lockedBefore, 'режим Радіація закритий до 12 �
 check(meta.item && meta.item.cat === 'Радіація' && meta.item.radiationPrice === 150 && meta.item.max === 1 && meta.item.cloneSkin === 'radiation',
   'у розділі Радіація є скін клонів за 150 монет радіації', JSON.stringify(meta.item));
 
-await page.evaluate(() => window.__game.test.startRadiation());
+await page.evaluate(() => {
+  const g = window.__game;
+  // моки проти протухання: ×2/×3 дня-тижня не мають множити +50 ☢️ (пастка mode-depth)
+  g.dailyChallengeId = () => '__none';
+  g.weeklyChallengeId = () => '__none';
+  g.test.startRadiation();
+});
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.radiation, null, { timeout: 60000 });
 
 const started = await page.evaluate(() => {

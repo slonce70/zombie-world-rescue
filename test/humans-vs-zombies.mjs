@@ -42,8 +42,12 @@ check(menu.afterExists && !menu.afterLocked && /ЗОМБІ ПРОТИ ЛЮДЕЙ
 
 console.log('▸ Старт режиму: 30 клонів проти 65 зомбі і робота');
 await page.evaluate(() => {
-  window.__game.save.coins = 200;
-  window.__game.test.startHumans();
+  const g = window.__game;
+  // моки проти протухання: ×2/×3 дня-тижня не мають множити нагороду (пастка mode-depth)
+  g.dailyChallengeId = () => '__none';
+  g.weeklyChallengeId = () => '__none';
+  g.save.coins = 200;
+  g.test.startHumans();
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.humans, null, { timeout: 30000 });
 const started = await page.evaluate(async () => {

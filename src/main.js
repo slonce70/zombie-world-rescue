@@ -1484,6 +1484,7 @@ class Game {
   renderWardrobe() {
     const save = this.save;
     syncTitles(save);
+    const hex6 = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
     const card = (id, meta, owned, equipped, kind) => `
       <div class="ward-card ${equipped ? 'equipped' : ''} ${owned ? '' : 'locked'}" data-kind="${kind}" data-id="${id}">
         <div class="ward-ico">${meta.icon}</div>
@@ -1534,7 +1535,6 @@ class Game {
     if (save.activeSkin === 'custom') {
       const h = save.hero;
       const slotLabel = { skin: t('Шкіра'), shirt: t('Футболка'), pants: t('Штани'), shoes: t('Взуття'), hatColor: t('Колір шапки') };
-      const hex6 = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
       const partGroup = (title, part, items) => {
         let out = `<div class="hero-sub">${title}</div><div class="ward-grid hero-parts">`;
         for (const [id, m] of Object.entries(items)) {
@@ -1650,7 +1650,7 @@ class Game {
         save.hero[slot] = parseInt(el.dataset.hex, 10);
         for (const sib of el.parentElement.querySelectorAll('.hero-swatch')) sib.classList.toggle('on', sib === el);
         const pick = el.parentElement.querySelector('.hero-pick');
-        if (pick) { const css = '#' + ((save.hero[slot] >>> 0) & 0xffffff).toString(16).padStart(6, '0'); pick.style.background = css; pick.querySelector('input').value = css; }
+        if (pick) { const css = hex6(save.hero[slot]); pick.style.background = css; pick.querySelector('input').value = css; }
         this.audio.purchase();
         onHeroChange();
       });
@@ -3821,8 +3821,10 @@ class Game {
     const fin = this._soloModeFinish('radiation', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
-      this.save.radiationCoins = (this.save.radiationCoins || 0) + RADIATION_WIN_COINS;
-      rewardTitle = t('☢️ +{n} монет радіації', { n: RADIATION_WIN_COINS });
+      // ×2/×3 дня-тижня діють і на монети радіації — інакше ротація для режиму пуста
+      const gain = RADIATION_WIN_COINS * fin.mult;
+      this.save.radiationCoins = (this.save.radiationCoins || 0) + gain;
+      rewardTitle = t('☢️ +{n} монет радіації', { n: gain });
       this.saveGame();
     }
     this._lastEndMode = 'radiation';

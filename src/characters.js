@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { toonMat, cachedGeo, capsule, sphere, box, cone, cylinder, bakeGroupMeshes } from './renderkit.js';
+import { lerp } from './utils.js';
 export { toonMat, bakeGroupMeshes } from './renderkit.js';
 
 const PART_NAMES = ['legL', 'legR', 'armL', 'armR', 'torso', 'head'];
@@ -237,7 +238,6 @@ export function setAnim(rig, mode) {
   if (mode === 'die') rig.anim.dieT = 0;
 }
 
-const lerp_ = (a, b, t) => a + (b - a) * t;
 const sstep = (e0, e1, x) => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
@@ -296,7 +296,7 @@ export function updateRig(rig, dt) {
     case 'attack': {
       a.attackT += dt / 0.55;
       const t = Math.min(1, a.attackT);
-      const raise = t < 0.4 ? lerp_(b.armL, 2.4, t / 0.4) : lerp_(2.4, 0.5, (t - 0.4) / 0.6);
+      const raise = t < 0.4 ? lerp(b.armL, 2.4, t / 0.4) : lerp(2.4, 0.5, (t - 0.4) / 0.6);
       armL = raise;
       armR = raise * 0.95;
       bodyRotX = b.bodyRotX - Math.sin(t * Math.PI) * 0.3;
@@ -634,11 +634,11 @@ function updateSnowmanRig(rig, dt) {
       const t = Math.min(1, a.attackT);
       // замах назад і кидок уперед
       if (t < 0.45) {
-        bodyRotX = lerp_(0, 0.3, t / 0.45);
-        armR = lerp_(-0.15, -1.6, t / 0.45);
+        bodyRotX = lerp(0, 0.3, t / 0.45);
+        armR = lerp(-0.15, -1.6, t / 0.45);
       } else {
-        bodyRotX = lerp_(0.3, -0.35, (t - 0.45) / 0.55);
-        armR = lerp_(-1.6, 1.8, (t - 0.45) / 0.55);
+        bodyRotX = lerp(0.3, -0.35, (t - 0.45) / 0.55);
+        armR = lerp(-1.6, 1.8, (t - 0.45) / 0.55);
       }
       armL = -0.4;
       break;

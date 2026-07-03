@@ -23,6 +23,7 @@ export const PF = {
 // --- байт стану зомбі у снапшоті ---
 // нижні 3 біти — стан, далі прапорці
 export const ZS = { WANDER: 0, CHASE: 1, ATTACK: 2, DEAD: 3, FLEE: 4 };
+export const ZS_MASK = 7; // нижні 3 біти байта стану — власне стан (розпаковка гостя)
 export const ZF = { MOVING: 8, CHARGING: 16, TELEGRAPH: 32, SLEEPING: 64, ENRAGED: 128 };
 
 export function packZombieState(z, moving) {

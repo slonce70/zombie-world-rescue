@@ -46,7 +46,13 @@ check(menu.afterExists && !menu.afterLocked && /Збирач душ/i.test(menu.
 check(menu.soulPathButton, 'у меню є кнопка Шлях душ', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: кімната 100x100, 20 білих привидів, 50 HP і тільки посох');
-await page.evaluate(() => window.__game.test.startSoulCollector());
+await page.evaluate(() => {
+  const g = window.__game;
+  // моки проти протухання: ×2/×3 дня-тижня не мають множити душі (пастка mode-depth)
+  g.dailyChallengeId = () => '__none';
+  g.weeklyChallengeId = () => '__none';
+  g.test.startSoulCollector();
+});
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.soulCollector, null, { timeout: 30000 });
 const started = await page.evaluate(() => {
   const g = window.__game;

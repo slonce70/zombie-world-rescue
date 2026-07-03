@@ -5,6 +5,7 @@
 // Деплой:  cd worker && npx wrangler deploy
 // Адреса потім вписується у src/net/transport.js (DEFAULT_RELAY).
 import { cleanNickSrv } from './nick.mjs';
+import { routeBatch } from './route.mjs';
 
 const MAX_PLAYERS = 4;
 const MAX_WS_BYTES = 65536;   // ліміт одного ws-повідомлення (звичайна пачка — сотні байт)
@@ -173,28 +174,10 @@ export class Room {
     const peers = this._peers();
     // 📦 пачка {t:'b', m:[{to,d},…]}: групуємо по отримувачах, кожному — одне ws-повідомлення
     if (msg && msg.t === 'b' && Array.isArray(msg.m)) {
-      const per = new Map(); // pid -> [d, …] у порядку надсилання
-      for (const it of msg.m.slice(0, MAX_BATCH_ITEMS)) {
-        if (!it || it.d === undefined) continue;
-        if (it.to === 0) {
-          for (const pid of peers.keys()) {
-            if (pid === att.id) continue;
-            if (!per.has(pid)) per.set(pid, []);
-            per.get(pid).push(it.d);
-          }
-        } else {
-          const pid = it.to | 0;
-          if (pid === att.id || !peers.has(pid)) continue;
-          if (!per.has(pid)) per.set(pid, []);
-          per.get(pid).push(it.d);
-        }
-      }
-      for (const [pid, list] of per) {
+      for (const { pid, msg: env2 } of routeBatch(msg.m, att.id, [...peers.keys()], (p) => peers.has(p), MAX_BATCH_ITEMS)) {
         const sock = peers.get(pid);
         if (!sock) continue;
-        this._safeSend(sock, JSON.stringify(
-          list.length === 1 ? { from: att.id, d: list[0] } : { from: att.id, b: list }
-        ));
+        this._safeSend(sock, JSON.stringify(env2));
       }
       return;
     }
