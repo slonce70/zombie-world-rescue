@@ -190,12 +190,31 @@ const mechanics = await page.evaluate(() => {
   p._shoot();
   const sword = { damage: 3000 - z.hp, mag: String(p.ammo.sword.mag) };
 
+  let flash = 0, shell = 0, shot = 0;
+  const oldFlash = g.level.effects.muzzleFlash;
+  const oldShell = g.level.effects.ejectShell;
+  const oldShot = g.level.audio.shot;
+  g.level.effects.muzzleFlash = () => { flash++; };
+  g.level.effects.ejectShell = () => { shell++; };
+  g.level.audio.shot = () => { shot++; };
+  place(2);
+  p.cur = 'sword';
+  p._applyView();
+  p.ammo.sword.mag = p.weapon.mag;
+  p.shootCd = 0;
+  p.reloading = 0;
+  p._shoot();
+  g.level.effects.muzzleFlash = oldFlash;
+  g.level.effects.ejectShell = oldShell;
+  g.level.audio.shot = oldShot;
+  const swordFx = { flash, shell, shot };
+
   p.health = p.maxHealth;
   p.armor = 0;
   p.gadgetShield = 1000;
   p.takeDamage(350, p.pos.x, p.pos.z - 8);
   const playerShield = { hp: p.health, shield: p.gadgetShield };
-  return { zombieShieldBreak, cannon, sword, playerShield };
+  return { zombieShieldBreak, cannon, sword, swordFx, playerShield };
 });
 check(mechanics.zombieShieldBreak.hp === 0 && !mechanics.zombieShieldBreak.has && mechanics.zombieShieldBreak.recast === 45,
   'щит зомбі ламається і перезаряджається 45с', JSON.stringify(mechanics));
@@ -203,6 +222,8 @@ check(mechanics.cannon.damage === 350 && mechanics.cannon.cd === 2.5 && mechanic
   'гармата реально наносить 350 і йде на 2.5с перезарядку', JSON.stringify(mechanics));
 check(mechanics.sword.damage === 300 && mechanics.sword.mag === 'Infinity',
   'меч реально бʼє зблизька на 300 і не витрачає патрони', JSON.stringify(mechanics));
+check(mechanics.swordFx.flash === 0 && mechanics.swordFx.shell === 0 && mechanics.swordFx.shot === 0,
+  'меч не показує і не звучить як постріл', JSON.stringify(mechanics.swordFx));
 check(mechanics.playerShield.hp === 2500 && mechanics.playerShield.shield === 650,
   'щит гравця поглинає шкоду від гармати', JSON.stringify(mechanics));
 

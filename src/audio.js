@@ -1,9 +1,10 @@
 // Процедурний звук через Web Audio API — без жодного аудіофайлу
+import { getLang } from './i18n.js';
 
 const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
-// усі реплики озвучки — файли assets/voice/<id>.m4a
-const VOICE_IDS = ['wave', 'victory', 'defeat', 'levelup', 'boss', 'heal', 'combo', 'golden', 'airdrop', 'horde'];
+// усі реплики озвучки — файли assets/voice/<мова>/<id>.m4a (Gemini TTS, голос Zephyr)
+const VOICE_IDS = ['wave', 'victory', 'defeat', 'levelup', 'boss', 'heal', 'combo', 'golden', 'airdrop', 'horde', 'megabox', 'quest', 'powerup', 'mission'];
 
 export class AudioMan {
   constructor() {
@@ -235,6 +236,7 @@ export class AudioMan {
 
   // ✨ підняв підсилення
   powerup() {
+    this.voiceOnce('powerup', 45);
     const t = this.t;
     [67, 72, 76, 79, 84].forEach((m, i) => {
       this._osc('square', midi(m), t + i * 0.06, 0.14, 0.16);
@@ -255,6 +257,7 @@ export class AudioMan {
 
   // 📅 завдання дня виконано
   questDone() {
+    this.voiceOnce('quest', 30);
     const t = this.t;
     [72, 76, 79, 76, 84].forEach((m, i) => this._osc('square', midi(m), t + i * 0.07, 0.12, 0.14));
   }
@@ -281,6 +284,7 @@ export class AudioMan {
 
   // 🦙 мегабокс: барабанний дріб + тада!
   megabox() {
+    this.voiceOnce('megabox', 30);
     const t = this.t;
     for (let i = 0; i < 10; i++) this._noise(t + i * 0.06, 0.04, 0.08, 'bandpass', 1800, 2);
     [72, 76, 79, 84].forEach((m, i) => {
@@ -367,6 +371,7 @@ export class AudioMan {
   }
 
   mission() {
+    this.voiceOnce('mission', 20);
     const t = this.t;
     [60, 64, 67, 72].forEach((m, i) => this._osc('triangle', midi(m), t + i * 0.11, 0.3, 0.3));
     this._osc('triangle', midi(76), t + 0.44, 0.5, 0.3);
@@ -450,7 +455,7 @@ export class AudioMan {
   // завантажити й закешувати буфер репліки (кешуємо промис, щоб не грузити двічі)
   async _loadVoice(id) {
     if (this._voiceBufs.has(id)) return this._voiceBufs.get(id);
-    const p = fetch(`./assets/voice/${id}.m4a`)
+    const p = fetch(`./assets/voice/${getLang()}/${id}.m4a`)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
       .then((ab) => this.ctx.decodeAudioData(ab))
       .catch(() => {

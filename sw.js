@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v243';
+const CACHE = 'zr-cache-v244';
 
 const SHELL = [
   './',
@@ -79,17 +79,50 @@ const SHELL = [
   './src/i18n/en.js',
   './src/i18n/ru.js',
   './worker/nick.mjs',
-  // 🎙️ українська озвучка (Lesya)
-  './assets/voice/wave.m4a',
-  './assets/voice/victory.m4a',
-  './assets/voice/defeat.m4a',
-  './assets/voice/levelup.m4a',
-  './assets/voice/boss.m4a',
-  './assets/voice/heal.m4a',
-  './assets/voice/combo.m4a',
-  './assets/voice/golden.m4a',
-  './assets/voice/airdrop.m4a',
-  './assets/voice/horde.m4a',
+  // 🎙️ озвучка Лесі трьома мовами (Gemini TTS): assets/voice/<мова>/<id>.m4a
+  // явні літерали — test/sw-cache.mjs звіряє кожен шлях з диском
+  './assets/voice/uk/wave.m4a',
+  './assets/voice/uk/victory.m4a',
+  './assets/voice/uk/defeat.m4a',
+  './assets/voice/uk/levelup.m4a',
+  './assets/voice/uk/boss.m4a',
+  './assets/voice/uk/heal.m4a',
+  './assets/voice/uk/combo.m4a',
+  './assets/voice/uk/golden.m4a',
+  './assets/voice/uk/airdrop.m4a',
+  './assets/voice/uk/horde.m4a',
+  './assets/voice/uk/megabox.m4a',
+  './assets/voice/uk/quest.m4a',
+  './assets/voice/uk/powerup.m4a',
+  './assets/voice/uk/mission.m4a',
+  './assets/voice/en/wave.m4a',
+  './assets/voice/en/victory.m4a',
+  './assets/voice/en/defeat.m4a',
+  './assets/voice/en/levelup.m4a',
+  './assets/voice/en/boss.m4a',
+  './assets/voice/en/heal.m4a',
+  './assets/voice/en/combo.m4a',
+  './assets/voice/en/golden.m4a',
+  './assets/voice/en/airdrop.m4a',
+  './assets/voice/en/horde.m4a',
+  './assets/voice/en/megabox.m4a',
+  './assets/voice/en/quest.m4a',
+  './assets/voice/en/powerup.m4a',
+  './assets/voice/en/mission.m4a',
+  './assets/voice/ru/wave.m4a',
+  './assets/voice/ru/victory.m4a',
+  './assets/voice/ru/defeat.m4a',
+  './assets/voice/ru/levelup.m4a',
+  './assets/voice/ru/boss.m4a',
+  './assets/voice/ru/heal.m4a',
+  './assets/voice/ru/combo.m4a',
+  './assets/voice/ru/golden.m4a',
+  './assets/voice/ru/airdrop.m4a',
+  './assets/voice/ru/horde.m4a',
+  './assets/voice/ru/megabox.m4a',
+  './assets/voice/ru/quest.m4a',
+  './assets/voice/ru/powerup.m4a',
+  './assets/voice/ru/mission.m4a',
 ];
 
 self.addEventListener('install', (e) => {

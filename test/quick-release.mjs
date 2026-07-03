@@ -1,9 +1,7 @@
 import { spawn } from 'child_process';
-import { ensureWebServer } from './_server.mjs';
 
 const BETWEEN_TESTS_MS = Number(process.env.QUICK_RELEASE_BETWEEN_TESTS_MS || 200);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { close: closeServer } = await ensureWebServer({ quiet: false });
 
 const suite = [
   ['node', ['test/version-sync.mjs']],
@@ -26,15 +24,11 @@ function run(cmd, args, env = {}) {
 }
 
 let code = 0;
-try {
-  for (const [cmd, args, env] of suite) {
-    console.log(`\n$ ${cmd} ${args.join(' ')}`);
-    code = await run(cmd, args, env);
-    if (code) break;
-    if (BETWEEN_TESTS_MS > 0) await sleep(BETWEEN_TESTS_MS);
-  }
-} finally {
-  closeServer();
+for (const [cmd, args, env] of suite) {
+  console.log(`\n$ ${cmd} ${args.join(' ')}`);
+  code = await run(cmd, args, env);
+  if (code) break;
+  if (BETWEEN_TESTS_MS > 0) await sleep(BETWEEN_TESTS_MS);
 }
 
 process.exit(code);

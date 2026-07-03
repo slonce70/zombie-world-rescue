@@ -713,17 +713,14 @@ export class Player {
     if (!infAmmo) a.mag--;
     this.shootCd = (60 / w.rpm) * (infAmmo ? 0.45 : 1);
     this.gunKick = 1;
-    level.audio.shot(this.cur);
     level.stats.shotsFired++;
     const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
 
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
-    level.effects.muzzleFlash(this._muzzlePos);
-    // 🟡 гільза вилітає праворуч-вгору від дула
-    if (SHELL_WEAPONS.has(this.cur)) level.effects.ejectShell(this._muzzlePos, Math.cos(this.yaw), -Math.sin(this.yaw));
 
     if (w.melee) {
+      level.audio.throwWhoosh(0.65);
       const origin = this._shootOrigin.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
       const dir = this.forwardVec(this._shootDir).normalize();
       const hit = level.zombies ? level.zombies.hitTest(origin, dir, w.range || 3) : null;
@@ -740,6 +737,11 @@ export class Player {
       this._applyRecoil(w);
       return;
     }
+
+    level.audio.shot(this.cur);
+    level.effects.muzzleFlash(this._muzzlePos);
+    // 🟡 гільза вилітає праворуч-вгору від дула
+    if (SHELL_WEAPONS.has(this.cur)) level.effects.ejectShell(this._muzzlePos, Math.cos(this.yaw), -Math.sin(this.yaw));
 
     // кооп: гість збирає влучання і шле хосту одним повідомленням
     const netHits = [];

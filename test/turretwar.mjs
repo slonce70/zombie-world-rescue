@@ -69,6 +69,30 @@ const hammer = await page.evaluate(async () => {
 });
 check(hammer.dmg === 35 && hammer.rpm === 60 && hammer.melee, 'молот: 35 шкоди, 1 удар/с, ближній бій', JSON.stringify(hammer));
 
+const hammerSwingFx = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  let flash = 0, shell = 0, shot = 0;
+  const oldFlash = g.level.effects.muzzleFlash;
+  const oldShell = g.level.effects.ejectShell;
+  const oldShot = g.level.audio.shot;
+  g.level.effects.muzzleFlash = () => { flash++; };
+  g.level.effects.ejectShell = () => { shell++; };
+  g.level.audio.shot = () => { shot++; };
+  p.cur = 'hammer';
+  p._applyView();
+  p.ammo.hammer.mag = p.weapon.mag;
+  p.shootCd = 0;
+  p.reloading = 0;
+  p._shoot();
+  g.level.effects.muzzleFlash = oldFlash;
+  g.level.effects.ejectShell = oldShell;
+  g.level.audio.shot = oldShot;
+  return { flash, shell, shot };
+});
+check(hammerSwingFx.flash === 0 && hammerSwingFx.shell === 0 && hammerSwingFx.shot === 0,
+  'молот не показує і не звучить як постріл', JSON.stringify(hammerSwingFx));
+
 // хвиля: кожні 10с +5 зомбі біля зомбі-турелі
 const wave = await page.evaluate(() => {
   const g = window.__game;
