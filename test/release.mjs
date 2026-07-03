@@ -60,6 +60,17 @@ const suite = [
   ['node', ['test/lobby-profiles.mjs']],
   ['node', ['test/coop-privacy.mjs']],
   ['node', ['test/pass-prestige.mjs']],
+  ['node', ['test/livingworld.mjs']],
+  ['node', ['test/mega-quest.mjs']],
+  ['node', ['test/angel-skin.mjs']],
+  ['node', ['test/demon-skin.mjs']],
+  ['node', ['test/radiation-mode.mjs']],
+  ['node', ['test/mega-radiation-quest.mjs']],
+  ['node', ['test/radiation-skin.mjs']],
+  ['node', ['test/radiation-skin-upgrade.mjs']],
+  ['node', ['test/radiation-turret-pack.mjs']],
+  ['node', ['test/radiation-pet.mjs']],
+  ['node', ['test/radiation-contract.mjs']],
 ];
 
 function run(cmd, args, env = {}) {

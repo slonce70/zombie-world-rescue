@@ -81,6 +81,8 @@ export const SHOP_ITEMS = [
   { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: 'Радіація' },
   { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', pet: true },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
+  // ☢️📜 повторюваний стік радіаційних монет: інакше після викупу разових товарів валюта мертва
+  { id: 'radiationcontract', icon: '📜', name: t('Радіаційний контракт'), desc: t('Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', contract: true },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -184,6 +186,8 @@ export class Shop {
     if (item.cloneSkin) return (this.game.save.cloneSkins || []).includes(item.cloneSkin) ? 1 : 0;
     if (item.pet) return this.game.save.pets.includes(item.id) ? 1 : 0;
     if (item.towerSkin) return (this.game.save.towerSkins || []).includes(item.towerSkin) ? 1 : 0;
+    // 📜 контракт «обнуляється» щотижня: МАКС лише до кінця поточного тижня
+    if (item.contract) return (this.game.save.weekly || {})['W' + this.game._weekIndex() + ':radshop'] ? 1 : 0;
     return this.game.save.upgrades[item.id] || 0;
   }
 
@@ -304,7 +308,7 @@ export class Shop {
       if (!save.stats || typeof save.stats !== 'object') save.stats = {};
       save.stats.coinsSpent = (save.stats.coinsSpent || 0) + price;
     }
-    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin && !item.cloneSkin) save.upgrades[id] = count + 1;
+    if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin && !item.cloneSkin && !item.contract) save.upgrades[id] = count + 1;
     if (item.skin) {
       if (!save.skins.includes(item.skin)) save.skins.push(item.skin);
       save.activeSkin = item.skin;
@@ -353,6 +357,13 @@ export class Shop {
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
       case 'radiationturretpack':
         game.hud.toast(t('☢️🤖 Радіаційна турель: +5 шкоди і зелені кулі'));
+        break;
+      case 'radiationcontract':
+        save.weekly = save.weekly || {};
+        save.weekly['W' + game._weekIndex() + ':radshop'] = true;
+        save.crystals = (save.crystals || 0) + 25;
+        game.hud.toast(t('📜 Контракт виконано: +25 💎! Новий — наступного тижня.'));
+        game.audio.levelUp();
         break;
       case 'grenade': player.grenades++; break;
       case 'rocket': player.addRockets(1); break;

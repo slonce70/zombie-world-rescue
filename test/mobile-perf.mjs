@@ -115,6 +115,27 @@ check(metrics.cameraFar <= 220, 'mobile камера не малює дальн�
 check(metrics.calls <= 430, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
 check(metrics.triangles <= 540000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
 
+const lostPage = await ctx.newPage();
+await lostPage.goto(`${BASE}/?test&fresh&touch&country=LOST&lang=uk`, { waitUntil: 'domcontentloaded' });
+await lostPage.waitForFunction(() => window.__game?.state === 'level', null, { timeout: 30000 });
+await lostPage.waitForFunction(() => window.__game?.renderer?.info?.render?.calls > 0, null, { timeout: 10000 });
+await lostPage.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+const lost = await lostPage.evaluate(() => {
+  const g = window.__game;
+  return {
+    country: g.test.state().country,
+    state: g.test.state().state,
+    calls: g.renderer.info.render.calls,
+    triangles: g.renderer.info.render.triangles,
+  };
+});
+await lostPage.close();
+
+console.log('▸ Mobile LOST metrics', JSON.stringify(lost));
+check(lost.state === 'level' && lost.country === 'LOST', 'LOST острів завантажено на реальній щільності', JSON.stringify(lost));
+check(lost.calls <= 550, 'LOST draw calls у бюджеті', `calls=${lost.calls}`);
+check(lost.triangles <= 685000, 'LOST triangles у бюджеті', `triangles=${lost.triangles}`);
+
 const heavy = await page.evaluate(async () => {
   const g = window.__game;
   const l = g.level;

@@ -412,7 +412,7 @@ const SOLO_MODES = [
 ];
 
 // 🎯 «Випробування дня»: один кімнатний режим на день дає подвійну нагороду
-const DAILY_CHALLENGE_POOL = ['knockout', 'defense', 'zone-defense', 'pvp', 'bank', 'portal', 'maze', 'humans', 'soul-collector'];
+const DAILY_CHALLENGE_POOL = ['knockout', 'defense', 'zone-defense', 'pvp', 'bank', 'portal', 'maze', 'humans', 'soul-collector', 'radiation', 'turretwar'];
 // 🏅 віхи перемог у кожному режимі (титул на 10 перемог відкриває syncTitles сам)
 const MODE_MILESTONES = [
   { wins: 3, crystals: 10 },
