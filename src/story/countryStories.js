@@ -1,6 +1,6 @@
-const t = (key) => key;
+import { t } from '../i18n.js';
 
-const STORY_COUNTRY_IDS = ['UKR', 'POL', 'EGY'];
+export const STORY_COUNTRY_IDS = ['UKR', 'POL', 'EGY'];
 
 const STORIES = {
   UKR: {
@@ -148,24 +148,19 @@ const STORIES = {
   },
 };
 
-function getCountryStory(countryId) {
+export function getCountryStory(countryId) {
   return STORIES[countryId] || null;
 }
 
-function storyPreview(countryId) {
+export function storyPreview(countryId) {
   const story = getCountryStory(countryId);
   return story ? story.objectives.map((o) => o.icon) : null;
 }
 
-function shouldUseStoryMissions({ countryId, modeId, isGuest, isCoop, isPlayground }) {
+export function shouldUseStoryMissions({ countryId, modeId, isGuest, isCoop, isPlayground }) {
   return modeId === 'campaign'
     && !isGuest
     && !isCoop
     && !isPlayground
     && !!getCountryStory(countryId);
 }
-
-exports.STORY_COUNTRY_IDS = STORY_COUNTRY_IDS;
-exports.getCountryStory = getCountryStory;
-exports.storyPreview = storyPreview;
-exports.shouldUseStoryMissions = shouldUseStoryMissions;

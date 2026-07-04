@@ -1,10 +1,29 @@
 import assert from 'node:assert/strict';
-import {
+import { readFile, rm, writeFile } from 'node:fs/promises';
+
+const sourcePath = new URL('../src/story/countryStories.js', import.meta.url);
+const tmpModulePath = new URL('./.tmp-countryStories.mjs', import.meta.url);
+
+const source = await readFile(sourcePath, 'utf8');
+const moduleSource = source.replace(
+  "import { t } from '../i18n.js';",
+  'const t = (key) => key;',
+);
+
+let storyModule;
+try {
+  await writeFile(tmpModulePath, moduleSource);
+  storyModule = await import(`${tmpModulePath.href}?v=${Date.now()}`);
+} finally {
+  await rm(tmpModulePath, { force: true });
+}
+
+const {
   STORY_COUNTRY_IDS,
   getCountryStory,
   shouldUseStoryMissions,
   storyPreview,
-} from '../src/story/countryStories.js';
+} = storyModule;
 
 assert.deepEqual(STORY_COUNTRY_IDS, ['UKR', 'POL', 'EGY']);
 
