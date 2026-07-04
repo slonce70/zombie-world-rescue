@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 273;
+const APP_VERSION = 274;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2536,7 +2536,7 @@ class Game {
         isGuest,
         isCoop: !!coop,
         isPlayground,
-      });
+      }) && !this._forceMissionSet;
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!level.net && !isPlayground) level.runBuild = new RunBuild();
