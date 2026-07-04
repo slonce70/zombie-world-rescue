@@ -57,9 +57,15 @@ await page.evaluate(async () => {
   window.__game.test.completeMission('ukr-rescue');
   window.__game.test.completeMission('ukr-signal');
   window.__game.test.completeMission('ukr-defense');
+  window.__game.test.finishHorde();
+  const arena = window.__game.level.world.layout.arena;
+  window.__game.test.teleport(arena.x, arena.z);
 });
 legacy = await page.evaluate(() => window.__game.test.state());
 check(legacy.missions.every((m) => m.state === 'done'), 'exact story objective IDs complete through legacy helper', JSON.stringify(legacy.missions));
+await page.waitForFunction(() => window.__game.test.state().bossStarted, null, { timeout: 10000 }).catch(() => null);
+legacy = await page.evaluate(() => window.__game.test.state());
+check(legacy.bossStarted === true, 'story compatibility wrapper starts boss after UKR objectives', JSON.stringify({ bossStarted: legacy.bossStarted }));
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
