@@ -93,6 +93,42 @@ st = await page.evaluate(() => ({
   marker: window.__game.level.missions.getMarkers()[0],
 }));
 check(st.kind === 'StoryMissions' && st.ids[0] === 'pol-bonfires' && st.marker.icon === '🔥', 'POL starts with bonfire story', JSON.stringify(st));
+st = await page.evaluate(() => {
+  const missions = window.__game.level.missions;
+  const first = missions.get('pol-bonfires');
+  window.__storyDoneEvents = [];
+  window.__game.level.bus.on('missionDone', (m) => {
+    window.__storyDoneEvents.push({ id: m.id, type: m.type, title: m.title, reward: m.reward });
+  });
+  window.__game.test.completeStoryObjective('pol-bonfires');
+  const real = missions.delegate.get('bonfire');
+  const legacy = missions.delegate.get('rescue');
+  return {
+    storyTitle: first.title,
+    current: missions.currentStoryObjective(),
+    hud: missions.getHudList().map((m) => ({ title: m.title, done: m.done })),
+    story: missions.get('pol-bonfires'),
+    real: real && { id: real.id, type: real.type, state: real.state, title: real.title },
+    legacy: legacy && { id: legacy.id, type: legacy.type, state: legacy.state, title: legacy.title },
+    events: window.__storyDoneEvents,
+  };
+});
+check(st.real && st.real.state === 'done' && st.story.state === 'done' && /поїзд/i.test(st.current), 'POL bonfire story completes real bonfire delegate and advances to train', JSON.stringify(st));
+check(st.hud[0].done && st.events.at(-1)?.title === st.storyTitle, 'POL bonfire completion banner uses story title', JSON.stringify({ storyTitle: st.storyTitle, events: st.events, hud: st.hud }));
+await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('POL'); });
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+st = await page.evaluate(() => {
+  const missions = window.__game.level.missions;
+  missions.delegate._complete('bonfire');
+  missions._syncObjectiveStates();
+  const real = missions.delegate.get('bonfire');
+  return {
+    current: missions.currentStoryObjective(),
+    story: missions.get('pol-bonfires'),
+    real: real && { id: real.id, type: real.type, state: real.state, title: real.title },
+  };
+});
+check(st.real && st.real.state === 'done' && st.story.state === 'done' && /поїзд/i.test(st.current), 'POL sync advances story after real bonfire delegate completion', JSON.stringify(st));
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('EGY'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
@@ -102,6 +138,42 @@ st = await page.evaluate(() => ({
   marker: window.__game.level.missions.getMarkers()[0],
 }));
 check(st.kind === 'StoryMissions' && st.ids[0] === 'egy-seals' && st.marker.icon === '🪬', 'EGY starts with seal story', JSON.stringify(st));
+st = await page.evaluate(() => {
+  const missions = window.__game.level.missions;
+  const first = missions.get('egy-seals');
+  window.__storyDoneEvents = [];
+  window.__game.level.bus.on('missionDone', (m) => {
+    window.__storyDoneEvents.push({ id: m.id, type: m.type, title: m.title, reward: m.reward });
+  });
+  window.__game.test.completeStoryObjective('egy-seals');
+  const real = missions.delegate.get('tomb');
+  const legacy = missions.delegate.get('rescue');
+  return {
+    storyTitle: first.title,
+    current: missions.currentStoryObjective(),
+    hud: missions.getHudList().map((m) => ({ title: m.title, done: m.done })),
+    story: missions.get('egy-seals'),
+    real: real && { id: real.id, type: real.type, state: real.state, title: real.title },
+    legacy: legacy && { id: legacy.id, type: legacy.type, state: legacy.state, title: legacy.title },
+    events: window.__storyDoneEvents,
+  };
+});
+check(st.real && st.real.state === 'done' && st.story.state === 'done' && /мум/i.test(st.current), 'EGY seal story completes real tomb delegate and advances to ambush', JSON.stringify(st));
+check(st.hud[0].done && st.events.at(-1)?.title === st.storyTitle, 'EGY seal completion banner uses story title', JSON.stringify({ storyTitle: st.storyTitle, events: st.events, hud: st.hud }));
+await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('EGY'); });
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+st = await page.evaluate(() => {
+  const missions = window.__game.level.missions;
+  missions.delegate._complete('tomb');
+  missions._syncObjectiveStates();
+  const real = missions.delegate.get('tomb');
+  return {
+    current: missions.currentStoryObjective(),
+    story: missions.get('egy-seals'),
+    real: real && { id: real.id, type: real.type, state: real.state, title: real.title },
+  };
+});
+check(st.real && st.real.state === 'done' && st.story.state === 'done' && /мум/i.test(st.current), 'EGY sync advances story after real tomb delegate completion', JSON.stringify(st));
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });

@@ -11,6 +11,17 @@ const LEGACY_UKR_MISSION_ALIASES = {
 
 const LEGACY_SLOT_IDS = ['rescue', 'tower', 'warehouse'];
 
+const STORY_DELEGATE_MATCHES = {
+  'ukr-rescue': { preferred: ['rescue'] },
+  'ukr-signal': { preferred: ['repair'] },
+  'ukr-defense': { preferred: ['clear'], compatible: ['defense'] },
+  'pol-bonfires': { preferred: ['bonfire'] },
+  'pol-train': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'pol-castle': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests'] },
+  'egy-seals': { preferred: ['tomb'] },
+  'egy-ambush': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests'] },
+};
+
 export class StoryMissions {
   constructor(level) {
     this.level = level;
@@ -91,12 +102,9 @@ export class StoryMissions {
     }
     if (obj.state === 'done') return;
 
-    const legacyId = this._toLegacyMissionId(obj.id);
-    const legacyMission = this.delegate.get(legacyId);
-    let missionDoneEmitted = false;
-    if (legacyMission && legacyMission.state !== 'done') {
-      this.delegate._complete(legacyId);
-      missionDoneEmitted = true;
+    const delegateMission = this._delegateMissionForObjective(obj);
+    if (delegateMission && delegateMission.state !== 'done') {
+      this.delegate._complete(delegateMission.id);
     } else {
       this.level.addCoins(obj.reward || 0);
       this.level.audio.mission();
@@ -111,7 +119,7 @@ export class StoryMissions {
 
     obj.state = 'done';
     const doneText = typeof obj.done === 'function' ? obj.done() : this._objectiveTitle(obj);
-    if (!missionDoneEmitted) this.level.bus.emit('missionDone', this._missionView(obj));
+    this.level.bus.emit('missionDone', this._missionView(obj));
     if (doneText) this.level.bus.emit('toast', doneText);
     this._advanceObjectiveState();
     if (this.objectives.every((o) => o.state === 'done')) this._unlockBoss();
@@ -170,11 +178,50 @@ export class StoryMissions {
   set pendingHorde(value) { this.delegate.pendingHorde = value; }
 
   _toLegacyMissionId(id) {
+    const objective = this.objectives.find((o) => o.id === id || o.slotIndex === id);
+    if (objective) {
+      const mission = this._delegateMissionForObjective(objective);
+      return mission ? mission.id : (LEGACY_SLOT_IDS[objective.slotIndex] || this.delegate.missions[objective.slotIndex]?.id || id);
+    }
     if (LEGACY_UKR_MISSION_ALIASES[id]) return LEGACY_UKR_MISSION_ALIASES[id];
     if (LEGACY_SLOT_IDS.includes(id)) return id;
-    const objective = this.objectives.find((o) => o.id === id || o.slotIndex === id);
-    if (objective) return LEGACY_SLOT_IDS[objective.slotIndex] || this.delegate.missions[objective.slotIndex]?.id || id;
     return id;
+  }
+
+  _delegateMissionForObjective(obj) {
+    const match = STORY_DELEGATE_MATCHES[obj.id] || {};
+    const preferred = match.preferred || [];
+    const compatible = match.compatible || [];
+
+    for (const type of preferred) {
+      const mission = this.delegate.get(type);
+      if (mission) return mission;
+    }
+
+    for (const type of compatible) {
+      const mission = this.delegate.get(type);
+      if (mission && mission.slotIndex === obj.slotIndex && !this._isReservedForOtherObjective(mission, obj)) {
+        return mission;
+      }
+    }
+
+    for (const type of compatible) {
+      const mission = this.delegate.get(type);
+      if (mission && !this._isReservedForOtherObjective(mission, obj)) return mission;
+    }
+
+    const slotMission = this.delegate.missions[obj.slotIndex] || null;
+    if (slotMission && !this._isReservedForOtherObjective(slotMission, obj)) return slotMission;
+    return null;
+  }
+
+  _isReservedForOtherObjective(mission, currentObj) {
+    if (!mission) return false;
+    return this.objectives.some((obj) => {
+      if (obj === currentObj) return false;
+      const preferred = (STORY_DELEGATE_MATCHES[obj.id] && STORY_DELEGATE_MATCHES[obj.id].preferred) || [];
+      return preferred.includes(mission.type || mission.id);
+    });
   }
 
   _objectiveForId(id) {
@@ -247,7 +294,7 @@ export class StoryMissions {
 
   _syncObjectiveStates() {
     for (const obj of this.objectives) {
-      const mission = this.delegate.get(this._toLegacyMissionId(obj.id));
+      const mission = this._delegateMissionForObjective(obj);
       if (mission && mission.state === 'done') {
         obj.state = 'done';
       }
