@@ -176,6 +176,25 @@ await page.waitForFunction(() => window.__game.state === 'level' && window.__gam
 st = await page.evaluate(() => ({ kind: window.__game.test.missionKind() }));
 check(st.kind === 'DynamicMissions', 'DEU keeps DynamicMissions fallback', JSON.stringify(st));
 
+await page.evaluate(async () => {
+  if (window.__game.level) window.__game.endLevel();
+  window.__game.save.liberated = { UKR: true };
+  window.__game.save.missionRuns = { UKR: 1 };
+  await window.__game.startLevel('UKR');
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+st = await page.evaluate(() => ({
+  kind: window.__game.test.missionKind(),
+  replayNightRaid: !!(window.__game.level.missions && window.__game.level.missions.replayNightRaid),
+  current: window.__game.level.missions.currentStoryObjective(),
+  worldTime: window.__game.level.world && window.__game.level.world.time,
+}));
+check(st.kind === 'StoryMissions', 'liberated UKR replay still uses StoryMissions', JSON.stringify(st));
+check(st.replayNightRaid === true, 'liberated UKR replay enables replayNightRaid', JSON.stringify(st));
+check(/Нічний рейд/.test(st.current), 'liberated UKR replay objective announces Night Raid', JSON.stringify(st));
+check(st.current.startsWith('🌙 Нічний рейд · '), 'liberated UKR replay objective uses Night Raid prefix', JSON.stringify(st));
+check(st.worldTime >= 150, 'liberated UKR replay pushes world toward night', JSON.stringify(st));
+
 check(errors.length === 0, `no JS errors (${errors.slice(0, 2).join('|')})`);
 console.log(failed === 0 ? '✅ story campaign 2 browser selector pass' : `❌ story campaign 2 browser selector failed: ${failed}`);
 await browser.close();

@@ -32,6 +32,14 @@ export class StoryMissions {
       slotIndex: i,
       state: i === 0 ? 'active' : 'locked',
     }));
+    this.replayNightRaid = !!(
+      this.story
+      && level.game
+      && level.game.save
+      && level.game.save.liberated
+      && level.game.save.liberated[level.countryId]
+    );
+    if (this.replayNightRaid) this._pushReplayNight();
     this.delegate = new DynamicMissions(level);
     this.npcState = spawnStoryNpc(
       level,
@@ -156,7 +164,9 @@ export class StoryMissions {
 
   currentStoryObjective() {
     const active = this.objectives.find((o) => o.state === 'active');
-    return active ? `${active.icon} ${this._objectiveTitle(active)}` : '';
+    if (!active) return '';
+    const prefix = this.replayNightRaid ? `🌙 ${t('Нічний рейд')} · ` : '';
+    return `${prefix}${active.icon} ${this._objectiveTitle(active)}`;
   }
 
   get missions() {
@@ -255,6 +265,11 @@ export class StoryMissions {
 
   _objectiveTitle(obj) {
     return typeof obj.title === 'function' ? obj.title() : (obj.title || obj.id);
+  }
+
+  _pushReplayNight() {
+    if (this.level.stats) this.level.stats.time = Math.max(this.level.stats.time || 0, 150);
+    if (this.level.world) this.level.world.time = Math.max(this.level.world.time || 0, 150);
   }
 
   _missionView(obj) {
