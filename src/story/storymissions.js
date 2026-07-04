@@ -104,7 +104,7 @@ export class StoryMissions {
 
     const delegateMission = this._delegateMissionForObjective(obj);
     if (delegateMission && delegateMission.state !== 'done') {
-      this.delegate._complete(delegateMission.id);
+      this._completeDelegateObjective(delegateMission.id);
     } else {
       this.level.addCoins(obj.reward || 0);
       this.level.audio.mission();
@@ -123,6 +123,25 @@ export class StoryMissions {
     if (doneText) this.level.bus.emit('toast', doneText);
     this._advanceObjectiveState();
     if (this.objectives.every((o) => o.state === 'done')) this._unlockBoss();
+  }
+
+  _completeDelegateObjective(id) {
+    const bus = this.level && this.level.bus;
+    if (!bus || typeof bus.emit !== 'function') {
+      this.delegate._complete(id);
+      return;
+    }
+
+    const originalEmit = bus.emit;
+    bus.emit = function emitWithoutDelegateMissionDone(eventName, ...args) {
+      if (eventName === 'missionDone') return undefined;
+      return originalEmit.call(this, eventName, ...args);
+    };
+    try {
+      this.delegate._complete(id);
+    } finally {
+      bus.emit = originalEmit;
+    }
   }
 
   _complete(id) {
