@@ -19,12 +19,12 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 await page.click('#btn-solo');
 await page.waitForSelector('#overlay-solo.show', { timeout: 10000 });
 await page.click('.solo-mode[data-mode="campaign"]');
-await page.waitForSelector('#country-list .country-item[data-id="UKR"] .mission-preview span', { timeout: 10000 });
+await page.waitForSelector('#solo-countries #country-list .country-item[data-id="UKR"] .mission-preview span', { timeout: 10000 });
 
-const preview = await page.evaluate(() => [...document.querySelectorAll('#country-list .country-item[data-id="UKR"] .mission-preview span')].map((el) => el.textContent));
+const preview = await page.evaluate(() => [...document.querySelectorAll('#solo-countries #country-list .country-item[data-id="UKR"] .mission-preview span')].map((el) => el.textContent));
 check(preview.join('') === '🆘📡🛡️', 'UKR preview uses story icons', preview.join(''));
 
-await page.evaluate(() => window.__game.startLevel('UKR'));
+await page.click('#solo-countries #country-list .country-item[data-id="UKR"]');
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
 let st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
@@ -32,6 +32,34 @@ let st = await page.evaluate(() => ({
 }));
 check(st.kind === 'StoryMissions', 'UKR solo campaign uses StoryMissions', JSON.stringify(st));
 check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense', 'UKR story objective IDs are present', JSON.stringify(st.ids));
+
+let legacy = await page.evaluate(() => {
+  try {
+    return { ok: true, missions: window.__game.test.state().missions };
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+});
+check(legacy.ok, 'legacy test.state().missions works for StoryMissions', JSON.stringify(legacy));
+check(legacy.ok && legacy.missions.map((m) => m.id).join(',') === 'rescue,tower,warehouse', 'legacy story mission slot IDs are stable', JSON.stringify(legacy.missions));
+
+await page.evaluate(() => {
+  window.__game.test.completeMission('rescue');
+  window.__game.test.completeMission('tower');
+  window.__game.test.completeMission('warehouse');
+});
+legacy = await page.evaluate(() => window.__game.test.state());
+check(legacy.missions.every((m) => m.state === 'done') && legacy.bossStarted === false, 'legacy story mission aliases complete UKR objectives', JSON.stringify({ missions: legacy.missions, bossStarted: legacy.bossStarted }));
+
+await page.evaluate(async () => {
+  window.__game.endLevel();
+  await window.__game.startLevel('UKR');
+  window.__game.test.completeMission('ukr-rescue');
+  window.__game.test.completeMission('ukr-signal');
+  window.__game.test.completeMission('ukr-defense');
+});
+legacy = await page.evaluate(() => window.__game.test.state());
+check(legacy.missions.every((m) => m.state === 'done'), 'exact story objective IDs complete through legacy helper', JSON.stringify(legacy.missions));
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });

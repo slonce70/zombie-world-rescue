@@ -1,5 +1,11 @@
 import { getCountryStory } from './countryStories.js';
 
+const LEGACY_UKR_MISSION_ALIASES = {
+  rescue: 'ukr-rescue',
+  tower: 'ukr-signal',
+  warehouse: 'ukr-defense',
+};
+
 export class StoryMissions {
   constructor(level) {
     this.level = level;
@@ -9,6 +15,7 @@ export class StoryMissions {
       slotIndex: i,
       state: i === 0 ? 'active' : 'locked',
     }));
+    this.missions = this.objectives;
     this.prompt = null;
     this.civilians = [];
     this.bossUnlocked = false;
@@ -16,7 +23,8 @@ export class StoryMissions {
   }
 
   get(id) {
-    return this.objectives.find((o) => o.id === id || o.slotIndex === id) || null;
+    const resolvedId = LEGACY_UKR_MISSION_ALIASES[id] || id;
+    return this.objectives.find((o) => o.id === resolvedId || o.slotIndex === resolvedId) || null;
   }
 
   getHudList() {
@@ -42,5 +50,9 @@ export class StoryMissions {
     const next = this.objectives.find((o) => o.state === 'locked');
     if (next) next.state = 'active';
     else this.bossUnlocked = true;
+  }
+
+  _complete(id) {
+    this._completeObjective(id);
   }
 }
