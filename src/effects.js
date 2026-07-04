@@ -108,6 +108,34 @@ export class Effects {
       scene.add(m);
       this.tracerPool.push({ mesh: m, life: 0 });
     }
+    // ⚡ видимі сегменти ланцюгової блискавки: товстий жовтий glow + біле ядро.
+    this.lightningGlowGeo = new THREE.CylinderGeometry(0.12, 0.12, 1, 7, 1, true);
+    this.lightningCoreGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6, 1, true);
+    this.lightningPool = [];
+    for (let i = 0; i < 12; i++) {
+      const glow = new THREE.Mesh(this.lightningGlowGeo, new THREE.MeshBasicMaterial({
+        color: 0xfff06a,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
+      }));
+      const core = new THREE.Mesh(this.lightningCoreGeo, new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        fog: false,
+      }));
+      for (const m of [glow, core]) {
+        m.visible = false;
+        m.frustumCulled = false;
+        scene.add(m);
+      }
+      this.lightningPool.push({ glow, core, life: 0, maxLife: 0.2 });
+    }
     // 🔫 промінь лазера (v46): один яскравий ціановий циліндр, оновлюється щокадру
     this.laserMat = new THREE.MeshBasicMaterial({ color: 0x66ffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     this.laserGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 6, 1, true);
@@ -245,12 +273,17 @@ export class Effects {
     const sc = this.scene;
     sc.remove(this.pMesh, this.flashLight);
     for (const t of this.tracerPool) { sc.remove(t.mesh); if (t.mesh.material) t.mesh.material.dispose(); }
+    for (const l of this.lightningPool) {
+      sc.remove(l.glow, l.core);
+      if (l.glow.material) l.glow.material.dispose();
+      if (l.core.material) l.core.material.dispose();
+    }
     for (const d of this.dmgPool) { sc.remove(d.spr); if (d.spr.material) d.spr.material.dispose(); if (d.tex) d.tex.dispose(); }
     sc.remove(this.laserMesh, this.laserCore, this.laserGlow);
     for (const r of this.ringPool) { sc.remove(r.mesh); if (r.mesh.material) r.mesh.material.dispose(); }
     this.pMesh.geometry.dispose();
     this.pMesh.material.dispose();
-    for (const g of [this.tracerGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry, this.ringGeo]) g.dispose();
+    for (const g of [this.tracerGeo, this.lightningGlowGeo, this.lightningCoreGeo, this.coinGeo, this.medGeo, this.ammoGeo, this.projGeo, this.grenadeGeo, this.bandGeo, this.laserGeo, this.laserCore.geometry, this.ringGeo]) g.dispose();
     for (const m of [this.tracerMat, this.grenadeMat, this.grenadeHotMat, this.laserMat, this.laserCoreMat, this.laserGlow.material]) m.dispose();
     // coinMat/medMat/ammoMat/projMat — спільні toonMat (userData.shared) — лишаємо на сеанс
     for (const g of this.groundGlows) {
@@ -848,6 +881,44 @@ export class Effects {
     slot.mesh.material.opacity = 0.85;
   }
 
+  lightningArc(from, to, opts = {}) {
+    const dir = this._tmpDir.copy(to).sub(from);
+    const len = dir.length();
+    if (len < 0.2) return;
+    let slot = null;
+    for (const l of this.lightningPool) {
+      if (!l.glow.visible) { slot = l; break; }
+    }
+    if (!slot) slot = this.lightningPool[0];
+
+    const hyper = !!opts.hyper;
+    const color = hyper ? 0x66f5ff : 0xfff06a;
+    const coreColor = hyper ? 0xf8ffff : 0xffffff;
+    dir.normalize();
+    const mid = this._sbOld.copy(from).add(to).multiplyScalar(0.5);
+    this._q.setFromUnitVectors(this._up, dir);
+    slot.life = slot.maxLife = hyper ? 0.24 : 0.2;
+
+    slot.glow.visible = true;
+    slot.glow.position.copy(mid);
+    slot.glow.quaternion.copy(this._q);
+    slot.glow.scale.set(hyper ? 1.45 : 1.15, len, hyper ? 1.45 : 1.15);
+    slot.glow.material.color.setHex(color);
+    slot.glow.material.opacity = hyper ? 0.95 : 0.9;
+
+    slot.core.visible = true;
+    slot.core.position.copy(mid);
+    slot.core.quaternion.copy(this._q);
+    slot.core.scale.set(hyper ? 1.35 : 1, len, hyper ? 1.35 : 1);
+    slot.core.material.color.setHex(coreColor);
+    slot.core.material.opacity = 1;
+
+    this.flashLight.position.copy(to);
+    this.flashLight.color.setHex(color);
+    this.flashLight.intensity = Math.max(this.flashLight.intensity, hyper ? 16 : 11);
+    this.flashT = Math.max(this.flashT, hyper ? 0.12 : 0.09);
+  }
+
   muzzleFlash(pos) {
     this.flashLight.position.copy(pos);
     this.flashLight.color.setHex(0xffc966);
@@ -1159,6 +1230,18 @@ export class Effects {
       t.life -= dt;
       t.mesh.material.opacity = Math.max(0, t.life / 0.07) * 0.85;
       if (t.life <= 0) t.mesh.visible = false;
+    }
+
+    for (const l of this.lightningPool) {
+      if (!l.glow.visible) continue;
+      l.life -= dt;
+      const k = Math.max(0, l.life / l.maxLife);
+      l.glow.material.opacity = k * 0.9;
+      l.core.material.opacity = Math.min(1, k * 1.15);
+      if (l.life <= 0) {
+        l.glow.visible = false;
+        l.core.visible = false;
+      }
     }
 
     // 🔫 промінь лазера: гасне за мить після відпускання вогню

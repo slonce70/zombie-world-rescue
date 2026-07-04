@@ -96,6 +96,13 @@ const effect = await page.evaluate(async () => {
   g.save.gadgetHypers = (g.save.gadgetHypers || []).filter((id) => id !== 'chainlightning');
   g.test.gadgetCdReset();
   g.test.teleport(0, 145);
+  const oldLightningArc = g.level.effects.lightningArc;
+  const visualArcs = [];
+  g.level.effects.lightningArc = function lightningArcSpy(from, to, opts = {}) {
+    visualArcs.push({ from: { x: from.x, y: from.y, z: from.z }, to: { x: to.x, y: to.y, z: to.z }, hyper: !!opts.hyper });
+    if (oldLightningArc) return oldLightningArc.call(this, from, to, opts);
+    return undefined;
+  };
   const spots = [
     [p.pos.x + 3, p.pos.z],
     [p.pos.x + 6, p.pos.z],
@@ -110,12 +117,13 @@ const effect = await page.evaluate(async () => {
     z.stunT = 0;
   }
   const used = g.test.useGadget();
+  g.level.effects.lightningArc = oldLightningArc;
   const data = zs.map((z) => ({
     hp: Math.round(z.hp * 10) / 10,
     dmg: Math.round((1000 - z.hp) * 10) / 10,
     stun: Math.round((z.stunT || 0) * 10) / 10,
   }));
-  return { used, cd: g.level.gadgets.cd, data };
+  return { used, cd: g.level.gadgets.cd, data, visualArcs };
 });
 check(effect.used && effect.cd === 35,
   'гаджет спрацьовує і запускає cooldown 35с', JSON.stringify(effect));
@@ -123,6 +131,8 @@ check(effect.data.slice(0, 5).every((z) => z.dmg === 35 && z.stun === 0.3),
   'блискавка бʼє 5 зомбі по ланцюгу: 35 HP і 0.3с збиття', JSON.stringify(effect.data));
 check(effect.data[5].dmg === 0 && effect.data[5].stun === 0,
   'шостий зомбі далеко від ланцюга не отримує шкоду', JSON.stringify(effect.data[5]));
+check(effect.visualArcs.length === 5 && effect.visualArcs.every((arc) => !arc.hyper),
+  'базова блискавка малює 5 видимих променів', JSON.stringify(effect.visualArcs));
 
 const hyperEffect = await page.evaluate(() => {
   const g = window.__game;
@@ -133,6 +143,13 @@ const hyperEffect = await page.evaluate(() => {
   g.save.gadgetHypers = ['chainlightning'];
   g.test.gadgetCdReset();
   g.test.teleport(0, 145);
+  const oldLightningArc = g.level.effects.lightningArc;
+  const visualArcs = [];
+  g.level.effects.lightningArc = function lightningArcSpy(from, to, opts = {}) {
+    visualArcs.push({ from: { x: from.x, y: from.y, z: from.z }, to: { x: to.x, y: to.y, z: to.z }, hyper: !!opts.hyper });
+    if (oldLightningArc) return oldLightningArc.call(this, from, to, opts);
+    return undefined;
+  };
   const spots = [
     [p.pos.x + 3, p.pos.z],
     [p.pos.x + 6, p.pos.z],
@@ -153,6 +170,7 @@ const hyperEffect = await page.evaluate(() => {
   zs[0].attackT = 0.7;
   zs[0].didHit = false;
   const used = g.test.useGadget();
+  g.level.effects.lightningArc = oldLightningArc;
   const data = zs.map((z) => ({
     hp: Math.round(z.hp * 10) / 10,
     dmg: Math.round((1000 - z.hp) * 10) / 10,
@@ -160,7 +178,7 @@ const hyperEffect = await page.evaluate(() => {
     attackLock: Math.round((z.attackLockT || 0) * 10) / 10,
     state: z.state,
   }));
-  return { used, cd: g.level.gadgets.cd, data };
+  return { used, cd: g.level.gadgets.cd, data, visualArcs };
 });
 check(hyperEffect.used && hyperEffect.cd === 35,
   'гіпер-блискавка спрацьовує з тим самим cooldown 35с', JSON.stringify(hyperEffect));
@@ -170,6 +188,8 @@ check(hyperEffect.data[0].state === 'chase',
   'гіпер-блискавка скидає зомбі з поточної атаки', JSON.stringify(hyperEffect.data[0]));
 check(hyperEffect.data[6].dmg === 0 && hyperEffect.data[6].stun === 0 && hyperEffect.data[6].attackLock === 0,
   'сьомий далекий зомбі не отримує ефект гіперу', JSON.stringify(hyperEffect.data[6]));
+check(hyperEffect.visualArcs.length === 6 && hyperEffect.visualArcs.every((arc) => arc.hyper),
+  'гіпер-блискавка малює 6 посилених видимих променів', JSON.stringify(hyperEffect.visualArcs));
 
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

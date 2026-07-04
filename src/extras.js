@@ -939,8 +939,11 @@ export class Gadgets {
     }
 
     level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xfff06a, Math.min(maxFirst, 7));
+    let arcFrom = p.pos.clone().setY(p.pos.y + 1.1);
     for (const z of hits) {
       const pos = new THREE.Vector3(z.x, z.y + 1.1, z.z);
+      level.effects.lightningArc(arcFrom, pos, { hyper });
+      arcFrom = pos.clone();
       z.damage(dmg, null, false, { chainLightning: true });
       if (z.state !== 'dead' && !(z.stats && z.stats.stunImmune)) z.stunT = Math.max(z.stunT || 0, zapT);
       if (hyper && z.state !== 'dead') {
