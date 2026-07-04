@@ -57,6 +57,9 @@ check(preview.join('') === '🆘📡🛡️', 'UKR preview uses story icons', pr
 
 await page.click('#solo-countries #country-list .country-item[data-id="UKR"]');
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+await page.waitForFunction(() => document.querySelector('.story-objective')?.textContent, null, { timeout: 3000 }).catch(() => null);
+const storyObjectiveText = await page.evaluate(() => document.querySelector('.story-objective')?.textContent || '');
+check(/Врятуй людей/.test(storyObjectiveText), 'HUD shows current UKR story objective', storyObjectiveText);
 let st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
   ids: window.__game.test.storyObjectiveIds(),
