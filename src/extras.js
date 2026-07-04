@@ -575,6 +575,11 @@ export class Gadgets {
     return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget;
   }
 
+  _zombieStructureDmg(z) {
+    const base = z && z.stats ? z.stats.dmg : 0;
+    return base + (this.level.game && this.level.game.save && this.level.game.save.strongZombies ? 10 : 0);
+  }
+
   update(dt, input, allowControl) {
     const level = this.level;
     const p = level.player;
@@ -1316,7 +1321,7 @@ export class Gadgets {
       let pressure = 0;
       for (const z of level.zombies.list) {
         if (z.state === 'dead' || !z.aggroed) continue;
-        if (Math.hypot(z.x - ttm.x, z.z - ttm.z) < 2.4) pressure += z.stats.dmg;
+        if (Math.hypot(z.x - ttm.x, z.z - ttm.z) < 2.4) pressure += this._zombieStructureDmg(z);
       }
       if (pressure) {
         ttm.hp -= pressure * dt * 0.85;
@@ -1340,7 +1345,7 @@ export class Gadgets {
       let pressure = 0;
       for (const z of level.zombies.list) {
         if (z.state === 'dead' || !z.aggroed) continue;
-        if (Math.hypot(z.x - ttm.x, z.z - ttm.z) < 2.4) pressure += z.stats.dmg;
+        if (Math.hypot(z.x - ttm.x, z.z - ttm.z) < 2.4) pressure += this._zombieStructureDmg(z);
       }
       if (pressure) {
         ttm.hp -= pressure * dt * 0.85;
@@ -1500,7 +1505,7 @@ export class Gadgets {
       let pressure = 0;
       for (const z of level.zombies.list) {
         if (z.state === 'dead' || !z.aggroed) continue;
-        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.6) pressure += z.stats.dmg;
+        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.6) pressure += this._zombieStructureDmg(z);
       }
       if (pressure > 0) {
         t.hp -= pressure * dt * 0.85;
@@ -1779,7 +1784,7 @@ export class Gadgets {
       let pressure = 0;
       for (const z of level.zombies.list) {
         if (z.state === 'dead' || !z.aggroed) continue;
-        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.4) pressure += z.stats.dmg;
+        if (Math.hypot(z.x - t.x, z.z - t.z) < 2.4) pressure += this._zombieStructureDmg(z);
       }
       if (pressure > 0) {
         t.hp -= pressure * dt * 0.85;
