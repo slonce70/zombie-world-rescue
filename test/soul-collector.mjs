@@ -158,19 +158,26 @@ const rewards = await page.evaluate(() => {
   g.save.souls = 5;
   g.save.soulLevel = 4;
   g.save.titles = g.save.titles.filter((id) => id !== 'ghost');
+  g.save.gadgetHypers = (g.save.gadgetHypers || []).filter((id) => id !== 'invisibility');
   g.claimSoulLevel();
   return {
     afterWin,
     afterClaim,
-    rewards: { gadget, skin, title: g.save.titles.includes('ghost'), level: g.save.soulLevel },
+    rewards: {
+      gadget,
+      skin,
+      title: g.save.titles.includes('ghost'),
+      invisibilityHyper: (g.save.gadgetHypers || []).includes('invisibility'),
+      level: g.save.soulLevel,
+    },
   };
 });
 check(rewards.afterWin.souls === 3 && rewards.afterWin.level === 1 && rewards.afterWin.shown && /ДУШ/i.test(rewards.afterWin.title),
   'перемога завершує режим і додає 3 душі', JSON.stringify(rewards.afterWin));
 check(rewards.afterClaim.souls === 0 && rewards.afterClaim.level === 2 && rewards.afterClaim.coinsDelta >= 500,
   '5 душ піднімають Шлях душ на рівень і дають нагороду', JSON.stringify(rewards.afterClaim));
-check(rewards.rewards.gadget && rewards.rewards.skin && rewards.rewards.title && rewards.rewards.level === 5,
-  'Шлях душ видає гаджет, скін Привид і титул Привид', JSON.stringify(rewards.rewards));
+check(rewards.rewards.gadget && rewards.rewards.skin && rewards.rewards.title && rewards.rewards.invisibilityHyper && rewards.rewards.level === 5,
+  'Шлях душ видає гаджет, скін Привид, титул Привид і гіпер невидимки', JSON.stringify(rewards.rewards));
 
 check(errors.length === 0, 'без JS-помилок консолі', errors.join('\n'));
 await browser.close();

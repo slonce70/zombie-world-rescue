@@ -85,6 +85,54 @@ check(effect.expired.invisibleT === 0 && effect.expired.visible === true,
 check(effect.expired.aggroed || effect.expired.state === 'chase' || effect.expired.state === 'attack',
   'після завершення невидимості зомбі знову бачить гравця', JSON.stringify(effect.expired));
 
+console.log('▸ Гіперзаряд невидимки лікує тільки під час невидимості');
+const regen = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.test.unlockGadget('invisibility');
+  g.save.activeGadget = 'invisibility';
+
+  g.save.gadgetHypers = [];
+  g.test.gadgetCdReset();
+  p.health = 25;
+  p.maxHealth = 100;
+  p.firstPerson = false;
+  p._applyView();
+  const baseUsed = g.test.useGadget();
+  p._updateBuffTimers(2);
+  const base = { used: baseUsed, hp: Math.round(p.health * 10) / 10, invisibleT: Math.round((p.invisibleT || 0) * 10) / 10 };
+
+  p.invisibleT = 0;
+  p._applyView();
+  g.save.gadgetHypers = ['invisibility'];
+  g.test.gadgetCdReset();
+  p.health = 25;
+  p.maxHealth = 100;
+  p.firstPerson = false;
+  p._applyView();
+  const hyperUsed = g.test.useGadget();
+  p._updateBuffTimers(1);
+  const after1 = { hp: Math.round(p.health * 10) / 10, invisibleT: Math.round((p.invisibleT || 0) * 10) / 10, visible: p.rig.group.visible };
+  p._updateBuffTimers(1);
+  const after2 = { hp: Math.round(p.health * 10) / 10, invisibleT: Math.round((p.invisibleT || 0) * 10) / 10, visible: p.rig.group.visible };
+  p._updateBuffTimers(4);
+  const ended = { hp: Math.round(p.health * 10) / 10, invisibleT: Math.round((p.invisibleT || 0) * 10) / 10, visible: p.rig.group.visible };
+  p.health = 50;
+  p._updateBuffTimers(1);
+  const afterExpiredTick = { hp: Math.round(p.health * 10) / 10, invisibleT: Math.round((p.invisibleT || 0) * 10) / 10, visible: p.rig.group.visible };
+  return { base, hyperUsed, after1, after2, ended, afterExpiredTick };
+});
+check(regen.base.used && regen.base.hp === 25 && regen.base.invisibleT === 3,
+  'без гіперу невидимка не лікує', JSON.stringify(regen.base));
+check(regen.hyperUsed && regen.after1.hp === 40 && regen.after1.invisibleT === 4 && regen.after1.visible === false,
+  'з гіпером за 1с відновлює 15 HP', JSON.stringify(regen.after1));
+check(regen.after2.hp === 55 && regen.after2.invisibleT === 3,
+  'з гіпером за 2с відновлює 30 HP', JSON.stringify(regen.after2));
+check(regen.ended.hp === 100 && regen.ended.invisibleT === 0 && regen.ended.visible === true,
+  'за повну невидимість може долікувати до максимуму і завершується', JSON.stringify(regen.ended));
+check(regen.afterExpiredTick.hp === 50,
+  'після завершення невидимості лікування зупиняється', JSON.stringify(regen.afterExpiredTick));
+
 console.log('');
 if (errors.length) {
   console.log('❌ ПОМИЛКИ КОНСОЛІ:');

@@ -78,7 +78,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 264;
+const APP_VERSION = 265;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1386,7 +1386,7 @@ class Game {
     if (lvl === 2) return { type: 'coins', n: 500, icon: '💰', name: t('500 монет') };
     if (lvl === 3) return { type: 'gadget', id: 'xray', icon: '👁️', name: t('Гаджет «Ікс-рей»') };
     if (lvl === 4) return { type: 'skin', id: 'ghost', icon: '👻', name: t('Скін «Привид»') };
-    if (lvl === 5) return { type: 'title', id: 'ghost', icon: '🏷️', name: t('Титул «Привид»') };
+    if (lvl === 5) return { type: 'titleHyper', titleId: 'ghost', hyperId: 'invisibility', icon: '👻', name: t('Титул «Привид» + гіпер «Невидимка»') };
     return { type: 'coins', n: 500 + lvl * 100, icon: '💰', name: t('{n} монет', { n: 500 + lvl * 100 }) };
   }
 
@@ -1412,6 +1412,12 @@ class Game {
     }
     if (r.type === 'title') {
       if (!this.save.titles.includes(r.id)) this.save.titles.push(r.id);
+      return t('Нагорода: {i} {n}', { i: r.icon, n: r.name });
+    }
+    if (r.type === 'titleHyper') {
+      if (!this.save.titles.includes(r.titleId)) this.save.titles.push(r.titleId);
+      if (!Array.isArray(this.save.gadgetHypers)) this.save.gadgetHypers = [];
+      if (!this.save.gadgetHypers.includes(r.hyperId)) this.save.gadgetHypers.push(r.hyperId);
       return t('Нагорода: {i} {n}', { i: r.icon, n: r.name });
     }
     return t('Нагорода отримана');

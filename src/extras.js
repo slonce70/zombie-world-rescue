@@ -772,11 +772,13 @@ export class Gadgets {
       level.bus.emit('toast', t('♾️ Бескінечні патрони на 3с! Автомат і швидкостріл шаленіють'));
       ok = true;
     } else if (id === 'invisibility') {
+      const hyper = (game.save.gadgetHypers || []).includes('invisibility');
       p.invisibleT = 5;
+      p.invisibleRegenRate = hyper ? 15 : 0;
       p.rig.group.visible = false;
       level.audio.powerup();
-      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0x9be8ff, 16, { speed: 3, up: 3, life: 0.7 });
-      level.bus.emit('toast', t('👻 Невидимка на 5 секунд!'));
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), hyper ? 0x7cff9b : 0x9be8ff, hyper ? 22 : 16, { speed: 3, up: 3, life: 0.7 });
+      level.bus.emit('toast', hyper ? t('👻💚 Гіпер-невидимка: +15 HP/с на 5с!') : t('👻 Невидимка на 5 секунд!'));
       ok = true;
     } else if (id === 'soulmagnet') {
       if (level.mirror) {
