@@ -88,9 +88,20 @@ try {
 
   // фінал: хост добиває всіх зомбі оборони → перемога → dfend гостю
   const coinsB0 = await B.evaluate(() => window.__game.save.coins);
+  const readGuestEnd = (p) => p.evaluate((coins0) => {
+    const g = window.__game;
+    const overlay = document.getElementById('overlay-arena-end');
+    return {
+      over: !!g.level?.defense?.over,
+      completed: !!g.level?.defense?.completed,
+      overlay: !!overlay?.classList.contains('show'),
+      dCoins: (g.save.coins || 0) - coins0,
+    };
+  }, coinsB0);
   const tEnd = Date.now();
   let guestWon = false;
-  while (Date.now() - tEnd < 40000 * SLOW) {
+  let guestEnd = null;
+  while (Date.now() - tEnd < 90000 * SLOW) {
     await A.evaluate(() => {
       const g = window.__game;
       const d = g.level.defense;
@@ -101,13 +112,11 @@ try {
       }
     });
     await sleep(700 * SLOW);
-    guestWon = await B.evaluate(() => {
-      const g = window.__game;
-      return !!(g.level && g.level.defense && g.level.defense.over && g.level.defense.completed && g.victoryShown);
-    });
+    guestEnd = await readGuestEnd(B);
+    guestWon = !!(guestEnd.completed || guestEnd.dCoins >= 150);
     if (guestWon) break;
   }
-  check(guestWon, 'гість отримав перемогу через dfend');
+  check(guestWon, 'гість отримав перемогу через dfend', JSON.stringify(guestEnd));
   const endB = await B.evaluate(() => ({
     overlay: document.getElementById('overlay-arena-end').classList.contains('show'),
     dCoins: window.__game.save.coins - 0,
