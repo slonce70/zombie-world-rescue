@@ -872,23 +872,30 @@ export class Gadgets {
   _frostBlast() {
     const level = this.level;
     const p = level.player;
+    const hyper = (level.game.save.gadgetHypers || []).includes('frostgrenade');
+    const radius = hyper ? 7.5 : 4;
+    const dmg = hyper ? 55 : 20;
+    const stun = hyper ? 5 : 3;
     const x = p.pos.x - Math.sin(p.yaw) * 5;
     const z = p.pos.z - Math.cos(p.yaw) * 5;
     const solved = level.world.collide(x, z, 0.45, p.pos.y);
     const y = this._floorY(solved.x, solved.z, p.pos.y);
     const pos = new THREE.Vector3(solved.x, y + 0.2, solved.z);
-    level.effects.ring(pos, 0xa8e8ff, 4);
-    level.effects.burst(pos.clone().setY(y + 0.8), 0xa8e8ff, 24, { speed: 4, up: 2.6, life: 0.85, size: 0.75 });
+    level.effects.ring(pos, 0xa8e8ff, radius);
+    level.effects.burst(pos.clone().setY(y + 0.8), 0xa8e8ff, hyper ? 40 : 24, { speed: hyper ? 5 : 4, up: 2.6, life: 0.85, size: hyper ? 0.9 : 0.75 });
     let hit = 0;
     for (const zb of level.zombies.list) {
       if (zb.state === 'dead' || zb.gone) continue;
-      if (Math.hypot(zb.x - solved.x, zb.z - solved.z) > 4) continue;
-      zb.damage(20, null, false, { frost: true });
-      if (!(zb.stats && zb.stats.stunImmune)) zb.stunT = Math.max(zb.stunT || 0, 3);
+      if (Math.hypot(zb.x - solved.x, zb.z - solved.z) > radius) continue;
+      zb.damage(dmg, null, false, { frost: true });
+      if (!(zb.stats && zb.stats.stunImmune)) zb.stunT = Math.max(zb.stunT || 0, stun);
       hit++;
     }
     level.audio.powerup();
-    level.bus.emit('toast', hit ? t('🧊 Заморозка! Зомбі зупинені на 3с') : t('🧊 Крижаний вибух!'));
+    const msg = hit
+      ? (hyper ? t('🧊⚡ Гіпер-заморозка! 55 шкоди і 5с стоп') : t('🧊 Заморозка! Зомбі зупинені на 3с'))
+      : (hyper ? t('🧊⚡ Великий крижаний вибух!') : t('🧊 Крижаний вибух!'));
+    level.bus.emit('toast', msg);
     return true;
   }
 
