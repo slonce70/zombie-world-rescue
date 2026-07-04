@@ -179,7 +179,7 @@ export class Zombies {
       aggroed: !!opts.horde,
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,
-      attackT: -1, didHit: false,
+      attackT: -1, didHit: false, attackLockT: 0,
       stunT: 0,
       slowT: 0, slowMul: 1,
       deadT: -1,
@@ -826,6 +826,7 @@ export class Zombies {
       }
 
       // 💫 оглушений: завмирає на місці (ні руху, ні атак), ледь хитається «в зірках»
+      if (z.attackLockT > 0) z.attackLockT = Math.max(0, z.attackLockT - dt);
       if (z.stunT > 0) {
         z.stunT -= dt;
         setAnim(rig, 'idle');
@@ -911,7 +912,7 @@ export class Zombies {
         if (!playerAlive) {
           z.state = 'wander';
           z.aggroed = z.horde;
-        } else if (distP < st.attackR && z.telegraph <= 0 && z.charging <= 0) {
+        } else if (distP < st.attackR && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
           // мелі тільки з прямою видимістю — крізь стіни бити не можна
           this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
           this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
@@ -924,7 +925,7 @@ export class Zombies {
             setAnim(rig, 'attack');
           }
         } else if (z.ranged && z.rangedCd <= 0 && distP >= z.ranged.min && distP <= z.ranged.max
-          && z.telegraph <= 0 && z.charging <= 0) {
+          && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
           // кидок сніжки, якщо є пряма видимість
           this._p0.set(z.x, z.y + z.rig.height * 0.75, z.z);
           this._p1.set(dxP, (tp.y + 1.2) - (z.y + z.rig.height * 0.75), dzP).normalize();

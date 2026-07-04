@@ -912,11 +912,13 @@ export class Gadgets {
   _chainLightning() {
     const level = this.level;
     const p = level.player;
+    const hyper = (level.game.save.gadgetHypers || []).includes('chainlightning');
     const maxFirst = 18;
     const jumpRange = 7.5;
-    const maxHits = 5;
-    const dmg = 35;
-    const zapT = 0.3;
+    const maxHits = hyper ? 6 : 5;
+    const dmg = hyper ? 40 : 35;
+    const zapT = hyper ? 1 : 0.3;
+    const attackLock = hyper ? 0.9 : 0;
     const alive = () => level.zombies.list.filter((z) => z.state !== 'dead' && !z.gone);
     const first = alive()
       .filter((z) => Math.hypot(z.x - p.pos.x, z.z - p.pos.z) <= maxFirst)
@@ -941,10 +943,19 @@ export class Gadgets {
       const pos = new THREE.Vector3(z.x, z.y + 1.1, z.z);
       z.damage(dmg, null, false, { chainLightning: true });
       if (z.state !== 'dead' && !(z.stats && z.stats.stunImmune)) z.stunT = Math.max(z.stunT || 0, zapT);
+      if (hyper && z.state !== 'dead') {
+        z.attackLockT = Math.max(z.attackLockT || 0, attackLock);
+        if (z.state === 'attack') {
+          z.state = 'chase';
+          z.attackT = -1;
+          z.didHit = false;
+          z.throwProj = false;
+        }
+      }
       level.effects.burst(pos, 0xfff06a, 14, { speed: 3.4, up: 2.4, life: 0.45, size: 0.8 });
     }
     level.audio.powerup();
-    level.bus.emit('toast', t('⚡ Ланцюгова блискавка! Уражено {n} зомбі', { n: hits.length }));
+    level.bus.emit('toast', hyper ? t('⚡🔥 Гіпер-блискавка! Уражено {n} зомбі', { n: hits.length }) : t('⚡ Ланцюгова блискавка! Уражено {n} зомбі', { n: hits.length }));
     return true;
   }
 
