@@ -54,6 +54,7 @@ export const SHOP_ITEMS = [
   { id: 'dash-hyper', icon: '⚡', name: t('Гіперзаряд: Ривок'), desc: t('Ривок 12м, 3с невразливості і вогняний слід 10с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'dash', needsGadget: 'dash' },
   { id: 'mine', icon: GADGETS.mine.icon, name: GADGETS.mine.name, desc: () => GADGETS.mine.desc + t(' · перезарядка {n}с', { n: GADGETS.mine.cd }), price: GADGETS.mine.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'mine-hyper', icon: '⚡', name: t('Гіперзаряд: Міна'), desc: t('Ставить 3 міни; виживші після вибуху зомбі оглушаються на 1с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'mine', needsGadget: 'mine' },
+  { id: 'dnaswitch', icon: GADGETS.dnaswitch.icon, name: GADGETS.dnaswitch.name, desc: () => GADGETS.dnaswitch.desc + t(' · перезарядка {n}с', { n: GADGETS.dnaswitch.cd }), price: GADGETS.dnaswitch.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'goldapple-hyper', icon: '⚡', name: t('Гіперзаряд: Золоте яблуко'), desc: t('Постійне покращення яблука: +40 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'goldapple', needsGadget: 'goldapple' },
   { id: 'meteor-hyper', icon: '⚡', name: t('Гіперзаряд: Метеорит'), desc: t('Після падіння лишає вогонь: 5 HP кожні 0.5с'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'meteor', needsGadget: 'meteor' },
   // ☄️ Метеорит НЕ продається — лише нагорода Зоряного шляху рівня 33 (PASS_REWARDS)
@@ -549,6 +550,7 @@ export class Shop {
       case 'goldapple':
       case 'dash':
       case 'mine':
+      case 'dnaswitch':
       case 'frostgrenade':
       case 'poisonpuddle':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);

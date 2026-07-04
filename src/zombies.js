@@ -200,6 +200,7 @@ export class Zombies {
       wx: x, wz: z,
       attackT: -1, didHit: false, attackLockT: 0,
       stunT: 0,
+      confusedT: 0,
       slowT: 0, slowMul: 1,
       deadT: -1,
       groanT: this.rng.range(2, 9),
@@ -855,13 +856,26 @@ export class Zombies {
         continue;
       }
 
+      if (z.confusedT > 0) z.confusedT = Math.max(0, z.confusedT - dt);
       let tgt = null;
       let distP = Infinity;
-      for (const pl of targets) {
-        if (pl.health <= 0) continue;
-        if (!pl.clone && pl.invisibleT > 0) continue;
-        const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
-        if (d < distP) { distP = d; tgt = pl; }
+      if (z.confusedT > 0) {
+        const enemy = this._nearestConfusedEnemy(z);
+        if (enemy) {
+          tgt = {
+            zombie: enemy,
+            get pos() { return { x: enemy.x, y: enemy.y, z: enemy.z }; },
+            get health() { return enemy.hp; },
+          };
+          distP = Math.hypot(enemy.x - z.x, enemy.z - z.z);
+        }
+      } else {
+        for (const pl of targets) {
+          if (pl.health <= 0) continue;
+          if (!pl.clone && pl.invisibleT > 0) continue;
+          const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
+          if (d < distP) { distP = d; tgt = pl; }
+        }
       }
       const playerAlive = !!tgt;
       const tp = tgt ? tgt.pos : player.pos;
@@ -1576,9 +1590,24 @@ export class Zombies {
     return (sess && sess.state === 'level') ? Math.max(1, sess.roster.size) : 1;
   }
 
+  _nearestConfusedEnemy(z) {
+    let best = null, bd = Infinity;
+    for (const other of this.list) {
+      if (other === z || other.state === 'dead' || other.gone || other.type === 'boss') continue;
+      const d = Math.hypot(other.x - z.x, other.z - z.z);
+      if (d < bd) { bd = d; best = other; }
+    }
+    return best;
+  }
+
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
   _hurt(tgt, dmg, fx, fz) {
     if (!tgt) return false;
+    if (tgt.zombie) {
+      const dir = new THREE.Vector3(tgt.zombie.x - fx, 0, tgt.zombie.z - fz).normalize();
+      tgt.zombie.damage(dmg, dir, false, { confused: true });
+      return true;
+    }
     if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return true; }
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.

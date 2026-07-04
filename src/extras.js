@@ -450,6 +450,7 @@ export const GADGETS = {
   dash: { name: t('Ривок'), icon: '🏃', cd: 30, price: 1000, desc: t('Короткий ривок уперед і 1с невразливості') },
   mine: { name: t('Міна'), icon: '💥', cd: 35, price: 1000, desc: t('Ставить пастку: вибухає, коли зомбі підходить') },
   frostgrenade: { name: t('Крижана граната'), icon: '🧊', cd: 40, price: 1000, desc: t('Крижаний вибух: 20 шкоди і 3с заморозки по зоні') },
+  dnaswitch: { name: t('ДНК-перемикач'), icon: '🧬', cd: 50, price: 1000, desc: t('На 6с змушує одного звичайного зомбі атакувати інших') },
   poisonpuddle: { name: t('Отруйна калюжа'), icon: '☣️', cd: 30, price: 0, desc: t('Ставить калюжу на 10с: зомбі в ній втрачають 5 HP/с') },
   // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
   meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 250 шкоди по площі 7×7 м') },
@@ -857,6 +858,12 @@ export class Gadgets {
         return false;
       }
       ok = this._placeMine();
+    } else if (id === 'dnaswitch') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('ДНК-перемикач доступний тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._dnaSwitch();
     } else if (id === 'frostgrenade') {
       if (level.mirror) {
         level.bus.emit('toast', t('Крижана граната доступна тільки в соло 🙈'));
@@ -1041,6 +1048,39 @@ export class Gadgets {
     }
     if (robot && rd <= 50) return robot;
     return this._nearestZombie(x, z);
+  }
+
+  _dnaSwitchTarget(x, z) {
+    let best = null, bd = 24;
+    for (const zb of this.level.zombies.list) {
+      if (zb.state === 'dead' || zb.gone || zb.type === 'boss') continue;
+      const d = Math.hypot(zb.x - x, zb.z - z);
+      if (d < bd) { bd = d; best = zb; }
+    }
+    return best;
+  }
+
+  _dnaSwitch() {
+    const level = this.level;
+    const p = level.player;
+    const zb = this._dnaSwitchTarget(p.pos.x, p.pos.z);
+    if (!zb) {
+      level.bus.emit('toast', t('🧬 Немає звичайного зомбі для перемикання!'));
+      level.game.audio.denied();
+      return false;
+    }
+    zb.confusedT = 6;
+    zb.aggroed = true;
+    if (zb.state !== 'dead') zb.state = 'chase';
+    zb.stunT = 0;
+    zb.attackLockT = 0;
+    zb.attackT = -1;
+    zb.didHit = false;
+    level.audio.powerup();
+    level.effects.ring(new THREE.Vector3(zb.x, zb.y, zb.z), 0xff66cc, 3);
+    level.effects.burst(new THREE.Vector3(zb.x, zb.y + 1.2, zb.z), 0xff66cc, 18, { speed: 3, up: 3, life: 0.7 });
+    level.bus.emit('toast', t('🧬 ДНК-перемикач! Зомбі 6с бʼє своїх'));
+    return true;
   }
 
   // соло/хост: метеорит падає на точку найближчого зомбі, б'є площу 7×7; візуал гостям ('met')
