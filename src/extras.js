@@ -1050,36 +1050,43 @@ export class Gadgets {
     return this._nearestZombie(x, z);
   }
 
-  _dnaSwitchTarget(x, z) {
-    let best = null, bd = 24;
+  _dnaSwitchTargets(x, z, count = 1) {
+    const found = [];
     for (const zb of this.level.zombies.list) {
       if (zb.state === 'dead' || zb.gone || zb.type === 'boss') continue;
       const d = Math.hypot(zb.x - x, zb.z - z);
-      if (d < bd) { bd = d; best = zb; }
+      if (d < 24) found.push({ zb, d });
     }
-    return best;
+    found.sort((a, b) => a.d - b.d);
+    return found.slice(0, count).map((item) => item.zb);
   }
 
   _dnaSwitch() {
     const level = this.level;
     const p = level.player;
-    const zb = this._dnaSwitchTarget(p.pos.x, p.pos.z);
-    if (!zb) {
+    const hyper = (level.game.save.gadgetHypers || []).includes('dnaswitch');
+    const targets = this._dnaSwitchTargets(p.pos.x, p.pos.z, hyper ? 3 : 1);
+    if (!targets.length) {
       level.bus.emit('toast', t('🧬 Немає звичайного зомбі для перемикання!'));
       level.game.audio.denied();
       return false;
     }
-    zb.confusedT = 6;
-    zb.aggroed = true;
-    if (zb.state !== 'dead') zb.state = 'chase';
-    zb.stunT = 0;
-    zb.attackLockT = 0;
-    zb.attackT = -1;
-    zb.didHit = false;
+    for (const zb of targets) {
+      zb.confusedT = hyper ? 9 : 6;
+      zb.confusedDmgBonus = hyper ? 5 : 0;
+      zb.aggroed = true;
+      if (zb.state !== 'dead') zb.state = 'chase';
+      zb.stunT = 0;
+      zb.attackLockT = 0;
+      zb.attackT = -1;
+      zb.didHit = false;
+      level.effects.ring(new THREE.Vector3(zb.x, zb.y, zb.z), hyper ? 0xffd23f : 0xff66cc, hyper ? 3.7 : 3);
+      level.effects.burst(new THREE.Vector3(zb.x, zb.y + 1.2, zb.z), hyper ? 0xffd23f : 0xff66cc, hyper ? 22 : 18, { speed: 3, up: 3, life: 0.7 });
+    }
     level.audio.powerup();
-    level.effects.ring(new THREE.Vector3(zb.x, zb.y, zb.z), 0xff66cc, 3);
-    level.effects.burst(new THREE.Vector3(zb.x, zb.y + 1.2, zb.z), 0xff66cc, 18, { speed: 3, up: 3, life: 0.7 });
-    level.bus.emit('toast', t('🧬 ДНК-перемикач! Зомбі 6с бʼє своїх'));
+    level.bus.emit('toast', hyper
+      ? t('🧬⚡ Гіпер-ДНК! 3 зомбі 9с бʼють своїх')
+      : t('🧬 ДНК-перемикач! Зомбі 6с бʼє своїх'));
     return true;
   }
 

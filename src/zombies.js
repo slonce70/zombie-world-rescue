@@ -201,6 +201,7 @@ export class Zombies {
       attackT: -1, didHit: false, attackLockT: 0,
       stunT: 0,
       confusedT: 0,
+      confusedDmgBonus: 0,
       slowT: 0, slowMul: 1,
       deadT: -1,
       groanT: this.rng.range(2, 9),
@@ -856,7 +857,10 @@ export class Zombies {
         continue;
       }
 
-      if (z.confusedT > 0) z.confusedT = Math.max(0, z.confusedT - dt);
+      if (z.confusedT > 0) {
+        z.confusedT = Math.max(0, z.confusedT - dt);
+        if (z.confusedT === 0) z.confusedDmgBonus = 0;
+      }
       let tgt = null;
       let distP = Infinity;
       if (z.confusedT > 0) {
@@ -1001,7 +1005,8 @@ export class Zombies {
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
-            const hit = this._hurt(tgt, st.dmg * this.diff.dmg, z.x, z.z);
+            const confusedBonus = z.confusedT > 0 ? (z.confusedDmgBonus || 0) : 0;
+            const hit = this._hurt(tgt, st.dmg * this.diff.dmg + confusedBonus, z.x, z.z);
             if (hit && st.punchEvery) {
               z.punchHits = (z.punchHits || 0) + 1;
               if (z.punchHits % st.punchEvery === 0) this._punchPush(tgt, z.x, z.z, st.punchPush || 5);
