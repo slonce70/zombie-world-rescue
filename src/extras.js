@@ -425,6 +425,7 @@ export class Vehicles {
 export const GADGETS = {
   shield: { name: t('Щит'), icon: '🛡️', cd: 30, price: 1000, desc: t('Аварійна бульбашка: поглинає 50 шкоди') },
   heal: { name: t('Відновлення'), icon: '💚', cd: 25, price: 1000, desc: t('+50 здоров\'я миттєво') },
+  chainlightning: { name: t('Ланцюгова блискавка'), icon: '⚡', cd: 35, price: 1000, desc: t('Бʼє найближчого зомбі і перескакує ще на 4 поруч') },
   tramp: { name: t('Кишеньковий батут'), icon: '🦘', cd: 20, price: 1000, desc: t('Постав і застрибни на дах') },
   // desc — getter: текст «забрати» залежить від керування і читається у момент показу
   wall: { name: t('Барикада'), icon: '🧱', cd: 25, price: 1000, get desc() { return t('Стіна на 100 міцності ({k})', { k: keyHint('кнопка ✋ — забрати', 'E — забрати') }); } },
@@ -771,6 +772,12 @@ export class Gadgets {
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffd23f, 16, { speed: 3, up: 3, life: 0.7 });
       level.bus.emit('toast', t('♾️ Бескінечні патрони на 3с! Автомат і швидкостріл шаленіють'));
       ok = true;
+    } else if (id === 'chainlightning') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Ланцюгова блискавка доступна тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._chainLightning();
     } else if (id === 'invisibility') {
       const hyper = (game.save.gadgetHypers || []).includes('invisibility');
       p.invisibleT = 5;
@@ -899,6 +906,45 @@ export class Gadgets {
       ? (hyper ? t('🧊⚡ Гіпер-заморозка! 55 шкоди і 5с стоп') : t('🧊 Заморозка! Зомбі зупинені на 3с'))
       : (hyper ? t('🧊⚡ Великий крижаний вибух!') : t('🧊 Крижаний вибух!'));
     level.bus.emit('toast', msg);
+    return true;
+  }
+
+  _chainLightning() {
+    const level = this.level;
+    const p = level.player;
+    const maxFirst = 18;
+    const jumpRange = 7.5;
+    const maxHits = 5;
+    const dmg = 35;
+    const zapT = 0.3;
+    const alive = () => level.zombies.list.filter((z) => z.state !== 'dead' && !z.gone);
+    const first = alive()
+      .filter((z) => Math.hypot(z.x - p.pos.x, z.z - p.pos.z) <= maxFirst)
+      .sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0];
+    if (!first) {
+      level.bus.emit('toast', t('⚡ Поруч немає зомбі для блискавки'));
+      level.audio.denied();
+      return false;
+    }
+
+    const hits = [];
+    let cur = first;
+    while (cur && hits.length < maxHits) {
+      hits.push(cur);
+      cur = alive()
+        .filter((z) => !hits.includes(z) && Math.hypot(z.x - cur.x, z.z - cur.z) <= jumpRange)
+        .sort((a, b) => Math.hypot(a.x - cur.x, a.z - cur.z) - Math.hypot(b.x - cur.x, b.z - cur.z))[0];
+    }
+
+    level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xfff06a, Math.min(maxFirst, 7));
+    for (const z of hits) {
+      const pos = new THREE.Vector3(z.x, z.y + 1.1, z.z);
+      z.damage(dmg, null, false, { chainLightning: true });
+      if (z.state !== 'dead' && !(z.stats && z.stats.stunImmune)) z.stunT = Math.max(z.stunT || 0, zapT);
+      level.effects.burst(pos, 0xfff06a, 14, { speed: 3.4, up: 2.4, life: 0.45, size: 0.8 });
+    }
+    level.audio.powerup();
+    level.bus.emit('toast', t('⚡ Ланцюгова блискавка! Уражено {n} зомбі', { n: hits.length }));
     return true;
   }
 

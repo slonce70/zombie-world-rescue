@@ -28,6 +28,7 @@ export const SHOP_ITEMS = [
   { id: 'shield-hyper', icon: '⚡', name: t('Гіперзаряд: Щит'), desc: t('Постійне покращення щита: 100 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'shield', needsGadget: 'shield' },
   { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: () => GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'frostgrenade', icon: GADGETS.frostgrenade.icon, name: GADGETS.frostgrenade.name, desc: () => GADGETS.frostgrenade.desc + t(' · перезарядка {n}с', { n: GADGETS.frostgrenade.cd }), price: GADGETS.frostgrenade.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'chainlightning', icon: GADGETS.chainlightning.icon, name: GADGETS.chainlightning.name, desc: () => GADGETS.chainlightning.desc + t(' · перезарядка {n}с', { n: GADGETS.chainlightning.cd }), price: GADGETS.chainlightning.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'frostgrenade-hyper', icon: '⚡', name: t('Гіперзаряд: Крижана граната'), desc: t('55 шкоди, зона 15×15м і 5с заморозки'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'frostgrenade', needsGadget: 'frostgrenade' },
   { id: 'heal-hyper', icon: '⚡', name: t('Гіперзаряд: Відновлення'), desc: t('Постійне покращення відновлення: 100 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'heal', needsGadget: 'heal' },
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -530,6 +531,7 @@ export class Shop {
         break;
       case 'shield':
       case 'heal':
+      case 'chainlightning':
       case 'tramp':
       case 'wall':
       case 'turret':
