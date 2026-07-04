@@ -25,6 +25,22 @@ const {
   storyPreview,
 } = storyModule;
 
+async function loadMapModule(name) {
+  const mapPath = new URL(`../src/maps/${name}.js`, import.meta.url);
+  const tmpPath = new URL(`./.tmp-map-${name}.mjs`, import.meta.url);
+  const mapSource = await readFile(mapPath, 'utf8');
+  const moduleSource = mapSource.replace(
+    /^import .*;\n/m,
+    'const ridge = () => 0;\nconst valley = () => 0;\nconst mesa = () => 0;\nconst dunes = () => 0;\nconst basin = () => 0;\n',
+  );
+  try {
+    await writeFile(tmpPath, moduleSource);
+    return (await import(`${tmpPath.href}?v=${Date.now()}`)).default;
+  } finally {
+    await rm(tmpPath, { force: true });
+  }
+}
+
 assert.deepEqual(STORY_COUNTRY_IDS, ['UKR', 'POL', 'EGY']);
 
 const ukr = getCountryStory('UKR');
@@ -54,6 +70,22 @@ assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️']);
 const preview = storyPreview('POL');
 assert.equal(preview.join(''), '🔥🚂🏰');
 assert.deepEqual(storyPreview('DEU'), null);
+
+const ukraineMap = await loadMapModule('ukraine');
+assert.ok(ukraineMap.storySites.barn);
+assert.ok(ukraineMap.storySites.tower);
+assert.ok(ukraineMap.storySites.village);
+
+const polandMap = await loadMapModule('poland');
+assert.ok(polandMap.storySites.railDepot);
+assert.ok(polandMap.storySites.castleRuin);
+assert.equal(polandMap.storySites.bonfires.length, 3);
+
+const egyptMap = await loadMapModule('egypt');
+assert.ok(egyptMap.storySites.sphinx);
+assert.ok(egyptMap.storySites.pyramid);
+assert.ok(egyptMap.storySites.tombDoor);
+assert.equal(egyptMap.storySites.seals.length, 2);
 
 console.log('✅ story selector preview pass');
 console.log('✅ story campaign 2 definitions pass');

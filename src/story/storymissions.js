@@ -1,5 +1,6 @@
 import { DynamicMissions } from '../missionpool.js';
 import { getCountryStory } from './countryStories.js';
+import { removeStoryNpc, spawnStoryNpc, updateStoryNpc } from './npcs.js';
 
 const LEGACY_UKR_MISSION_ALIASES = {
   'ukr-rescue': 'rescue',
@@ -13,12 +14,18 @@ export class StoryMissions {
   constructor(level) {
     this.level = level;
     this.story = getCountryStory(level.countryId);
+    this.storySites = (level.country.map && level.country.map.storySites) || {};
     this.objectives = (this.story ? this.story.objectives : []).map((cfg, i) => ({
       ...cfg,
       slotIndex: i,
       state: i === 0 ? 'active' : 'locked',
     }));
     this.delegate = new DynamicMissions(level);
+    this.npcState = spawnStoryNpc(
+      level,
+      this.story && this.story.npc,
+      this.story && this.story.npc ? this._site(this.story.npc.site) : null,
+    );
     return new Proxy(this, {
       get(target, prop, receiver) {
         if (prop in target) return Reflect.get(target, prop, receiver);
@@ -46,6 +53,7 @@ export class StoryMissions {
   }
 
   update(dt, input, allowControl) {
+    updateStoryNpc(this.npcState, dt);
     this.delegate.update(dt, input, allowControl);
     this._syncObjectiveStates();
   }
@@ -60,7 +68,13 @@ export class StoryMissions {
   }
 
   dispose() {
+    removeStoryNpc(this.level, this.npcState);
+    this.npcState = null;
     if (this.delegate.dispose) this.delegate.dispose();
+  }
+
+  currentStoryObjective() {
+    return this.objectives.find((o) => o.state === 'active') || null;
   }
 
   get missions() { return this.delegate.missions; }
@@ -84,6 +98,15 @@ export class StoryMissions {
     const objective = this.objectives.find((o) => o.id === id || o.slotIndex === id);
     if (objective) return LEGACY_SLOT_IDS[objective.slotIndex] || this.delegate.missions[objective.slotIndex]?.id || id;
     return id;
+  }
+
+  _site(id) {
+    if (!id) return null;
+    if (this.storySites && this.storySites[id]) return this.storySites[id];
+    if (this.delegate && typeof this.delegate._site === 'function') return this.delegate._site(id);
+    const layout = (this.delegate && this.delegate.L) || (this.level.world && this.level.world.layout);
+    if (layout && layout[id]) return layout[id];
+    return null;
   }
 
   _syncObjectiveStates() {
