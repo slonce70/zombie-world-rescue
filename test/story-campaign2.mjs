@@ -51,6 +51,9 @@ assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGu
 assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGuest: false, isCoop: false, isPlayground: true }), false);
 
 assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️']);
+const preview = storyPreview('POL');
+assert.equal(preview.join(''), '🔥🚂🏰');
 assert.deepEqual(storyPreview('DEU'), null);
 
+console.log('✅ story selector preview pass');
 console.log('✅ story campaign 2 definitions pass');

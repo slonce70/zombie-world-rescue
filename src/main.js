@@ -7,6 +7,8 @@ import { World } from './world.js';
 import { Player, WEAPONS, WEAPON_SLOTS } from './player.js';
 import { Zombies } from './zombies.js';
 import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js';
+import { StoryMissions } from './story/storymissions.js';
+import { shouldUseStoryMissions, storyPreview } from './story/countryStories.js';
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop, goalInfo } from './shop.js';
@@ -1124,6 +1126,11 @@ class Game {
   _missionPreviewHtml(countryId) {
     const c = COUNTRIES[countryId];
     if (!c) return '';
+    const storyIcons = storyPreview(countryId);
+    if (storyIcons) {
+      const chips = storyIcons.map((icon) => `<span>${icon}</span>`);
+      return `<span class="mission-preview">${chips.join('')}</span>`;
+    }
     const runIndex = (this.save.missionRuns && this.save.missionRuns[countryId]) || 0;
     const types = rollMissionSet(countryId, c.seed, runIndex);
     const labels = {
@@ -2523,7 +2530,14 @@ class Game {
       level.runBuild = new RunBuild();
     } else {
       if (!isGuest) level.zombies.populate();
-      level.missions = new DynamicMissions(level);
+      const useStory = shouldUseStoryMissions({
+        countryId,
+        modeId,
+        isGuest,
+        isCoop: !!coop,
+        isPlayground,
+      });
+      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!level.net && !isPlayground) level.runBuild = new RunBuild();
     }
@@ -4655,6 +4669,17 @@ class Game {
         g.saveGame();
       },
       forceMissions: (types) => { g._forceMissionSet = types; },
+      missionKind: () => g.level && g.level.missions && g.level.missions.constructor
+        ? g.level.missions.constructor.name : null,
+      storyObjectiveIds: () => g.level && g.level.missions && g.level.missions.objectives
+        ? g.level.missions.objectives.map((o) => o.id) : [],
+      completeStoryObjective: (id) => {
+        if (g.level && g.level.missions && g.level.missions._completeObjective) {
+          g.level.missions._completeObjective(id);
+          return true;
+        }
+        return false;
+      },
       // 🤝 кооп
       coopCreate: async (nick) => {
         const code = await g.coop.session.create(nick || t('Хост'));
