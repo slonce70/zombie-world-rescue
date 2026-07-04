@@ -63,9 +63,13 @@ check(/Врятуй людей/.test(storyObjectiveText), 'HUD shows current UKR
 let st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
   ids: window.__game.test.storyObjectiveIds(),
+  replayNightRaid: window.__game.level.missions && window.__game.level.missions.replayNightRaid,
+  current: window.__game.level.missions.currentStoryObjective(),
 }));
 check(st.kind === 'StoryMissions', 'UKR solo campaign uses StoryMissions', JSON.stringify(st));
 check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense', 'UKR story objective IDs are present', JSON.stringify(st.ids));
+check(st.replayNightRaid === false, 'first UKR story start does not enable replayNightRaid', JSON.stringify(st));
+check(!/Нічний рейд/.test(st.current), 'first UKR story objective does not announce Night Raid', JSON.stringify(st));
 
 await page.evaluate(() => window.__game.test.completeStoryObjective('ukr-rescue'));
 st = await page.evaluate(() => ({
@@ -173,8 +177,12 @@ check(st.real && st.real.state === 'done' && st.story.state === 'done' && /му�
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
-st = await page.evaluate(() => ({ kind: window.__game.test.missionKind() }));
+st = await page.evaluate(() => ({
+  kind: window.__game.test.missionKind(),
+  replayNightRaid: window.__game.level.missions && window.__game.level.missions.replayNightRaid,
+}));
 check(st.kind === 'DynamicMissions', 'DEU keeps DynamicMissions fallback', JSON.stringify(st));
+check(!st.replayNightRaid, 'DEU fallback has no replayNightRaid truthy value', JSON.stringify(st));
 
 await page.evaluate(async () => {
   if (window.__game.level) window.__game.endLevel();
@@ -183,16 +191,20 @@ await page.evaluate(async () => {
   await window.__game.startLevel('UKR');
 });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+await page.waitForTimeout(100);
 st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
-  replayNightRaid: !!(window.__game.level.missions && window.__game.level.missions.replayNightRaid),
+  replayNightRaid: window.__game.level.missions && window.__game.level.missions.replayNightRaid,
   current: window.__game.level.missions.currentStoryObjective(),
+  statsTime: window.__game.level.stats && window.__game.level.stats.time,
+  nightK: window.__game.test.state().nightK,
   worldTime: window.__game.level.world && window.__game.level.world.time,
 }));
 check(st.kind === 'StoryMissions', 'liberated UKR replay still uses StoryMissions', JSON.stringify(st));
 check(st.replayNightRaid === true, 'liberated UKR replay enables replayNightRaid', JSON.stringify(st));
-check(/Нічний рейд/.test(st.current), 'liberated UKR replay objective announces Night Raid', JSON.stringify(st));
 check(st.current.startsWith('🌙 Нічний рейд · '), 'liberated UKR replay objective uses Night Raid prefix', JSON.stringify(st));
+check(st.statsTime >= 150, 'liberated UKR replay sets engine-consumed stats time', JSON.stringify(st));
+check(st.nightK > 0, 'liberated UKR replay reaches engine-consumed night signal', JSON.stringify(st));
 check(st.worldTime >= 150, 'liberated UKR replay pushes world toward night', JSON.stringify(st));
 
 check(errors.length === 0, `no JS errors (${errors.slice(0, 2).join('|')})`);
