@@ -84,6 +84,7 @@ export const SHOP_ITEMS = [
   { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', pet: true },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
   { id: 'poisonpuddle', icon: GADGETS.poisonpuddle.icon, name: GADGETS.poisonpuddle.name, desc: () => GADGETS.poisonpuddle.desc + t(' · перезарядка {n}с', { n: GADGETS.poisonpuddle.cd }), price: 0, radiationPrice: 300, max: 1, cat: 'Радіація', gadget: true },
+  { id: 'poisonpuddle-hyper', icon: '⚡', name: t('Гіперзаряд: Отруйна калюжа'), desc: t('Калюжа наносить 10 HP/с і сповільнює зомбі'), price: 5000, crystalPrice: 5, max: 1, cat: 'Радіація', hyper: 'poisonpuddle', needsGadget: 'poisonpuddle' },
   // ☢️📜 повторюваний стік радіаційних монет: інакше після викупу разових товарів валюта мертва
   { id: 'radiationcontract', icon: '📜', name: t('Радіаційний контракт'), desc: t('Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', contract: true },
   // --- спорядження (видно на герої — клавіша V!) ---

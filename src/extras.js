@@ -856,9 +856,10 @@ export class Gadgets {
         level.bus.emit('toast', t('Отруйна калюжа доступна тільки в соло 🙈'));
         return false;
       }
-      level.effects.radiationPuddle(p.pos.clone(), true, 10);
+      const hyper = (game.save.gadgetHypers || []).includes('poisonpuddle');
+      level.effects.radiationPuddle(p.pos.clone(), true, 10, hyper ? { dmg: 10, slow: 0.5 } : {});
       level.audio.powerup();
-      level.bus.emit('toast', t('☣️ Отруйна калюжа! 10с шкодить зомбі поруч'));
+      level.bus.emit('toast', hyper ? t('☣️⚡ Гіпер-калюжа! 10 HP/с і сповільнення') : t('☣️ Отруйна калюжа! 10с шкодить зомбі поруч'));
       ok = true;
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму

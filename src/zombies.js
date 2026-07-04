@@ -181,6 +181,7 @@ export class Zombies {
       wx: x, wz: z,
       attackT: -1, didHit: false,
       stunT: 0,
+      slowT: 0, slowMul: 1,
       deadT: -1,
       groanT: this.rng.range(2, 9),
       groupId: opts.groupId ?? -1,
@@ -1329,6 +1330,11 @@ export class Zombies {
       if (Math.hypot(z.wx - z.x, z.wz - z.z) < 1) spd = 0;
     }
     if (z.charging > 0 || z.telegraph > 0) spd = 0;
+    if (z.slowT > 0) {
+      spd *= z.slowMul || 0.5;
+      z.slowT = Math.max(0, z.slowT - dt);
+      if (z.slowT === 0) z.slowMul = 1;
+    }
     // сніговик тримає дистанцію і кидає сніжки (зупиняється лише в зоні кидка)
     if (z.ranged && z.ranged.hold > 0 && z.state === 'chase'
       && distP < z.ranged.hold && distP > Math.max(st.attackR * 1.2, z.ranged.min)) spd = 0;

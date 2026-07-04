@@ -810,10 +810,10 @@ export class Effects {
     this.burst(pos.clone().setY(pos.y + 1.2), 0xff2b2b, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
   }
 
-  radiationPuddle(pos, damaging = false, life = 3) {
+  radiationPuddle(pos, damaging = false, life = 3, opts = {}) {
     this.groundGlow(pos, 0x77ff55, 3.2, life);
     this.burst(pos.clone().setY(pos.y + 0.4), 0x77ff55, 18, { speed: 1.4, up: 1.2, life: Math.min(life, 3), size: 0.55 });
-    if (damaging) this.radiationPuddles.push({ x: pos.x, z: pos.z, life });
+    if (damaging) this.radiationPuddles.push({ x: pos.x, z: pos.z, life, dmg: opts.dmg || 5, slow: opts.slow || 0 });
   }
 
   radiationDrops(pos) {
@@ -1206,7 +1206,13 @@ export class Effects {
       p.life -= dt;
       if (L && L.zombies) {
         for (const z of L.zombies.list) {
-          if (z.state !== 'dead' && Math.hypot(z.x - p.x, z.z - p.z) < 2.1) z.damage(5 * dt, null, false, { radiationPuddle: true });
+          if (z.state !== 'dead' && Math.hypot(z.x - p.x, z.z - p.z) < 2.1) {
+            z.damage((p.dmg || 5) * dt, null, false, { radiationPuddle: true });
+            if (p.slow) {
+              z.slowT = Math.max(z.slowT || 0, 0.35);
+              z.slowMul = Math.min(z.slowMul || 1, p.slow);
+            }
+          }
         }
       }
       if (p.life <= 0) this.radiationPuddles.splice(i, 1);
