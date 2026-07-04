@@ -1,0 +1,94 @@
+import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+let failed = 0;
+const errors = [];
+const check = (ok, msg, extra = '') => {
+  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
+  if (!ok) failed++;
+};
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+
+await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+
+console.log('▸ Налаштування «Живучі зомбі»');
+const setting = await page.evaluate(() => {
+  const g = window.__game;
+  const btn = document.getElementById('btn-tough-zombies');
+  const before = {
+    exists: !!btn,
+    label: btn ? btn.textContent : '',
+    save: !!g.save.toughZombies,
+  };
+  if (btn) btn.click();
+  const afterOn = {
+    label: btn ? btn.textContent : '',
+    save: !!g.save.toughZombies,
+    stored: JSON.parse(localStorage.getItem('zr-save-v1') || '{}').toughZombies,
+  };
+  if (btn) btn.click();
+  const afterOff = {
+    label: btn ? btn.textContent : '',
+    save: !!g.save.toughZombies,
+    stored: JSON.parse(localStorage.getItem('zr-save-v1') || '{}').toughZombies,
+  };
+  return { before, afterOn, afterOff };
+});
+check(setting.before.exists && setting.before.label.includes('Живучі зомбі') && setting.before.label.includes('викл'),
+  'кнопка є в меню і стартує вимкнено', JSON.stringify(setting.before));
+check(setting.afterOn.save === true && setting.afterOn.stored === true && setting.afterOn.label.includes('увімк'),
+  'натискання вмикає живучих зомбі і зберігає в сейв', JSON.stringify(setting.afterOn));
+check(setting.afterOff.save === false && setting.afterOff.stored === false && setting.afterOff.label.includes('викл'),
+  'повторне натискання вимикає живучих зомбі', JSON.stringify(setting.afterOff));
+
+const hp = await page.evaluate(() => {
+  const g = window.__game;
+  const Z = g.level.zombies;
+  const p = g.level.player;
+  const clear = () => {
+    for (const z of [...Z.list]) {
+      z.gone = true;
+      if (z.rig && z.rig.group && z.rig.group.parent) z.rig.group.parent.remove(z.rig.group);
+    }
+    Z.list = [];
+    Z.boss = null;
+  };
+  const spawnHp = (type, tough) => {
+    g.save.toughZombies = tough;
+    clear();
+    const z = g.test.spawnZombie(type, p.pos.x + 8, p.pos.z);
+    return { hp: z.hp, maxHp: z.maxHp, statsHp: z.stats.hp };
+  };
+  const bossHp = (tough) => {
+    g.save.toughZombies = tough;
+    clear();
+    const b = Z.spawnBoss();
+    return { hp: b.hp, maxHp: b.maxHp, statsHp: b.stats.hp };
+  };
+  return {
+    walker: { off: spawnHp('walker', false), on: spawnHp('walker', true) },
+    tank: { off: spawnHp('tank', false), on: spawnHp('tank', true) },
+    robot: { off: spawnHp('robot', false), on: spawnHp('robot', true) },
+    boss: { off: bossHp(false), on: bossHp(true) },
+  };
+});
+for (const [type, res] of Object.entries(hp)) {
+  check(res.on.maxHp === res.off.maxHp + 100 && res.on.hp === res.off.hp + 100 && res.on.statsHp === res.on.maxHp,
+    `${type}: живучі зомбі додають +100 HP`, JSON.stringify(res));
+}
+
+console.log('');
+if (errors.length) {
+  console.log('❌ ПОМИЛКИ КОНСОЛІ:');
+  for (const e of errors.slice(0, 10)) console.log('  ', e);
+  failed += errors.length;
+}
+console.log(failed === 0 ? '🎉 ЖИВУЧІ ЗОМБІ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
+await browser.close();
+closeServer();
+process.exit(failed === 0 ? 0 : 1);

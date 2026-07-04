@@ -256,8 +256,7 @@ export class TurretWarMode {
       noLeash: true,
       anchor: { x: this.px, z: this.cz, r: this._halfW * 2 },
     });
-    zb.maxHp = ROBOT_HP;
-    zb.hp = ROBOT_HP;
+    level.zombies.setConfiguredHp(zb, ROBOT_HP);
     if (zb.shieldObj) { zb.rig.body.remove(zb.shieldObj.group); disposeObject(zb.shieldObj.group); }
     zb.shieldHp = zb.shieldMax = zb.shieldRecastCd = 0;
     zb.shieldObj = null;

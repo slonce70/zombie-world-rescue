@@ -149,6 +149,23 @@ export class Zombies {
     this._corpseTtl = touch ? 1.6 : 3.0;
   }
 
+  _toughHpBonus(opts = {}) {
+    if (opts.mirror) return 0;
+    return this.level.game && this.level.game.save && this.level.game.save.toughZombies ? 100 : 0;
+  }
+
+  hpWithSettings(baseHp, opts = {}) {
+    return Math.max(1, Math.round(baseHp) + this._toughHpBonus(opts));
+  }
+
+  setConfiguredHp(z, baseHp, opts = {}) {
+    const hp = this.hpWithSettings(baseHp, opts);
+    z.maxHp = hp;
+    z.hp = hp;
+    z.stats = { ...z.stats, hp };
+    return hp;
+  }
+
   spawn(type, x, z, opts = {}) {
     const bossStyle = opts.style || (opts.frost ? 'frost' : 'king');
     const nid = opts.nid !== undefined ? opts.nid
@@ -156,7 +173,7 @@ export class Zombies {
     // зовнішність зомбі — з nid-сідованого RNG: однакова у всіх гравців кооперативу
     const vrng = new RNG((Math.imul(nid, 2654435761) ^ 0x9e3779) >>> 0);
     const rig = type === 'boss' ? makeBoss(bossStyle) : makeZombie(type, vrng);
-    const stats = TYPE_STATS[type];
+    const stats = { ...TYPE_STATS[type] };
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
@@ -167,9 +184,11 @@ export class Zombies {
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = type === 'boss' ? 1 : this.diff.hp * coopScale;
+    const maxHp = this.hpWithSettings(stats.hp * hpScale, opts);
+    stats.hp = maxHp;
     const z_ = {
       nid, rig, type, stats,
-      hp: Math.round(stats.hp * hpScale), maxHp: Math.round(stats.hp * hpScale),
+      hp: maxHp, maxHp,
       x, z, y,
       state: opts.horde ? 'chase' : 'wander',
       anchor: opts.anchor || { x, z, r: 10 },
@@ -403,7 +422,7 @@ export class Zombies {
       if (ok) break;
     }
     const z_ = this.spawn('walker', x, z, { golden: true });
-    z_.hp = z_.maxHp = 80;
+    this.setConfiguredHp(z_, 80);
     z_.anchor = { x, z, r: 30 };
     return z_;
   }
@@ -457,9 +476,10 @@ export class Zombies {
     // 🤝 кооп: бос міцніший пропорційно команді (×N гравців)
     // ⭐ зірки (M7): бос масштабується м'якше (×0.5/зірка), щоб не став «губкою для куль»; на ★1 — ×1.
     const _bs = this.diffStar > 1 ? (1 + 0.5 * (this.diffStar - 1)) : 1;
-    const bossHp = Math.round(cfg.hp * this.coopMul() * _bs);
+    const bossHp = this.hpWithSettings(cfg.hp * this.coopMul() * _bs);
     b.maxHp = bossHp;
     b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
+    b.stats = { ...b.stats, hp: bossHp };
     // 🔁 відновлення боса (після смерті гравця): не повторюємо вже пройдені хвилі призову.
     // Свіжий бос на повному HP (frac=100) лишає всі пороги невзятими — хвилі підуть штатно.
     const frac0 = (b.hp / b.maxHp) * 100;

@@ -78,7 +78,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 270;
+const APP_VERSION = 271;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -675,6 +675,16 @@ class Game {
       });
     }
     this._applyStrongZombies({ silent: true });
+    const toughZombiesBtn = document.getElementById('btn-tough-zombies');
+    if (toughZombiesBtn) {
+      toughZombiesBtn.addEventListener('click', () => {
+        this.save.toughZombies = !this.save.toughZombies;
+        this.saveGame();
+        this._applyToughZombies();
+        this.audio.click();
+      });
+    }
+    this._applyToughZombies({ silent: true });
 
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
@@ -723,7 +733,7 @@ class Game {
       modeBest: {}, modeWins: {}, modeRewards: {}, weekly: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
-      missionRuns: {}, kidMode: null, strongZombies: false, cloudTs: 0, goal: null,
+      missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, cloudTs: 0, goal: null,
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0, cloneUses: 0, gadgetUses: 0, damageDealt: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [], infected: { cleared: {}, done: false },
@@ -835,6 +845,7 @@ class Game {
         if (typeof out.crystals !== 'number' || !isFinite(out.crystals)) out.crystals = 0;
         if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
         out.strongZombies = !!out.strongZombies;
+        out.toughZombies = !!out.toughZombies;
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
         // легасі-сейв БЕЗ passLvl (Object.assign підставив дефолт 1 — НЕ вір йому:
         // видача 2..40 повторилась би) → null: grantBacklog ініціалізує «до 40 видано»
@@ -975,6 +986,17 @@ class Game {
       this.hud.toast(on
         ? t('🧟 Сильні зомбі: +10 шкоди турелям, баштам і тотемам')
         : t('🧟 Сильні зомбі вимкнені'));
+    }
+  }
+
+  _applyToughZombies(opts = {}) {
+    const on = !!this.save.toughZombies;
+    const btn = document.getElementById('btn-tough-zombies');
+    if (btn) btn.textContent = on ? t('💪 Живучі зомбі: увімк') : t('💪 Живучі зомбі: викл');
+    if (!opts.silent && this.hud) {
+      this.hud.toast(on
+        ? t('💪 Живучі зомбі: у всіх зомбі +100 HP')
+        : t('💪 Живучі зомбі вимкнені'));
     }
   }
 

@@ -92,9 +92,8 @@ export class RadiationMode {
       anchor: { x: this.cx, z: this.cz, r: this._half - 2 },
     });
     zb.radiationMode = true;
-    zb.maxHp = 500;
-    zb.hp = 500;
-    zb.stats = { ...zb.stats, hp: 500, dmg: 10, coins: 0 };
+    this.level.zombies.setConfiguredHp(zb, 500);
+    zb.stats = { ...zb.stats, dmg: 10, coins: 0 };
     zb.aggroed = true;
     zb.state = 'chase';
     this.level.zombies.boss = zb;

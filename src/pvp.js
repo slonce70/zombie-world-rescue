@@ -117,9 +117,8 @@ export class PvpMode {
       anchor: { x: this.cx, z: this.cz, r: this._half - 2 },
     });
     zb.pvp = true;
-    zb.maxHp = this.cfg.zombieHp;
-    zb.hp = this.cfg.zombieHp;
-    zb.stats = { ...zb.stats, hp: this.cfg.zombieHp, dmg: this.cfg.zombieDmg, coins: 0 };
+    this.level.zombies.setConfiguredHp(zb, this.cfg.zombieHp);
+    zb.stats = { ...zb.stats, dmg: this.cfg.zombieDmg, coins: 0 };
     if (this.cfg.zombieRanged) zb.ranged = { ...this.cfg.zombieRanged };
     if (this.cfg.zombieShield) {
       zb.shieldHp = zb.shieldMax = this.cfg.zombieShield;

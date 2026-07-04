@@ -205,9 +205,13 @@ export class WorldBossMode {
       anchor: { x: this.cx, z: this.cz, r: this._half - 3 },
     });
     boss.worldBoss = this.id;
-    boss.maxHp = this.cfg.hp;
-    boss.hp = this.cfg.hp;
-    boss.stats = { ...boss.stats, hp: this.cfg.hp, coins: 0 };
+    if (this.level.zombies && typeof this.level.zombies.setConfiguredHp === 'function') {
+      this.level.zombies.setConfiguredHp(boss, this.cfg.hp);
+    } else {
+      boss.maxHp = boss.hp = this.cfg.hp;
+      boss.stats = { ...boss.stats, hp: this.cfg.hp };
+    }
+    boss.stats = { ...boss.stats, coins: 0 };
     boss.aggroed = true;
     boss.state = 'chase';
     this.level.zombies.boss = boss;

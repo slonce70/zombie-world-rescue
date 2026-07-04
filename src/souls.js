@@ -116,8 +116,8 @@ export class SoulCollectorMode {
       });
       zb.soulGhost = true;
       zb.invisible = false;
-      zb.hp = zb.maxHp = SOUL_GHOST_HP;
-      zb.stats = { ...zb.stats, hp: SOUL_GHOST_HP, coins: 0, invisible: false };
+      this.level.zombies.setConfiguredHp(zb, SOUL_GHOST_HP);
+      zb.stats = { ...zb.stats, coins: 0, invisible: false };
       zb.aggroed = true;
       zb.state = 'chase';
       zb.rig.group.visible = true;

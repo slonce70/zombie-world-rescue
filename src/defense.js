@@ -327,9 +327,8 @@ export class DefenseMode {
 
   _tuneZombie(zb) {
     if (!this.cfg.zombieHp) return;
-    zb.maxHp = this.cfg.zombieHp;
-    zb.hp = this.cfg.zombieHp;
-    zb.stats = { ...zb.stats, hp: this.cfg.zombieHp, dmg: this.cfg.zombieDmg, coins: 0 };
+    this.level.zombies.setConfiguredHp(zb, this.cfg.zombieHp);
+    zb.stats = { ...zb.stats, dmg: this.cfg.zombieDmg, coins: 0 };
     if (zb.ranged) zb.ranged = { ...zb.ranged, dmg: this.cfg.zombieDmg };
   }
 

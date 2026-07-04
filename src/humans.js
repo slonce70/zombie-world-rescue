@@ -161,8 +161,7 @@ export class HumansMode {
     }
     const robot = this._addZombie('robot', this.cx, this.cz - this._half + 55);
     if (this.cfg.robotHp) {
-      robot.hp = robot.maxHp = this.cfg.robotHp;
-      robot.stats = { ...robot.stats, hp: this.cfg.robotHp };
+      this.level.zombies.setConfiguredHp(robot, this.cfg.robotHp);
     }
   }
 
