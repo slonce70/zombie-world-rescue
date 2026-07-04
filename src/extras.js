@@ -448,6 +448,8 @@ export const GADGETS = {
   goldapple: { name: t('Золоте яблуко'), icon: '🍎', cd: 45, price: 1000, desc: t('+20 здоров\'я на 5 секунд') },
   dash: { name: t('Ривок'), icon: '🏃', cd: 30, price: 1000, desc: t('Короткий ривок уперед і 1с невразливості') },
   mine: { name: t('Міна'), icon: '💥', cd: 35, price: 1000, desc: t('Ставить пастку: вибухає, коли зомбі підходить') },
+  frostgrenade: { name: t('Крижана граната'), icon: '🧊', cd: 40, price: 1000, desc: t('Крижаний вибух: 20 шкоди і 3с заморозки по зоні') },
+  poisonpuddle: { name: t('Отруйна калюжа'), icon: '☣️', cd: 30, price: 0, desc: t('Ставить калюжу на 10с: зомбі в ній втрачають 5 HP/с') },
   // ☄️ Метеорит: викликає з космосу метеорит на НАЙБЛИЖЧОГО зомбі — 135 шкоди згори
   meteor: { name: t('Метеорит'), icon: '☄️', cd: 45, price: 1000, desc: t('Метеорит з космосу — 250 шкоди по площі 7×7 м') },
 };
@@ -841,6 +843,21 @@ export class Gadgets {
         return false;
       }
       ok = this._placeMine();
+    } else if (id === 'frostgrenade') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Крижана граната доступна тільки в соло 🙈'));
+        return false;
+      }
+      ok = this._frostBlast();
+    } else if (id === 'poisonpuddle') {
+      if (level.mirror) {
+        level.bus.emit('toast', t('Отруйна калюжа доступна тільки в соло 🙈'));
+        return false;
+      }
+      level.effects.radiationPuddle(p.pos.clone(), true, 10);
+      level.audio.powerup();
+      level.bus.emit('toast', t('☣️ Отруйна калюжа! 10с шкодить зомбі поруч'));
+      ok = true;
     } else if (id === 'meteor') {
       // ☄️ гість шле запит хосту (шкода — авторитетна), хост/соло б'є напряму
       ok = level.mirror ? this._requestMeteor() : this._callMeteor();
@@ -850,6 +867,29 @@ export class Gadgets {
       level.bus.emit('gadgetUsed', id);
     }
     return ok;
+  }
+
+  _frostBlast() {
+    const level = this.level;
+    const p = level.player;
+    const x = p.pos.x - Math.sin(p.yaw) * 5;
+    const z = p.pos.z - Math.cos(p.yaw) * 5;
+    const solved = level.world.collide(x, z, 0.45, p.pos.y);
+    const y = this._floorY(solved.x, solved.z, p.pos.y);
+    const pos = new THREE.Vector3(solved.x, y + 0.2, solved.z);
+    level.effects.ring(pos, 0xa8e8ff, 4);
+    level.effects.burst(pos.clone().setY(y + 0.8), 0xa8e8ff, 24, { speed: 4, up: 2.6, life: 0.85, size: 0.75 });
+    let hit = 0;
+    for (const zb of level.zombies.list) {
+      if (zb.state === 'dead' || zb.gone) continue;
+      if (Math.hypot(zb.x - solved.x, zb.z - solved.z) > 4) continue;
+      zb.damage(20, null, false, { frost: true });
+      if (!(zb.stats && zb.stats.stunImmune)) zb.stunT = Math.max(zb.stunT || 0, 3);
+      hit++;
+    }
+    level.audio.powerup();
+    level.bus.emit('toast', hit ? t('🧊 Заморозка! Зомбі зупинені на 3с') : t('🧊 Крижаний вибух!'));
+    return true;
   }
 
   // ☄️ найближчий ЖИВИЙ зомбі до точки (соло/хост мають авторитетний список)

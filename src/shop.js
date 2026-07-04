@@ -27,6 +27,7 @@ export const SHOP_ITEMS = [
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'shield-hyper', icon: '⚡', name: t('Гіперзаряд: Щит'), desc: t('Постійне покращення щита: 100 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'shield', needsGadget: 'shield' },
   { id: 'heal', icon: GADGETS.heal.icon, name: GADGETS.heal.name, desc: () => GADGETS.heal.desc + t(' · перезарядка {n}с', { n: GADGETS.heal.cd }), price: GADGETS.heal.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
+  { id: 'frostgrenade', icon: GADGETS.frostgrenade.icon, name: GADGETS.frostgrenade.name, desc: () => GADGETS.frostgrenade.desc + t(' · перезарядка {n}с', { n: GADGETS.frostgrenade.cd }), price: GADGETS.frostgrenade.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'heal-hyper', icon: '⚡', name: t('Гіперзаряд: Відновлення'), desc: t('Постійне покращення відновлення: 100 HP'), price: 5000, max: 1, cat: t('Гіперзаряди'), hyper: 'heal', needsGadget: 'heal' },
   { id: 'tramp', icon: GADGETS.tramp.icon, name: GADGETS.tramp.name, desc: () => GADGETS.tramp.desc + t(' · перезарядка {n}с', { n: GADGETS.tramp.cd }), price: GADGETS.tramp.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
   { id: 'wall', icon: GADGETS.wall.icon, name: GADGETS.wall.name, desc: () => GADGETS.wall.desc + t(' · перезарядка {n}с', { n: GADGETS.wall.cd }), price: GADGETS.wall.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
@@ -81,6 +82,7 @@ export const SHOP_ITEMS = [
   { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: 'Радіація' },
   { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', pet: true },
   { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
+  { id: 'poisonpuddle', icon: GADGETS.poisonpuddle.icon, name: GADGETS.poisonpuddle.name, desc: () => GADGETS.poisonpuddle.desc + t(' · перезарядка {n}с', { n: GADGETS.poisonpuddle.cd }), price: 0, radiationPrice: 300, max: 1, cat: 'Радіація', gadget: true },
   // ☢️📜 повторюваний стік радіаційних монет: інакше після викупу разових товарів валюта мертва
   { id: 'radiationcontract', icon: '📜', name: t('Радіаційний контракт'), desc: t('Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', contract: true },
   // --- спорядження (видно на герої — клавіша V!) ---
@@ -542,6 +544,8 @@ export class Shop {
       case 'goldapple':
       case 'dash':
       case 'mine':
+      case 'frostgrenade':
+      case 'poisonpuddle':
         if (!save.gadgetsOwned.includes(id)) save.gadgetsOwned.push(id);
         if (!save.activeGadget) save.activeGadget = id;
         game.hud.toast(t('{i} {n} — твій назавжди! {k} (обрати інший — Гардероб 🎒)', { i: item.icon, n: item.name, k: keyHint('кнопка 🧰', 'Клавіша F') }));

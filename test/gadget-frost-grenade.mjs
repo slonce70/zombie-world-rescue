@@ -1,0 +1,110 @@
+import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+let failed = 0;
+const errors = [];
+const check = (ok, msg, extra = '') => {
+  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
+  if (!ok) failed++;
+};
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+
+await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 60000 });
+
+console.log('▸ Гаджет «Крижана граната»');
+const meta = await page.evaluate(async () => {
+  const { GADGETS } = await import('/src/extras.js');
+  const { SHOP_ITEMS } = await import('/src/shop.js');
+  const item = SHOP_ITEMS.find((i) => i.id === 'frostgrenade');
+  const G = GADGETS.frostgrenade;
+  return {
+    gadget: G && { cd: G.cd, price: G.price, icon: G.icon, desc: G.desc },
+    item: item && { price: item.price, max: item.max, gadget: item.gadget },
+  };
+});
+check(meta.gadget && meta.gadget.cd === 40 && meta.gadget.price === 1000 && meta.gadget.icon === '🧊',
+  'мета: 40с cd, 1000 монет, 🧊', JSON.stringify(meta.gadget));
+check(meta.item && meta.item.price === 1000 && meta.item.max === 1 && meta.item.gadget,
+  'продається як гаджет за 1000 монет', JSON.stringify(meta.item));
+
+const visible = await page.evaluate(() => {
+  const g = window.__game;
+  g.shop.open();
+  [...document.querySelectorAll('#shop-tabs .shop-tab')]
+    .find((el) => el.textContent.trim() === 'Гаджети й друзі')?.click();
+  const cards = [...document.querySelectorAll('#shop-grid .shop-item')];
+  const el = cards.find((card) => card.dataset.id === 'frostgrenade');
+  const rect = el && el.getBoundingClientRect();
+  return {
+    index: el ? cards.indexOf(el) : -1,
+    name: el?.querySelector('.shop-name')?.textContent.trim() || null,
+    price: el?.querySelector('.shop-price')?.textContent.trim() || null,
+    inViewport: !!rect && rect.top >= 0 && rect.bottom <= window.innerHeight,
+    firstIds: cards.slice(0, 8).map((card) => card.dataset.id),
+  };
+});
+check(visible.index === 2 && visible.inViewport && visible.name === 'Крижана граната' && visible.price === '1000 ₴',
+  'видима в першому ряду магазину після Відновлення', JSON.stringify(visible));
+
+const buy = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.coins = 999;
+  g.save.gadgetsOwned = g.save.gadgetsOwned.filter((id) => id !== 'frostgrenade');
+  g.save.activeGadget = null;
+  g.test.shopBuy('frostgrenade');
+  const denied = { coins: g.save.coins, owned: g.save.gadgetsOwned.includes('frostgrenade'), active: g.save.activeGadget };
+  g.save.coins = 1000;
+  g.test.shopBuy('frostgrenade');
+  const bought = { coins: g.save.coins, owned: g.save.gadgetsOwned.includes('frostgrenade'), active: g.save.activeGadget };
+  return { denied, bought };
+});
+check(buy.denied.coins === 999 && !buy.denied.owned
+  && buy.bought.coins === 0 && buy.bought.owned && buy.bought.active === 'frostgrenade',
+  'купівля списує 1000 монет, відкриває гаджет і робить його активним', JSON.stringify(buy));
+
+const effect = await page.evaluate(() => {
+  const g = window.__game;
+  if (!g.level.gadgets || !g.save.gadgetsOwned.includes('frostgrenade')) {
+    return { used: false, cd: null, nearDmg: 0, farDmg: 0, nearStun: 0, farStun: 0 };
+  }
+  const p = g.level.player;
+  for (const z of g.level.zombies.list) z.state = 'dead';
+  g.test.unlockGadget('frostgrenade');
+  g.save.activeGadget = 'frostgrenade';
+  g.test.gadgetCdReset();
+  g.test.teleport(0, 145);
+  p.yaw = 0;
+  const near = g.test.spawnZombie('tank', p.pos.x, p.pos.z - 5);
+  const far = g.test.spawnZombie('tank', p.pos.x + 8, p.pos.z - 5);
+  near.hp = near.maxHp = 1000;
+  far.hp = far.maxHp = 1000;
+  const used = g.test.useGadget();
+  return {
+    used,
+    cd: g.level.gadgets.cd,
+    nearDmg: 1000 - near.hp,
+    farDmg: 1000 - far.hp,
+    nearStun: Math.round((near.stunT || 0) * 10) / 10,
+    farStun: Math.round((far.stunT || 0) * 10) / 10,
+  };
+});
+check(effect.used && effect.cd === 40, 'гаджет спрацьовує і ставить cooldown 40с', JSON.stringify(effect));
+check(effect.nearDmg === 20 && effect.nearStun === 3,
+  'зомбі в зоні отримує 20 HP шкоди і 3с заморозки', JSON.stringify(effect));
+check(effect.farDmg === 0 && effect.farStun === 0,
+  'далекий зомбі не отримує шкоду і заморозку', JSON.stringify(effect));
+
+if (errors.length) {
+  console.log('❌ ПОМИЛКИ КОНСОЛІ:');
+  for (const e of errors.slice(0, 10)) console.log('  ', e);
+  failed += errors.length;
+}
+console.log(failed === 0 ? '🎉 КРИЖАНА ГРАНАТА ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
+await browser.close();
+closeServer();
+process.exit(failed === 0 ? 0 : 1);

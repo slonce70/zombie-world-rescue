@@ -810,10 +810,10 @@ export class Effects {
     this.burst(pos.clone().setY(pos.y + 1.2), 0xff2b2b, 34, { speed: 2.8, up: 4.2, life: 5, size: 0.62 });
   }
 
-  radiationPuddle(pos, damaging = false) {
-    this.groundGlow(pos, 0x77ff55, 3.2, 3);
-    this.burst(pos.clone().setY(pos.y + 0.4), 0x77ff55, 18, { speed: 1.4, up: 1.2, life: 3, size: 0.55 });
-    if (damaging) this.radiationPuddles.push({ x: pos.x, z: pos.z, life: 3 });
+  radiationPuddle(pos, damaging = false, life = 3) {
+    this.groundGlow(pos, 0x77ff55, 3.2, life);
+    this.burst(pos.clone().setY(pos.y + 0.4), 0x77ff55, 18, { speed: 1.4, up: 1.2, life: Math.min(life, 3), size: 0.55 });
+    if (damaging) this.radiationPuddles.push({ x: pos.x, z: pos.z, life });
   }
 
   radiationDrops(pos) {
