@@ -1,4 +1,5 @@
 import { DynamicMissions } from '../missionpool.js';
+import { t } from '../i18n.js';
 import { getCountryStory } from './countryStories.js';
 import { removeStoryNpc, spawnStoryNpc, updateStoryNpc } from './npcs.js';
 
@@ -41,15 +42,38 @@ export class StoryMissions {
   }
 
   get(id) {
-    return this.delegate.get(this._toLegacyMissionId(id));
+    const objective = this._objectiveForId(id);
+    if (objective) return this._missionView(objective);
+    return this.delegate.get(id);
   }
 
   getHudList() {
-    return this.delegate.getHudList();
+    const out = this.objectives.map((obj) => ({
+      icon: obj.icon,
+      title: this._objectiveTitle(obj),
+      done: obj.state === 'done',
+    }));
+    if (this.bossUnlocked && !this.bossStarted) {
+      out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });
+    } else if (this.bossStarted) {
+      out.push({ icon: '👑', title: t('Бій з босом!'), done: false });
+    }
+    return out;
   }
 
   getMarkers() {
-    return this.delegate.getMarkers();
+    const mk = [];
+    const active = this.objectives.find((o) => o.state === 'active');
+    if (active) {
+      for (const site of this._objectiveTargets(active)) {
+        mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
+      }
+    }
+    if (this.bossUnlocked && !this.bossStarted) {
+      const arena = this._site('arena') || (this.level.world && this.level.world.layout && this.level.world.layout.arena);
+      if (arena) mk.push({ x: arena.x, z: arena.z, color: '#ff44aa', icon: '👑' });
+    }
+    return mk;
   }
 
   update(dt, input, allowControl) {
@@ -59,12 +83,42 @@ export class StoryMissions {
   }
 
   _completeObjective(id) {
-    this._complete(id);
+    const obj = this._objectiveForId(id);
+    if (!obj) {
+      this.delegate._complete(this._toLegacyMissionId(id));
+      this._syncObjectiveStates();
+      return;
+    }
+    if (obj.state === 'done') return;
+
+    const legacyId = this._toLegacyMissionId(obj.id);
+    const legacyMission = this.delegate.get(legacyId);
+    let missionDoneEmitted = false;
+    if (legacyMission && legacyMission.state !== 'done') {
+      this.delegate._complete(legacyId);
+      missionDoneEmitted = true;
+    } else {
+      this.level.addCoins(obj.reward || 0);
+      this.level.audio.mission();
+      if (obj.horde > 0) {
+        const count = Math.round(obj.horde * ((this.level.country && this.level.country.difficulty.counts) || 1));
+        if (this.pendingHorde) this.pendingHorde.count += count;
+        else this.pendingHorde = { t: 5, count };
+        this.level.bus.emit('hordeWarning', 5);
+        this.level.netEv('hw');
+      }
+    }
+
+    obj.state = 'done';
+    const doneText = typeof obj.done === 'function' ? obj.done() : this._objectiveTitle(obj);
+    if (!missionDoneEmitted) this.level.bus.emit('missionDone', this._missionView(obj));
+    if (doneText) this.level.bus.emit('toast', doneText);
+    this._advanceObjectiveState();
+    if (this.objectives.every((o) => o.state === 'done')) this._unlockBoss();
   }
 
   _complete(id) {
-    this.delegate._complete(this._toLegacyMissionId(id));
-    this._syncObjectiveStates();
+    this._completeObjective(id);
   }
 
   dispose() {
@@ -74,10 +128,33 @@ export class StoryMissions {
   }
 
   currentStoryObjective() {
-    return this.objectives.find((o) => o.state === 'active') || null;
+    const active = this.objectives.find((o) => o.state === 'active');
+    return active ? `${active.icon} ${this._objectiveTitle(active)}` : '';
   }
 
-  get missions() { return this.delegate.missions; }
+  get missions() {
+    return LEGACY_SLOT_IDS.map((slotId, i) => {
+      const obj = this.objectives[i];
+      const legacy = this.delegate.missions[i] || {};
+      if (!obj) {
+        return {
+          ...legacy,
+          id: slotId,
+          state: this.objectives.every((o) => o.state === 'done') ? 'done' : (legacy.state || 'active'),
+        };
+      }
+      return {
+        ...legacy,
+        id: slotId,
+        type: obj.id,
+        icon: obj.icon,
+        title: this._objectiveTitle(obj),
+        reward: obj.reward || legacy.reward || 0,
+        horde: obj.horde || 0,
+        state: obj.state === 'done' ? 'done' : 'active',
+      };
+    });
+  }
   set missions(value) { this.delegate.missions = value; }
   get prompt() { return this.delegate.prompt; }
   set prompt(value) { this.delegate.prompt = value; }
@@ -100,6 +177,65 @@ export class StoryMissions {
     return id;
   }
 
+  _objectiveForId(id) {
+    if (id in LEGACY_UKR_MISSION_ALIASES) {
+      return this.objectives.find((o) => o.id === id) || null;
+    }
+    if (LEGACY_SLOT_IDS.includes(id)) {
+      return this.objectives[LEGACY_SLOT_IDS.indexOf(id)] || null;
+    }
+    return this.objectives.find((o) => o.id === id || o.slotIndex === id) || null;
+  }
+
+  _objectiveTitle(obj) {
+    return typeof obj.title === 'function' ? obj.title() : (obj.title || obj.id);
+  }
+
+  _missionView(obj) {
+    return {
+      id: obj.id,
+      type: obj.kind || obj.id,
+      slotIndex: obj.slotIndex,
+      icon: obj.icon,
+      title: this._objectiveTitle(obj),
+      reward: obj.reward || 0,
+      horde: obj.horde || 0,
+      state: obj.state,
+      site: this._objectiveTarget(obj),
+    };
+  }
+
+  _objectiveTargets(obj) {
+    const site = this._site(obj.site);
+    if (!site) return [];
+    return Array.isArray(site) ? site.filter(Boolean) : [site];
+  }
+
+  _objectiveTarget(obj) {
+    return this._objectiveTargets(obj)[0] || null;
+  }
+
+  _advanceObjectiveState() {
+    let foundNext = false;
+    for (const obj of this.objectives) {
+      if (obj.state === 'done') continue;
+      obj.state = foundNext ? 'locked' : 'active';
+      foundNext = true;
+    }
+  }
+
+  _unlockBoss() {
+    if (this.delegate.bossUnlocked) return;
+    const arena = this._site('arena') || (this.delegate.L && this.delegate.L.arena);
+    this.delegate.allDone = true;
+    this.delegate.bossUnlocked = true;
+    if (arena && !this.delegate.bossBeam) {
+      this.delegate.bossBeam = this.level.effects.makeBeam(arena.x, arena.z, 0xff44aa, '👑');
+    }
+    if (this.level.audio && this.level.audio.bossRoar) this.level.audio.bossRoar();
+    this.level.bus.emit('bossUnlocked');
+  }
+
   _site(id) {
     if (!id) return null;
     if (this.storySites && this.storySites[id]) return this.storySites[id];
@@ -110,17 +246,13 @@ export class StoryMissions {
   }
 
   _syncObjectiveStates() {
-    let foundNext = false;
     for (const obj of this.objectives) {
       const mission = this.delegate.get(this._toLegacyMissionId(obj.id));
       if (mission && mission.state === 'done') {
         obj.state = 'done';
-      } else if (!foundNext) {
-        obj.state = 'active';
-        foundNext = true;
-      } else {
-        obj.state = 'locked';
       }
     }
+    this._advanceObjectiveState();
+    if (this.objectives.every((o) => o.state === 'done')) this._unlockBoss();
   }
 }

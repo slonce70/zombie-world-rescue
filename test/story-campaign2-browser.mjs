@@ -33,6 +33,24 @@ let st = await page.evaluate(() => ({
 check(st.kind === 'StoryMissions', 'UKR solo campaign uses StoryMissions', JSON.stringify(st));
 check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense', 'UKR story objective IDs are present', JSON.stringify(st.ids));
 
+await page.evaluate(() => window.__game.test.completeStoryObjective('ukr-rescue'));
+st = await page.evaluate(() => ({
+  ids: window.__game.test.storyObjectiveIds(),
+  hud: window.__game.level.missions.getHudList().map((m) => ({ title: m.title, done: m.done })),
+  current: window.__game.level.missions.currentStoryObjective(),
+}));
+check(st.hud[0].done && /сигнал/i.test(st.current), 'UKR story advances from rescue to signal', JSON.stringify(st));
+
+await page.evaluate(() => {
+  window.__game.test.completeStoryObjective('ukr-signal');
+  window.__game.test.completeStoryObjective('ukr-defense');
+});
+st = await page.evaluate(() => ({
+  unlocked: window.__game.level.missions.bossUnlocked,
+  markers: window.__game.level.missions.getMarkers().map((m) => m.icon),
+}));
+check(st.unlocked && st.markers.includes('👑'), 'UKR story unlocks boss after final objective', JSON.stringify(st));
+
 let legacy = await page.evaluate(() => {
   try {
     return { ok: true, missions: window.__game.test.state().missions };
@@ -66,6 +84,24 @@ check(legacy.missions.every((m) => m.state === 'done'), 'exact story objective I
 await page.waitForFunction(() => window.__game.test.state().bossStarted, null, { timeout: 10000 }).catch(() => null);
 legacy = await page.evaluate(() => window.__game.test.state());
 check(legacy.bossStarted === true, 'story compatibility wrapper starts boss after UKR objectives', JSON.stringify({ bossStarted: legacy.bossStarted }));
+
+await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('POL'); });
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+st = await page.evaluate(() => ({
+  kind: window.__game.test.missionKind(),
+  ids: window.__game.test.storyObjectiveIds(),
+  marker: window.__game.level.missions.getMarkers()[0],
+}));
+check(st.kind === 'StoryMissions' && st.ids[0] === 'pol-bonfires' && st.marker.icon === '🔥', 'POL starts with bonfire story', JSON.stringify(st));
+
+await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('EGY'); });
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+st = await page.evaluate(() => ({
+  kind: window.__game.test.missionKind(),
+  ids: window.__game.test.storyObjectiveIds(),
+  marker: window.__game.level.missions.getMarkers()[0],
+}));
+check(st.kind === 'StoryMissions' && st.ids[0] === 'egy-seals' && st.marker.icon === '🪬', 'EGY starts with seal story', JSON.stringify(st));
 
 await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
