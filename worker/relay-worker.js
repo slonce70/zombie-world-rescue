@@ -271,9 +271,19 @@ export class Lobby {
   }
 
   // Ліниво піднімаємо денний топ зі storage у кеш (раз на добу / після гібернації).
+  // Single-flight: DO однопоточний, але await віддає хід — два паралельні пінги
+  // без цього читали storage удвох, і друге читання ЗАТИРАЛО в кеші рахунок,
+  // який перший пінг щойно додав (реальна втрата day-score при in-flight пінгу).
   async _loadTop3(now) {
     const day = this._dayKey(now);
-    if (this._top3Loaded && this._top3Day === day) return;
+    while (!(this._top3Loaded && this._top3Day === day)) {
+      if (this._top3Loading) { await this._top3Loading; continue; }
+      this._top3Loading = this._readTop3(day);
+      try { await this._top3Loading; } finally { this._top3Loading = null; }
+    }
+  }
+
+  async _readTop3(day) {
     const stored = await this.state.storage.get('day:' + day);
     this._top3 = Array.isArray(stored) ? stored : [];
     this._top3Day = day;
@@ -648,8 +658,11 @@ export class League {
     if (mode === 'storm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
     if (mode === 'coopstorm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
     if (mode === 'arena' && !(score >= 30000 && score <= 3600000)) return this.json({ error: 'score' }, 400);
-    // 🤝 командний режим має сенс лише коли грали ≥2 — самотній «командний» рекорд не приймаємо
-    if (TEAM_MODES.has(mode) && (!Array.isArray(d.team) || d.team.filter((n) => cleanNickSrv(n)).length < 2)) {
+    // 🤝 команда: чистимо ніки і прибираємо дублі ЩЕ ДО перевірки «грали ≥2» —
+    // ростер після реконекту може тримати той самий нік двічі, а «Влад + Влад»
+    // у таблиці виглядає як брехня. Командний рекорд = щонайменше 2 РІЗНІ ніки.
+    const teamNicks = [...new Set((Array.isArray(d.team) ? d.team : []).map(cleanNickSrv).filter(Boolean))].slice(0, 4);
+    if (TEAM_MODES.has(mode) && teamNicks.length < 2) {
       return this.json({ error: 'team' }, 400);
     }
     // анти-спам: не частіше за раз на 10с НА РЕЖИМ (шторм і арена не заважають одне одному)
@@ -659,7 +672,7 @@ export class League {
     if (now - last < 10000) return this.json({ error: 'slow' }, 429);
     this._lastSubmit.set(rlKey, now);
     if (this._lastSubmit.size > 5000) this._lastSubmit.clear();
-    const team = JSON.stringify((Array.isArray(d.team) ? d.team : []).slice(0, 4).map(cleanNickSrv));
+    const team = JSON.stringify(teamNicks);
     // тримаємо найкращий результат
     const cur = this.sql.exec(
       'SELECT score FROM entries WHERE cid = ? AND mode = ? AND country = ?', cid, mode, country

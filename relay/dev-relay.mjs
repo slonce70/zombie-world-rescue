@@ -278,11 +278,12 @@ const httpServer = createServer((req, res) => {
       const mode = String(d.mode || '');
       const country = String(d.country || '').slice(0, 4).toUpperCase();
       const score = Math.round(Number(d.score));
-      const team = (Array.isArray(d.team) ? d.team : []).slice(0, 4).map(cleanNickSrv);
+      // дедуп ніків команди (дзеркало League DO): «Влад + Влад» після реконекту — брехня
+      const team = [...new Set((Array.isArray(d.team) ? d.team : []).map(cleanNickSrv).filter(Boolean))].slice(0, 4);
       const bounds = { storm: [1, 200], coopstorm: [1, 200], arena: [30000, 3600000] }[mode];
       if (!bounds || !(score >= bounds[0] && score <= bounds[1])) return jsonRes(res, { error: 'score' }, 400);
-      // командний режим має сенс лише коли грали ≥2
-      if (mode === 'coopstorm' && team.filter((n) => n).length < 2) return jsonRes(res, { error: 'team' }, 400);
+      // командний режим має сенс лише коли грали ≥2 РІЗНІ ніки
+      if (mode === 'coopstorm' && team.length < 2) return jsonRes(res, { error: 'team' }, 400);
       const key = `${d.cid}|${mode}|${country}`;
       const cur = league.get(key);
       const better = !cur || (mode === 'arena' ? score < cur.score : score > cur.score);

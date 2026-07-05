@@ -2584,12 +2584,13 @@ class Game {
       level.knockout = new KnockoutMode(level, knockoutVariant);
       level.missions = level.knockout;
       // 🎲 «Прокачка» у Нокауті: соло-драфт на середині забігу (див. KnockoutMode.update)
-      if (!level.net) level.runBuild = new RunBuild();
+      // (level.net тут ЩЕ null — кооп визначаємо по coop-параметру, net ставиться нижче)
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isDefense) {
       level.defense = new DefenseMode(level, defenseVariant);
       level.missions = level.defense;
       // 🎲 «Прокачка» в Обороні: соло-драфт на межі хвилі (див. DefenseMode.update)
-      if (!level.net) level.runBuild = new RunBuild();
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isPvp) {
       level.pvp = new PvpMode(level, pvpVariant);
       level.missions = level.pvp;
@@ -2600,7 +2601,7 @@ class Game {
       level.portal = new PortalMode(level);
       level.missions = level.portal;
       // 🎲 «Прокачка» у Порталі: соло-драфт при закритті кожного порталу (див. PortalMode.damagePortal)
-      if (!level.net) level.runBuild = new RunBuild();
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isMaze) {
       level.maze = new MazeMode(level);
       level.missions = level.maze;
@@ -2641,7 +2642,7 @@ class Game {
       }) && !this._forceMissionSet;
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
-      if (!level.net && !isPlayground) level.runBuild = new RunBuild();
+      if (!coop && !isPlayground) level.runBuild = new RunBuild();
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -3651,14 +3652,16 @@ class Game {
     const placeEl = document.getElementById('storm-league-place');
     if (placeEl) {
       placeEl.textContent = '';
+      // дедуп ніків: після реконекту ростер може тримати той самий нік двічі —
+      // у таблиці Ліги «Влад + Влад» виглядає як брехня (воркер дедупить так само)
       const team = level.net
-        ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
+        ? [...new Set([...this.coop.session.roster.values()].map((r) => r.nick || '').filter(Boolean))]
         : [];
       submitScore(this, { mode: 'storm', country: level.countryId, score: res.wave, team }).then((r) => {
         if (r && r.me) placeEl.textContent = t('🌍 Твоє місце у світовій Лізі: #{r}', { r: r.me.rank });
       });
       // 🤝 командний рекорд шторму: ЛИШЕ хост (authority) і лише коли реально грали разом (≥2)
-      if (level.net && level.net.authority && team.filter((n) => n).length >= 2) {
+      if (level.net && level.net.authority && team.length >= 2) {
         submitScore(this, { mode: 'coopstorm', country: level.countryId, score: res.wave, team });
       }
     }

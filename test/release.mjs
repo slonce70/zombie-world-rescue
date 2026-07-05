@@ -20,6 +20,7 @@ const suite = [
   ['node', ['test/weekly-mutators.mjs']],
   ['node', ['test/draft-modes.mjs']],
   ['node', ['test/team-league.mjs']],
+  ['node', ['test/lobby-dayscore-queue.mjs']],
   ['node', ['test/shop-boxes.mjs']],
   ['node', ['test/skin-box.mjs']],
   ['node', ['test/shop-sections.mjs']],

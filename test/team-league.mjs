@@ -88,6 +88,15 @@ try {
   const olya = v2.top3.filter((e) => e.nick === 'Оля');
   check(olya.length === 1 && olya[0].score === 11, 'один запис на нік, кращий результат (Оля=11)', JSON.stringify(olya));
   check(v2.top3[0].nick === 'Оля', 'Оля тепер перша (11)', JSON.stringify(v2.top3[0]));
+
+  // ── (д) дедуп ніків команди (v282): ростер після реконекту міг дати той самий нік двічі ──
+  console.log('▸ (д) дедуп ніків команди');
+  await submit({ cid: 'cid-dedup-aaaa', nick: 'Влад', mode: 'coopstorm', country: 'POL', score: 5, team: ['Влад', 'Влад', 'Мама'] });
+  const td = await top('coopstorm', 'POL', 'cid-dedup-aaaa');
+  check(td.top.length === 1 && JSON.stringify(td.top[0].team) === JSON.stringify(['Влад', 'Мама']),
+    'дубль ніка прибрано — команда [Влад, Мама]', JSON.stringify(td.top[0] && td.top[0].team));
+  const rd = await submit({ cid: 'cid-dedup-bbbb', nick: 'Соло', mode: 'coopstorm', country: 'POL', score: 5, team: ['Соло', 'Соло'] });
+  check(rd.status === 400, '«команда» з двох ОДНАКОВИХ ніків відхилена (1 унікальний нік — не команда)', String(rd.status));
 } finally {
   relay.kill();
 }
