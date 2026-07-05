@@ -85,6 +85,9 @@ export class RescueHQ {
     h += '</div>';
     const stars = this.game.progress ? this.game.progress.prestigeStars : 0;
     h += `<div class="hq-prestige">${t('🎖️ Ранг Рятівника: {n} ⭐', { n: stars })}</div>`;
+    // 🌟 зірки за пожертви рятівнику — окремим рядком, щоб не чіпати обчислюваний престиж
+    const donStars = save.donStars || 0;
+    if (donStars > 0) h += `<div class="hq-prestige">${t('🌟 Зірки пожертв: {n}', { n: donStars })}</div>`;
     return h;
   }
 

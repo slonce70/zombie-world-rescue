@@ -14,6 +14,9 @@ export const SHOP_ITEMS = [
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   { id: 'passxp1000', icon: '⭐', name: t('1000 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 100, passXp: 1000, max: Infinity, cat: t('Ресурси') },
+  // 🌟 повторюваний стік монет: віддай монети рятівникам → отримай престиж-зірку. Ціна росте геометрично (×1.5),
+  //    тож монети живі навіть у ветерана, який викупив усі разові товари.
+  { id: 'donate', icon: '🌟', name: t('Пожертва рятівника'), desc: t('Віддай монети рятівникам — і отримай зірку Рятівника! Що більше даруєш, то дорожча наступна.'), price: (save) => Math.round(2000 * Math.pow(1.5, (save && save.donations) || 0)), max: Infinity, cat: t('Ресурси'), donate: true },
   { id: 'starterpack', icon: '🎒', name: t('Стартовий набір'), desc: t('+2 гранати, +1 ракета для базуки, +30 патронів'), price: 500, crystalPrice: 10, max: Infinity, cat: t('Набори') },
   { id: 'propack', icon: '🏆', name: t('Профі набір'), desc: t('Золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'), price: 3500, crystalPrice: 35, max: Infinity, cat: t('Набори') },
   { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
@@ -117,7 +120,8 @@ export function goalInfo(game) {
   if (!id) return null;
   const item = SHOP_ITEMS.find((i) => i.id === id);
   if (!item || !itemAvailable(item)) return null;
-  const need = item.radiationPrice || item.crystalPrice || item.price;
+  const price = typeof item.price === 'function' ? item.price(game.save) : item.price;
+  const need = item.radiationPrice || item.crystalPrice || price;
   const have = item.radiationPrice ? (game.save.radiationCoins || 0) : item.crystalPrice ? (game.save.crystals || 0) : (game.save.coins || 0);
   return { item, need, have, remaining: Math.max(0, need - have), done: have >= need };
 }
@@ -161,7 +165,13 @@ export class Shop {
   }
 
   priceOf(item) {
-    return item.price;
+    // 🌟 динамічна ціна (Пожертва рятівника росте геометрично): price може бути функцією save→число
+    return typeof item.price === 'function' ? item.price(this.game.save) : item.price;
+  }
+
+  // базова (не-динамічна) ціна для порівняння «чи є націнка 📈»: у динамічних товарів беремо поточну
+  basePriceOf(item) {
+    return typeof item.price === 'function' ? this.priceOf(item) : item.price;
   }
 
   showMegaboxReveal(reward) {
@@ -231,7 +241,7 @@ export class Shop {
       const afford = save.coins >= price && (!item.crystalPrice || (save.crystals || 0) >= item.crystalPrice)
         && (!item.radiationPrice || (save.radiationCoins || 0) >= item.radiationPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
-      const surge = price > item.price ? ' <span class="shop-surge">📈</span>' : '';
+      const surge = price > this.basePriceOf(item) ? ' <span class="shop-surge">📈</span>' : '';
       const priceLabel = (locked || lockedGadget || lockedSkin || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.crystalPrice && item.radiationPrice ? `${item.crystalPrice} 💎 + ${item.radiationPrice} ☢️`
@@ -371,6 +381,13 @@ export class Shop {
         save.weekly['W' + game._weekIndex() + ':radshop'] = true;
         save.crystals = (save.crystals || 0) + 25;
         game.hud.toast(t('📜 Контракт виконано: +25 💎! Новий — наступного тижня.'));
+        game.audio.levelUp();
+        break;
+      case 'donate':
+        // 🌟 монети вже списано вище; ростимо лічильник (від нього — нова ціна й титули) і престиж-зірку
+        save.donations = (save.donations || 0) + 1;
+        save.donStars = (save.donStars || 0) + 1;
+        game.hud.toast(t('🌟 Дякуємо, рятівнику! +1 зірка Рятівника'));
         game.audio.levelUp();
         break;
       case 'grenade': player.grenades++; break;

@@ -765,6 +765,9 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, cloudTs: 0, goal: null,
+      // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
+      // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
+      donations: 0, donStars: 0,
       // 🎁 подарунок дня зі стрик-календарем; 🗓️ ціль тижня «300 зомбі → 💎 25»
       gift: { last: '', streak: 0, week: 1 },
       weeklyGoal: { week: -1, n: 0, claimed: false },
@@ -854,6 +857,11 @@ class Game {
         out.soulLevel = Math.floor(out.soulLevel);
         if (typeof out.radiationCoins !== 'number' || !isFinite(out.radiationCoins) || out.radiationCoins < 0) out.radiationCoins = 0;
         out.radiationCoins = Math.floor(out.radiationCoins);
+        // 🌟 донації рятівнику: скінченні цілі ≥0 (зіпсоване/чуже → 0)
+        for (const k of ['donations', 'donStars']) {
+          if (typeof out[k] !== 'number' || !isFinite(out[k]) || out[k] < 0) out[k] = 0;
+          out[k] = Math.floor(out[k]);
+        }
         if (!Array.isArray(out.cloneSkins)) out.cloneSkins = [];
         out.cloneSkins = out.cloneSkins.filter((id, i, arr) => id === 'radiation' && arr.indexOf(id) === i);
         if (out.activeCloneSkin !== 'radiation' || !out.cloneSkins.includes('radiation')) out.activeCloneSkin = 'ninja';
@@ -1472,10 +1480,13 @@ class Game {
     const frac = this.progress.levelFrac();
     const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
     const prestige = this.progress.prestigeStars;
-    document.getElementById('pass-progress').innerHTML = lvl >= PASS_MAX_LEVEL
+    // 🌟 зірки за пожертви рятівнику — окремим рядком (обчислюваний престиж НЕ чіпаємо)
+    const donStars = this.save.donStars || 0;
+    const donLine = donStars > 0 ? `<br>${t('🌟 Зірки пожертв: {n}', { n: donStars })}` : '';
+    document.getElementById('pass-progress').innerHTML = (lvl >= PASS_MAX_LEVEL
       ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl }) + (prestige > 0 ? `<br>${t('🎖️ Ранг Рятівника: {n} ⭐', { n: prestige })}` : '')
       : t('⭐ Рівень {lvl} · до наступного: {a}/{b} XP', { lvl, a: Math.round(frac * need), b: need }) + `
-         <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
+         <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`) + donLine;
     let html = '';
     for (let n = 2; n <= PASS_MAX_LEVEL; n++) {
       const r = PASS_REWARDS[n];
@@ -1711,7 +1722,15 @@ class Game {
     tracerHtml += '</div>';
     let titleHtml = t('<div class="ward-section">Титули</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TITLES)) {
-      titleHtml += card(id, { icon: meta.icon, name: meta.name(), desc: meta.desc(), detail: meta.detail() }, save.titles.includes(id), save.activeTitle === id, 'title');
+      const owned = save.titles.includes(id);
+      // прогрес-бар лише для нерозблокованих титулів із «рахунковим» порогом (>1)
+      const tgt = meta.target;
+      const cur = typeof meta.current === 'function' ? meta.current(save) : 0;
+      const pct = tgt > 0 ? Math.min(100, Math.round((cur / tgt) * 100)) : 0;
+      const statHtml = (!owned && tgt > 1)
+        ? `<div class="ward-progress"><div class="ward-progress-fill" style="width:${pct}%"></div></div><div class="ward-progress-text">${cur}/${tgt}</div>`
+        : '';
+      titleHtml += card(id, { icon: meta.icon, name: meta.name(), desc: meta.desc(), detail: meta.detail(), stat: statHtml }, owned, save.activeTitle === id, 'title');
     }
     titleHtml += '</div>';
     let html = `<div class="ward-tabs">${tabs.map(([id, label]) => `<button class="shop-tab ward-tab ${this._wardrobeTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
@@ -4279,6 +4298,18 @@ class Game {
     nextBtn.style.display = solo && nextTarget(this.save.liberated) !== null ? '' : 'none';
     retryBtn.style.display = solo ? '' : 'none';
     this._showOverlay('overlay-victory');
+    // ⭐ «майже досяг»: тост про перший титул із прогресом ≥80% (раз на сесію, тротл через Set)
+    if (!this._almostTitleToasts) this._almostTitleToasts = new Set();
+    for (const [id, meta] of Object.entries(TITLES)) {
+      if (this.save.titles.includes(id)) continue;
+      if (!(meta.target > 0)) continue;
+      const cur = meta.current(this.save);
+      if (cur / meta.target < 0.8) continue;
+      if (this._almostTitleToasts.has(id)) continue;
+      this._almostTitleToasts.add(id);
+      this.hud.toast(t('⭐ Ще трохи — і титул «{n}»! {c}/{t}', { n: meta.name(), c: cur, t: meta.target }), 5);
+      break;
+    }
   }
 
   _grantInfectedWin(countryId, stats) {
