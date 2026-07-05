@@ -98,9 +98,9 @@ const glad = await page.evaluate(async () => {
   p.pos.x = ar.x; p.pos.z = ar.z;
   const z = Z.spawn('gladiator', ar.x + 16, ar.z, {});
   z.aggroed = true; z.state = 'chase';
-  return { hp: z.stats.hp, charger: z.charger, ztype: z.rig.ztype };
+  return { hp: z.maxHp, expectedHp: Math.round(175 * Z.diff.hp), charger: z.charger, ztype: z.rig.ztype };
 });
-check(glad.hp === 175 && glad.charger, `gladiator: 175 HP, charger=${glad.charger}`);
+check(glad.hp === glad.expectedHp && glad.charger, `gladiator: HP країни ${glad.hp}/${glad.expectedHp}, charger=${glad.charger}`);
 check(glad.ztype === 'gladiator', 'gladiator має власний вигляд (шолом+меч+щит)', glad.ztype);
 // gladiator мусить телеграфувати випад і виконати його (чиста лінія видимості в арені)
 const charged = await page.evaluate(async (SLOW) => {

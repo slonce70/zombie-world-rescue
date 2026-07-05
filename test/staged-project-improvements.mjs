@@ -29,8 +29,8 @@ let preview = await page.evaluate(() => ({
   chips: [...document.querySelectorAll('#country-list .country-item[data-id="UKR"] .mission-preview span')].map((el) => el.textContent.trim()),
   expected: window.__game.test.rollMissions('UKR', 1234, 0),
 }));
-check(preview.chips.length === 4, 'preview показує 3 основні місії + бонус', JSON.stringify(preview));
-check(preview.chips.some((s) => /Бонус/.test(s)), 'bonus місія позначена у preview', JSON.stringify(preview.chips));
+check(preview.chips.join('') === '🆘📡🛡️', 'preview показує story-місії України', JSON.stringify(preview));
+check(preview.expected.join(',') === 'rescue,repair,clear', 'динамічний roll для UKR лишається доступним test API', JSON.stringify(preview.expected));
 check(JSON.stringify(preview.missionRuns) === '{}', 'preview не змінює actual missionRuns', JSON.stringify(preview.missionRuns));
 
 console.log('▸ Solo mode registry routes every visible mode');
