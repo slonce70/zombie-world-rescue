@@ -158,8 +158,10 @@ export class DefenseMode {
     }
     if (!this.over && this.towerHp <= 0) this.level.game._endDefenseRun(false);
     if (!this.over && this.remaining() <= 0) {
-      if (this.wave < this.waveTotal) this._spawnWave(this.wave);
-      else {
+      if (this.wave < this.waveTotal) {
+        this.level.game._maybeModeDraft(this.level); // 🎲 драфт на межі хвилі (соло)
+        this._spawnWave(this.wave);
+      } else {
         this.completed = true;
         this.level.game._endDefenseRun(true);
       }

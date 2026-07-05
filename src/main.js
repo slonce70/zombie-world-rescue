@@ -2583,9 +2583,13 @@ class Game {
     if (isKnockout) {
       level.knockout = new KnockoutMode(level, knockoutVariant);
       level.missions = level.knockout;
+      // 🎲 «Прокачка» у Нокауті: соло-драфт на середині забігу (див. KnockoutMode.update)
+      if (!level.net) level.runBuild = new RunBuild();
     } else if (isDefense) {
       level.defense = new DefenseMode(level, defenseVariant);
       level.missions = level.defense;
+      // 🎲 «Прокачка» в Обороні: соло-драфт на межі хвилі (див. DefenseMode.update)
+      if (!level.net) level.runBuild = new RunBuild();
     } else if (isPvp) {
       level.pvp = new PvpMode(level, pvpVariant);
       level.missions = level.pvp;
@@ -2595,6 +2599,8 @@ class Game {
     } else if (isPortal) {
       level.portal = new PortalMode(level);
       level.missions = level.portal;
+      // 🎲 «Прокачка» у Порталі: соло-драфт при закритті кожного порталу (див. PortalMode.damagePortal)
+      if (!level.net) level.runBuild = new RunBuild();
     } else if (isMaze) {
       level.maze = new MazeMode(level);
       level.missions = level.maze;
@@ -3720,6 +3726,17 @@ class Game {
       ${best ? `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>` : ''}
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>`;
     this._showOverlay('overlay-arena-end');
+  }
+
+  // 🎲 Драфт «Прокачки» на межі хвилі в аренних режимах (Нокаут/Оборона/Портал).
+  // Лише соло (!level.net), живий гравець, режим не завершено. У ?test вимкнено тим самим
+  // гейтом, що й кампанія (main.js missionDone): вмикається лише з &draft — інакше
+  // оверлей заморозив би цикл гри у тестах режимів (knockout.mjs/defense.mjs).
+  _maybeModeDraft(level) {
+    if (!level || level.net || !level.runBuild || !this.draft || this.draft.isOpen) return;
+    if (this.victoryShown || level.player.health <= 0) return;
+    if (this.testMode && !this.params.has('draft')) return;
+    this.draft.open();
   }
 
   _endKnockoutRun(won = true) {
