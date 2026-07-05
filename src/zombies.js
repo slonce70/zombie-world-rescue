@@ -1192,6 +1192,11 @@ export class Zombies {
   // 1-2 вампіри навколо гравця, доки живих < cap. Удень нові НЕ спавняться; таймер скидаємо на світанку.
   _spawnNightVampires(dt, players) {
     const level = this.level;
+    // 🚪 кімнатні режими спавнять зомбі самі (пачки/ліміти) — амбієнтний вампір
+    // там ламає баланс і лічильники (мутатор «ніч» v280 форсить nightK з t=0)
+    if (level.knockout || level.defense || level.pvp || level.bank || level.portal
+      || level.maze || level.humans || level.soulCollector || level.turretwar
+      || level.radiation || level.worldBoss || level.bossRush) return;
     const isNight = (level.nightK || 0) > 0.5;
     if (isNight && this._allowVampire) {
       const VAMP_CAP = 6;

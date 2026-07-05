@@ -3395,11 +3395,15 @@ class Game {
   _refreshWeeklyGoalUI() {
     const el = document.getElementById('weekly-goal');
     if (!el) return;
-    const wg = this.save.weeklyGoal || { n: 0, claimed: false };
-    const n = Math.min(300, wg.n | 0);
+    const wg = this._sanitizeWeeklyGoal(this.save.weeklyGoal || { week: -1, n: 0, claimed: false });
+    // reset тижня ледачий (перший кіл у _bumpWeeklyGoal) — але ГЛОБУС не сміє
+    // показувати торішнє «✅ 300/300» у понеділок: новий тиждень = чистий 0/300
+    const stale = this._weekIndex() > wg.week;
+    const claimed = !stale && wg.claimed;
+    const n = stale ? 0 : Math.min(300, wg.n | 0);
     const label = el.querySelector('.wg-label');
     const fill = el.querySelector('.wg-fill');
-    if (wg.claimed) {
+    if (claimed) {
       if (label) label.textContent = t('✅ Ціль тижня: 300/300 · 💎 +25');
       if (fill) fill.style.width = '100%';
     } else {
@@ -3694,6 +3698,7 @@ class Game {
       level.netEv('arenaend');
       level.net.flushEvents();
     }
+    if (res.completed && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і на арені босів
     const retryBtn = document.getElementById('btn-arena-retry');
     if (retryBtn) retryBtn.style.display = level.net ? 'none' : '';
     if (res.completed) this.audio.victory();
@@ -3758,6 +3763,8 @@ class Game {
     const res = level.knockout.results();
     level.knockout.over = true;
     this._grantWeeklyCoop(level, !!won);
+    // 🤝 v279-бонус «за перемогу разом» — у ВСІХ кооп-перемогах, не лише в кампанії
+    if (won && level.net) this._grantCoopWin();
     level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
@@ -3817,6 +3824,7 @@ class Game {
     // 🌐 кооп: фінал вирішує хост і сповіщає гостей (дзеркало stormend)
     if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
     level.defense.completed = !!won;
     const res = level.defense.results();
     level.defense.over = true;
@@ -3866,6 +3874,7 @@ class Game {
     // 🌐 кооп: бій веде хост (update гостя дзеркальний) — фінал сповіщаємо подією (патерн dfend)
     if (level.net && level.net.authority) level.netEv('twend', won ? 1 : 0, reason);
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в турельній війні
     level.turretwar.completed = !!won;
     const res = level.turretwar.results();
     level.turretwar.over = true;
@@ -4165,6 +4174,7 @@ class Game {
     if (!level || !level.radiation || level.radiation.over) return;
     // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн нокауту)
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в радіації
     level.radiation.completed = !!won;
     const res = level.radiation.results();
     level.radiation.over = true;

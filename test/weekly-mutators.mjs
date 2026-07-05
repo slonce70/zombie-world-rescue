@@ -115,6 +115,19 @@ check(!!night.weeklyMutator && night.weeklyMutator.night === true, 'weeklyMutato
 check(night.nightK >= 0.75, 'night форсить nightK >= 0.75 у bank', JSON.stringify(night));
 check(night.eventToasts.length === 1, 'подієвий тост показано рівно один раз', JSON.stringify(night.eventToasts));
 
+// 🧛 v282: форс ночі НЕ вмикає амбієнтного спавнера вампірів у кімнатних режимах —
+// пачки/ліміти там свої, зайвий вампір ламає баланс дитині
+const vamp = await page.evaluate(() => {
+  const g = window.__game;
+  const z = g.level.zombies;
+  const before = z.list.filter((x) => x.type === 'vampire').length;
+  z._vampT = 0; // таймер «дозрів» — спавн мав би статись цього ж виклику
+  z._spawnNightVampires(1, [g.level.player]);
+  const after = z.list.filter((x) => x.type === 'vampire').length;
+  return { before, after, nightK: g.level.nightK };
+});
+check(vamp.after === vamp.before, 'вампіри НЕ спавняться у кімнатному режимі попри ніч', JSON.stringify(vamp));
+
 console.log('▸ guard: unknown/playground/coop не отримують weeklyMutator');
 const guards = await page.evaluate(() => {
   const g = window.__game;

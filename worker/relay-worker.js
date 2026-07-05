@@ -304,8 +304,12 @@ export class Lobby {
     const cleaned = cleanNickSrv(nick);
     const sc = this._safeInt(score, 1, 200); // штормова хвиля: та сама стеля, що й у Лізі
     if (!cleaned) return;
-    const list = this._top3.filter((e) => e.nick !== cleaned); // один запис на нік — кращий
-    list.push({ nick: cleaned, score: sc });
+    // один запис на нік — КРАЩИЙ: клієнт шле результат після кожного забігу,
+    // слабший пізніший забіг не сміє затерти ранковий рекорд
+    const prev = this._top3.find((e) => e.nick === cleaned);
+    const best = prev ? Math.max(prev.score, sc) : sc;
+    const list = this._top3.filter((e) => e.nick !== cleaned);
+    list.push({ nick: cleaned, score: best });
     list.sort((a, b) => b.score - a.score);
     this._top3 = list.slice(0, 3);
     this._top3Day = day;

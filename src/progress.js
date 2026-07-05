@@ -577,7 +577,9 @@ export class DailyGift {
     const last = this.game.save.gift.last;
     if (last && /^\d{4}-\d{2}-\d{2}$/.test(last)) {
       const days = (new Date(last + 'T00:00:00') - new Date(key + 'T00:00:00')) / 86400000;
-      if (days > 7) this.game.save.gift.last = '';
+      // NaN-safe: неможлива «валідна за regex» дата (2026-99-99) дає Invalid Date → NaN,
+      // а лексикографічно key > last стало б true аж наступного року — теж лікуємо
+      if (!(days <= 7)) this.game.save.gift.last = '';
     }
     return key > this.game.save.gift.last;
   }

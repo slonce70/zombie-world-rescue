@@ -55,8 +55,11 @@ function recordDayScore(now, nick, score) {
   const cleaned = cleanNickSrv(nick);
   const sc = safeInt(score, 1, 200);
   if (!cleaned) return;
+  // один запис на нік — КРАЩИЙ (дзеркало Lobby DO): слабший забіг не затирає рекорд
+  const prev = lobbyTop3.find((e) => e.nick === cleaned);
+  const best = prev ? Math.max(prev.score, sc) : sc;
   const list = lobbyTop3.filter((e) => e.nick !== cleaned);
-  list.push({ nick: cleaned, score: sc });
+  list.push({ nick: cleaned, score: best });
   list.sort((a, b) => b.score - a.score);
   lobbyTop3 = list.slice(0, 3);
 }

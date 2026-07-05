@@ -57,6 +57,7 @@ export class DefenseMode {
     this.spawnT = this.zone ? 0 : Infinity;
     this.completed = false;
     this.over = false;
+    this._draftFired = false; // 🎲 драфт «Прокачки» — раз за забіг (соло)
     this.prompt = null;
     this.missions = [];
     this.civilians = [];
@@ -157,6 +158,14 @@ export class DefenseMode {
       this._damagePlayerIfClose(z, dt);
     }
     if (!this.over && this.towerHp <= 0) this.level.game._endDefenseRun(false);
+    // 🎲 звичайна Оборона має ОДНУ хвилю — межі хвиль нема, тож драфт на середині
+    // пачки (як у Нокауті); spawned>0 — інакше спрацює на першому кадрі ДО спавну.
+    // Багатохвильові варіанти беруть драфт на межі хвиль нижче.
+    if (!this.over && !this._draftFired && this.waveTotal === 1 && this.target > 0 && this.spawned > 0
+        && this.remaining() <= Math.floor(this.target / 2)) {
+      this._draftFired = true;
+      this.level.game._maybeModeDraft(this.level);
+    }
     if (!this.over && this.remaining() <= 0) {
       if (this.wave < this.waveTotal) {
         this.level.game._maybeModeDraft(this.level); // 🎲 драфт на межі хвилі (соло)
@@ -171,6 +180,11 @@ export class DefenseMode {
   _updateZone(dt) {
     this._clampActor(this.level.player);
     this.timer -= dt;
+    // 🎲 драфт у зоні: на середині часу (хвиль-меж тут нема — таймерні пачки)
+    if (!this.over && !this._draftFired && this.cfg.duration && this.timer <= this.cfg.duration / 2) {
+      this._draftFired = true;
+      this.level.game._maybeModeDraft(this.level);
+    }
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
       this._spawnZoneWave();

@@ -88,6 +88,10 @@ try {
   const olya = v2.top3.filter((e) => e.nick === 'Оля');
   check(olya.length === 1 && olya[0].score === 11, 'один запис на нік, кращий результат (Оля=11)', JSON.stringify(olya));
   check(v2.top3[0].nick === 'Оля', 'Оля тепер перша (11)', JSON.stringify(v2.top3[0]));
+  // слабший ПІЗНІШИЙ забіг не затирає рекорд дня (v282: «кращий», не «останній»)
+  const v2b = await ping({ cid: 'cid-day-1111', nick: 'Оля', day: { nick: 'Оля', score: 2 } });
+  const olyaAfter = v2b.top3.filter((e) => e.nick === 'Оля');
+  check(olyaAfter.length === 1 && olyaAfter[0].score === 11, 'слабший забіг (2) НЕ затер рекорд Олі (11)', JSON.stringify(olyaAfter));
 
   // ── (д) дедуп ніків команди (v282): ростер після реконекту міг дати той самий нік двічі ──
   console.log('▸ (д) дедуп ніків команди');

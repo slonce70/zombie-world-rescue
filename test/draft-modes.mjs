@@ -146,6 +146,49 @@ const portalPick = await page.evaluate(() => {
 check(!portalPick.open && portalPick.picks === 1 && portalPick.changed, 'Портал: pick застосувався і закрив драфт', JSON.stringify(portalPick));
 check(portalPick.closed === 1, 'Портал: один портал лишається закритим після драфту', JSON.stringify(portalPick));
 
+// ─── ОБОРОНА (звичайна, 1 хвиля): драфт на середині пачки (v282) ───
+console.log('▸ Оборона (звичайна): драфт на середині пачки');
+await startMode('startDefense', 'defense', 'рівень Оборона (звичайна)');
+const nd = await page.evaluate(() => ({
+  waves: window.__game.level.defense.waveTotal,
+  target: window.__game.level.defense.target,
+  open: window.__game.draft.isOpen,
+}));
+check(nd.waves === 1, 'звичайна Оборона має 1 хвилю', JSON.stringify(nd));
+if (nd.open) await page.evaluate(() => window.__game.draft.pick(0)); // стартовий бордер-драфт (як у overloaded)
+await page.evaluate(() => {
+  const g = window.__game;
+  let toKill = Math.ceil(g.level.defense.target / 2) + 1;
+  for (const z of [...g.level.zombies.list]) {
+    if (toKill <= 0) break;
+    if (z.defense && z.state !== 'dead') { z.damage(99999, null, false); toKill--; }
+  }
+});
+const ndDraft = await waitFor(page, async () => (await page.evaluate(() => window.__game.draft.isOpen)), 8000 * SLOW, 'драфт звичайної Оборони');
+check(ndDraft, 'звичайна Оборона: драфт відкрився на середині пачки');
+const ndPick = await page.evaluate(() => {
+  const g = window.__game;
+  g.draft.pick(0);
+  return { open: g.draft.isOpen, picks: g.level.runBuild.picks.length };
+});
+check(!ndPick.open && ndPick.picks >= 1, 'звичайна Оборона: pick застосувався і закрив драфт', JSON.stringify(ndPick));
+
+// ─── ОБОРОНА В ЗОНІ: драфт на половині часу (v282) ───
+console.log('▸ Оборона в зоні: драфт на половині часу');
+await startMode('startZoneDefense', 'defense', 'рівень Оборона в зоні');
+await page.evaluate(() => {
+  const d = window.__game.level.defense;
+  d.timer = d.cfg.duration / 2 - 0.5; // перемотуємо на середину
+});
+const zdDraft = await waitFor(page, async () => (await page.evaluate(() => window.__game.draft.isOpen)), 8000 * SLOW, 'драфт зони');
+check(zdDraft, 'зона: драфт відкрився на половині часу');
+const zdPick = await page.evaluate(() => {
+  const g = window.__game;
+  g.draft.pick(0);
+  return { open: g.draft.isOpen, picks: g.level.runBuild.picks.length };
+});
+check(!zdPick.open && zdPick.picks >= 1, 'зона: pick застосувався і закрив драфт', JSON.stringify(zdPick));
+
 // ─── Пул ~24 картки + крос-тегова синергія «Універсал» ───
 console.log('▸ Пул і крос-тегова синергія');
 const poolInfo = await page.evaluate(async () => {
