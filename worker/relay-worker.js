@@ -253,12 +253,53 @@ export class Lobby {
     // цього досить. Точність через storage (seen:<day>:<cid>) — якщо колись знадобиться.
     this.day = '';
     this.todaySet = new Set();
+    // 🏆 «топ-3 сьогодні»: денний список кращих штормових результатів. Живе у DO storage
+    // (ключ day:<UTC-дата>), щоб пережити гібернацію; у памʼяті — гарячий кеш для швидкого _view.
+    this._top3 = [];        // [{nick, score}] відсортовано за спаданням
+    this._top3Day = '';     // яку добу тримає кеш
+    this._top3Loaded = false;
+  }
+
+  _dayKey(now) {
+    return new Date(now).toISOString().slice(0, 10);
   }
 
   _recordToday(now, cid) {
-    const day = new Date(now).toISOString().slice(0, 10);
+    const day = this._dayKey(now);
     if (day !== this.day) { this.day = day; this.todaySet = new Set(); }
     if (cid && this.todaySet.size < 100000) this.todaySet.add(cid);
+  }
+
+  // Ліниво піднімаємо денний топ зі storage у кеш (раз на добу / після гібернації).
+  async _loadTop3(now) {
+    const day = this._dayKey(now);
+    if (this._top3Loaded && this._top3Day === day) return;
+    const stored = await this.state.storage.get('day:' + day);
+    this._top3 = Array.isArray(stored) ? stored : [];
+    this._top3Day = day;
+    this._top3Loaded = true;
+    // прибираємо вчорашні ключі, щоб storage не ріс нескінченно
+    const old = await this.state.storage.list({ prefix: 'day:' });
+    const stale = [];
+    for (const key of old.keys()) if (key !== 'day:' + day) stale.push(key);
+    if (stale.length) await this.state.storage.delete(stale);
+  }
+
+  // Приймаємо «денний результат» {nick, score} і тримаємо топ-3 за сьогодні у storage.
+  async _recordDayScore(now, nick, score) {
+    await this._loadTop3(now);
+    const day = this._dayKey(now);
+    // ігноруємо відсутній/сміттєвий скор — інакше _safeInt дав би підлогу 1 і засмітив топ
+    if (!Number.isFinite(Number(score)) || Number(score) < 1) return;
+    const cleaned = cleanNickSrv(nick);
+    const sc = this._safeInt(score, 1, 200); // штормова хвиля: та сама стеля, що й у Лізі
+    if (!cleaned) return;
+    const list = this._top3.filter((e) => e.nick !== cleaned); // один запис на нік — кращий
+    list.push({ nick: cleaned, score: sc });
+    list.sort((a, b) => b.score - a.score);
+    this._top3 = list.slice(0, 3);
+    this._top3Day = day;
+    await this.state.storage.put('day:' + day, this._top3);
   }
 
   // нормальний клієнт пінгує раз на ~8с; 30/10с з однієї IP — щедрий запас, але стеля проти флуду
@@ -319,7 +360,7 @@ export class Lobby {
         code, host: r.host, mode: r.mode, country: r.country,
         n: r.n, state: r.state, build: r.build,
       }));
-    return { online: this.players.size, today: this.todaySet.size, players, profiles, rooms };
+    return { online: this.players.size, today: this.todaySet.size, top3: this._top3, players, profiles, rooms };
   }
 
   json(obj, status = 200) {
@@ -336,7 +377,7 @@ export class Lobby {
       return this.json({ error: 'big' }, 413);
     }
     try {
-      if (url.pathname === '/lobby/state') return this.json(this._view(now));
+      if (url.pathname === '/lobby/state') { await this._loadTop3(now); return this.json(this._view(now)); }
       if (url.pathname === '/lobby/ping' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         if (!this._pingAllowed(ip)) return this.json({ error: 'rate' }, 429);
@@ -349,6 +390,9 @@ export class Lobby {
         this.players.set(cid, { nick, ts: now });
         this.profiles.set(cid, this._cleanProfile(nick, d.profile, now));
         this._recordToday(now, cid); // 📅 рахуємо унікального гравця за сьогодні
+        // 🏆 денний результат для «топ-3 сьогодні» (клієнт шле свій кращий штормовий за сьогодні)
+        if (d.day && typeof d.day === 'object') await this._recordDayScore(now, d.day.nick || nick, d.day.score);
+        else await this._loadTop3(now); // однаково піднімаємо кеш, щоб _view повернув свіжий top3
         if (this.players.size > 500) this._prune(now);
         // хост закрив кімнату — прибираємо одразу, не чекаючи TTL
         if (d.close) {
@@ -527,7 +571,9 @@ export class SaveVault {
 // 🏆 Ліга рекордів: один DO на весь світ, SQLite-таблиця рекордів.
 // Кращий результат на гравця (cid) у кожному режимі+країні.
 // ============================================================
-const MODES = { storm: 'desc', arena: 'asc' }; // як сортувати score
+const MODES = { storm: 'desc', arena: 'asc', coopstorm: 'desc' }; // як сортувати score
+// 🤝 командні режими: запис показуємо лише коли реально грали разом (team ≥ 2)
+const TEAM_MODES = new Set(['coopstorm']);
 
 export class League {
   constructor(state, env) {
@@ -600,7 +646,12 @@ export class League {
     }
     // здоровий глузд: шторм — хвилі, арена — мілісекунди
     if (mode === 'storm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
+    if (mode === 'coopstorm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
     if (mode === 'arena' && !(score >= 30000 && score <= 3600000)) return this.json({ error: 'score' }, 400);
+    // 🤝 командний режим має сенс лише коли грали ≥2 — самотній «командний» рекорд не приймаємо
+    if (TEAM_MODES.has(mode) && (!Array.isArray(d.team) || d.team.filter((n) => cleanNickSrv(n)).length < 2)) {
+      return this.json({ error: 'team' }, 400);
+    }
     // анти-спам: не частіше за раз на 10с НА РЕЖИМ (шторм і арена не заважають одне одному)
     const now = Date.now();
     const rlKey = `${cid}|${mode}|${country}`;

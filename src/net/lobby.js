@@ -37,6 +37,13 @@ export class LobbyClient {
   // кімнату закрито — прибрати зі списку, не чекаючи TTL
   announceClose(code) { this._ping({ close: code }); }
 
+  // 🏆 «топ-3 сьогодні»: шлемо свій штормовий результат у денний рейтинг лобі.
+  // Разовий пінг поза розкладом — навіть якщо панель зараз не пінгує (кінець забігу).
+  announceDayScore(wave) {
+    const score = Math.max(1, Math.min(200, wave | 0));
+    this._ping({ day: { nick: cleanNick(loadNick()) || t('Гравець'), score } });
+  }
+
   async _ping(extra = {}) {
     if (this._busy) return;
     this._busy = true;

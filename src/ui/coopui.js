@@ -43,6 +43,7 @@ export class CoopUI {
       pub: $('coop-public'),
       onlineN: $('coop-online-n'),
       todayN: $('coop-today-n'),
+      top3: $('coop-top3'),
       rooms: $('coop-rooms'),
       players: $('coop-players'),
       lobby: $('overlay-lobby'),
@@ -319,12 +320,30 @@ export class CoopUI {
     if (!d) {
       this.el.onlineN.textContent = '—';
       if (this.el.todayN) this.el.todayN.textContent = '—';
+      if (this.el.top3) this.el.top3.innerHTML = '';
       this.el.rooms.innerHTML = t('<div class="coop-side-empty">📡 Сервер недоступний — перевір інтернет</div>');
       this.el.players.innerHTML = '';
       return;
     }
     this.el.onlineN.textContent = d.online;
     if (this.el.todayN) this.el.todayN.textContent = d.today != null ? d.today : '—';
+
+    // 🏆 «Сьогодні найкращі»: топ-3 штормових результатів за добу
+    if (this.el.top3) {
+      const top3 = Array.isArray(d.top3) ? d.top3 : [];
+      if (top3.length) {
+        const medal = ['🥇', '🥈', '🥉'];
+        let th = `<div class="coop-side-title">${t('🏆 Сьогодні найкращі')}</div>`;
+        top3.forEach((e, i) => {
+          th += `<div class="coop-top3-row"><span class="ct3-medal">${medal[i] || `${i + 1}.`}</span>`
+            + `<span class="ct3-nick">${esc(e.nick)}</span>`
+            + `<span class="ct3-score">${t('хвиля {s}', { s: e.score | 0 })}</span></div>`;
+        });
+        this.el.top3.innerHTML = th;
+      } else {
+        this.el.top3.innerHTML = '';
+      }
+    }
 
     // кімнати: лише сумісні з нашою версією і не наша власна
     const build = window.__APP_VERSION;
