@@ -3490,6 +3490,9 @@ class Game {
 
   _buildWeeklyMutator(id, { coop = null, isPlayground = false } = {}) {
     if (coop || isPlayground) return null;
+    // у тестах мутатор їде від РЕАЛЬНОГО календаря → батарея зелена/червона залежно від тижня;
+    // тому в ?test він вимкнений, опт-ін через ?weekmod (той самий патерн, що ?draft для драфту)
+    if (this.testMode && !this.params.has('weekmod')) return null;
     const mod = this._modifierById(id);
     if (!mod) return null;
     const hpMul = (mod.zMul && mod.zMul.hp) || 1;

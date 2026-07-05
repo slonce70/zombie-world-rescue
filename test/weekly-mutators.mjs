@@ -42,7 +42,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
-await page.goto(`${BASE}/?test&fresh&seed=7`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/?test&fresh&seed=7&weekmod`, { waitUntil: 'domcontentloaded' });
 await waitFor(page, async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'globe', 30000 * SLOW, 'глобус');
 
 console.log('▸ tough: HP множиться у кімнатному solo-режимі');
@@ -127,6 +127,23 @@ const guards = await page.evaluate(() => {
 });
 check(guards.hasBuilder, '_buildWeeklyMutator доступний для чесного unit-гарда', JSON.stringify(guards));
 check(guards.unknown === null && guards.playground === null && guards.coop === null, 'unknown/playground/coop резолвляться у null', JSON.stringify(guards));
+
+console.log('▸ testMode-гейт: без ?weekmod мутатор у ?test вимкнений (батарея не залежить від реального тижня)');
+const gatePage = await ctx.newPage();
+gatePage.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+await gatePage.goto(`${BASE}/?test&fresh&seed=7`, { waitUntil: 'domcontentloaded' });
+await waitFor(gatePage, async () => (await gatePage.evaluate(() => window.__game && window.__game.state)) === 'globe', 30000 * SLOW, 'глобус без weekmod');
+await gatePage.evaluate(() => {
+  const g = window.__game;
+  g.weeklyModifierId = () => 'tough';
+  g.test.startBank();
+});
+await waitFor(gatePage, async () => (
+  await gatePage.evaluate(() => window.__game.state === 'level' && !!window.__game.level && !!window.__game.level.bank)
+), 30000 * SLOW, 'банк без weekmod');
+const gated = await gatePage.evaluate(() => window.__game.level.weeklyMutator);
+check(gated === null || gated === undefined, 'у ?test без ?weekmod level.weeklyMutator не ставиться', JSON.stringify(gated));
+await gatePage.close();
 
 console.log('▸ JS-помилки');
 check(errors.length === 0, 'немає pageerror/console error', errors.slice(0, 10).join('\n'));
