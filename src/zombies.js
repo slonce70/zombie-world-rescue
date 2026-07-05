@@ -1,6 +1,6 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
-import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, updateRig, setAnim, toonMat } from './characters.js';
+import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, updateRig, setAnim, toonMat, disposeRigSkeleton } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
 import { t } from './i18n.js';
@@ -467,6 +467,7 @@ export class Zombies {
         zb.gone = true;
         if (zb.horde) this.hordeRemaining--;
         this.scene.remove(zb.rig.group);
+        disposeRigSkeleton(zb.rig); // звільняємо per-клон boneTexture (геометрія/матеріал спільні — не чіпаємо)
         this.byNidMap.delete(zb.nid);
         this.level.netEv('zg', zb.nid);
       }
@@ -868,6 +869,7 @@ export class Zombies {
           // лише бос: ріг свіжий (makeBoss), геометрія per-instance. Звичайні зомбі
           // клонуються з кешу (cloneRig ділить mg за посиланням) — диспоз зламав би сіблінгів.
           if (z.type === 'boss') disposeObject(rig.group);
+          else disposeRigSkeleton(rig); // звичайний зомбі: геометрія/матеріал спільні, але Skeleton/boneTexture — per-клон
           this.byNidMap.delete(z.nid);
         }
         continue;
@@ -1714,6 +1716,7 @@ export class Zombies {
     z.gone = true;
     this.scene.remove(z.rig.group);
     if (z.type === 'boss') disposeObject(z.rig.group); // бос per-instance; звичайні — спільний кеш
+    else disposeRigSkeleton(z.rig); // per-клон Skeleton/boneTexture
     this.byNidMap.delete(nid);
     if (this.boss === z) this.boss = null;
     this.list = this.list.filter((zb) => zb !== z);
@@ -1795,6 +1798,7 @@ export class Zombies {
     for (const z of this.list) {
       this.scene.remove(z.rig.group);
       if (z.type === 'boss') disposeObject(z.rig.group); // бос per-instance; звичайні — спільний кеш
+      else disposeRigSkeleton(z.rig); // per-клон Skeleton/boneTexture
     }
     this.list = [];
     this.byNidMap.clear();
@@ -1821,6 +1825,7 @@ export class Zombies {
           // лише бос: ріг свіжий (makeBoss), геометрія per-instance. Звичайні зомбі
           // клонуються з кешу (cloneRig ділить mg за посиланням) — диспоз зламав би сіблінгів.
           if (z.type === 'boss') disposeObject(rig.group);
+          else disposeRigSkeleton(rig); // звичайний зомбі: геометрія/матеріал спільні, але Skeleton/boneTexture — per-клон
           this.byNidMap.delete(z.nid);
         }
         continue;

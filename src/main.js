@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 283;
+const APP_VERSION = 284;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3163,6 +3163,9 @@ class Game {
             m.dispose();
           });
         }
+        // SkinnedMesh: Skeleton — завжди per-клон (навіть коли geometry/material спільні,
+        // див. characters.js cloneRig), тож boneTexture DataTexture тут ще не звільнено вище.
+        if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose();
       });
       this.renderer.renderLists.dispose();
     }

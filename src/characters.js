@@ -1,7 +1,7 @@
 // Процедурні мультяшні персонажі (стиль Fortnite-lite) + анімації
 import * as THREE from 'three';
 import { t } from './i18n.js';
-import { toonMat, cachedGeo, capsule, sphere, box, cone, cylinder, bakeGroupMeshes } from './renderkit.js';
+import { toonMat, cachedGeo, capsule, sphere, box, cone, cylinder, bakeGroupMeshes, bakeGroupGeometry, getBakedMat } from './renderkit.js';
 import { lerp } from './utils.js';
 export { toonMat, bakeGroupMeshes } from './renderkit.js';
 
@@ -26,6 +26,162 @@ export function bakeRig(rig, castAll = false) {
   return rig;
 }
 
+// Порядок кісток у скелеті: корінь body (0) + 6 частин. Індекс = skinIndex вершин частини.
+const BONE_NAMES = ['body', 'legL', 'legR', 'armL', 'armR', 'torso', 'head'];
+
+// Конвертує Group у Bone НА МІСЦІ: створює Bone, копіює name/transform, переносить дітей,
+// підміняє у батька та у переданих посиланнях. Повертає нову кістку.
+// Bone extends Object3D, тож updateRig (мутує rotation/position/scale) працює без змін.
+function groupToBone(grp) {
+  const bone = new THREE.Bone();
+  bone.name = grp.name;
+  bone.position.copy(grp.position);
+  bone.quaternion.copy(grp.quaternion);
+  bone.scale.copy(grp.scale);
+  // перенести дітей (меші/під-групи), зберігаючи порядок
+  while (grp.children.length) bone.add(grp.children[0]);
+  const parent = grp.parent;
+  if (parent) {
+    const idx = parent.children.indexOf(grp);
+    parent.remove(grp);
+    parent.add(bone);
+    // add() штовхнув у кінець — повернути на місце, щоб ієрархія/порядок не з'їхали
+    if (idx >= 0 && idx < parent.children.length - 1) {
+      parent.children.splice(parent.children.indexOf(bone), 1);
+      parent.children.splice(idx, 0, bone);
+    }
+  }
+  return bone;
+}
+
+// Запікає весь риг у ОДИН SkinnedMesh (1 main + 1 shadow call на зомбі).
+// Скелет: body(root) + 6 кісток-частин, які І Є вузлами rig.body/rig.parts[key].
+// Rigid-bind: кожна вершина частини повністю належить своїй кістці (weight=[1,0,0,0]).
+// Геометрія печеться у ПРОСТОРІ group (root-local, bind-поза), boneInverses з тієї ж пози —
+// статичний зомбі ідентичний до-скінінговому, анімований рухає частинами так само.
+export function bakeRigSkinned(rig) {
+  const outline = 0.028 / Math.max(0.7, rig.spec ? rig.spec.scale : 1);
+  const group = rig.group;
+  const body = rig.body;
+
+  // 1) конвертувати body + частини у Bone на місці (до випікання геометрії — трансформи ті самі)
+  const newBody = groupToBone(body);
+  rig.body = newBody;
+  for (const key of PART_NAMES) {
+    const b = groupToBone(rig.parts[key]);
+    rig.parts[key] = b;
+  }
+  // мапа ім'я→кістка у канонічному порядку BONE_NAMES
+  const boneByName = { body: rig.body };
+  for (const key of PART_NAMES) boneByName[key] = rig.parts[key];
+  const bones = BONE_NAMES.map((n) => boneByName[n]);
+  const boneIndex = {};
+  BONE_NAMES.forEach((n, i) => { boneIndex[n] = i; });
+
+  // 2) актуалізувати локальні матриці кісток (bind-поза) для випікання у group-простір
+  newBody.updateMatrix();
+  for (const key of PART_NAMES) rig.parts[key].updateMatrix();
+
+  // 3) зібрати геометрію: кожну частину печемо у part-local, підіймаємо у group-простір
+  //    матрицею (body.matrix · part.matrix), нормалі — normalMatrix. skinIndex = кістка частини.
+  const chunks = [];
+  const bindMat = new THREE.Matrix4();
+  const normMat = new THREE.Matrix3();
+  const pushBaked = (baked, mat4, boneIdx) => {
+    if (!baked) return;
+    const pos = baked.position; // Float32Array (mutable, свіжий з bakeGroupGeometry)
+    const nor = baked.normal;
+    normMat.getNormalMatrix(mat4);
+    const v = new THREE.Vector3();
+    const nn = new THREE.Vector3();
+    for (let i = 0; i < baked.count; i++) {
+      v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).applyMatrix4(mat4);
+      pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+      nn.set(nor[i * 3], nor[i * 3 + 1], nor[i * 3 + 2]).applyMatrix3(normMat).normalize();
+      nor[i * 3] = nn.x; nor[i * 3 + 1] = nn.y; nor[i * 3 + 2] = nn.z;
+    }
+    chunks.push({ baked, boneIdx });
+  };
+  const stripMeshes = (o) => {
+    const kill = [];
+    o.traverse((c) => { if (c.isMesh) kill.push(c); });
+    for (const m of kill) m.parent.remove(m);
+  };
+  for (const key of PART_NAMES) {
+    const part = rig.parts[key];
+    const baked = bakeGroupGeometry(part, { outline });
+    bindMat.multiplyMatrices(newBody.matrix, part.matrix);
+    pushBaked(baked, bindMat, boneIndex[key]);
+    stripMeshes(part); // прибрати вихідні меші — тепер вони у SkinnedMesh
+  }
+  // прямі меші на тілі (extras) — приписати до кістки body
+  const direct = newBody.children.filter((c) => c.isMesh);
+  if (direct.length) {
+    const g = new THREE.Group();
+    g.name = 'extras';
+    for (const m of direct) g.add(m);
+    newBody.add(g);
+    g.updateMatrix();
+    const baked = bakeGroupGeometry(g, { outline });
+    newBody.remove(g);
+    // g.matrix — identity (position 0); у group-простір лише body.matrix
+    pushBaked(baked, newBody.matrix, boneIndex.body);
+  }
+
+  // 4) конкатенувати у плоскі буфери + skin атрибути
+  let total = 0;
+  for (const c of chunks) total += c.baked.count;
+  const position = new Float32Array(total * 3);
+  const normal = new Float32Array(total * 3);
+  const color = new Float32Array(total * 3);
+  const skinIndex = new Uint16Array(total * 4);
+  const skinWeight = new Float32Array(total * 4);
+  let off = 0;
+  for (const c of chunks) {
+    const n = c.baked.count;
+    position.set(c.baked.position, off * 3);
+    normal.set(c.baked.normal, off * 3);
+    color.set(c.baked.color, off * 3);
+    for (let i = 0; i < n; i++) {
+      skinIndex[(off + i) * 4] = c.boneIdx; // [bone,0,0,0]
+      skinWeight[(off + i) * 4] = 1;         // [1,0,0,0]
+    }
+    off += n;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  geo.computeBoundingSphere();
+  geo.boundingSphere.radius *= 1.5; // die-fall труп не зникає на краю фрустуму
+
+  // 5) SkinnedMesh — дитина group (сиблінг body), тінь повносилуетна
+  const skinned = new THREE.SkinnedMesh(geo, getBakedMat());
+  skinned.name = 'skin';
+  skinned.castShadow = true;
+  skinned.receiveShadow = false;
+  group.add(skinned);
+  // bind у поточній (bind) позі: bindMatrix = matrixWorld меша, boneInverses з пози шаблону
+  group.updateMatrixWorld(true);
+  const skeleton = new THREE.Skeleton(bones);
+  skinned.bind(skeleton, skinned.matrixWorld);
+
+  rig.skinned = skinned;
+  rig.skeleton = skeleton;
+  return rig;
+}
+
+// Звільняє per-клон Skeleton (і його boneTexture — DataTexture з bind-матрицями кісток,
+// див. bakeRigSkinned/cloneRig: КОЖЕН клон отримує власний new THREE.Skeleton). Геометрію
+// й матеріал SkinnedMesh НЕ чіпаємо — вони спільні (кеш шаблону), як і в disposeObject.
+// Викликати при остаточному прибиранні зомбі зі сцени (не на смерть — на deadT>ttl/gone).
+export function disposeRigSkeleton(rig) {
+  if (rig && rig.skeleton && rig.skeleton.dispose) rig.skeleton.dispose();
+}
+
 // Клон ріга-шаблона: ділить геометрії/матеріали, нова ієрархія та анімаційний стан
 export function cloneRig(tpl) {
   const group = tpl.group.clone(true);
@@ -34,13 +190,27 @@ export function cloneRig(tpl) {
   body.traverse((o) => {
     if (PART_NAMES.includes(o.name)) parts[o.name] = o;
   });
-  return {
+  const rig = {
     group, body, parts,
     spec: tpl.spec, height: tpl.height, radius: tpl.radius, ztype: tpl.ztype, kind: tpl.kind,
     anim: { mode: 'idle', t: 0, phase: Math.random() * 6.28, speed: 0, attackT: -1, dieT: -1, aimPitch: 0 },
     base: tpl.base,
     dieSpin: (Math.random() - 0.5) * 0.8,
   };
+  // Скінований риг: клонований SkinnedMesh далі вказує на скелет ШАБЛОНУ → ребіндимо
+  // на клоновані кістки (у стилі SkeletonUtils). Інакше УСІ зомбі анімуються синхронно.
+  if (tpl.skinned) {
+    const cloned = group.getObjectByProperty('isSkinnedMesh', true);
+    // зібрати клоновані кістки у ТОМУ Ж порядку, що й у шаблону (за іменами)
+    const cloneByName = {};
+    group.traverse((o) => { if (o.isBone) cloneByName[o.name] = o; });
+    const clonedBones = tpl.skeleton.bones.map((b) => cloneByName[b.name]);
+    cloned.updateMatrixWorld(true);
+    cloned.bind(new THREE.Skeleton(clonedBones, tpl.skeleton.boneInverses), cloned.matrixWorld);
+    rig.skinned = cloned;
+    rig.skeleton = cloned.skeleton;
+  }
+  return rig;
 }
 
 // ============================================================
@@ -488,7 +658,9 @@ export function makeZombie(type, rng) {
   const idx = rng.int(0, 2);
   if (!arr[idx]) {
     const rig = buildZombie(type, rng);
-    bakeRig(rig);
+    // сніговик має фіктивні кістки/torso і власний апдейтер — лишається на bakeRig
+    if (rig.kind === 'snowman') bakeRig(rig);
+    else bakeRigSkinned(rig);
     if (rig._postBake) rig._postBake(rig);
     arr[idx] = rig;
   }
