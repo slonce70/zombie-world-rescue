@@ -1247,6 +1247,14 @@ body.touch-mode #touch-coach.show { display: block; }
   text-align: center; letter-spacing: 0.5px; cursor: pointer;
 }
 #coop-room b { color: #4dd6a8; letter-spacing: 2px; }
+/* 📤 «поділитись» просто в бою: зручний тап-таргет ≥40px */
+.coop-room-share {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; min-height: 40px; margin-left: 2px; vertical-align: middle;
+  border-radius: 10px; cursor: pointer; font-size: 18px; line-height: 1;
+  background: rgba(77, 214, 168, 0.16);
+}
+.coop-room-share:hover, .coop-room-share:focus { background: rgba(77, 214, 168, 0.3); outline: none; }
 
 /* 📣 колесо пінгів: 5 фраз великими кнопками (зручно з телефона) */
 .ping-btn {
