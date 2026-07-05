@@ -15,11 +15,47 @@ const STORY_DELEGATE_MATCHES = {
   'ukr-rescue': { preferred: ['rescue'] },
   'ukr-signal': { preferred: ['repair'] },
   'ukr-defense': { preferred: ['clear'], compatible: ['defense'] },
+  // 🪤 АНТИ-СОФТЛОК: у країнах із фірмовою місією (bonfire B/C, tomb B/C) фірма може
+  // зайняти слот сусідньої цілі. Тоді слот-фолбек тієї цілі впирається у РЕЗЕРВ
+  // (місія у preferred іншої цілі) і ціль лишається без делегата — бос не відкриється.
+  // Ліки: compatible-списки сусідніх цілей покривають пули ВСІХ слотів.
   'pol-bonfires': { preferred: ['bonfire'] },
-  'pol-train': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
-  'pol-castle': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests'] },
+  'pol-train': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests', 'clear', 'collect', 'hunt', 'escort', 'rescue'] },
+  'pol-castle': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'escort', 'rescue', 'repair'] },
   'egy-seals': { preferred: ['tomb'] },
-  'egy-ambush': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests'] },
+  'egy-ambush': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'escort', 'rescue', 'repair'] },
+  // 🇩🇪 фірмова convoy може зайняти слот A або C — тому сусідні цілі мають
+  // ШИРОКІ compatible-списки (покривають пули всіх слотів), інакше при
+  // невдалому ролі ціль лишиться без місії-делегата і бос не відкриється.
+  'deu-workshop': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
+  'deu-convoy': { preferred: ['convoy'] },
+  'deu-gate': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
+  // 🇫🇷 фірмова balloon (слоти A/C) — та сама страховка широкими списками
+  'fra-kitchen': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
+  'fra-balloon': { preferred: ['balloon'] },
+  'fra-cellar': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
+  'esp-band': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'esp-bells': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'esp-fireworks': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'prt-fishers': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'prt-lighthouse': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'prt-docks': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'ita-trattoria': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'ita-aqueduct': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'ita-legion': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  // 🇹🇷 фірмова bazaar (слоти A/C) — сусідні цілі зі страховкою
+  'tur-bazaar': { preferred: ['bazaar'] },
+  'tur-lighthouse': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'tur-spices': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'escort', 'rescue', 'lights'] },
+  'swe-longhouse': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'swe-aurora': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'swe-jarl': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'jpn-teahouse': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'jpn-lanterns': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'jpn-dojo': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'chn-scrolls': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
+  'chn-beacon': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
+  'chn-pit': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
 };
 
 export class StoryMissions {
@@ -40,6 +76,11 @@ export class StoryMissions {
       && level.game.save.liberated[level.countryId]
     );
     if (this.replayNightRaid) this._pushReplayNight();
+    // 📖 інтро глави: банер з назвою і реплікою НПС показуємо трохи згодом,
+    // коли HUD уже живий (перший кадр рівня — ще завантаження)
+    this._introShown = false;
+    this._introT = 1.1;
+    this._activeId = this.objectives[0] ? this.objectives[0].id : null;
     this.delegate = new DynamicMissions(level);
     this.npcState = spawnStoryNpc(
       level,
@@ -102,6 +143,33 @@ export class StoryMissions {
     updateStoryNpc(this.npcState, dt);
     this.delegate.update(dt, input, allowControl);
     this._syncObjectiveStates();
+    if (!this._introShown) {
+      this._introT -= dt;
+      if (this._introT <= 0) { this._introShown = true; this._showIntro(); }
+    }
+  }
+
+  // 📖 банер глави: назва історії + репліка НПС (при повторі-рейді — короткий тост)
+  _showIntro() {
+    if (!this.story) return;
+    const title = typeof this.story.title === 'function' ? this.story.title() : '';
+    const npc = this.story.npc || {};
+    const name = typeof npc.name === 'function' ? npc.name() : '';
+    const intro = typeof npc.intro === 'function' ? npc.intro() : '';
+    if (!title) return;
+    if (this.replayNightRaid) {
+      this.level.bus.emit('toast', `🌙 ${t('Нічний рейд')} · ${title}`);
+      return;
+    }
+    const game = this.level.game;
+    if (game && game.hud && typeof game.hud.banner === 'function') {
+      game.hud.banner(`📖 ${title}`, name && intro ? `${name}: ${intro}` : intro, 6);
+    } else {
+      this.level.bus.emit('toast', `📖 ${title}`);
+    }
+    if (intro && this.level.audio && typeof this.level.audio.voiceOnce === 'function') {
+      this.level.audio.voiceOnce('quest', 20);
+    }
   }
 
   _completeObjective(id) {
@@ -308,6 +376,15 @@ export class StoryMissions {
       if (obj.state === 'done') continue;
       obj.state = foundNext ? 'locked' : 'active';
       foundNext = true;
+    }
+    // 🗣️ репліка «start» нової активної цілі — рівно раз на перехід
+    // (_advanceObjectiveState викликається щокадру з _syncObjectiveStates)
+    const active = this.objectives.find((o) => o.state === 'active');
+    const id = active ? active.id : null;
+    if (id !== this._activeId) {
+      this._activeId = id;
+      const startText = active && typeof active.start === 'function' ? active.start() : '';
+      if (startText) this.level.bus.emit('toast', `${active.icon} ${startText}`);
     }
   }
 
