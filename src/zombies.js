@@ -73,6 +73,12 @@ const TYPE_STATS = {
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
 
+// 🦁 Бестіарій-колекція (R2-5.3): усі звичайні типи зомбі з TYPE_STATS (включно з 'boss' —
+// його вбивають у кінці кожної глави, тож ціль «усі види» лишається реально досяжною).
+// 'golden' — окремий запис у save.bestiary (золотий зомбі — це варіант звичайного типу,
+// не власний вид), тому в лічильник видів для бестіарій-цілей його НЕ включаємо.
+export const BESTIARY_TYPE_IDS = Object.freeze(Object.keys(TYPE_STATS));
+
 const FROST_RANGED = { min: 9, max: 40, hold: 0, cd: 4.5, projSpeed: 20, dmg: 18, size: 0.5 };
 // 🥖 Шеф Багет жбурляє багети
 const BAGUETTE_RANGED = { min: 8, max: 38, hold: 0, cd: 3.6, projSpeed: 19, dmg: 16, size: 0.34, color: 0xd9a35e, stretch: true };

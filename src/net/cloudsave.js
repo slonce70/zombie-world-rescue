@@ -31,7 +31,7 @@ export const hasLiberated = (liberated = {}, id) => !!(liberated && liberated[id
 export const SAVE_PROGRESS_KEYS = Object.freeze([
   'liberated', 'xp', 'passLvl', 'missionRuns', 'stormBest', 'worldBosses',
   'modeBest', 'modeWins', 'modeRewards', 'weekly',
-  'coins', 'crystals', 'upgrades', 'bestiary',
+  'coins', 'crystals', 'upgrades', 'bestiary', 'bestiaryGoals',
   'chapter', 'infected', 'megaQuests', 'medals', 'stats',
   'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
   'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
@@ -62,6 +62,7 @@ export function saveHasProgress(s) {
     || (s.crystals | 0) > 0                                  // преміальна валюта зі скінів
     || Object.keys(s.upgrades || {}).length > 0             // куплені прокачування
     || Object.keys(s.bestiary || {}).length > 0             // бачені вороги
+    || !!(s.bestiaryGoals && (s.bestiaryGoals.b10 || s.bestiaryGoals.b20 || s.bestiaryGoals.all)) // видані нагороди бестіарію
     || (s.chapter && (s.chapter.done || Object.keys(s.chapter.p || {}).length > 0))
     || (s.infected && (s.infected.done || Object.keys(s.infected.cleared || {}).length > 0))
     || Object.values(s.megaQuests || {}).some((q) => q && ((q.progress | 0) > 0 || q.done))

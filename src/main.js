@@ -5,7 +5,7 @@ import { Input } from './input.js';
 import { AudioMan } from './audio.js';
 import { World } from './world.js';
 import { Player, WEAPONS, WEAPON_SLOTS } from './player.js';
-import { Zombies } from './zombies.js';
+import { Zombies, BESTIARY_TYPE_IDS } from './zombies.js';
 import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js';
 import { StoryMissions } from './story/storymissions.js';
 import { shouldUseStoryMissions, storyPreview } from './story/countryStories.js';
@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 277;
+const APP_VERSION = 278;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -773,6 +773,8 @@ class Game {
       weeklyGoal: { week: -1, n: 0, claimed: false },
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0, cloneUses: 0, gadgetUses: 0, damageDealt: 0 },
       bestiary: {},
+      // 🦁 Бестіарій-колекція: одноразові прапорці нагород за 10/20/усі зібрані види
+      bestiaryGoals: { b10: false, b20: false, all: false },
       chapter: { p: {}, done: false }, medals: [], infected: { cleared: {}, done: false },
       diffStar: 1,
       // 🎓 разові підказки-знайомства (вежа/самокат/гаджет/робот): { ключ: 1 } = вже показано
@@ -867,6 +869,9 @@ class Game {
         if (out.activeCloneSkin !== 'radiation' || !out.cloneSkins.includes('radiation')) out.activeCloneSkin = 'ninja';
         syncTitles(out);
         if (!out.bestiary || typeof out.bestiary !== 'object') out.bestiary = {};
+        // 🦁 бестіарій-цілі: старий сейв без полів дістає дефолти (не видані нагороди)
+        if (!out.bestiaryGoals || typeof out.bestiaryGoals !== 'object' || Array.isArray(out.bestiaryGoals)) out.bestiaryGoals = { b10: false, b20: false, all: false };
+        else out.bestiaryGoals = { b10: !!out.bestiaryGoals.b10, b20: !!out.bestiaryGoals.b20, all: !!out.bestiaryGoals.all };
         if (!out.chapter || typeof out.chapter !== 'object') out.chapter = { p: {}, done: false };
         if (!out.chapter.p || typeof out.chapter.p !== 'object') out.chapter.p = {};
         if (!out.infected || typeof out.infected !== 'object') out.infected = { cleared: {}, done: false };
@@ -2826,6 +2831,7 @@ class Game {
       this._bumpWeeklyGoal();
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
+      this._checkBestiaryGoals();
       if (z.golden) this.save.stats.golden++;
       const big = z.type === 'tank' || z.type === 'shield' || z.type === 'snowman' || z.type === 'spitter';
       const killXp = (level.worldBoss || level.radiation) && z.type === 'boss'
@@ -3398,6 +3404,41 @@ class Game {
       this.hud.banner(t('🏆 ЦІЛЬ ТИЖНЯ ВИКОНАНО!'), t('300 зомбі · 💎 +25'), 4.5);
       this.saveGame();
     }
+  }
+
+  // 🦁 Бестіарій-колекція: пороги за кількістю ЗІБРАНИХ ВИДІВ (унікальні ключі save.bestiary
+  // з count>0, без 'golden' — golden не є окремим видом). Викликається одразу після
+  // інкремента save.bestiary в zombieKilled; лічба дешева (Object.keys), а видача — одноразова
+  // через прапорці save.bestiaryGoals.
+  _checkBestiaryGoals() {
+    const bg = this.save.bestiaryGoals || (this.save.bestiaryGoals = { b10: false, b20: false, all: false });
+    if (bg.b10 && bg.b20 && bg.all) return; // усе видано — не рахувати види на кожному кілі
+    let granted = false;
+    const n = Object.keys(this.save.bestiary || {}).filter((id) => BESTIARY_TYPE_IDS.includes(id) && this.save.bestiary[id] > 0).length;
+    if (!bg.b10 && n >= 10) {
+      bg.b10 = true;
+      granted = true;
+      this.save.coins += 1000;
+      this.audio.levelUp();
+      this.hud.banner(t('📖 БЕСТІАРІЙ: 10 ВИДІВ!'), t('+1000 монет 🪙'), 4.5);
+    }
+    if (!bg.b20 && n >= 20) {
+      bg.b20 = true;
+      granted = true;
+      this.save.crystals = (this.save.crystals || 0) + 25;
+      this.audio.levelUp();
+      this.hud.banner(t('📖 БЕСТІАРІЙ: 20 ВИДІВ!'), t('💎 +25'), 4.5);
+    }
+    if (!bg.all && n >= BESTIARY_TYPE_IDS.length) {
+      bg.all = true;
+      granted = true;
+      this.save.crystals = (this.save.crystals || 0) + 50;
+      this.audio.levelUp();
+      this.hud.banner(t('🦁 БЕСТІАРІЙ ЗІБРАНО ПОВНІСТЮ!'), t('💎 +50 · титул «Зоолог» 🎖️'), 5);
+      // титул zoologist синкнеться сам через syncTitles (unlocked-предикат від save.bestiary)
+      syncTitles(this.save);
+    }
+    if (granted) this.saveGame(); // сейв лише при видачі — НЕ на кожному кілі (фризи на мобільному)
   }
 
   // 🗓️ приведення полів цілі тижня до безпечних типів (week/n — цілі, claimed — bool).

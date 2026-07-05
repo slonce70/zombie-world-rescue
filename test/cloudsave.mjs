@@ -132,7 +132,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     const guardedTopLevelKeys = new Set([
       'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
       'activeCloneSkin',
-      'bestiary', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
+      'bestiary', 'bestiaryGoals', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
       'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'strongZombies', 'toughZombies', 'liberated', 'medals',
       'megaPity', 'megaQuests', 'missionRuns', 'modeBest', 'modeRewards', 'modeWins', 'passLvl', 'pets', 'quests', 'records', 'skins', 'soulLevel',
       'cloneSkins',
@@ -144,7 +144,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
     out.progressManifestHasCurrentCategories = [
       'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses', 'coins', 'crystals', 'upgrades',
-      'bestiary', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
+      'bestiary', 'bestiaryGoals', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
     ].every((k) => knownProgressKeys.has(k));
@@ -169,6 +169,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.crystals = saveHasProgress({ ...fresh, crystals: 15 }) === true;
     out.medals = saveHasProgress({ ...fresh, medals: ['hero'] }) === true;
     out.bestiary = saveHasProgress({ ...fresh, bestiary: { walker: 3 } }) === true;
+    // 🦁 бестіарій-цілі: видана нагорода — теж прогрес (не можна тихо загубити при claim/adopt)
+    out.bestiaryGoals = saveHasProgress({ ...fresh, bestiaryGoals: { b10: true, b20: false, all: false } }) === true;
     out.stats = saveHasProgress({ ...fresh, stats: { ...fresh.stats, killed: 1 } }) === true;
     out.diffStar = saveHasProgress({ ...fresh, diffStar: 3 }) === true;
     out.gadget = saveHasProgress({ ...fresh, gadgetsOwned: ['shield'] }) === true;
@@ -205,6 +207,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);
   check('бестіарій → прогрес=true', res.bestiary);
+  check('бестіарій-нагороди → прогрес=true', res.bestiaryGoals);
   check('stats.killed>0 → прогрес=true', res.stats);
   check('diffStar>1 → прогрес=true', res.diffStar);
   check('куплений гаджет → прогрес=true', res.gadget);

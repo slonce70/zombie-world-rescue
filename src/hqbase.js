@@ -6,6 +6,7 @@ import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
 import { makeHero, HERO_SKINS } from './characters.js';
 import { WORLD_BOSSES } from './worldboss.js';
+import { BESTIARY_TYPE_IDS } from './zombies.js';
 
 export class LivingHQ {
   constructor(game) {
@@ -487,14 +488,14 @@ export class LivingHQ {
     const saved = save.liberated || {};
     const bestiary = save.bestiary || {};
     const countries = Object.keys(saved).filter((id) => saved[id]).length;
-    const beasts = Object.keys(bestiary).filter((id) => bestiary[id] > 0).length;
+    const beasts = Object.keys(bestiary).filter((id) => BESTIARY_TYPE_IDS.includes(id) && bestiary[id] > 0).length;
     const skins = (save.skins || []).filter((id) => HERO_SKINS[id]).length;
     const cc = document.getElementById('hqbase-country-count');
     const bc = document.getElementById('hqbase-beast-count');
     const sc = document.getElementById('hqbase-skin-count');
     const hc = document.getElementById('hqbase-hall-count');
     if (cc) cc.textContent = String(countries);
-    if (bc) bc.textContent = String(beasts);
+    if (bc) bc.textContent = `${beasts}/${BESTIARY_TYPE_IDS.length}`;
     if (sc) sc.textContent = String(skins);
     if (hc) hc.textContent = '4';
 
