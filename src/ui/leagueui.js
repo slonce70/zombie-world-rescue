@@ -22,11 +22,11 @@ export class LeagueUI {
     const root = document.getElementById('league-content');
     // перемикачі
     let html = '<div class="league-tabs">';
-    for (const [mid, label] of [['storm', t('⛈️ Шторм')], ['arena', t('👑 Арена')]]) {
+    for (const [mid, label] of [['storm', t('⛈️ Шторм')], ['arena', t('👑 Арена')], ['coopstorm', t('🤝 Команди')]]) {
       html += `<button class="league-tab ${this.mode === mid ? 'on' : ''}" data-mode="${mid}">${label}</button>`;
     }
     html += '</div>';
-    if (this.mode === 'storm') {
+    if (this.mode === 'storm' || this.mode === 'coopstorm') {
       html += '<div class="league-countries">';
       for (const id of CAMPAIGN_ORDER) {
         html += `<button class="league-cty ${this.country === id ? 'on' : ''}" data-cty="${id}">${COUNTRIES[id].flag}</button>`;
@@ -64,14 +64,21 @@ export class LeagueUI {
     let rows = '';
     for (const e of data.top) {
       const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : `${e.rank}.`;
-      const team = e.team && e.team.length > 1 ? ` <span class="league-team">🤝 ${this._esc(e.team.join(', '))}</span>` : '';
+      // 🤝 у вкладці «Команди» головне — склад команди; у соло-режимах team лише підпис
+      const nick = this.mode === 'coopstorm' && e.team && e.team.length
+        ? `🤝 ${this._esc(e.team.join(', '))}`
+        : this._esc(e.nick) + (e.team && e.team.length > 1 ? ` <span class="league-team">🤝 ${this._esc(e.team.join(', '))}</span>` : '');
       rows += `<div class="league-row ${e.me ? 'me' : ''}">
         <span class="lr-rank">${medal}</span>
-        <span class="lr-nick">${this._esc(e.nick)}${team}</span>
+        <span class="lr-nick">${nick}</span>
         <span class="lr-score">${fmt(e.score)}</span>
       </div>`;
     }
-    if (!rows) rows = t('<div class="league-loading">Поки порожньо — стань ПЕРШИМ у світі! 🚀</div>');
+    if (!rows) {
+      rows = this.mode === 'coopstorm'
+        ? t('<div class="league-loading">Ще нема команд — грайте шторм разом і станьте ПЕРШИМИ! 🤝</div>')
+        : t('<div class="league-loading">Поки порожньо — стань ПЕРШИМ у світі! 🚀</div>');
+    }
     if (data.me && !data.top.some((e) => e.me)) {
       rows += `<div class="league-row me gap"><span class="lr-rank">${data.me.rank}.</span>
         <span class="lr-nick">${t('Ти')}</span><span class="lr-score">${fmt(data.me.score)}</span></div>`;

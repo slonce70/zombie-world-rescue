@@ -45,6 +45,21 @@ function recordToday(now, cid) {
   if (day !== lobbyDay) { lobbyDay = day; lobbyToday = new Set(); }
   if (cid && lobbyToday.size < 100000) lobbyToday.add(cid);
 }
+// 🏆 «топ-3 сьогодні» (дзеркало Lobby DO): кращі штормові результати за добу
+let lobbyTop3 = [];            // [{nick, score}] за спаданням
+let lobbyTop3Day = '';
+function recordDayScore(now, nick, score) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (day !== lobbyTop3Day) { lobbyTop3Day = day; lobbyTop3 = []; }
+  if (!Number.isFinite(Number(score)) || Number(score) < 1) return; // сміттєвий скор ігноруємо
+  const cleaned = cleanNickSrv(nick);
+  const sc = safeInt(score, 1, 200);
+  if (!cleaned) return;
+  const list = lobbyTop3.filter((e) => e.nick !== cleaned);
+  list.push({ nick: cleaned, score: sc });
+  list.sort((a, b) => b.score - a.score);
+  lobbyTop3 = list.slice(0, 3);
+}
 
 function lobbyView(now) {
   for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
@@ -53,9 +68,12 @@ function lobbyView(now) {
     const old = [...lobbyProfiles.entries()].sort((a, b) => a[1].ts - b[1].ts);
     for (let i = 0; i < old.length - 800; i++) lobbyProfiles.delete(old[i][0]);
   }
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (day !== lobbyTop3Day) { lobbyTop3Day = day; lobbyTop3 = []; } // добова ротація як у DO
   return {
     online: lobbyPlayers.size,
     today: lobbyToday.size,
+    top3: lobbyTop3,
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
     profiles: [...lobbyProfiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
@@ -90,6 +108,7 @@ function lobbyPing(d) {
   lobbyPlayers.set(cid, { nick, ts: now });
   lobbyProfiles.set(cid, cleanProfile(nick, d.profile, now));
   recordToday(now, cid);
+  if (d.day && typeof d.day === 'object') recordDayScore(now, d.day.nick || nick, d.day.score);
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);
     const r = lobbyRooms.get(code);
@@ -255,12 +274,21 @@ const httpServer = createServer((req, res) => {
   }
   if (url.pathname === '/league/submit' && req.method === 'POST') {
     readBody(req, (d) => {
-      const key = `${d.cid}|${d.mode}|${String(d.country).toUpperCase()}`;
+      // клампимо так само, як League DO у воркері (тести шлють сюди сміття свідомо)
+      const mode = String(d.mode || '');
+      const country = String(d.country || '').slice(0, 4).toUpperCase();
+      const score = Math.round(Number(d.score));
+      const team = (Array.isArray(d.team) ? d.team : []).slice(0, 4).map(cleanNickSrv);
+      const bounds = { storm: [1, 200], coopstorm: [1, 200], arena: [30000, 3600000] }[mode];
+      if (!bounds || !(score >= bounds[0] && score <= bounds[1])) return jsonRes(res, { error: 'score' }, 400);
+      // командний режим має сенс лише коли грали ≥2
+      if (mode === 'coopstorm' && team.filter((n) => n).length < 2) return jsonRes(res, { error: 'team' }, 400);
+      const key = `${d.cid}|${mode}|${country}`;
       const cur = league.get(key);
-      const better = !cur || (d.mode === 'arena' ? d.score < cur.score : d.score > cur.score);
-      if (better) league.set(key, { nick: cleanNickSrv(d.nick), score: Math.round(d.score), team: d.team || [], ts: Date.now() });
-      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-      res.end(JSON.stringify(leagueTop(d.mode, String(d.country).toUpperCase(), d.cid)));
+      const better = !cur || (mode === 'arena' ? score < cur.score : score > cur.score);
+      if (better) league.set(key, { nick: cleanNickSrv(d.nick), score, team, ts: Date.now() });
+      else if (cur) cur.nick = cleanNickSrv(d.nick); // нік міг змінитись — оновлюємо м'яко
+      jsonRes(res, leagueTop(mode, country, d.cid));
     }, res);
     return;
   }

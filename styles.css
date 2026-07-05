@@ -1032,6 +1032,16 @@ body.touch-mode #touch-coach.show { display: block; }
   margin: 10px 0 6px; text-transform: uppercase;
 }
 .coop-side-empty { color: #7e94a8; font-size: 13px; font-weight: 600; padding: 6px 2px; line-height: 1.5; }
+/* 🏆 «Сьогодні найкращі» — топ-3 штормових результатів дня */
+.coop-top3 { display: flex; flex-direction: column; gap: 4px; }
+.coop-top3-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255, 214, 92, 0.08); border: 1px solid rgba(255, 214, 92, 0.22);
+  border-radius: 10px; padding: 5px 9px;
+}
+.ct3-medal { font-size: 16px; min-width: 22px; text-align: center; }
+.ct3-nick { flex: 1; min-width: 0; font-size: 13px; font-weight: 800; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct3-score { font-size: 12px; font-weight: 800; color: #ffd65c; white-space: nowrap; }
 .coop-rooms { display: flex; flex-direction: column; gap: 6px; }
 .coop-room {
   display: flex; align-items: center; gap: 8px;

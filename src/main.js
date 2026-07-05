@@ -3657,7 +3657,13 @@ class Game {
       submitScore(this, { mode: 'storm', country: level.countryId, score: res.wave, team }).then((r) => {
         if (r && r.me) placeEl.textContent = t('🌍 Твоє місце у світовій Лізі: #{r}', { r: r.me.rank });
       });
+      // 🤝 командний рекорд шторму: ЛИШЕ хост (authority) і лише коли реально грали разом (≥2)
+      if (level.net && level.net.authority && team.filter((n) => n).length >= 2) {
+        submitScore(this, { mode: 'coopstorm', country: level.countryId, score: res.wave, team });
+      }
     }
+    // 🏆 «топ-3 сьогодні» в лобі: шлемо свій штормовий результат у денний рейтинг
+    if (this.coop && this.coop.lobbyNet) this.coop.lobbyNet.announceDayScore(res.wave);
     const rec = isRecord && prev ? t(' <span class="record-badge">🏆 НОВИЙ РЕКОРД!</span>') : '';
     const best = this.save.stormBest[level.countryId];
     const rb = level.runBuild;
