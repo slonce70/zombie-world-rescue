@@ -4238,6 +4238,12 @@ class Game {
     const mode = level.worldBoss;
     if (mode._ended) return;
     mode._ended = true;
+    // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн radiation).
+    // Командний бонус + недільна нагорода — обом сторонам локально (wire не чіпаємо).
+    // Кожен локально пише save.worldBosses[id] нижче — гість отримує clear без окремого
+    // соло-анлоку СВІДОМО (прецедент radiationCoins: нагороди коопу нараховуються локально).
+    this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin();
     mode.completed = !!won;
     mode.over = true;
     level.bossDefeated = !!won;

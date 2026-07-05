@@ -12,12 +12,13 @@ import { FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES } from '../knockout.js';
 import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defense.js';
 import { RADIATION_UNLOCK_COUNTRIES } from '../radiationmode.js';
 import { TURRETWAR_UNLOCK_COUNTRIES } from '../turretwar.js';
+import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
   campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝',
   'friendly-defense': '🛡️', 'friendly-zone-defense': '⭕', 'weekly-coop': '🗓️',
-  radiation: '☢️', turretwar: '🗼',
+  radiation: '☢️', turretwar: '🗼', worldboss: '🌋',
 };
 
 export class CoopUI {
@@ -541,6 +542,7 @@ export class CoopUI {
       ['friendly-zone-defense', t('⭕ Дружня оборона в зоні')],
       ['radiation', t('☢️ Радіація')],
       ['turretwar', t('🗼 Оборона турелі')],
+      ['worldboss', t('🌋 Світовий бос')],
       ['arena', t('👑 Арена')],
       ['weekly-coop', t('🗓️ Командний тиждень: {i} 💎', { i: MODE_ICON[wkCoopMode] || '🎲' })],
     ]) {
@@ -552,6 +554,7 @@ export class CoopUI {
         || (mid === 'friendly-zone-defense' && libCount < ZONE_DEFENSE_UNLOCK_COUNTRIES)
         || (mid === 'radiation' && libCount < RADIATION_UNLOCK_COUNTRIES)
         || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
+        || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
         || (mid === 'weekly-coop' && !anyLib));
       mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
     }
@@ -578,7 +581,7 @@ export class CoopUI {
     // weekly-coop показує пікер лише коли режим тижня — Шторм)
     const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout'
       || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
-      || s.mode === 'radiation' || s.mode === 'turretwar'
+      || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss'
       || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
     document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
     this.el.countries.style.display = hideCountries ? 'none' : '';

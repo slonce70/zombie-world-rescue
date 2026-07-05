@@ -368,6 +368,9 @@ export class HostNet {
     if (z.horde) o.h = 1;
     if (z.radiationMode) o.rm = 1;
     if (z.turretwar) o.tw = 1;
+    // 🌋 світовий бос: id боса → puppet забіндить level.worldBoss.boss; міньйони — маркер HUD
+    if (z.worldBoss) o.wb = z.worldBoss;
+    if (z.worldBossMinion) o.wbm = 1;
     if (z.bossStyle) o.st = z.bossStyle;
     // 🩺 mhp долітає до puppet-а гостя, лише якщо відрізняється від його НАЇВНОЇ
     // переоцінки (mirror: coopScale=1, без мутатора → baseHp×diff.hp). Раніше базою
@@ -533,6 +536,8 @@ export class HostNet {
       if (zb.defense) o.d = 1;
       if (zb.radiationMode) o.rm = 1;
       if (zb.turretwar) o.tw = 1;
+      if (zb.worldBoss) o.wb = zb.worldBoss;
+      if (zb.worldBossMinion) o.wbm = 1;
       if (zb.bossStyle) o.st = zb.bossStyle;
       o.mhp = zb.maxHp;
       o.hp = zb.hp;

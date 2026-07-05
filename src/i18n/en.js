@@ -1369,6 +1369,7 @@ export const EN = {
 "⭕ Дружня оборона в зоні": "⭕ Friendly Zone Defense",
 "☢️ Радіація": "☢️ Radiation",
 "🗼 Оборона турелі": "🗼 Turret Defense",
+"🌋 Світовий бос": "🌋 World Boss",
 "Радіаційний контракт": "Radiation Contract",
 "Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.": "Trade in 150 ☢️ — get 25 💎. Once a week.",
 "📜 Контракт виконано: +25 💎! Новий — наступного тижня.": "📜 Contract complete: +25 💎! New one next week.",

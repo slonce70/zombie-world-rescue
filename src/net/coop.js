@@ -181,16 +181,19 @@ export class CoopSession {
       : mode === 'friendly-zone-defense' ? 'zone-friendly' : null;
     const radiation = mode === 'radiation';
     const turretwar = mode === 'turretwar';
-    const realCountry = (arena || knockout || defense || radiation || turretwar) ? 'UKR' : countryId;
+    // 🌋 кооп-worldboss: ХОСТ обирає боса тижня і кладе id у spec (wb). Гість стартує
+    // рівень саме з opts.wb, а не з локального weeklyBossId — інакше розсинхрон опівночі.
+    const wb = mode === 'worldboss' ? game.weeklyBossId() : null;
+    const realCountry = (arena || knockout || defense || radiation || turretwar || wb) ? 'UKR' : countryId;
     // 🎲 мутатор тижня в коопі: ХОСТ — джерело id (їде у spec обом сторонам;
     // ті самі гейти, що соло: playground/?test-без-weekmod → null). Гість НЕ рахує
     // локально — інакше розсинхрон опівночі/часових поясів.
     const mut = game._hostWeeklyMutatorId();
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, weekly, mut };
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, weekly, mut });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, worldBoss: wb, weekly, mut });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -246,7 +249,7 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, weekly: d.weekly || null, mut: d.mut || null });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {
