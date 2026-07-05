@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 281;
+const APP_VERSION = 282;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2584,12 +2584,13 @@ class Game {
       level.knockout = new KnockoutMode(level, knockoutVariant);
       level.missions = level.knockout;
       // 🎲 «Прокачка» у Нокауті: соло-драфт на середині забігу (див. KnockoutMode.update)
-      if (!level.net) level.runBuild = new RunBuild();
+      // (level.net тут ЩЕ null — кооп визначаємо по coop-параметру, net ставиться нижче)
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isDefense) {
       level.defense = new DefenseMode(level, defenseVariant);
       level.missions = level.defense;
       // 🎲 «Прокачка» в Обороні: соло-драфт на межі хвилі (див. DefenseMode.update)
-      if (!level.net) level.runBuild = new RunBuild();
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isPvp) {
       level.pvp = new PvpMode(level, pvpVariant);
       level.missions = level.pvp;
@@ -2600,7 +2601,7 @@ class Game {
       level.portal = new PortalMode(level);
       level.missions = level.portal;
       // 🎲 «Прокачка» у Порталі: соло-драфт при закритті кожного порталу (див. PortalMode.damagePortal)
-      if (!level.net) level.runBuild = new RunBuild();
+      if (!coop) level.runBuild = new RunBuild();
     } else if (isMaze) {
       level.maze = new MazeMode(level);
       level.missions = level.maze;
@@ -2641,7 +2642,7 @@ class Game {
       }) && !this._forceMissionSet;
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
-      if (!level.net && !isPlayground) level.runBuild = new RunBuild();
+      if (!coop && !isPlayground) level.runBuild = new RunBuild();
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -3394,11 +3395,15 @@ class Game {
   _refreshWeeklyGoalUI() {
     const el = document.getElementById('weekly-goal');
     if (!el) return;
-    const wg = this.save.weeklyGoal || { n: 0, claimed: false };
-    const n = Math.min(300, wg.n | 0);
+    const wg = this._sanitizeWeeklyGoal(this.save.weeklyGoal || { week: -1, n: 0, claimed: false });
+    // reset тижня ледачий (перший кіл у _bumpWeeklyGoal) — але ГЛОБУС не сміє
+    // показувати торішнє «✅ 300/300» у понеділок: новий тиждень = чистий 0/300
+    const stale = this._weekIndex() > wg.week;
+    const claimed = !stale && wg.claimed;
+    const n = stale ? 0 : Math.min(300, wg.n | 0);
     const label = el.querySelector('.wg-label');
     const fill = el.querySelector('.wg-fill');
-    if (wg.claimed) {
+    if (claimed) {
       if (label) label.textContent = t('✅ Ціль тижня: 300/300 · 💎 +25');
       if (fill) fill.style.width = '100%';
     } else {
@@ -3651,14 +3656,16 @@ class Game {
     const placeEl = document.getElementById('storm-league-place');
     if (placeEl) {
       placeEl.textContent = '';
+      // дедуп ніків: після реконекту ростер може тримати той самий нік двічі —
+      // у таблиці Ліги «Влад + Влад» виглядає як брехня (воркер дедупить так само)
       const team = level.net
-        ? [...this.coop.session.roster.values()].map((r) => r.nick || '')
+        ? [...new Set([...this.coop.session.roster.values()].map((r) => r.nick || '').filter(Boolean))]
         : [];
       submitScore(this, { mode: 'storm', country: level.countryId, score: res.wave, team }).then((r) => {
         if (r && r.me) placeEl.textContent = t('🌍 Твоє місце у світовій Лізі: #{r}', { r: r.me.rank });
       });
       // 🤝 командний рекорд шторму: ЛИШЕ хост (authority) і лише коли реально грали разом (≥2)
-      if (level.net && level.net.authority && team.filter((n) => n).length >= 2) {
+      if (level.net && level.net.authority && team.length >= 2) {
         submitScore(this, { mode: 'coopstorm', country: level.countryId, score: res.wave, team });
       }
     }
@@ -3691,6 +3698,7 @@ class Game {
       level.netEv('arenaend');
       level.net.flushEvents();
     }
+    if (res.completed && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і на арені босів
     const retryBtn = document.getElementById('btn-arena-retry');
     if (retryBtn) retryBtn.style.display = level.net ? 'none' : '';
     if (res.completed) this.audio.victory();
@@ -3755,6 +3763,8 @@ class Game {
     const res = level.knockout.results();
     level.knockout.over = true;
     this._grantWeeklyCoop(level, !!won);
+    // 🤝 v279-бонус «за перемогу разом» — у ВСІХ кооп-перемогах, не лише в кампанії
+    if (won && level.net) this._grantCoopWin();
     level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
@@ -3814,6 +3824,7 @@ class Game {
     // 🌐 кооп: фінал вирішує хост і сповіщає гостей (дзеркало stormend)
     if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
     level.defense.completed = !!won;
     const res = level.defense.results();
     level.defense.over = true;
@@ -3863,6 +3874,7 @@ class Game {
     // 🌐 кооп: бій веде хост (update гостя дзеркальний) — фінал сповіщаємо подією (патерн dfend)
     if (level.net && level.net.authority) level.netEv('twend', won ? 1 : 0, reason);
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в турельній війні
     level.turretwar.completed = !!won;
     const res = level.turretwar.results();
     level.turretwar.over = true;
@@ -4162,6 +4174,7 @@ class Game {
     if (!level || !level.radiation || level.radiation.over) return;
     // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн нокауту)
     this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в радіації
     level.radiation.completed = !!won;
     const res = level.radiation.results();
     level.radiation.over = true;

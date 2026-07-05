@@ -119,6 +119,19 @@ r = await page.evaluate(() => {
 check(r.visibleBefore === true, '5: картка donate видима у магазині', JSON.stringify({ v: r.visibleBefore }));
 check(r.visibleAfter === true && r.maxed === false, '5: після покупки картка лишилась і НЕ maxed', JSON.stringify(r));
 
+console.log('▸ 5б. Стеля ціни 25000 (v282): «Легенда фонду» (25 донацій) досяжна');
+r = await page.evaluate(async () => {
+  const g = window.__game;
+  const mod = await import('/src/shop.js');
+  const donItem = mod.SHOP_ITEMS.find((i) => i.id === 'donate');
+  const at = (n) => { g.save.donations = n; return g.shop.priceOf(donItem); };
+  const p6 = at(6), p7 = at(7), p24 = at(24);
+  g.save.donations = 2; // повертаємо стан тесту
+  return { p6, p7, p24 };
+});
+check(r.p6 === 22781, '5б: 7-ма пожертва ще росте геометрично (22781)', JSON.stringify(r));
+check(r.p7 === 25000 && r.p24 === 25000, '5б: від 8-ї — стеля 25000 (25-та досяжна)', JSON.stringify(r));
+
 console.log('▸ 6. JS-помилки');
 check(errors.length === 0, `6: без JS-помилок (${errors.slice(0, 3).join(' | ')})`);
 

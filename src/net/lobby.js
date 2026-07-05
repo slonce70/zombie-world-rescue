@@ -18,6 +18,7 @@ export class LobbyClient {
     this.getRoom = null;     // () => {code, mode, country, n, state, build} | null
     this._timer = null;
     this._busy = false;
+    this._pendingExtra = null; // разовий вантаж (day/close), що чекає слоту між пінгами
   }
 
   get active() { return !!this._timer; }
@@ -45,15 +46,22 @@ export class LobbyClient {
   }
 
   async _ping(extra = {}) {
-    if (this._busy) return;
+    if (this._busy) {
+      // разовий вантаж (day/close) НЕ сміє загубитись, поки плановий пінг у польоті —
+      // відкладаємо і донесемо одразу після завершення поточного запиту
+      if (extra && Object.keys(extra).length) this._pendingExtra = { ...(this._pendingExtra || {}), ...extra };
+      return;
+    }
     this._busy = true;
     try {
       const body = {
         cid: ensureCid(this.game),
         nick: cleanNick(loadNick()) || t('Гравець'),
         profile: this._profile(),
+        ...(this._pendingExtra || {}),
         ...extra,
       };
+      this._pendingExtra = null;
       const room = this.getRoom && this.getRoom();
       if (room) body.room = room;
       const res = await fetch(`${apiBase()}/lobby/ping`, {
@@ -68,6 +76,8 @@ export class LobbyClient {
       this._busy = false;
     }
     if (this.onUpdate) this.onUpdate(this.data);
+    // накопичився відкладений вантаж, поки цей запит літав — шлемо одразу
+    if (this._pendingExtra) this._ping();
   }
 
   _profile() {

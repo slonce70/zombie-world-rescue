@@ -55,8 +55,11 @@ function recordDayScore(now, nick, score) {
   const cleaned = cleanNickSrv(nick);
   const sc = safeInt(score, 1, 200);
   if (!cleaned) return;
+  // один запис на нік — КРАЩИЙ (дзеркало Lobby DO): слабший забіг не затирає рекорд
+  const prev = lobbyTop3.find((e) => e.nick === cleaned);
+  const best = prev ? Math.max(prev.score, sc) : sc;
   const list = lobbyTop3.filter((e) => e.nick !== cleaned);
-  list.push({ nick: cleaned, score: sc });
+  list.push({ nick: cleaned, score: best });
   list.sort((a, b) => b.score - a.score);
   lobbyTop3 = list.slice(0, 3);
 }
@@ -120,7 +123,8 @@ function lobbyPing(d) {
     if (code && (!existing || existing.cid === cid)) {
       lobbyRooms.set(code, {
         cid, host: nick,
-        mode: ['campaign', 'storm', 'arena'].includes(d.room.mode) ? d.room.mode : 'campaign',
+        mode: ['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'friendly-knockout',
+          'friendly-defense', 'friendly-zone-defense', 'weekly-coop'].includes(d.room.mode) ? d.room.mode : 'campaign',
         country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
         n: Math.min(4, Math.max(1, d.room.n | 0)),
         state: d.room.state === 'game' ? 'game' : 'lobby',
@@ -278,11 +282,12 @@ const httpServer = createServer((req, res) => {
       const mode = String(d.mode || '');
       const country = String(d.country || '').slice(0, 4).toUpperCase();
       const score = Math.round(Number(d.score));
-      const team = (Array.isArray(d.team) ? d.team : []).slice(0, 4).map(cleanNickSrv);
+      // дедуп ніків команди (дзеркало League DO): «Влад + Влад» після реконекту — брехня
+      const team = [...new Set((Array.isArray(d.team) ? d.team : []).map(cleanNickSrv).filter(Boolean))].slice(0, 4);
       const bounds = { storm: [1, 200], coopstorm: [1, 200], arena: [30000, 3600000] }[mode];
       if (!bounds || !(score >= bounds[0] && score <= bounds[1])) return jsonRes(res, { error: 'score' }, 400);
-      // командний режим має сенс лише коли грали ≥2
-      if (mode === 'coopstorm' && team.filter((n) => n).length < 2) return jsonRes(res, { error: 'team' }, 400);
+      // командний режим має сенс лише коли грали ≥2 РІЗНІ ніки
+      if (mode === 'coopstorm' && team.length < 2) return jsonRes(res, { error: 'team' }, 400);
       const key = `${d.cid}|${mode}|${country}`;
       const cur = league.get(key);
       const better = !cur || (mode === 'arena' ? score < cur.score : score > cur.score);

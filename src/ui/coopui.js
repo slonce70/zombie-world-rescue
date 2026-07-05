@@ -183,7 +183,11 @@ export class CoopUI {
     this.game.audio.click();
     try {
       if (navigator.share) { await navigator.share({ title: t('Операція: Порятунок Світу'), text, url }); return; }
-    } catch (e) { /* користувач скасував share — ок */ return; }
+    } catch (e) {
+      // скасування користувачем — тихо виходимо; інші фейли share (WebView,
+      // NotAllowedError поза жестом) — падаємо на буфер обміну нижче
+      if (e && e.name === 'AbortError') return;
+    }
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(url);
@@ -352,7 +356,7 @@ export class CoopUI {
     let rh = '';
     for (const r of rooms) {
       const c = COUNTRIES[r.country];
-      const where = r.mode === 'arena' ? t('Арена') : c ? `${c.flag} ${c.name}` : r.country;
+      const where = r.mode === 'arena' ? t('Арена') : c ? `${c.flag} ${c.name}` : esc(r.country); // невідома country — лише ескейпнутою
       const full = r.n >= 4;
       rh += `<div class="coop-room">
         <span class="cr-mode">${MODE_ICON[r.mode] || '🎯'}</span>

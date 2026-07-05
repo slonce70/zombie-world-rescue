@@ -175,14 +175,61 @@ st = await page.evaluate(() => {
 });
 check(st.real && st.real.state === 'done' && st.story.state === 'done' && /мум/i.test(st.current), 'EGY sync advances story after real tomb delegate completion', JSON.stringify(st));
 
-await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('DEU'); });
+// 📖 Кампанія 2.0 (v282): усі 9 нових країн стартують зі своєю історією
+const NEW_STORIES = [
+  { id: 'DEU', first: 'deu-workshop', icon: '🔧', word: /механік/i, chapter: 'Осінній конвой' },
+  { id: 'FRA', first: 'fra-kitchen', icon: '🥐', word: /кухар/i, chapter: 'Куля над Парижем' },
+  { id: 'ESP', first: 'esp-band', icon: '🎺', word: /музикант/i, chapter: 'Фієста повертається' },
+  { id: 'PRT', first: 'prt-fishers', icon: '⛵', word: /рибалок/i, chapter: 'Маяк Атлантики' },
+  { id: 'ITA', first: 'ita-trattoria', icon: '🍕', word: /тратторі/i, chapter: 'Фонтан бажань' },
+  { id: 'TUR', first: 'tur-bazaar', icon: '🧿', word: /килим/i, chapter: 'Килими й Босфор' },
+  { id: 'SWE', first: 'swe-longhouse', icon: '🛶', word: /довгого дому/i, chapter: 'Північне сяйво' },
+  { id: 'JPN', first: 'jpn-teahouse', icon: '🌸', word: /садівник/i, chapter: 'Сад тисячі ліхтариків' },
+  { id: 'CHN', first: 'chn-scrolls', icon: '📜', word: /учених/i, chapter: 'Вогні Великої стіни' },
+];
+for (const c of NEW_STORIES) {
+  await page.evaluate((cid) => { window.__game.endLevel(); window.__game.startLevel(cid); }, c.id);
+  await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
+  const s = await page.evaluate(() => ({
+    kind: window.__game.test.missionKind(),
+    ids: window.__game.test.storyObjectiveIds(),
+    marker: window.__game.level.missions.getMarkers()[0],
+    current: window.__game.level.missions.currentStoryObjective(),
+    npc: !!(window.__game.level.missions.npcState && window.__game.level.missions.npcState.rig),
+  }));
+  check(s.kind === 'StoryMissions' && s.ids && s.ids[0] === c.first, `${c.id} starts its story (${c.first})`, JSON.stringify(s.ids));
+  check(!!s.marker && s.marker.icon === c.icon, `${c.id} first marker is ${c.icon}`, JSON.stringify(s.marker));
+  check(c.word.test(s.current), `${c.id} HUD shows first story objective`, s.current);
+  check(s.npc, `${c.id} story NPC spawned`, String(s.npc));
+  // 📖 інтро-банер: назва глави і репліка НПС потрапляють у DOM
+  const intro = await page.evaluate(() => {
+    const m = window.__game.level.missions;
+    m._introShown = false;
+    m._showIntro();
+    return {
+      title: document.getElementById('banner-title')?.textContent || '',
+      sub: document.getElementById('banner-sub')?.textContent || '',
+    };
+  });
+  check(intro.title.includes(c.chapter), `${c.id} intro banner shows chapter title`, JSON.stringify(intro.title));
+  check(intro.sub.length > 5, `${c.id} intro banner shows NPC line`, JSON.stringify(intro.sub));
+  // перша ціль завершується і історія просувається далі
+  const adv = await page.evaluate((firstId) => {
+    window.__game.test.completeStoryObjective(firstId);
+    const m = window.__game.level.missions;
+    return { done: m.get(firstId).state === 'done', current: m.currentStoryObjective() };
+  }, c.first);
+  check(adv.done && !!adv.current, `${c.id} advances after first objective`, JSON.stringify(adv));
+}
+
+await page.evaluate(() => { window.__game.endLevel(); window.__game.startLevel('LOST'); });
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
 st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
   replayNightRaid: window.__game.level.missions && window.__game.level.missions.replayNightRaid,
 }));
-check(st.kind === 'DynamicMissions', 'DEU keeps DynamicMissions fallback', JSON.stringify(st));
-check(!st.replayNightRaid, 'DEU fallback has no replayNightRaid truthy value', JSON.stringify(st));
+check(st.kind === 'DynamicMissions', 'LOST keeps DynamicMissions fallback', JSON.stringify(st));
+check(!st.replayNightRaid, 'LOST fallback has no replayNightRaid truthy value', JSON.stringify(st));
 
 await page.evaluate(async () => {
   if (window.__game.level) window.__game.endLevel();

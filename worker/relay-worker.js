@@ -239,7 +239,10 @@ export class Room {
 // перезапуститься, картина відновиться за один пінг. Нічого не платимо за сховище.
 // ============================================================
 const LOBBY_TTL = 40_000;
-const LOBBY_MODES = new Set(['campaign', 'storm', 'arena']);
+// повний перелік режимів, які хост реально анонсує (MODE_ICON у src/ui/coopui.js);
+// невідомий режим коерситься в 'campaign' — радіація більше не прикидається кампанією
+const LOBBY_MODES = new Set(['campaign', 'storm', 'arena', 'radiation', 'turretwar',
+  'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 
 export class Lobby {
   constructor(state) {
@@ -271,9 +274,19 @@ export class Lobby {
   }
 
   // Ліниво піднімаємо денний топ зі storage у кеш (раз на добу / після гібернації).
+  // Single-flight: DO однопоточний, але await віддає хід — два паралельні пінги
+  // без цього читали storage удвох, і друге читання ЗАТИРАЛО в кеші рахунок,
+  // який перший пінг щойно додав (реальна втрата day-score при in-flight пінгу).
   async _loadTop3(now) {
     const day = this._dayKey(now);
-    if (this._top3Loaded && this._top3Day === day) return;
+    while (!(this._top3Loaded && this._top3Day === day)) {
+      if (this._top3Loading) { await this._top3Loading; continue; }
+      this._top3Loading = this._readTop3(day);
+      try { await this._top3Loading; } finally { this._top3Loading = null; }
+    }
+  }
+
+  async _readTop3(day) {
     const stored = await this.state.storage.get('day:' + day);
     this._top3 = Array.isArray(stored) ? stored : [];
     this._top3Day = day;
@@ -294,8 +307,12 @@ export class Lobby {
     const cleaned = cleanNickSrv(nick);
     const sc = this._safeInt(score, 1, 200); // штормова хвиля: та сама стеля, що й у Лізі
     if (!cleaned) return;
-    const list = this._top3.filter((e) => e.nick !== cleaned); // один запис на нік — кращий
-    list.push({ nick: cleaned, score: sc });
+    // один запис на нік — КРАЩИЙ: клієнт шле результат після кожного забігу,
+    // слабший пізніший забіг не сміє затерти ранковий рекорд
+    const prev = this._top3.find((e) => e.nick === cleaned);
+    const best = prev ? Math.max(prev.score, sc) : sc;
+    const list = this._top3.filter((e) => e.nick !== cleaned);
+    list.push({ nick: cleaned, score: best });
     list.sort((a, b) => b.score - a.score);
     this._top3 = list.slice(0, 3);
     this._top3Day = day;
@@ -648,8 +665,11 @@ export class League {
     if (mode === 'storm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
     if (mode === 'coopstorm' && !(score >= 1 && score <= 200)) return this.json({ error: 'score' }, 400);
     if (mode === 'arena' && !(score >= 30000 && score <= 3600000)) return this.json({ error: 'score' }, 400);
-    // 🤝 командний режим має сенс лише коли грали ≥2 — самотній «командний» рекорд не приймаємо
-    if (TEAM_MODES.has(mode) && (!Array.isArray(d.team) || d.team.filter((n) => cleanNickSrv(n)).length < 2)) {
+    // 🤝 команда: чистимо ніки і прибираємо дублі ЩЕ ДО перевірки «грали ≥2» —
+    // ростер після реконекту може тримати той самий нік двічі, а «Влад + Влад»
+    // у таблиці виглядає як брехня. Командний рекорд = щонайменше 2 РІЗНІ ніки.
+    const teamNicks = [...new Set((Array.isArray(d.team) ? d.team : []).map(cleanNickSrv).filter(Boolean))].slice(0, 4);
+    if (TEAM_MODES.has(mode) && teamNicks.length < 2) {
       return this.json({ error: 'team' }, 400);
     }
     // анти-спам: не частіше за раз на 10с НА РЕЖИМ (шторм і арена не заважають одне одному)
@@ -659,7 +679,7 @@ export class League {
     if (now - last < 10000) return this.json({ error: 'slow' }, 429);
     this._lastSubmit.set(rlKey, now);
     if (this._lastSubmit.size > 5000) this._lastSubmit.clear();
-    const team = JSON.stringify((Array.isArray(d.team) ? d.team : []).slice(0, 4).map(cleanNickSrv));
+    const team = JSON.stringify(teamNicks);
     // тримаємо найкращий результат
     const cur = this.sql.exec(
       'SELECT score FROM entries WHERE cid = ? AND mode = ? AND country = ?', cid, mode, country

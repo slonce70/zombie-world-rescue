@@ -14,9 +14,9 @@ export const SHOP_ITEMS = [
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   { id: 'passxp1000', icon: '⭐', name: t('1000 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 100, passXp: 1000, max: Infinity, cat: t('Ресурси') },
-  // 🌟 повторюваний стік монет: віддай монети рятівникам → отримай престиж-зірку. Ціна росте геометрично (×1.5),
-  //    тож монети живі навіть у ветерана, який викупив усі разові товари.
-  { id: 'donate', icon: '🌟', name: t('Пожертва рятівника'), desc: t('Віддай монети рятівникам — і отримай зірку Рятівника! Що більше даруєш, то дорожча наступна.'), price: (save) => Math.round(2000 * Math.pow(1.5, (save && save.donations) || 0)), max: Infinity, cat: t('Ресурси'), donate: true },
+  // 🌟 повторюваний стік монет: віддай монети рятівникам → отримай престиж-зірку. Ціна росте геометрично (×1.5)
+  //    до стелі 25000: без стелі 25-та пожертва коштувала б ~34 млн монет і титул «Легенда фонду» був би недосяжним.
+  { id: 'donate', icon: '🌟', name: t('Пожертва рятівника'), desc: t('Віддай монети рятівникам — і отримай зірку Рятівника! Що більше даруєш, то дорожча наступна.'), price: (save) => Math.min(25000, Math.round(2000 * Math.pow(1.5, (save && save.donations) || 0))), max: Infinity, cat: t('Ресурси'), donate: true },
   { id: 'starterpack', icon: '🎒', name: t('Стартовий набір'), desc: t('+2 гранати, +1 ракета для базуки, +30 патронів'), price: 500, crystalPrice: 10, max: Infinity, cat: t('Набори') },
   { id: 'propack', icon: '🏆', name: t('Профі набір'), desc: t('Золотий скін, +5 гранат, +3 ракети, +250 XP, +90 патронів'), price: 3500, crystalPrice: 35, max: Infinity, cat: t('Набори') },
   { id: 'militarypack', icon: '🪖', name: t('Військовий набір'), desc: t('Військовий скін, +5 гранат, +5 ракет, +120 патронів'), price: 1000, crystalPrice: 20, max: Infinity, cat: t('Набори') },
