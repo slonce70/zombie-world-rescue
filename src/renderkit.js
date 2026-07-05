@@ -73,7 +73,7 @@ export function cylinder(rT, rB, h, mat, seg = 12) {
 }
 
 let bakedMat = null;
-function getBakedMat() {
+export function getBakedMat() {
   if (!bakedMat) {
     bakedMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: getGradMap(), dithering: true });
     bakedMat.userData.shared = true;
