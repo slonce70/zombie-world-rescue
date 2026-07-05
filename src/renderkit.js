@@ -81,7 +81,10 @@ function getBakedMat() {
   return bakedMat;
 }
 
-export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = false, outline = 0 } = {}) {
+// Обходить групу, запікає трансформи+кольори в плоскі буфери (position/normal/color),
+// і за потреби добудовує outline-оболонку в ТИХ САМИХ масивах. Чиста генерація даних,
+// без створення BufferGeometry/Mesh — щоб той самий результат міг лягти і в SkinnedMesh.
+export function bakeGroupGeometry(group, { outline = 0 } = {}) {
   const meshes = [];
   group.traverse((o) => { if (o.isMesh) meshes.push(o); });
   if (!meshes.length) return null;
@@ -137,10 +140,18 @@ export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = fal
       }
     }
   }
+  return { position: pos, normal: nor, color: col, count: total * copies };
+}
+
+export function bakeGroupMeshes(group, { castShadow = false, receiveShadow = false, outline = 0 } = {}) {
+  const meshes = [];
+  group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  if (!meshes.length) return null;
+  const bakedData = bakeGroupGeometry(group, { outline });
   const mg = new THREE.BufferGeometry();
-  mg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  mg.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  mg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  mg.setAttribute('position', new THREE.BufferAttribute(bakedData.position, 3));
+  mg.setAttribute('normal', new THREE.BufferAttribute(bakedData.normal, 3));
+  mg.setAttribute('color', new THREE.BufferAttribute(bakedData.color, 3));
   for (const mesh of meshes) mesh.parent.remove(mesh);
   const baked = new THREE.Mesh(mg, getBakedMat());
   baked.castShadow = castShadow;
