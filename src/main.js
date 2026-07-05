@@ -2396,13 +2396,18 @@ class Game {
     const coop = opts.coop || null;
     const soloWeeklyModId = (!coop && !isPlayground) ? this.weeklyModifierId() : null;
     // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
-    // без сюрпризів); у коопі — лише явно зі spec (хост = джерело істини)
+    // без сюрпризів); у коопі — лише зі spec хоста (opts.mut), а НЕ з локального
+    // календаря гостя (границя тижня опівночі не розсинхронить команду)
+    // weeklyMod (правила/орда) лишається campaign-only соло — у коопі його НЕ вмикаємо,
+    // мутатор тижня несе лише hp/type/night-ефекти через weeklyMutator нижче
     const wkModId = coop
-      ? (opts.weeklyMod || null)
+      ? null
       : (modeId === 'campaign' && !opts.playground && hasLiberated(this.save.liberated, countryId)
         ? soloWeeklyModId : null);
     const wkMod = this._modifierById(wkModId);
-    const weeklyMutator = this._buildWeeklyMutator(soloWeeklyModId, { coop, isPlayground });
+    // джерело id мутатора: соло — гейтований календарний id; кооп — id зі spec хоста
+    const mutatorSrcId = coop ? (opts.mut || null) : soloWeeklyModId;
+    const weeklyMutator = this._buildWeeklyMutator(mutatorSrcId, { coop, isPlayground });
     const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
     document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isGuest = !!(coop && coop.role === 'guest');
@@ -3497,10 +3502,12 @@ class Game {
   }
 
   _buildWeeklyMutator(id, { coop = null, isPlayground = false } = {}) {
-    if (coop || isPlayground) return null;
+    if (isPlayground) return null;
     // у тестах мутатор їде від РЕАЛЬНОГО календаря → батарея зелена/червона залежно від тижня;
-    // тому в ?test він вимкнений, опт-ін через ?weekmod (той самий патерн, що ?draft для драфту)
-    if (this.testMode && !this.params.has('weekmod')) return null;
+    // тому в ?test він вимкнений, опт-ін через ?weekmod (той самий патерн, що ?draft для драфту).
+    // У КООПІ гейт уже застосував хост (_hostWeeklyMutatorId), а id прийшов зі spec —
+    // гість БЕЗ ?weekmod все одно має бачити мутатор (джерело — хост, не URL гостя).
+    if (!coop && this.testMode && !this.params.has('weekmod')) return null;
     const mod = this._modifierById(id);
     if (!mod) return null;
     const hpMul = (mod.zMul && mod.zMul.hp) || 1;
@@ -3516,6 +3523,14 @@ class Game {
       eliteTypes: ['tank', 'shield'],
       night,
     };
+  }
+
+  // 🎲🤝 id мутатора тижня, який ХОСТ кладе у кооп-spec (їде обом сторонам).
+  // Ті самі гейти, що соло: ?test без ?weekmod → null (детермінізм тестів),
+  // а сам id — з реального календаря хоста (джерело істини для команди).
+  _hostWeeklyMutatorId() {
+    if (this.testMode && !this.params.has('weekmod')) return null;
+    return this.weeklyModifierId();
   }
 
   weeklyBossId() {

@@ -182,11 +182,15 @@ export class CoopSession {
     const radiation = mode === 'radiation';
     const turretwar = mode === 'turretwar';
     const realCountry = (arena || knockout || defense || radiation || turretwar) ? 'UKR' : countryId;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, weekly };
+    // 🎲 мутатор тижня в коопі: ХОСТ — джерело id (їде у spec обом сторонам;
+    // ті самі гейти, що соло: playground/?test-без-weekmod → null). Гість НЕ рахує
+    // локально — інакше розсинхрон опівночі/часових поясів.
+    const mut = game._hostWeeklyMutatorId();
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, weekly, mut };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, weekly });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, weekly, mut });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -242,7 +246,7 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, weekly: d.weekly || null });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {

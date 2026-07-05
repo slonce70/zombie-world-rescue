@@ -323,6 +323,9 @@ export class Zombies {
 
   byNid(nid) { return this.byNidMap.get(nid) || null; }
 
+  // 🧪 тест-хук: базове (немодифіковане) hp типу зомбі — для перевірки множників мутатора
+  baseHpFor(type) { return (TYPE_STATS[type] && TYPE_STATS[type].hp) || null; }
+
   // золоте покриття: один матеріал поверх запечених кольорів
   _makeGolden(z_) {
     z_.golden = true;

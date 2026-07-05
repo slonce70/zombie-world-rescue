@@ -128,18 +128,22 @@ const vamp = await page.evaluate(() => {
 });
 check(vamp.after === vamp.before, 'вампіри НЕ спавняться у кімнатному режимі попри ніч', JSON.stringify(vamp));
 
-console.log('▸ guard: unknown/playground/coop не отримують weeklyMutator');
+console.log('▸ guard: unknown/playground → null; coop зі spec-id → мутатор (M2.1)');
 const guards = await page.evaluate(() => {
   const g = window.__game;
   return {
     hasBuilder: typeof g._buildWeeklyMutator === 'function',
     unknown: g._buildWeeklyMutator && g._buildWeeklyMutator('__none', { coop: null, isPlayground: false }),
     playground: g._buildWeeklyMutator && g._buildWeeklyMutator('tough', { coop: null, isPlayground: true }),
+    // M2.1: у коопі мутатор БУДУЄТЬСЯ з id зі spec хоста (гейт застосував хост);
+    // порожній id у коопі все одно null
     coop: g._buildWeeklyMutator && g._buildWeeklyMutator('tough', { coop: { role: 'host' }, isPlayground: false }),
+    coopNoId: g._buildWeeklyMutator && g._buildWeeklyMutator(null, { coop: { role: 'host' }, isPlayground: false }),
   };
 });
 check(guards.hasBuilder, '_buildWeeklyMutator доступний для чесного unit-гарда', JSON.stringify(guards));
-check(guards.unknown === null && guards.playground === null && guards.coop === null, 'unknown/playground/coop резолвляться у null', JSON.stringify(guards));
+check(guards.unknown === null && guards.playground === null, 'unknown/playground резолвляться у null', JSON.stringify(guards));
+check(guards.coop && guards.coop.id === 'tough' && guards.coopNoId === null, 'coop зі spec-id → мутатор; без id → null', JSON.stringify(guards));
 
 console.log('▸ testMode-гейт: без ?weekmod мутатор у ?test вимкнений (батарея не залежить від реального тижня)');
 const gatePage = await ctx.newPage();

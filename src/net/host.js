@@ -369,7 +369,15 @@ export class HostNet {
     if (z.radiationMode) o.rm = 1;
     if (z.turretwar) o.tw = 1;
     if (z.bossStyle) o.st = z.bossStyle;
-    if (z.maxHp !== Math.round(z.stats.hp * (z.type === 'boss' ? 1 : this.level.zombies.diff.hp))) o.mhp = z.maxHp;
+    // 🩺 mhp долітає до puppet-а гостя, лише якщо відрізняється від його НАЇВНОЇ
+    // переоцінки (mirror: coopScale=1, без мутатора → baseHp×diff.hp). Раніше базою
+    // було z.stats.hp, яке на спавні вже = maxHp (coopMul/мутатор «запечені»), тож
+    // gate завжди фолсив і puppet-и мали занижений hp у коопі 2+ / під мутатором тижня.
+    const baseHp = z.type === 'boss' ? null : this.level.zombies.baseHpFor(z.type);
+    const guestNaiveHp = baseHp != null
+      ? Math.max(1, Math.round(baseHp * this.level.zombies.diff.hp))
+      : Math.round(z.stats.hp * (z.type === 'boss' ? 1 : this.level.zombies.diff.hp));
+    if (z.maxHp !== guestNaiveHp) o.mhp = z.maxHp;
     this.ev('zs', z.nid, z.type, r1(z.x), r1(z.z), o);
   }
 
