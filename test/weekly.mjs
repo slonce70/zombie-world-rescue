@@ -124,6 +124,7 @@ const compass = await page.evaluate(async () => {
   g.save.liberated.LOST = true;
   g.save.liberated.LAB = true; // Глава 3 пройдена — інакше компас веде в неї, не у тиждень
   g.save.infected = { cleared: { A: 1, B: 1, C: 1 }, done: true };
+  g.quests.list.forEach((q) => { q.done = true; }); // завдання дня виконані — інакше компас (v277) веде в них, а не у тиждень
   g.dailyChallengeId = () => 'knockout';
   const after = g._nextActionInfo(); // W1000:mode вже стоїть → мусить бути daily
   delete g.save.weekly['W1000:mode'];
