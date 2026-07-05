@@ -3163,6 +3163,9 @@ class Game {
             m.dispose();
           });
         }
+        // SkinnedMesh: Skeleton — завжди per-клон (навіть коли geometry/material спільні,
+        // див. characters.js cloneRig), тож boneTexture DataTexture тут ще не звільнено вище.
+        if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose();
       });
       this.renderer.renderLists.dispose();
     }

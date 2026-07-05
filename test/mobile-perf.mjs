@@ -113,7 +113,9 @@ check(errors.length === 0, 'немає console/page errors', JSON.stringify(erro
 check(metrics.state === 'level', 'mobile level завантажено');
 check(sky.avg[2] > 70 && sky.avg[0] > 20, 'mobile небо не обрізається чорним far plane', JSON.stringify(sky));
 check(metrics.cameraFar <= 220, 'mobile камера не малює дальню непотрібну сцену');
-check(metrics.calls <= 450, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
+// v284 rigid-bind SkinnedMesh (58c73e8): 1 draw call/зомбі замість 7 — реальні заміри
+// 7×поспіль дали 252-265 (джитер — спавн-RNG типів місії/будинків); бюджет = max+~10%.
+check(metrics.calls <= 290, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
 check(metrics.triangles <= 560000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
 
 const lostPage = await ctx.newPage();
@@ -134,7 +136,8 @@ await lostPage.close();
 
 console.log('▸ Mobile LOST metrics', JSON.stringify(lost));
 check(lost.state === 'level' && lost.country === 'LOST', 'LOST острів завантажено на реальній щільності', JSON.stringify(lost));
-check(lost.calls <= 550, 'LOST draw calls у бюджеті', `calls=${lost.calls}`);
+// реальні заміри 7×поспіль: 220-229; бюджет = max+~10% (SkinnedMesh-зомбі — 1 draw call замість 7)
+check(lost.calls <= 255, 'LOST draw calls у бюджеті', `calls=${lost.calls}`);
 check(lost.triangles <= 685000, 'LOST triangles у бюджеті', `triangles=${lost.triangles}`);
 
 const heavy = await page.evaluate(async () => {
@@ -173,14 +176,76 @@ const heavy = await page.evaluate(async () => {
     fires: l.gadgets._meteorFires.length,
     calls: g.renderer.info.render.calls,
     triangles: g.renderer.info.render.triangles,
+    textures: g.renderer.info.memory.textures,
   };
 });
 
 console.log('▸ Mobile heavy metrics', JSON.stringify(heavy));
 check(heavy.zombies >= 36 && heavy.mines >= 2 && heavy.totems >= 2 && heavy.magnets >= 1 && heavy.fires >= 2,
   'mobile heavy state: horde + mines/totems/soulmagnet/fire активні', JSON.stringify(heavy));
-check(heavy.calls <= 520, 'mobile heavy draw calls у бюджеті', `calls=${heavy.calls}`);
+// 36 зомбі-орда (кожен — 1 SkinnedMesh) + мінне поле/тотеми/магніт/метеори: реальні заміри
+// 7×поспіль дали 124-134; бюджет = max+~10%.
+check(heavy.calls <= 150, 'mobile heavy draw calls у бюджеті', `calls=${heavy.calls}`);
 check(heavy.triangles <= 620000, 'mobile heavy triangles у бюджеті', `triangles=${heavy.triangles}`);
+
+// 🦴 Skeleton/boneTexture memory-перевірка: кожен клон зомбі несе власний THREE.Skeleton
+// (bone DataTexture, characters.js cloneRig) — не звільнимо при видаленні зі сцени, і
+// textures монотонно ростимуть з кожною ордою. Заміряємо ДО, вбиваємо орду, проганяємо
+// симуляцію через g._step() (детерміновано, без залежності від реального rAF/фокуса вкладки
+// у headless — інакше ігровий dt майже не тече) на TTL трупа (touch=1.6с), спавнимо нову
+// орду 36 зомбі, знову вбиваємо і прибираємо — textures після циклу мають лишитись у межах
+// ДО + невеликий допуск (±5 — інші ефемерні текстури модалок/HUD).
+const memCycle = await page.evaluate(() => {
+  const g = window.__game;
+  const l = g.level;
+  const texturesBefore = g.renderer.info.memory.textures;
+
+  const killHorde = () => {
+    for (const z of [...l.zombies.list]) {
+      if (z.horde && z.state !== 'dead') z.damage(99999, null, false);
+    }
+  };
+  const stepUntilCorpsesGone = () => {
+    // _corpseTtl(touch)=1.6с; кроки по 0.05с (max dt/кадр) — з запасом до ~2с.
+    // skipRender=false — інакше SkinnedMesh.skeleton.boneTexture ніколи не
+    // виділяється (лежить за WebGLRenderer.renderBufferDirect/updateSkeleton),
+    // і тест не побачив би ні виділення, ні реального витоку.
+    for (let i = 0; i < 42; i++) g._step(0.05, false);
+  };
+  const respawnWave = () => {
+    for (let i = 0; i < 36; i++) {
+      const a = (Math.PI * 2 * i) / 36;
+      const z = l.zombies.spawn(i % 5 === 0 ? 'runner' : i % 7 === 0 ? 'tank' : 'walker', Math.cos(a) * 12, Math.sin(a) * 12, { horde: true });
+      z.aggroed = true;
+      z.state = 'chase';
+    }
+    l.zombies.hordeActive = true;
+    l.zombies.hordeRemaining = l.zombies.list.filter((z) => z.horde && z.state !== 'dead').length;
+  };
+
+  killHorde();
+  stepUntilCorpsesGone();
+  const afterFirstKill = { textures: g.renderer.info.memory.textures, dead: l.zombies.list.filter((z) => z.state === 'dead').length };
+  respawnWave();
+  const respawned = l.zombies.list.filter((z) => z.horde && z.state !== 'dead').length;
+  killHorde();
+  stepUntilCorpsesGone();
+
+  return {
+    texturesBefore,
+    afterFirstKill,
+    respawned,
+    texturesAfter: g.renderer.info.memory.textures,
+    deadAfter: l.zombies.list.filter((z) => z.state === 'dead').length,
+  };
+});
+
+console.log('▸ Mobile memory cycle', JSON.stringify(memCycle));
+check(memCycle.afterFirstKill.dead === 0, 'перша хвиля трупів прибрана до респавну', JSON.stringify(memCycle.afterFirstKill));
+check(memCycle.deadAfter === 0, 'друга хвиля трупів теж прибрана', `deadAfter=${memCycle.deadAfter}`);
+check(memCycle.texturesAfter <= memCycle.texturesBefore + 5,
+  'mobile: textures не ростуть монотонно після хвилі вбивств+респавнів (skeleton.dispose)',
+  `before=${memCycle.texturesBefore} after=${memCycle.texturesAfter}`);
 
 await ctx.close();
 await browser.close();

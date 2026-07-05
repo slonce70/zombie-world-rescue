@@ -174,6 +174,14 @@ export function bakeRigSkinned(rig) {
   return rig;
 }
 
+// Звільняє per-клон Skeleton (і його boneTexture — DataTexture з bind-матрицями кісток,
+// див. bakeRigSkinned/cloneRig: КОЖЕН клон отримує власний new THREE.Skeleton). Геометрію
+// й матеріал SkinnedMesh НЕ чіпаємо — вони спільні (кеш шаблону), як і в disposeObject.
+// Викликати при остаточному прибиранні зомбі зі сцени (не на смерть — на deadT>ttl/gone).
+export function disposeRigSkeleton(rig) {
+  if (rig && rig.skeleton && rig.skeleton.dispose) rig.skeleton.dispose();
+}
+
 // Клон ріга-шаблона: ділить геометрії/матеріали, нова ієрархія та анімаційний стан
 export function cloneRig(tpl) {
   const group = tpl.group.clone(true);
