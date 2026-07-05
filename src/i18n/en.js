@@ -1445,4 +1445,5 @@ export const EN = {
 "▶️ Далі": "▶️ Next",
 "🔁 Ще раз": "🔁 Again",
 "🔁 Реванш": "🔁 Rematch",
+"⭐ Ще трохи — і титул «{n}»! {c}/{t}": "⭐ Almost there — the title \"{n}\"! {c}/{t}",
 };

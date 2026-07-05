@@ -838,6 +838,9 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .ward-stat { color: var(--accent); font-weight: 900; font-size: 12px; margin-top: 4px; }
 .ward-tag { font-size: 12px; font-weight: 700; color: #9fb8d4; margin-top: 3px; }
 .ward-card.equipped .ward-tag { color: #58c14c; }
+.ward-progress { width: 100%; height: 6px; background: rgba(255,255,255,0.12); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+.ward-progress-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.ward-progress-text { font-size: 11px; font-weight: 700; color: #9fb8d4; margin-top: 2px; }
 .ward-try {
   margin-top: 7px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--ui-border);
   background: rgba(255,210,63,.16); color: var(--accent); font: inherit; font-size: 12px; font-weight: 900; cursor: pointer;

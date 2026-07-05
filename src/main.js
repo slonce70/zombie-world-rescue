@@ -1722,7 +1722,15 @@ class Game {
     tracerHtml += '</div>';
     let titleHtml = t('<div class="ward-section">Титули</div><div class="ward-grid">');
     for (const [id, meta] of Object.entries(TITLES)) {
-      titleHtml += card(id, { icon: meta.icon, name: meta.name(), desc: meta.desc(), detail: meta.detail() }, save.titles.includes(id), save.activeTitle === id, 'title');
+      const owned = save.titles.includes(id);
+      // прогрес-бар лише для нерозблокованих титулів із «рахунковим» порогом (>1)
+      const tgt = meta.target;
+      const cur = typeof meta.current === 'function' ? meta.current(save) : 0;
+      const pct = tgt > 0 ? Math.min(100, Math.round((cur / tgt) * 100)) : 0;
+      const statHtml = (!owned && tgt > 1)
+        ? `<div class="ward-progress"><div class="ward-progress-fill" style="width:${pct}%"></div></div><div class="ward-progress-text">${cur}/${tgt}</div>`
+        : '';
+      titleHtml += card(id, { icon: meta.icon, name: meta.name(), desc: meta.desc(), detail: meta.detail(), stat: statHtml }, owned, save.activeTitle === id, 'title');
     }
     titleHtml += '</div>';
     let html = `<div class="ward-tabs">${tabs.map(([id, label]) => `<button class="shop-tab ward-tab ${this._wardrobeTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
@@ -4290,6 +4298,18 @@ class Game {
     nextBtn.style.display = solo && nextTarget(this.save.liberated) !== null ? '' : 'none';
     retryBtn.style.display = solo ? '' : 'none';
     this._showOverlay('overlay-victory');
+    // ⭐ «майже досяг»: тост про перший титул із прогресом ≥80% (раз на сесію, тротл через Set)
+    if (!this._almostTitleToasts) this._almostTitleToasts = new Set();
+    for (const [id, meta] of Object.entries(TITLES)) {
+      if (this.save.titles.includes(id)) continue;
+      if (!(meta.target > 0)) continue;
+      const cur = meta.current(this.save);
+      if (cur / meta.target < 0.8) continue;
+      if (this._almostTitleToasts.has(id)) continue;
+      this._almostTitleToasts.add(id);
+      this.hud.toast(t('⭐ Ще трохи — і титул «{n}»! {c}/{t}', { n: meta.name(), c: cur, t: meta.target }), 5);
+      break;
+    }
   }
 
   _grantInfectedWin(countryId, stats) {

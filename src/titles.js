@@ -12,6 +12,8 @@ export const TITLES = {
     desc: () => t('Пройди Зоряний шлях до кінця'),
     detail: () => t('Відкривається на {n} рівні Зоряного шляху', { n: PASS_MAX_LEVEL }),
     unlocked: (s) => ((s.xp | 0) >= XP_PASS_CAP),
+    current: (s) => (s.xp | 0),
+    target: XP_PASS_CAP,
   },
   zombie_killer: {
     icon: '🧟',
@@ -19,6 +21,8 @@ export const TITLES = {
     desc: () => t('Вбий 555 зомбі'),
     detail: () => t('Відкривається за 555 вбитих зомбі'),
     unlocked: (s) => ((s.stats && s.stats.killed) | 0) >= 555,
+    current: (s) => ((s.stats && s.stats.killed) | 0),
+    target: 555,
   },
   zero_coins: {
     icon: '🪙',
@@ -26,6 +30,8 @@ export const TITLES = {
     desc: () => t('Витрать 50000 монет'),
     detail: () => t('Відкривається за 50000 витрачених монет'),
     unlocked: (s) => ((s.stats && s.stats.coinsSpent) | 0) >= 50000,
+    current: (s) => ((s.stats && s.stats.coinsSpent) | 0),
+    target: 50000,
   },
   clone_army: {
     icon: '🧍',
@@ -33,6 +39,8 @@ export const TITLES = {
     desc: () => t('Використай Клон 35 разів'),
     detail: () => t('Відкривається за 35 використань гаджета Клон'),
     unlocked: (s) => ((s.stats && s.stats.cloneUses) | 0) >= 35,
+    current: (s) => ((s.stats && s.stats.cloneUses) | 0),
+    target: 35,
   },
   tyrant: {
     icon: '👑',
@@ -40,6 +48,8 @@ export const TITLES = {
     desc: () => t('Нанеси 50000 шкоди'),
     detail: () => t('Відкривається за 50000 шкоди по ворогах'),
     unlocked: (s) => ((s.stats && s.stats.damageDealt) | 0) >= 50000,
+    current: (s) => ((s.stats && s.stats.damageDealt) | 0),
+    target: 50000,
   },
   gadget_king: {
     icon: '🧰',
@@ -47,6 +57,8 @@ export const TITLES = {
     desc: () => t('Використай гаджети 100 разів'),
     detail: () => t('Відкривається за 100 використань будь-яких гаджетів'),
     unlocked: (s) => ((s.stats && s.stats.gadgetUses) | 0) >= 100,
+    current: (s) => ((s.stats && s.stats.gadgetUses) | 0),
+    target: 100,
   },
   infection_cleaner: {
     icon: '🧪',
@@ -54,6 +66,8 @@ export const TITLES = {
     desc: () => t('Очисти заражену країну'),
     detail: () => t('Відкривається за першу перемогу в Главі 2'),
     unlocked: (s) => Object.keys((s.infected && s.infected.cleared) || {}).length >= 1,
+    current: (s) => Object.keys((s.infected && s.infected.cleared) || {}).length,
+    target: 1,
   },
   ghost: {
     icon: '👻',
@@ -61,6 +75,8 @@ export const TITLES = {
     desc: () => t('Досягни 5 рівня Шляху душ'),
     detail: () => t('Відкривається на 5 рівні Шляху душ'),
     unlocked: (s) => ((s.soulLevel || 1) | 0) >= 5,
+    current: (s) => ((s.soulLevel || 1) | 0),
+    target: 5,
   },
   radiation_player: {
     icon: '☢️',
@@ -68,6 +84,9 @@ export const TITLES = {
     desc: () => t('Мега-квест: переможи Боса Радіації 5 разів'),
     detail: () => t('Нагорода за мега-квест Боса Радіації'),
     unlocked: (s) => (s.titles || []).includes('radiation_player'),
+    // немає природного лічильника — нагорода за мега-квест; прогрес бінарний 0/1
+    current: (s) => ((s.titles || []).includes('radiation_player') ? 1 : 0),
+    target: 1,
   },
   // 🌟 титули за «Пожертву рятівника»: чим більше донацій, тим вищий титул
   generous_rescuer: {
@@ -76,6 +95,8 @@ export const TITLES = {
     desc: () => t('Зроби 5 пожертв рятівнику'),
     detail: () => t('Відкривається за 5 пожертв рятівнику'),
     unlocked: (s) => ((s.donations | 0) >= 5),
+    current: (s) => (s.donations | 0),
+    target: 5,
   },
   golden_heart: {
     icon: '💛',
@@ -83,6 +104,8 @@ export const TITLES = {
     desc: () => t('Зроби 10 пожертв рятівнику'),
     detail: () => t('Відкривається за 10 пожертв рятівнику'),
     unlocked: (s) => ((s.donations | 0) >= 10),
+    current: (s) => (s.donations | 0),
+    target: 10,
   },
   fund_legend: {
     icon: '🏛️',
@@ -90,6 +113,8 @@ export const TITLES = {
     desc: () => t('Зроби 25 пожертв рятівнику'),
     detail: () => t('Відкривається за 25 пожертв рятівнику'),
     unlocked: (s) => ((s.donations | 0) >= 25),
+    current: (s) => (s.donations | 0),
+    target: 25,
   },
 };
 
@@ -112,6 +137,8 @@ for (const [id, modeId, icon, name, modeName] of MODE_TITLES) {
     desc: () => t('10 перемог: {m}', { m: t(modeName) }),
     detail: () => t('Відкривається за 10 перемог у режимі «{m}»', { m: t(modeName) }),
     unlocked: (s) => ((s.modeWins && s.modeWins[modeId]) | 0) >= 10,
+    current: (s) => ((s.modeWins && s.modeWins[modeId]) | 0),
+    target: 10,
   };
 }
 
