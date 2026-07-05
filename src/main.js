@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 278;
+const APP_VERSION = 279;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -768,6 +768,9 @@ class Game {
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
+      // 🤝 кооп-перемоги: coopWins — лічильник перемог у грі разом (roster>1);
+      // coopBonusDay — dayKey останнього виданого щоденного командного кристала (скаляр, НЕ map)
+      coopWins: 0, coopBonusDay: '',
       // 🎁 подарунок дня зі стрик-календарем; 🗓️ ціль тижня «300 зомбі → 💎 25»
       gift: { last: '', streak: 0, week: 1 },
       weeklyGoal: { week: -1, n: 0, claimed: false },
@@ -864,6 +867,10 @@ class Game {
           if (typeof out[k] !== 'number' || !isFinite(out[k]) || out[k] < 0) out[k] = 0;
           out[k] = Math.floor(out[k]);
         }
+        // 🤝 кооп-перемоги: лічильник — ціле ≥0; день бонуса — рядок (зіпсоване/чуже → 0/'')
+        if (typeof out.coopWins !== 'number' || !isFinite(out.coopWins) || out.coopWins < 0) out.coopWins = 0;
+        out.coopWins = Math.floor(out.coopWins);
+        if (typeof out.coopBonusDay !== 'string') out.coopBonusDay = '';
         if (!Array.isArray(out.cloneSkins)) out.cloneSkins = [];
         out.cloneSkins = out.cloneSkins.filter((id, i, arr) => id === 'radiation' && arr.indexOf(id) === i);
         if (out.activeCloneSkin !== 'radiation' || !out.cloneSkins.includes('radiation')) out.activeCloneSkin = 'ninja';
@@ -3488,6 +3495,27 @@ class Game {
     this.saveGame();
   }
 
+  // 🤝 нагорода за перемогу В КООПІ (roster>1) — обом сторонам локально, wire не чіпаємо:
+  // командний бонус монет ЗАВЖДИ, а щоденний кристал — раз на день (coopBonusDay = dayKey).
+  _grantCoopWin() {
+    const level = this.level;
+    if (!level || !level.net) return;             // тільки кооп-перемоги
+    const roster = this.coop && this.coop.session && this.coop.session.roster;
+    if (!roster || roster.size <= 1) return;      // грали разом (не сам-один у кімнаті)
+    this.save.coopWins = (this.save.coopWins || 0) + 1;
+    this.save.coins += 150;                        // командний бонус — завжди
+    const day = this.gift.dayKey();                // локальний 'YYYY-MM-DD' — те саме джерело дати
+    if (this.save.coopBonusDay !== day) {
+      this.save.coopBonusDay = day;
+      this.save.crystals = (this.save.crystals || 0) + 1;
+      this.hud.banner(t('🤝 КОМАНДНИЙ БОНУС!'), t('🪙 +150 · 💎 +1 (щодня за гру разом)'), 4.5);
+    } else {
+      this.hud.banner(t('🤝 КОМАНДНИЙ БОНУС!'), t('🪙 +150 за гру разом'), 4.5);
+    }
+    this.audio.levelUp();
+    this.saveGame();
+  }
+
   // 🏁 спільний фінал кімнатних режимів: перемоги, віхи, рекорд часу, множник дня.
   // Викликати ДО нарахування нагород; mult множить монети/XP режиму.
   // Кооп-варіанти (friendly-нокаут) рекорди/віхи не чіпають — це соло-прогрес.
@@ -4295,6 +4323,8 @@ class Game {
     this.progress.addXp(XP_VALUES.country);
     if (!wasLiberated) this.quests.onEvent('country');
     this.saveGame();
+    // 🤝 бонус за гру РАЗОМ — обом сторонам локально (як _grantWeeklyCoop): wire не чіпаємо
+    this._grantCoopWin();
     if (this.level.net && this.level.net.authority) this.level.netEv('vict');
     this.globe.setLiberated();
     this.input.exitLock();

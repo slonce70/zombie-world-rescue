@@ -78,6 +78,8 @@ export class RescueHQ {
       ['🦙', t('Мегабоксів відкрито'), s.megaboxes || 0],
       ['🔥', t('Найкраще комбо'), s.bestCombo || 0],
     ];
+    // 🤝 кооп-перемоги показуємо лише коли вони є — не захаращуємо соло-гравцям
+    if ((save.coopWins || 0) > 0) rows.push(['🤝', t('Кооп-перемог'), save.coopWins || 0]);
     let h = `<h3 class="hq-h">${t('🏅 Мої цифри')}</h3><div class="hq-stats">`;
     for (const [i, label, n] of rows) {
       h += `<div class="hq-stat"><span class="hq-stat-i">${i}</span><span class="hq-stat-l">${label}</span><span class="hq-stat-n">${n}</span></div>`;

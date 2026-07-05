@@ -222,13 +222,21 @@ export class CoopUI {
     el.style.display = show ? '' : 'none';
     if (show) {
       const n = s.roster.size;
-      el.innerHTML = t('🤝 Код:', {}) + ` <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''}`;
+      // 📤 «поділитись» просто в бою — span[role=button] (вкладений button у клікабельний div невалідний).
+      // ≥40px тап-таргет; клік не пробиває на чип (див. делегований слухач нижче — data-share).
+      const share = `<span class="coop-room-share" role="button" tabindex="0" data-share="1" aria-label="${t('Поділитися посиланням на кімнату')}">📤</span>`;
+      el.innerHTML = t('🤝 Код:', {}) + ` <b>${this._esc(s.room)}</b> · ${n}/4${n > 1 ? ` · 🧟×${n}` : ''} ${share}`;
     }
-    // тап по чипу = колесо пінгів (без нового HUD-елемента). Слухач навішуємо раз.
+    // тап по чипу = колесо пінгів; тап по 📤 = поділитись. Слухач навішуємо раз (делегуємо всередину).
     if (!this._chipPingWired) {
       this._chipPingWired = true;
       el.title = t('Пінг команді');
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        if (e.target && e.target.closest && e.target.closest('[data-share]')) {
+          e.stopPropagation();
+          this._shareInvite(); // сам грає audio.click()
+          return;
+        }
         if (this.session.state === 'level') this.openPingWheel();
       });
     }
