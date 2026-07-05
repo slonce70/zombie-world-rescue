@@ -140,6 +140,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'weapons', 'weekly', 'worldBosses', 'xp', 'radiationCoins',
       'gift', 'weeklyGoal', 'donations', 'donStars',
       'coopWins', 'coopBonusDay',
+      'coopRole',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;

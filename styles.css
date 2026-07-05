@@ -1128,6 +1128,18 @@ body.touch-mode #touch-coach.show { display: block; }
 .lobby-country.sel { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
 .lobby-country.locked { opacity: 0.45; }
 
+/* 🎭 кооп-ролі: ряд із 3 чипів під ростером (guard/medic/scout) */
+#lobby-roles { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
+.lobby-role {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 92px; min-height: 44px; padding: 8px 10px; border-radius: 12px;
+  font-size: 22px; cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.12);
+}
+.lobby-role span { font-size: 12px; font-weight: 800; }
+.lobby-role:hover { border-color: rgba(255, 210, 63, 0.6); }
+.lobby-role.sel { border-color: var(--accent); background: rgba(255, 210, 63, 0.12); }
+
 /* панель команди в бою */
 #team-panel {
   position: absolute; left: 14px; top: 46%; transform: translateY(-50%);

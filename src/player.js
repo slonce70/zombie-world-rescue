@@ -55,6 +55,7 @@ export class Player {
     this.maxHealth = 100;
     this.health = 100;
     this.speedMult = 1;
+    this.pickupMult = 1; // 🎭 кооп-scout: радіус підбору монет/дропів ×1.25 (див. effects)
     this.damageMult = 1;
     this.damageTotemMult = 1;
     this.respawnProtect = 0;

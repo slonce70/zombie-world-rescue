@@ -10,6 +10,24 @@ import { nickIsBad } from '../../worker/nick.mjs';
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
 
+// 🎭 кооп-ролі v1: дитина в лобі обирає «ким я буду» (ідентичність + маленький САМО-баф).
+// Роль знімається СНАПШОТОМ на старті рівня (див. main._buildLevel), змінити посеред бою не діє.
+// Бафи скромні: guard — +25 maxHealth; medic — швидший ревайв друга (3с→1.8с);
+// scout — швидкість ×1.08 + радіус підбору ×1.25. У radiation/pvp/соло ролі НЕ діють.
+export const COOP_ROLE_IDS = ['guard', 'medic', 'scout'];
+export const COOP_ROLES = {
+  guard: { icon: '🛡️', maxHealthBonus: 25 },
+  medic: { icon: '💉', reviveSecs: 1.8 },
+  scout: { icon: '🏹', speedMult: 1.08, pickupMult: 1.25 },
+};
+// клампимо будь-яку вхідну роль (сейв/мережа) у whitelist — інакше null (без ролі)
+export function sanitizeCoopRole(r) {
+  return COOP_ROLE_IDS.includes(r) ? r : null;
+}
+export function coopRoleIcon(r) {
+  return (COOP_ROLES[r] && COOP_ROLES[r].icon) || '';
+}
+
 // 📣 безпечні пінги — лише 5 фіксованих фраз, без вільного тексту
 export const PING_PHRASES = [
   { icon: '📍', text: t('Сюди!') },
@@ -59,6 +77,8 @@ export class CoopSession {
     const save = this.game.save;
     return {
       nick: this.nick,
+      // 🎭 кооп-роль (див. COOP_ROLES): їде в hello/roster, щоб друзі бачили «💉 медик»
+      role: sanitizeCoopRole(save.coopRole),
       skin: save.activeSkin || 'classic',
       // 🎨 кастом-герой: 3 числа {shirt,pants,skin} — щоб друзі бачили твій вигляд.
       // Лише для активного кастом-скіна; інакше null (дефолтна гілка makeHero).
@@ -163,6 +183,31 @@ export class CoopSession {
     if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode }, true);
   }
 
+  // 🎭 моя кооп-роль (лобі): зберігаємо у сейв, оновлюємо ростер і синхронізуємо кімнату.
+  // Хост міняє локально + ребродкаст; гість шле намір хосту (той клампить і ребродкастить).
+  setMyRole(role) {
+    role = sanitizeCoopRole(role);
+    this.game.save.coopRole = role;
+    this.game.saveGame();
+    const mine = this.roster.get(this.myPid);
+    if (mine) mine.role = role;
+    if (this.role === 'host') {
+      this._broadcastRoster();
+    } else {
+      this.transport.send(1, { t: 'role', r: role }, true);
+    }
+    if (this.onRoster) this.onRoster();
+  }
+
+  // хост отримав намір гостя змінити роль: клампимо, оновлюємо ростер, ребродкаст
+  _hostSetGuestRole(from, r) {
+    const rr = this.roster.get(from);
+    if (!rr) return;
+    rr.role = sanitizeCoopRole(r);
+    this._broadcastRoster();
+    if (this.onRoster) this.onRoster();
+  }
+
   // хост тисне СТАРТ
   startLevel() {
     if (this.role !== 'host') return;
@@ -220,6 +265,7 @@ export class CoopSession {
     if (this.role === 'host') {
       if (d.t === 'hello') this._hostHello(from, d);
       else if (d.t === 'bye') this._dropGuest(from, 'left');
+      else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
     } else {
       if (d.t === 'welcome') {
         this.myPid = d.pid;
@@ -278,7 +324,7 @@ export class CoopSession {
     // 🧼 безпека дітей: захист від клієнта, що оминає cleanNick (нік видно іншій дитині)
     if (nickIsBad(nick)) nick = t('Гравець');
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
-    this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
+    this.roster.set(from, { pid: from, nick, role: sanitizeCoopRole(d.role), skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
@@ -305,7 +351,7 @@ export class CoopSession {
   _rosterList() {
     const out = [];
     for (const [pid, r] of this.roster) {
-      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
+      out.push({ pid, nick: r.nick || this.nick, role: sanitizeCoopRole(r.role), skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
     }
     return out;
   }
