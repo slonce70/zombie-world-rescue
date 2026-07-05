@@ -1,7 +1,7 @@
 // UI кооперативу: модалка «Грати разом» і лобі кімнати.
 // Потік: нік (раз) → панель з кнопками ліворуч і «життям» праворуч —
 // лічильник онлайна, хто в мережі, відкриті кімнати з кнопкою «Зайти» без кода.
-import { CoopSession, loadNick, saveNick, cleanNick, PING_PHRASES } from '../net/coop.js';
+import { CoopSession, loadNick, saveNick, cleanNick, PING_PHRASES, COOP_ROLE_IDS, coopRoleIcon } from '../net/coop.js';
 import { t } from '../i18n.js';
 import { nickIsBad } from '../../worker/nick.mjs';
 import { LobbyClient } from '../net/lobby.js';
@@ -12,12 +12,13 @@ import { FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES } from '../knockout.js';
 import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defense.js';
 import { RADIATION_UNLOCK_COUNTRIES } from '../radiationmode.js';
 import { TURRETWAR_UNLOCK_COUNTRIES } from '../turretwar.js';
+import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
   campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝',
   'friendly-defense': '🛡️', 'friendly-zone-defense': '⭕', 'weekly-coop': '🗓️',
-  radiation: '☢️', turretwar: '🗼',
+  radiation: '☢️', turretwar: '🗼', worldboss: '🌋',
 };
 
 export class CoopUI {
@@ -51,6 +52,7 @@ export class CoopUI {
       lobbyPubRow: $('lobby-public-row'),
       lobbyPub: $('lobby-public'),
       roster: $('lobby-roster'),
+      roles: $('lobby-roles'),
       countries: $('lobby-countries'),
       modes: $('lobby-modes'),
       start: $('btn-lobby-start'),
@@ -515,9 +517,10 @@ export class CoopUI {
     let html = '';
     for (const [pid, r] of s.roster) {
       const skin = HERO_SKINS[r.skin] ? HERO_SKINS[r.skin].icon : '🙂';
+      const roleIcon = coopRoleIcon(r.role); // 🎭 емодзі ролі біля ніка
       html += `<div class="lobby-player ${pid === s.myPid ? 'me' : ''}">
         <span class="lp-skin">${skin}</span>
-        <span class="lp-nick">${this._esc(r.nick || '...')}</span>
+        <span class="lp-nick">${roleIcon ? roleIcon + ' ' : ''}${this._esc(r.nick || '...')}</span>
         <span class="lp-role">${pid === 1 ? t('👑 хост') : ''}</span>
       </div>`;
     }
@@ -525,6 +528,9 @@ export class CoopUI {
       html += t('<div class="lobby-player empty"><span class="lp-skin">➕</span><span class="lp-nick">вільне місце</span></div>');
     }
     this.el.roster.innerHTML = html;
+
+    // 🎭 ряд вибору ролі (спільний для хоста і гостя): guard/medic/scout + «без ролі»
+    this._renderRoles(s);
 
     // режим
     const save = this.game.save;
@@ -541,6 +547,7 @@ export class CoopUI {
       ['friendly-zone-defense', t('⭕ Дружня оборона в зоні')],
       ['radiation', t('☢️ Радіація')],
       ['turretwar', t('🗼 Оборона турелі')],
+      ['worldboss', t('🌋 Світовий бос')],
       ['arena', t('👑 Арена')],
       ['weekly-coop', t('🗓️ Командний тиждень: {i} 💎', { i: MODE_ICON[wkCoopMode] || '🎲' })],
     ]) {
@@ -552,6 +559,7 @@ export class CoopUI {
         || (mid === 'friendly-zone-defense' && libCount < ZONE_DEFENSE_UNLOCK_COUNTRIES)
         || (mid === 'radiation' && libCount < RADIATION_UNLOCK_COUNTRIES)
         || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
+        || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
         || (mid === 'weekly-coop' && !anyLib));
       mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
     }
@@ -578,7 +586,7 @@ export class CoopUI {
     // weekly-coop показує пікер лише коли режим тижня — Шторм)
     const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout'
       || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
-      || s.mode === 'radiation' || s.mode === 'turretwar'
+      || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss'
       || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
     document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
     this.el.countries.style.display = hideCountries ? 'none' : '';
@@ -613,6 +621,35 @@ export class CoopUI {
         ? t('Кімнату видно у списку — чекай гостей або продиктуй код 👆')
         : t('Продиктуй другу код кімнати 👆')))
       : t('Хост обрав {m} · {c} — чекаємо на СТАРТ…', { m: modeTxt, c: COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag + ' ' + COUNTRIES[s.countryId].name : '' });
+  }
+
+  // 🎭 ряд вибору кооп-ролі: 3 чипи (Захисник/Медик/Розвідник) + «без ролі».
+  // Тап → session.setMyRole (зберігає в сейв, синхронізує кімнату). Чипи ≥44px, з aria-label.
+  _renderRoles(s) {
+    if (!this.el.roles) return;
+    const my = s.roster.get(s.myPid);
+    const cur = (my && my.role) || null;
+    const chips = [
+      [null, '🚫', t('Без ролі')],
+      ['guard', coopRoleIcon('guard'), t('Захисник')],
+      ['medic', coopRoleIcon('medic'), t('Медик')],
+      ['scout', coopRoleIcon('scout'), t('Розвідник')],
+    ];
+    let rh = '';
+    for (const [id, icon, label] of chips) {
+      const sel = cur === id;
+      rh += `<div class="lobby-role ${sel ? 'sel' : ''}" data-role="${id || ''}"`
+        + ` role="button" tabindex="0" aria-pressed="${sel}"`
+        + ` aria-label="${t('Роль: {r}', { r: label })}">${icon}<span>${this._esc(label)}</span></div>`;
+    }
+    this.el.roles.innerHTML = rh;
+    this.el.roles.querySelectorAll('.lobby-role').forEach((el) => {
+      el.addEventListener('click', () => {
+        this.game.audio.click();
+        const raw = el.dataset.role;
+        s.setMyRole(COOP_ROLE_IDS.includes(raw) ? raw : null);
+      });
+    });
   }
 
   _esc(str) {

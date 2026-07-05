@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 284;
+const APP_VERSION = 285;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -768,6 +768,8 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, cloudTs: 0, goal: null,
+      // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
+      coopRole: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -908,6 +910,8 @@ class Game {
         else out.weeklyGoal = this._sanitizeWeeklyGoal(Object.assign({ week: -1, n: 0, claimed: false }, out.weeklyGoal));
         out.strongZombies = !!out.strongZombies;
         out.toughZombies = !!out.toughZombies;
+        // 🎭 кооп-роль: лише з білого списку (зіпсоване/чуже → null, без ролі)
+        if (!['guard', 'medic', 'scout'].includes(out.coopRole)) out.coopRole = null;
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
         // легасі-сейв БЕЗ passLvl (Object.assign підставив дефолт 1 — НЕ вір йому:
         // видача 2..40 повторилась би) → null: grantBacklog ініціалізує «до 40 видано»
@@ -2396,13 +2400,18 @@ class Game {
     const coop = opts.coop || null;
     const soloWeeklyModId = (!coop && !isPlayground) ? this.weeklyModifierId() : null;
     // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
-    // без сюрпризів); у коопі — лише явно зі spec (хост = джерело істини)
+    // без сюрпризів); у коопі — лише зі spec хоста (opts.mut), а НЕ з локального
+    // календаря гостя (границя тижня опівночі не розсинхронить команду)
+    // weeklyMod (правила/орда) лишається campaign-only соло — у коопі його НЕ вмикаємо,
+    // мутатор тижня несе лише hp/type/night-ефекти через weeklyMutator нижче
     const wkModId = coop
-      ? (opts.weeklyMod || null)
+      ? null
       : (modeId === 'campaign' && !opts.playground && hasLiberated(this.save.liberated, countryId)
         ? soloWeeklyModId : null);
     const wkMod = this._modifierById(wkModId);
-    const weeklyMutator = this._buildWeeklyMutator(soloWeeklyModId, { coop, isPlayground });
+    // джерело id мутатора: соло — гейтований календарний id; кооп — id зі spec хоста
+    const mutatorSrcId = coop ? (opts.mut || null) : soloWeeklyModId;
+    const weeklyMutator = this._buildWeeklyMutator(mutatorSrcId, { coop, isPlayground });
     const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
     document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isGuest = !!(coop && coop.role === 'guest');
@@ -2934,6 +2943,24 @@ class Game {
     // прогріваємо шейдери, поки висить екран завантаження — без фризу на старті
     try { this.renderer.compile(level.scene, level.player.camera); } catch (e) { /* ignore */ }
 
+    // 🎭 кооп-ролі v1: СНАПШОТ своєї ролі на СТАРТІ рівня (зміна ролі посеред бою не діє —
+    // анти-гриф). Скромні САМО-бафи; radiation (контракт 50 HP) і pvp — виключення.
+    // Дефолт для соло/несумісних режимів: без ролі, revive-фактор 1/3 (3с).
+    this._coopReviveRate = 1 / 3;
+    if (coop && !isRadiation && !isPvp) {
+      const myRole = ['guard', 'medic', 'scout'].includes(this.save.coopRole) ? this.save.coopRole : null;
+      level.coopRole = myRole;
+      if (myRole === 'guard') {
+        level.player.maxHealth += 25;
+        level.player.health = level.player.maxHealth;
+      } else if (myRole === 'scout') {
+        level.player.speedMult *= 1.08;
+        level.player.pickupMult = 1.25;
+      } else if (myRole === 'medic') {
+        this._coopReviveRate = 1 / 1.8;
+      }
+    }
+
     // 🤝 кооп: мережевий шар рівня
     if (coop) {
       level.net = coop.session.makeNet(level, coop.spec);
@@ -2942,12 +2969,18 @@ class Game {
         // предмети підбирають і снаряди б'ють УСІХ гравців
         level.effects.getPickupTargets = () => {
           const out = [];
+          const roster = coop.session.roster;
           for (const pl of level.players || []) {
             if (pl.health <= 0) continue;
+            // 🎭 scout: ширший радіус підбору. Хост читає роль кожного гравця з ростера
+            // (снапшот на старті рівня — зміна ролі посеред бою не діє: див. _buildLevel).
+            const remoteScout = pl.pid !== 1 && (roster.get(pl.pid) || {}).role === 'scout';
             out.push({
               pos: pl.pos,
               magnet: pl.pid === 1 ? level.player.buffs.magnet > 0 : !!pl.magnet,
               pid: pl.pid,
+              // pid 1 — снапшот у player.pickupMult (заморожено на старті); гості — роль з ростера
+              pickMult: pl.pid === 1 ? (level.player.pickupMult || 1) : (remoteScout ? 1.25 : 1),
             });
           }
           return out;
@@ -3327,7 +3360,8 @@ class Game {
       this._revProg = 0;
     }
     if (allowControl && this.input.down('KeyE')) {
-      this._revProg = Math.min(1, (this._revProg || 0) + dt / 3);
+      // 🎭 медик піднімає швидше (1.8с проти 3с) — снапшот-фактор із _buildLevel
+      this._revProg = Math.min(1, (this._revProg || 0) + dt * (this._coopReviveRate || 1 / 3));
       if (this._revProg >= 1) {
         this._revProg = 0;
         level.net.sendRevive(target.pid);
@@ -3497,10 +3531,12 @@ class Game {
   }
 
   _buildWeeklyMutator(id, { coop = null, isPlayground = false } = {}) {
-    if (coop || isPlayground) return null;
+    if (isPlayground) return null;
     // у тестах мутатор їде від РЕАЛЬНОГО календаря → батарея зелена/червона залежно від тижня;
-    // тому в ?test він вимкнений, опт-ін через ?weekmod (той самий патерн, що ?draft для драфту)
-    if (this.testMode && !this.params.has('weekmod')) return null;
+    // тому в ?test він вимкнений, опт-ін через ?weekmod (той самий патерн, що ?draft для драфту).
+    // У КООПІ гейт уже застосував хост (_hostWeeklyMutatorId), а id прийшов зі spec —
+    // гість БЕЗ ?weekmod все одно має бачити мутатор (джерело — хост, не URL гостя).
+    if (!coop && this.testMode && !this.params.has('weekmod')) return null;
     const mod = this._modifierById(id);
     if (!mod) return null;
     const hpMul = (mod.zMul && mod.zMul.hp) || 1;
@@ -3516,6 +3552,14 @@ class Game {
       eliteTypes: ['tank', 'shield'],
       night,
     };
+  }
+
+  // 🎲🤝 id мутатора тижня, який ХОСТ кладе у кооп-spec (їде обом сторонам).
+  // Ті самі гейти, що соло: ?test без ?weekmod → null (детермінізм тестів),
+  // а сам id — з реального календаря хоста (джерело істини для команди).
+  _hostWeeklyMutatorId() {
+    if (this.testMode && !this.params.has('weekmod')) return null;
+    return this.weeklyModifierId();
   }
 
   weeklyBossId() {
@@ -4223,6 +4267,12 @@ class Game {
     const mode = level.worldBoss;
     if (mode._ended) return;
     mode._ended = true;
+    // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн radiation).
+    // Командний бонус + недільна нагорода — обом сторонам локально (wire не чіпаємо).
+    // Кожен локально пише save.worldBosses[id] нижче — гість отримує clear без окремого
+    // соло-анлоку СВІДОМО (прецедент radiationCoins: нагороди коопу нараховуються локально).
+    this._grantWeeklyCoop(level, !!won);
+    if (won && level.net) this._grantCoopWin();
     mode.completed = !!won;
     mode.over = true;
     level.bossDefeated = !!won;
@@ -5024,6 +5074,7 @@ class Game {
       },
       coopSetCountry: (c) => g.coop.session.setCountry(c),
       coopSetMode: (mo) => g.coop.session.setMode(mo),
+      coopSetRole: (r) => g.coop.session.setMyRole(r),
       coopStartLevel: () => g.coop.session.startLevel(),
       coopLeave: () => g.coop.session.leave(),
       coopState: () => {

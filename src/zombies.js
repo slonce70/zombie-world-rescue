@@ -314,6 +314,10 @@ export class Zombies {
       z_.sleeping = true;
       setAnim(rig, 'idle');
     }
+    // 🌋 світовий бос: прапори мусять стояти ДО onZombieSpawn, інакше live-подія zs
+    // (бос спавниться посеред бою) не понесе o.wb/o.wbm — гість не забіндить puppet-боса
+    if (opts.worldBoss) z_.worldBoss = opts.worldBoss;
+    if (opts.worldBossMinion) z_.worldBossMinion = true;
     this.byNidMap.set(nid, z_);
     this.list.push(z_);
     if (finalType === 'boss') this.boss = z_;
@@ -322,6 +326,9 @@ export class Zombies {
   }
 
   byNid(nid) { return this.byNidMap.get(nid) || null; }
+
+  // 🧪 тест-хук: базове (немодифіковане) hp типу зомбі — для перевірки множників мутатора
+  baseHpFor(type) { return (TYPE_STATS[type] && TYPE_STATS[type].hp) || null; }
 
   // золоте покриття: один матеріал поверх запечених кольорів
   _makeGolden(z_) {
@@ -1684,6 +1691,9 @@ export class Zombies {
     if (o.d) z_.defense = true;
     if (o.rm) z_.radiationMode = true;
     if (o.tw) z_.turretwar = true;
+    // 🌋 світовий бос: гість біндить puppet-боса, HUD/маркер читають level.zombies.boss
+    if (o.wb) { z_.worldBoss = o.wb; this.boss = z_; }
+    if (o.wbm) z_.worldBossMinion = true;
     if (o.mhp) { z_.maxHp = o.mhp; z_.hp = o.hp !== undefined ? o.hp : o.mhp; }
     if (o.sh !== undefined && z_.shieldMax > 0) this._applyShieldPct(z_, o.sh);
     if (o.ch !== undefined && z_.chestMax > 0) this._applyChestPct(z_, o.ch);

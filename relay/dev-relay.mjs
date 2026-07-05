@@ -123,7 +123,7 @@ function lobbyPing(d) {
     if (code && (!existing || existing.cid === cid)) {
       lobbyRooms.set(code, {
         cid, host: nick,
-        mode: ['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'friendly-knockout',
+        mode: ['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss', 'friendly-knockout',
           'friendly-defense', 'friendly-zone-defense', 'weekly-coop'].includes(d.room.mode) ? d.room.mode : 'campaign',
         country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
         n: Math.min(4, Math.max(1, d.room.n | 0)),

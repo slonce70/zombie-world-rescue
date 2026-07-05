@@ -10,6 +10,24 @@ import { nickIsBad } from '../../worker/nick.mjs';
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
 
+// 🎭 кооп-ролі v1: дитина в лобі обирає «ким я буду» (ідентичність + маленький САМО-баф).
+// Роль знімається СНАПШОТОМ на старті рівня (див. main._buildLevel), змінити посеред бою не діє.
+// Бафи скромні: guard — +25 maxHealth; medic — швидший ревайв друга (3с→1.8с);
+// scout — швидкість ×1.08 + радіус підбору ×1.25. У radiation/pvp/соло ролі НЕ діють.
+export const COOP_ROLE_IDS = ['guard', 'medic', 'scout'];
+export const COOP_ROLES = {
+  guard: { icon: '🛡️', maxHealthBonus: 25 },
+  medic: { icon: '💉', reviveSecs: 1.8 },
+  scout: { icon: '🏹', speedMult: 1.08, pickupMult: 1.25 },
+};
+// клампимо будь-яку вхідну роль (сейв/мережа) у whitelist — інакше null (без ролі)
+export function sanitizeCoopRole(r) {
+  return COOP_ROLE_IDS.includes(r) ? r : null;
+}
+export function coopRoleIcon(r) {
+  return (COOP_ROLES[r] && COOP_ROLES[r].icon) || '';
+}
+
 // 📣 безпечні пінги — лише 5 фіксованих фраз, без вільного тексту
 export const PING_PHRASES = [
   { icon: '📍', text: t('Сюди!') },
@@ -59,6 +77,8 @@ export class CoopSession {
     const save = this.game.save;
     return {
       nick: this.nick,
+      // 🎭 кооп-роль (див. COOP_ROLES): їде в hello/roster, щоб друзі бачили «💉 медик»
+      role: sanitizeCoopRole(save.coopRole),
       skin: save.activeSkin || 'classic',
       // 🎨 кастом-герой: 3 числа {shirt,pants,skin} — щоб друзі бачили твій вигляд.
       // Лише для активного кастом-скіна; інакше null (дефолтна гілка makeHero).
@@ -163,6 +183,31 @@ export class CoopSession {
     if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode }, true);
   }
 
+  // 🎭 моя кооп-роль (лобі): зберігаємо у сейв, оновлюємо ростер і синхронізуємо кімнату.
+  // Хост міняє локально + ребродкаст; гість шле намір хосту (той клампить і ребродкастить).
+  setMyRole(role) {
+    role = sanitizeCoopRole(role);
+    this.game.save.coopRole = role;
+    this.game.saveGame();
+    const mine = this.roster.get(this.myPid);
+    if (mine) mine.role = role;
+    if (this.role === 'host') {
+      this._broadcastRoster();
+    } else {
+      this.transport.send(1, { t: 'role', r: role }, true);
+    }
+    if (this.onRoster) this.onRoster();
+  }
+
+  // хост отримав намір гостя змінити роль: клампимо, оновлюємо ростер, ребродкаст
+  _hostSetGuestRole(from, r) {
+    const rr = this.roster.get(from);
+    if (!rr) return;
+    rr.role = sanitizeCoopRole(r);
+    this._broadcastRoster();
+    if (this.onRoster) this.onRoster();
+  }
+
   // хост тисне СТАРТ
   startLevel() {
     if (this.role !== 'host') return;
@@ -181,12 +226,19 @@ export class CoopSession {
       : mode === 'friendly-zone-defense' ? 'zone-friendly' : null;
     const radiation = mode === 'radiation';
     const turretwar = mode === 'turretwar';
-    const realCountry = (arena || knockout || defense || radiation || turretwar) ? 'UKR' : countryId;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, weekly };
+    // 🌋 кооп-worldboss: ХОСТ обирає боса тижня і кладе id у spec (wb). Гість стартує
+    // рівень саме з opts.wb, а не з локального weeklyBossId — інакше розсинхрон опівночі.
+    const wb = mode === 'worldboss' ? game.weeklyBossId() : null;
+    const realCountry = (arena || knockout || defense || radiation || turretwar || wb) ? 'UKR' : countryId;
+    // 🎲 мутатор тижня в коопі: ХОСТ — джерело id (їде у spec обом сторонам;
+    // ті самі гейти, що соло: playground/?test-без-weekmod → null). Гість НЕ рахує
+    // локально — інакше розсинхрон опівночі/часових поясів.
+    const mut = game._hostWeeklyMutatorId();
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
-    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, weekly });
+    game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, worldBoss: wb, weekly, mut });
   }
 
   // створення мережевого шару рівня (викликає main під час побудови)
@@ -213,6 +265,7 @@ export class CoopSession {
     if (this.role === 'host') {
       if (d.t === 'hello') this._hostHello(from, d);
       else if (d.t === 'bye') this._dropGuest(from, 'left');
+      else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
     } else {
       if (d.t === 'welcome') {
         this.myPid = d.pid;
@@ -242,7 +295,7 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, weekly: d.weekly || null });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'end') {
@@ -271,7 +324,7 @@ export class CoopSession {
     // 🧼 безпека дітей: захист від клієнта, що оминає cleanNick (нік видно іншій дитині)
     if (nickIsBad(nick)) nick = t('Гравець');
     for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
-    this.roster.set(from, { pid: from, nick, skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
+    this.roster.set(from, { pid: from, nick, role: sanitizeCoopRole(d.role), skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
@@ -298,7 +351,7 @@ export class CoopSession {
   _rosterList() {
     const out = [];
     for (const [pid, r] of this.roster) {
-      out.push({ pid, nick: r.nick || this.nick, skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
+      out.push({ pid, nick: r.nick || this.nick, role: sanitizeCoopRole(r.role), skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
     }
     return out;
   }

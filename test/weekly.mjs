@@ -32,6 +32,9 @@ await page.evaluate(() => {
   const g = window.__game;
   for (const id of ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY']) g.save.liberated[id] = true;
   g.save.xp = 999999; // за 40 рівнем пасса XP не дає монетних нагород
+  // квести дня — від ДАТИ: у «вдалий» день є «збери N монет», і нагорода режиму сама
+  // закриває його (+120 через onEvent('coins')) — закриваємо квести, щоб лічба була точна
+  g.quests.list.forEach((q) => { q.done = true; });
   g.saveGame();
   g._weekIndex = () => 1000;
   g.weeklyChallengeId = () => 'bank';

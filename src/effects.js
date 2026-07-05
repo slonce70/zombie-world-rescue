@@ -1645,14 +1645,16 @@ export class Effects {
         const dx = tpv.x - c.mesh.position.x;
         const dz = tpv.z - c.mesh.position.z;
         const d = Math.hypot(dx, dz);
-        const magnetR = c.type === 'coin' ? (tgt.magnet ? 22 : 5) : 2.2;
+        // 🎭 кооп-scout: множник радіуса підбору (pickMult ×1.25); дефолт 1
+        const pm = tgt.pickMult || 1;
+        const magnetR = (c.type === 'coin' ? (tgt.magnet ? 22 : 5) : 2.2) * pm;
         if (!pulled && d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;
           c.mesh.position.z += dz * pull;
           pulled = true;
         }
-        const grabR = tgt.pid === 1 ? 1.0 : 1.5; // гостям трохи щедріше через лаг
+        const grabR = (tgt.pid === 1 ? 1.0 : 1.5) * pm; // гостям трохи щедріше через лаг
         if (d < grabR && Math.abs(c.mesh.position.y - (tpv.y + 0.6)) < 1.8) {
           granted = tgt;
           break;
@@ -1664,7 +1666,9 @@ export class Effects {
         const dz = pp.z - c.mesh.position.z;
         const d = Math.hypot(dx, dz);
         const magnetOn = this.getMagnetActive && this.getMagnetActive();
-        const magnetR = c.type === 'coin' ? (magnetOn ? 22 : 5) : 2.2;
+        // 🎭 гість-scout бачить ширший магніт-радіус (підбір усе одно вирішує хост)
+        const pm = (L.player && L.player.pickupMult) || 1;
+        const magnetR = (c.type === 'coin' ? (magnetOn ? 22 : 5) : 2.2) * pm;
         if (d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;

@@ -88,8 +88,16 @@ export class WorldBossMode {
 
   get(id) { void id; return null; }
 
+  // 🌐 кооп: гість шукає боса живим у списку (state-ресинк заміняє об'єкт на puppet
+  // із прапором o.wb); host/solo — прямий this.boss
+  _liveBoss() {
+    if (this.boss && this.boss.state !== 'dead') return this.boss;
+    return this.level.zombies.list.find((z) => z.worldBoss && z.state !== 'dead') || this.boss || null;
+  }
+
   getHudList() {
-    const hp = Math.max(0, Math.ceil(this.boss?.hp || 0));
+    const boss = this._liveBoss();
+    const hp = Math.max(0, Math.ceil(boss?.hp || 0));
     return [
       { icon: this.cfg.icon, title: this.cfg.name(), done: this.completed },
       { icon: '❤️', title: t('HP боса: {n}', { n: hp }), done: hp <= 0 },
@@ -98,17 +106,27 @@ export class WorldBossMode {
   }
 
   getMarkers() {
-    return this.boss && this.boss.state !== 'dead'
-      ? [{ x: this.boss.x, z: this.boss.z, color: '#ff5d73', icon: this.cfg.icon }]
+    const boss = this._liveBoss();
+    return boss && boss.state !== 'dead'
+      ? [{ x: boss.x, z: boss.z, color: '#ff5d73', icon: this.cfg.icon }]
       : [];
   }
 
   remaining() {
-    return this.boss && this.boss.state !== 'dead' ? 1 : 0;
+    return this._liveBoss() ? 1 : 0;
   }
+
+  // авторитет над спавнами/фазами/хазардами: соло (level.net===null) або хост
+  get _authority() { return !this.level.net || this.level.net.authority; }
 
   update(dt = 0.016) {
     if (this.over) return;
+    // 🌐 гість: боса/міньйонів/хазарди спавнить лише хост (puppet-и приходять через zs);
+    // фінал детектимо самі зі стану puppet-боса (патерн radiation)
+    if (!this._authority) {
+      this._updateGuest();
+      return;
+    }
     if (!this._spawned) {
       this._spawned = true;
       this._spawnBoss();
@@ -124,12 +142,59 @@ export class WorldBossMode {
     this._updateHazards(dt);
   }
 
+  // 🌐 гість: тримаємось у кімнаті, детектимо перемогу зі стану puppet-боса.
+  // Хазарди/урон від них — авторитет хоста (гість не рахує собі шкоду).
+  _updateGuest() {
+    this._clampActor(this.level.player);
+    // хост убив боса → puppet мертвий/зник у списку → перемога кожному локально
+    if (!this._detectedWin && this._bossSeen && !this._liveBoss()) {
+      this._detectedWin = true;
+      this.completed = true;
+      this.over = true;
+      this.level.game._endWorldBossRun(true);
+      return;
+    }
+    if (this._liveBoss()) this._bossSeen = true;
+  }
+
   onBossDied() {
     if (this.over) return;
     this.completed = true;
     this.over = true;
     this.level.game._endWorldBossRun(true);
   }
+
+  // 🌐 генеричний канал snap.m (level.missions === level.worldBoss): фази боса їдуть
+  // гостю у снапшоті хоста. Puppet-бос — джерело HP/позиції; сюди кладемо лише прапори фаз.
+  netState() {
+    const b = this.boss;
+    return [
+      b && b.worldBossShield ? 1 : 0,
+      b && b.worldBossCoreOpen ? 1 : 0,
+      b && b.worldBossCoreClosed ? 1 : 0,
+      // maxHp боса: puppet рахує наївний boss-HP (не 9000/12000/16000) — виправляємо,
+      // щоб «HP боса: {n}» у гостя показував ту саму абсолютну шкалу, що й хост
+      this.cfg.hp,
+    ];
+  }
+
+  applyNet(m) {
+    const b = this._liveBoss();
+    if (!b || !Array.isArray(m)) return;
+    b.worldBossShield = m[0] === 1;
+    b.worldBossCoreOpen = m[1] === 1;
+    b.worldBossCoreClosed = m[2] === 1;
+    // фіксуємо шкалу maxHp один раз: снапшот далі жене hp як % від maxHp
+    if (m[3] && b.maxHp !== m[3]) {
+      const pct = b.maxHp > 0 ? b.hp / b.maxHp : 1;
+      b.maxHp = m[3];
+      b.hp = Math.max(1, Math.round(b.maxHp * pct));
+    }
+  }
+
+  // повний стан для новоприбулого/реконект-гостя — ті самі прапори фаз
+  netFullState() { return this.netState(); }
+  applyNetFull(m) { this.applyNet(m); }
 
   results() {
     return {
@@ -202,6 +267,7 @@ export class WorldBossMode {
     const boss = this.level.zombies.spawn('boss', this.cx, this.cz - 11, {
       style: this.cfg.style,
       noLeash: true,
+      worldBoss: this.id, // прапор ставиться до onZombieSpawn → o.wb їде гостю у live-zs
       anchor: { x: this.cx, z: this.cz, r: this._half - 3 },
     });
     boss.worldBoss = this.id;
@@ -262,6 +328,7 @@ export class WorldBossMode {
       for (const off of [-5, 0, 5]) {
         const z = this.level.zombies.spawn('robot', this.cx + off, this.cz + 9, {
           noLeash: true,
+          worldBossMinion: true, // прапор до onZombieSpawn → o.wbm гостю
           anchor: { x: this.cx, z: this.cz, r: this._half - 3 },
         });
         z.worldBossMinion = true;
@@ -285,17 +352,26 @@ export class WorldBossMode {
   }
 
   _updateHazards(dt) {
-    const p = this.level.player;
+    const level = this.level;
+    const net = level.net;
+    // 🌐 кооп-хост б'є ВСІХ гравців (собі — локально, віддаленим — через net.hurtPlayer);
+    // соло — лише свій гравець. Гість сюди не заходить (авторитет хоста).
+    const targets = (net && level.players) ? level.players : [{ pid: 1, pos: level.player.pos, health: level.player.health }];
     for (let i = this.hazards.length - 1; i >= 0; i--) {
       const h = this.hazards[i];
       h.life -= dt;
       h.mesh.material.opacity = Math.max(0, 0.45 * (h.life / h.maxLife));
       h.mesh.scale.setScalar(1 + Math.sin((this.level.stats.time + i) * 6) * 0.04);
-      if (Math.hypot(p.pos.x - h.x, p.pos.z - h.z) <= h.r && p.health > 0) {
+      const inside = targets.filter((pl) => pl.health > 0 && Math.hypot(pl.pos.x - h.x, pl.pos.z - h.z) <= h.r);
+      if (inside.length) {
         h.tick += dt;
         if (h.tick >= 0.5) {
           h.tick = 0;
-          p.takeDamage(h.dps * 0.5, h.x, h.z);
+          const dmg = h.dps * 0.5;
+          for (const pl of inside) {
+            if (net) net.hurtPlayer(pl, dmg, h.x, h.z);
+            else level.player.takeDamage(dmg, h.x, h.z);
+          }
         }
       }
       if (h.life <= 0) {
