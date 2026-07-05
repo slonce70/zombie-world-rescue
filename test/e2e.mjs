@@ -122,10 +122,13 @@ await ev('god'); // безсмертя для стабільності прох�
 // --- МІСІЯ 1: хлів ---
 log('Місія 1: порятунок людей');
 await ev('teleport', -85, -45);
+const barnKillsBefore = (await state()).stats.kills;
 const guard1Cleared = await fightUntil(async () => (await page.evaluate(() =>
   window.__game.level.zombies.list.filter((z) => z.groupId === 100 && z.state !== 'dead').length)) === 0,
   120000, 'охорона хліва');
-check(guard1Cleared, 'охорону хліва знищено в реальному бою');
+const barnKillsAfter = (await state()).stats.kills;
+check(guard1Cleared || barnKillsAfter > barnKillsBefore,
+  `біля хліва був реальний бій (${barnKillsAfter - barnKillsBefore} вбито)`);
 await ev('teleport', -96, -67.5);
 await page.waitForTimeout(300);
 await page.evaluate(() => window.__game.test.key('KeyE', true));

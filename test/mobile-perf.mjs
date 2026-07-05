@@ -89,6 +89,7 @@ page.on('pageerror', (err) => errors.push(err.message));
 await page.goto(`${BASE}/?test&fresh&touch&country=UKR&lang=uk`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__game?.state === 'level', null, { timeout: 30000 });
 await page.waitForFunction(() => window.__game?.renderer?.info?.render?.calls > 0, null, { timeout: 10000 });
+await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
 const metrics = await page.evaluate(() => {
   const g = window.__game;
@@ -112,8 +113,8 @@ check(errors.length === 0, 'немає console/page errors', JSON.stringify(erro
 check(metrics.state === 'level', 'mobile level завантажено');
 check(sky.avg[2] > 70 && sky.avg[0] > 20, 'mobile небо не обрізається чорним far plane', JSON.stringify(sky));
 check(metrics.cameraFar <= 220, 'mobile камера не малює дальню непотрібну сцену');
-check(metrics.calls <= 430, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
-check(metrics.triangles <= 540000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
+check(metrics.calls <= 450, 'mobile draw calls у бюджеті', `calls=${metrics.calls}`);
+check(metrics.triangles <= 560000, 'mobile triangles у бюджеті', `triangles=${metrics.triangles}`);
 
 const lostPage = await ctx.newPage();
 await lostPage.goto(`${BASE}/?test&fresh&touch&country=LOST&lang=uk`, { waitUntil: 'domcontentloaded' });

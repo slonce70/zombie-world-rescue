@@ -142,34 +142,29 @@ const st = await page.evaluate(() => ({ coins: window.__game.save.coins, weapons
 check(!st.weapons.includes('flamethrower'), 'звільнення ESP НЕ дало вогнемет');
 check(st.coins >= coinsBefore + 600, `звільнення ESP дало +600 монет (${coinsBefore} → ${st.coins})`);
 
-// ===== (г) зомбі 'imp' (Шкет) =====
-console.log('▸ 🧟 Шкет (imp)');
-const imp = await page.evaluate(() => {
-  const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
-  p.respawnProtect = 1e9;
-  const z = Z.spawn('imp', p.pos.x + 10, p.pos.z, {});
-  z.aggroed = true; z.state = 'chase';
-  return {
-    baseHp: z.stats.hp, chaseSpeed: z.stats.chaseSpeed, runnerChase: 5.6,
-    ztype: z.rig.ztype, small: !!z.stats.small,
-  };
-});
-check(imp.baseHp === 50, `шкет: 50 HP (${imp.baseHp})`);
-check(imp.chaseSpeed > imp.runnerChase, `шкет швидший за бігуна (chase ${imp.chaseSpeed} > ${imp.runnerChase})`);
-check(imp.ztype === 'imp' && imp.small, 'шкет має власний дрібний риг (small)', imp.ztype);
-
-// imp доступний з УСІХ країн — стартуємо UKR і перевіряємо, що тип дозволено в populate
+// imp доступний з УСІХ країн — стартуємо UKR: тут немає country HP-множника,
+// тож можна перевіряти базовий баланс 50 HP, швидкість і дрібний риг.
 await page.evaluate(() => { window.__game.save.liberated = {}; });
 await page.evaluate(() => window.__game.startLevel('UKR'));
 await waitFor(page, () => window.__game.state === 'level' && window.__game.level
   && window.__game.level.countryId === 'UKR'
   && !document.getElementById('overlay-level-loading').classList.contains('show'), 30000, 'рівень UKR');
+console.log('▸ 🧟 Шкет (imp)');
 const impUkr = await page.evaluate(() => {
-  // imp дозволений усюди: безпосередньо спавнимо в UKR і переконуємось, що тип валідний
-  const z = window.__game.level.zombies.spawn('imp', 0, 0, {});
-  return { ok: z.type === 'imp', country: window.__game.level.countryId };
+  const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
+  p.respawnProtect = 1e9;
+  const z = Z.spawn('imp', p.pos.x + 10, p.pos.z, {});
+  z.aggroed = true; z.state = 'chase';
+  return {
+    ok: z.type === 'imp', country: g.level.countryId,
+    baseHp: z.stats.hp, chaseSpeed: z.stats.chaseSpeed, runnerChase: 5.6,
+    ztype: z.rig.ztype, small: !!z.stats.small,
+  };
 });
 check(impUkr.ok && impUkr.country === 'UKR', 'шкет доступний навіть в Україні (UKR)');
+check(impUkr.baseHp === 50, `шкет: 50 HP (${impUkr.baseHp})`);
+check(impUkr.chaseSpeed > impUkr.runnerChase, `шкет швидший за бігуна (chase ${impUkr.chaseSpeed} > ${impUkr.runnerChase})`);
+check(impUkr.ztype === 'imp' && impUkr.small, 'шкет має власний дрібний риг (small)', impUkr.ztype);
 
 console.log('');
 if (errors.length) {

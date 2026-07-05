@@ -330,6 +330,13 @@ export class HUD {
     // місії
     const list = level.missions.getHudList();
     let html = '';
+    const storyObjective = typeof level.missions.currentStoryObjective === 'function'
+      ? level.missions.currentStoryObjective()
+      : '';
+    const storyLine = typeof storyObjective === 'string' ? storyObjective.trim() : '';
+    if (storyLine) {
+      html += `<div class="story-objective">${storyLine}</div>`;
+    }
     for (const m of list) {
       html += `<div class="mission ${m.done ? 'done' : ''}"><span class="mi">${m.done ? '✅' : m.icon}</span> ${m.title}</div>`;
     }

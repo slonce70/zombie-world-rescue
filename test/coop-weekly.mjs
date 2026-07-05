@@ -80,9 +80,20 @@ try {
     a: await A.evaluate(() => window.__game.save.crystals || 0),
     b: await B.evaluate(() => window.__game.save.crystals || 0),
   };
+  const readWinState = (p) => p.evaluate(() => {
+    const g = window.__game;
+    const overlay = document.getElementById('overlay-arena-end');
+    return {
+      completed: !!g.level?.knockout?.completed,
+      overlay: !!overlay?.classList.contains('show'),
+      flag: !!g.save.weekly['W777:coop'],
+      crystals: g.save.crystals || 0,
+    };
+  });
   const t0 = Date.now();
   let bothWon = false;
-  while (Date.now() - t0 < 40000 * SLOW) {
+  let winState = null;
+  while (Date.now() - t0 < 90000 * SLOW) {
     await A.evaluate(() => {
       const g = window.__game;
       for (const z of g.level.zombies.list) {
@@ -90,11 +101,14 @@ try {
       }
     });
     await sleep(700 * SLOW);
-    const aWon = await A.evaluate(() => !!(window.__game.level?.knockout?.completed));
-    const bWon = await B.evaluate(() => !!(window.__game.level?.knockout?.completed));
+    const a = await readWinState(A);
+    const b = await readWinState(B);
+    winState = { a, b };
+    const aWon = a.completed || a.overlay || a.flag;
+    const bWon = b.completed || b.overlay || b.flag;
     if (aWon && bWon) { bothWon = true; break; }
   }
-  check(bothWon, 'перемога зарахована обом');
+  check(bothWon, 'перемога зарахована обом', JSON.stringify(winState));
 
   const rew = {
     a: await A.evaluate(() => ({

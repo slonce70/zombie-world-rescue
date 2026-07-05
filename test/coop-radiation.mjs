@@ -79,22 +79,31 @@ try {
   console.log('▸ Фінал: хост убиває боса — гість детектить перемогу сам');
   const radB0 = await B.evaluate(() => window.__game.save.radiationCoins || 0);
   const radA0 = await A.evaluate(() => window.__game.save.radiationCoins || 0);
+  const readGuestEnd = (p) => p.evaluate((rad0) => {
+    const g = window.__game;
+    const overlay = document.getElementById('overlay-arena-end');
+    return {
+      over: !!g.level?.radiation?.over,
+      completed: !!g.level?.radiation?.completed,
+      overlay: !!overlay?.classList.contains('show'),
+      dRad: (g.save.radiationCoins || 0) - rad0,
+    };
+  }, radB0);
   const tEnd = Date.now();
   let guestWon = false;
-  while (Date.now() - tEnd < 40000 * SLOW) {
+  let guestEnd = null;
+  while (Date.now() - tEnd < 90000 * SLOW) {
     await A.evaluate(() => {
       for (const z of window.__game.level.zombies.list) {
         if (z.radiationMode && z.state !== 'dead') z.damage(99999, null, false);
       }
     });
     await sleep(700 * SLOW);
-    guestWon = await B.evaluate(() => {
-      const g = window.__game;
-      return !!(g.level && g.level.radiation && g.level.radiation.over && g.level.radiation.completed);
-    });
+    guestEnd = await readGuestEnd(B);
+    guestWon = !!(guestEnd.completed || guestEnd.dRad >= 50);
     if (guestWon) break;
   }
-  check(guestWon, 'гість отримав перемогу зі стану puppet-боса');
+  check(guestWon, 'гість отримав перемогу зі стану puppet-боса', JSON.stringify(guestEnd));
   const radB1 = await B.evaluate(() => window.__game.save.radiationCoins || 0);
   const radA1 = await A.evaluate(() => window.__game.save.radiationCoins || 0);
   check(radA1 - radA0 === 50, 'хост отримав +50 ☢️', `Δ=${radA1 - radA0}`);

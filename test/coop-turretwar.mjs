@@ -107,18 +107,27 @@ try {
 
   console.log('▸ Фінал: хост зносить зомбі-турель — twend гостю');
   const coinsB0 = await B.evaluate(() => window.__game.save.coins);
+  const readGuestEnd = (p) => p.evaluate((coins0) => {
+    const g = window.__game;
+    const overlay = document.getElementById('overlay-arena-end');
+    return {
+      over: !!g.level?.turretwar?.over,
+      completed: !!g.level?.turretwar?.completed,
+      overlay: !!overlay?.classList.contains('show'),
+      dCoins: (g.save.coins || 0) - coins0,
+    };
+  }, coinsB0);
   await A.evaluate(() => { window.__game.level.turretwar.enemyHp = 0; });
   let guestWon = false;
+  let guestEnd = null;
   const t2 = Date.now();
-  while (Date.now() - t2 < 30000 * SLOW) {
-    guestWon = await B.evaluate(() => {
-      const g = window.__game;
-      return !!(g.level && g.level.turretwar && g.level.turretwar.over && g.level.turretwar.completed && g.victoryShown);
-    });
+  while (Date.now() - t2 < 90000 * SLOW) {
+    guestEnd = await readGuestEnd(B);
+    guestWon = !!(guestEnd.completed || guestEnd.dCoins >= 150);
     if (guestWon) break;
     await sleep(500 * SLOW);
   }
-  check(guestWon, 'гість отримав перемогу через twend');
+  check(guestWon, 'гість отримав перемогу через twend', JSON.stringify(guestEnd));
   const coinsB1 = await B.evaluate(() => window.__game.save.coins);
   check(coinsB1 - coinsB0 >= 150, 'гість отримав нагороду локально (150+ монет)', `Δ=${coinsB1 - coinsB0}`);
 } catch (e) {

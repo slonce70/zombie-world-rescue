@@ -45,9 +45,13 @@ for (const c of ORDER) {
   await page.evaluate(() => {
     const g = window.__game;
     g.test.god();
-    g.test.completeMission('rescue');
-    g.test.completeMission('tower');
-    g.test.completeMission('warehouse');
+    if (g.test.missionKind() === 'StoryMissions') {
+      for (const id of g.test.storyObjectiveIds()) g.test.completeStoryObjective(id);
+    } else {
+      g.test.completeMission('rescue');
+      g.test.completeMission('tower');
+      g.test.completeMission('warehouse');
+    }
   });
   // зброя-нагорода видається при відкритті ящика — у тесті місія завершена напряму,
   // тож даємо її явно (як зробив би гравець, відкривши ящик). ESP/PRT/ITA зброї не дають — пропускаємо.
