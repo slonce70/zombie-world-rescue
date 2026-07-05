@@ -88,6 +88,9 @@ export class StoryMissions {
         mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
       }
     }
+    for (const marker of this.delegate.getMarkers()) {
+      if (marker.icon === '🌍') mk.push(marker);
+    }
     if (this.bossUnlocked && !this.bossStarted) {
       const arena = this._site('arena') || (this.level.world && this.level.world.layout && this.level.world.layout.arena);
       if (arena) mk.push({ x: arena.x, z: arena.z, color: '#ff44aa', icon: '👑' });
@@ -270,6 +273,9 @@ export class StoryMissions {
   _pushReplayNight() {
     if (this.level.stats) this.level.stats.time = Math.max(this.level.stats.time || 0, 150);
     if (this.level.world) this.level.world.time = Math.max(this.level.world.time || 0, 150);
+    this.level.nightK = Math.max(this.level.nightK || 0, 1);
+    if (this.level.world && this.level.world.setNight) this.level.world.setNight(this.level.nightK);
+    if (this.level.player && this.level.player.setLamp) this.level.player.setLamp(this.level.nightK);
   }
 
   _missionView(obj) {

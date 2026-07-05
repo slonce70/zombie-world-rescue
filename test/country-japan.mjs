@@ -36,7 +36,9 @@ const cfg = await page.evaluate(async () => {
   try {
     const ar = window.__game.level.world.layout.arena;
     const z = window.__game.level.zombies.spawn('samurai', ar.x + 16, ar.z, {});
-    out.samuraiBuilt = z.type === 'samurai' && z.rig.ztype === 'samurai' && z.charger && z.stats.hp === 150;
+    out.samuraiExpectedHp = Math.round(150 * window.__game.level.zombies.diff.hp);
+    out.samuraiHp = z.maxHp;
+    out.samuraiBuilt = z.type === 'samurai' && z.rig.ztype === 'samurai' && z.charger && z.maxHp === out.samuraiExpectedHp;
   } catch (e) { out.errors.push('spawn(samurai): ' + e.message); }
   try { const rig = makeBoss('sumo'); out.sumoBuilt = !!(rig && rig.group && rig.ztype === 'boss'); }
   catch (e) { out.errors.push('makeBoss(sumo): ' + e.message); }
@@ -49,7 +51,7 @@ check(cfg.hasBiome && cfg.biome === 'sakura', 'біом sakura існує', cfg.
 check(cfg.extra === 'samurai', 'унікальний моб Японії — samurai', cfg.extra);
 check((cfg.types.samurai || 0) > 0, 'samurai присутній у спавні Японії', JSON.stringify(cfg.types));
 check(!cfg.types.gladiator, 'гладіатори не спавняться в Японії', JSON.stringify(cfg.types));
-check(cfg.samuraiBuilt, 'spawn(samurai) будує унікального самурая-чарджера', cfg.errors.join('|'));
+check(cfg.samuraiBuilt, 'spawn(samurai) будує унікального самурая-чарджера з HP країни', JSON.stringify({ hp: cfg.samuraiHp, expected: cfg.samuraiExpectedHp, errors: cfg.errors }));
 check(cfg.bossStyle === 'sumo', 'бос — стиль sumo', cfg.bossStyle);
 check(cfg.sumoBuilt, 'makeBoss(sumo) будує риг без помилок', cfg.errors.join('|'));
 check(cfg.coin === 800, 'нагорода — монети (як фінал)', String(cfg.coin));

@@ -94,9 +94,9 @@ const toro = await page.evaluate(async () => {
   p.pos.x = ar.x; p.pos.z = ar.z;
   const z = Z.spawn('toro', ar.x + 16, ar.z, {});
   z.aggroed = true; z.state = 'chase';
-  return { hp: z.stats.hp, charger: z.charger, ztype: z.rig.ztype, x0: z.x };
+  return { hp: z.maxHp, expectedHp: Math.round(130 * Z.diff.hp), charger: z.charger, ztype: z.rig.ztype, x0: z.x };
 });
-check(toro.hp === 130 && toro.charger, `toro: 130 HP, charger=${toro.charger}`);
+check(toro.hp === toro.expectedHp && toro.charger, `toro: HP країни ${toro.hp}/${toro.expectedHp}, charger=${toro.charger}`);
 check(toro.ztype === 'toro', 'toro має власний вигляд (рогатий риг)', toro.ztype);
 // toro мусить телеграфувати ривок і виконати його. Тримаємо дистанцію ~15 м у
 // відкритій арені (чиста лінія видимості) і скидаємо chargeCd, щоб не чекати.

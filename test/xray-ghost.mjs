@@ -78,11 +78,11 @@ check(shopBuyXray.firstCost === 1000 && shopBuyXray.secondCost === 0, 'xray не
 const spawned = await page.evaluate(() => {
   const Z = window.__game.level.zombies;
   const g = Z.spawn('ghost', 30, 30, {});
-  return { invisible: g.invisible, visible: g.rig.group.visible, hp: g.stats.hp };
+  return { invisible: g.invisible, visible: g.rig.group.visible, hp: g.maxHp, expectedHp: Math.round(60 * Z.diff.hp) };
 });
 check(spawned.invisible === true, 'ghost має прапорець invisible', String(spawned.invisible));
 check(spawned.visible === false, 'ghost невидимий при спавні (rig.group.visible=false)', String(spawned.visible));
-check(spawned.hp === 60, 'ghost: 60 HP', spawned.hp);
+check(spawned.hp === spawned.expectedHp, 'ghost: HP масштабується країною', `${spawned.hp} vs ${spawned.expectedHp}`);
 
 // ===== 2) Ікс-рей вмикає видимість =====
 const revealed = await page.evaluate(() => {

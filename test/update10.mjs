@@ -34,7 +34,7 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('☰ меню: 10 другорядних кнопок у висувному меню', menu.side === 10, `${menu.side}`);
+  check('☰ меню: 12 другорядних кнопок у висувному меню', menu.side === 12, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');
@@ -72,8 +72,8 @@ try {
       })),
     };
   });
-  check('16 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
-    fresh.modes === 16 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('17 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
+    fresh.modes === 17 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked
       && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
@@ -87,7 +87,7 @@ try {
       && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
       && JSON.stringify(fresh.sections) === JSON.stringify([
         { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
-        { title: 'БОСИ', modes: ['arena', 'worldboss'] },
+        { title: 'БОСИ', modes: ['arena', 'worldboss', 'radiation'] },
         { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
         { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
         { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
@@ -110,7 +110,7 @@ try {
   check('кожен pane-розділ містить свої режими',
     JSON.stringify(fresh.sections) === JSON.stringify([
       { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
-      { title: 'БОСИ', modes: ['arena', 'worldboss'] },
+      { title: 'БОСИ', modes: ['arena', 'worldboss', 'radiation'] },
       { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
       { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
       { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },

@@ -193,6 +193,7 @@ await page.evaluate(async () => {
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
 await page.waitForTimeout(100);
 st = await page.evaluate(() => ({
+  updated: (window.__game._updateDayNight(), true),
   kind: window.__game.test.missionKind(),
   replayNightRaid: window.__game.level.missions && window.__game.level.missions.replayNightRaid,
   current: window.__game.level.missions.currentStoryObjective(),

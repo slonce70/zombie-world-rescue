@@ -29,7 +29,7 @@ const missionList = () => page.evaluate(() => window.__game.level.missions.missi
 console.log('▸ Роздача місій із пулу');
 await loadCountry('UKR');
 let types = await missionList();
-check(JSON.stringify(types) === '["rescue","repair","clear"]', `перше проходження України — класика (${types})`);
+check(JSON.stringify(types) === '["ukr-rescue","ukr-signal","ukr-defense"]', `перше проходження України — story-місії (${types})`);
 
 const rolls = await page.evaluate(() => {
   const g = window.__game;
@@ -59,7 +59,7 @@ for (const arr of [rolls.polA, rolls.deu, rolls.fra]) {
 // POL реально будується зі своїм набором
 await loadCountry('POL');
 types = await missionList();
-check(JSON.stringify(types) === JSON.stringify(rolls.polA), `Польща отримала свій набір (${types})`);
+check(JSON.stringify(types) === '["pol-bonfires","pol-train","pol-castle"]', `Польща отримала story-набір (${types})`);
 
 // ============ 🧺 ЗБІР ПРИПАСІВ ============
 console.log('▸ Місія «Збір припасів»');

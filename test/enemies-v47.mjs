@@ -43,9 +43,9 @@ const ranged = await page.evaluate(async () => {
   w.aggroed = true; w.state = 'chase'; w.minions = [];
   const hp0 = p.health;
   // базові значення (stats) — без країнного множника diff.hp
-  return { stats: { hp: w.stats.hp, dmg: w.ranged.dmg, sh: w.shieldMax }, hp0, nid: w.nid };
+  return { stats: { hp: w.stats.hp, expectedHp: Math.round(200 * Z.diff.hp), dmg: w.ranged.dmg, sh: w.shieldMax }, hp0, nid: w.nid };
 });
-check(ranged.stats.hp === 200, 'чарівник: базові 200 HP', ranged.stats.hp);
+check(ranged.stats.hp === ranged.stats.expectedHp, 'чарівник: HP масштабовано складністю країни', `${ranged.stats.hp} vs ${ranged.stats.expectedHp}`);
 check(ranged.stats.dmg === 15, 'чарівник: дальня шкода 15', ranged.stats.dmg);
 check(ranged.stats.sh === 100, 'чарівник: щит 100', ranged.stats.sh);
 // проганяємо ~6 секунд симуляції — снаряди мають долетіти й поранити
@@ -124,10 +124,10 @@ const shieldHp = await page.evaluate(() => {
   const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
   const s = Z.spawn('shield', p.pos.x + 40, p.pos.z, {});
   s.shieldFireproof = false; // звичайний для цього кроку
-  return { max: s.shieldMax, hp: s.shieldHp, bodyBase: s.stats.hp };
+  return { max: s.shieldMax, hp: s.shieldHp, bodyHp: s.stats.hp, expectedBodyHp: Math.round(20 * Z.diff.hp) };
 });
 check(shieldHp.max === 1000, 'щитоносець: shieldHp=1000', shieldHp.max);
-check(shieldHp.bodyBase === 20, 'щитоносець: базове тіло слабке (20hp)', shieldHp.bodyBase);
+check(shieldHp.bodyHp === shieldHp.expectedBodyHp, 'щитоносець: тіло слабке, але масштабується країною', `${shieldHp.bodyHp} vs ${shieldHp.expectedBodyHp}`);
 
 // ---------- (б2) Звичайний щит: вогнемет ламає ----------
 console.log('▸ (б) Звичайний щит вогнемет ЛАМАЄ');

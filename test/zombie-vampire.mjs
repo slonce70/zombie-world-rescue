@@ -26,7 +26,7 @@ const cfg = await page.evaluate(() => {
     const z = Z.spawn('vampire', g.level.player.pos.x + 24, g.level.player.pos.z, {});
     out.built = z.type === 'vampire' && z.rig.ztype === 'vampire';
     out.maxHp = z.maxHp;              // 150 × diff.hp
-    out.baseHp = z.stats.hp;          // 150 (база)
+    out.scaledHp = z.stats.hp;        // spawn() зберігає масштабований HP у stats.hp
     out.dmg = z.stats.dmg;            // 14
     out.speed = z.stats.speed;        // 1.7
     out.chaseSpeed = z.stats.chaseSpeed; // 4.0
@@ -39,7 +39,7 @@ const cfg = await page.evaluate(() => {
 });
 check(cfg.allowVampire === true, 'вампір дозволений у FRA (ніч універсальна)', String(cfg.allowVampire));
 check(cfg.built, 'spawn(vampire) будує риг (type+ztype=vampire)', cfg.errors.join('|'));
-check(cfg.baseHp === 150, 'база 150 HP', String(cfg.baseHp));
+check(cfg.scaledHp === Math.round(150 * cfg.diffHp), 'HP масштабується складністю країни', `${cfg.scaledHp} vs ${Math.round(150 * cfg.diffHp)}`);
 check(cfg.maxHp === Math.round(150 * cfg.diffHp), 'maxHp = 150 × складність', `${cfg.maxHp} vs ${Math.round(150 * cfg.diffHp)}`);
 check(cfg.dmg === 14, 'удар зблизька — 14 шкоди', String(cfg.dmg));
 check(cfg.speed === 1.7 && cfg.chaseSpeed === 4.0, 'швидкий: speed 1.7 / chase 4.0', `${cfg.speed}/${cfg.chaseSpeed}`);

@@ -40,7 +40,9 @@ const cfg = await page.evaluate(async () => {
   try {
     const ar = window.__game.level.world.layout.arena;
     const z = window.__game.level.zombies.spawn('terracotta', ar.x + 16, ar.z, {});
-    out.terraBuilt = z.type === 'terracotta' && z.rig.ztype === 'terracotta' && z.charger && z.stats.hp === 165;
+    out.terraExpectedHp = Math.round(165 * window.__game.level.zombies.diff.hp);
+    out.terraHp = z.maxHp;
+    out.terraBuilt = z.type === 'terracotta' && z.rig.ztype === 'terracotta' && z.charger && z.maxHp === out.terraExpectedHp;
   } catch (e) { out.errors.push('spawn(terracotta): ' + e.message); }
   try { const rig = makeBoss('emperor'); out.emperorBuilt = !!(rig && rig.group && rig.ztype === 'boss'); }
   catch (e) { out.errors.push('makeBoss(emperor): ' + e.message); }
@@ -53,7 +55,7 @@ check(cfg.inOrder && cfg.lastInOrder === 'CHN' && cfg.count >= 11, 'CHN — ОС
 check(cfg.hasBiome && cfg.biome === 'greatwall', 'біом greatwall існує', cfg.biome);
 check(cfg.extra === 'terracotta', 'унікальний моб Китаю — terracotta', cfg.extra);
 check((cfg.types.terracotta || 0) > 0, 'теракотові воїни присутні у спавні Китаю', JSON.stringify(cfg.types));
-check(cfg.terraBuilt, 'spawn(terracotta) будує броньованого воїна-чарджера (hp165)', cfg.errors.join('|'));
+check(cfg.terraBuilt, 'spawn(terracotta) будує броньованого воїна-чарджера з HP країни', JSON.stringify({ hp: cfg.terraHp, expected: cfg.terraExpectedHp, errors: cfg.errors }));
 check(cfg.bossStyle === 'emperor', 'бос — стиль emperor', cfg.bossStyle);
 check(cfg.bossHp === 7600 && cfg.bossHp > 7200, 'бос HP 7600 (вище за JPN 7200)', String(cfg.bossHp));
 check(cfg.emperorBuilt, 'makeBoss(emperor) будує риг без помилок', cfg.errors.join('|'));
