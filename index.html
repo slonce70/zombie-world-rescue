@@ -24,11 +24,17 @@
       <p class="globe-sub">Зомбі захопили планету! Рятуй країни — сам або з друзями.</p>
     </div>
     <div class="globe-bottom">
+      <button id="gift-chip" type="button" aria-label="Подарунок дня — забрати">🎁 Подарунок дня!</button>
+      <div id="globe-compass" class="player-compass"></div>
       <div class="globe-play-row">
         <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
         <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
+      <div id="weekly-goal">
+        <span class="wg-label">🗓️ Ціль тижня: 0/300 🧟</span>
+        <div class="wg-bar"><div class="wg-fill"></div></div>
+      </div>
       <p class="globe-hint">🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!</p>
     </div>
     <div id="version-tag"></div>
@@ -251,6 +257,7 @@
       <h2>💀 Зомбі тебе схопили!</h2>
       <p>Не хвилюйся — прогрес місій зберігся.</p>
       <div id="death-countdown" class="countdown">3</div>
+      <button id="btn-death-revenge" class="btn btn-primary">🔁 Реванш</button>
     </div>
   </div>
 
@@ -260,7 +267,11 @@
       <h1>🇺🇦 УКРАЇНУ ЗВІЛЬНЕНО!</h1>
       <p class="victory-sub">Ти переміг Зомбі-Короля і врятував країну!</p>
       <div id="victory-stats"></div>
-      <button id="btn-victory-globe" class="btn btn-primary big">🌍 На глобус</button>
+      <div class="victory-actions">
+        <button id="btn-victory-next" class="btn btn-primary big">▶️ Далі</button>
+        <button id="btn-victory-retry" class="btn">🔁 Ще раз</button>
+        <button id="btn-victory-globe" class="btn btn-primary big">🌍 На глобус</button>
+      </div>
     </div>
   </div>
 
@@ -285,6 +296,20 @@
       </div>
       <p class="panel-sub">Нові завдання — щодня! Нагорода: монети та зірковий досвід ⭐</p>
       <div id="quest-list"></div>
+    </div>
+  </div>
+
+  <!-- 🎁 Подарунок дня: стрик-календар -->
+  <div id="overlay-gift" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>🎁 ПОДАРУНОК ДНЯ</h2>
+        <button class="btn-x panel-close" data-close="overlay-gift">✕</button>
+      </div>
+      <p class="panel-sub">Заходь щодня — і забирай подарунки! Пропустив день? Нічого страшного, стрик зачекає 😊</p>
+      <div id="gift-week" class="gift-week"></div>
+      <div id="gift-grid" class="gift-grid"></div>
+      <button id="btn-gift-claim" class="btn btn-primary">🎁 Забрати</button>
     </div>
   </div>
 

@@ -416,6 +416,9 @@ export class DailyQuests {
       list.push(quest);
     }
     this.game.save.quests = { date: key, list, lang, maxKey: key > maxKey ? key : maxKey };
+    // 🎯 нові завдання дня — тост лише коли це НЕ найперший старт (saved вже був)
+    // і HUD готовий. Спрацює і при переході опівночі посеред сесії (ensureToday → onEvent).
+    if (saved && this.game.hud) this.game.hud.toast(t('🎯 Нові завдання дня!'));
     this.game.saveGame();
   }
 
@@ -530,5 +533,77 @@ export class DailyQuests {
     game.hud.toast(t('⚡ Мега-квест виконано: {q}! {r}', { q: q.title, r: q.rewardText }));
     game.hud.banner(t('⚡ МЕГА-КВЕСТ!'), q.rewardText, 4.4);
     game.progress.addXp(reward.xp || 0);
+  }
+}
+
+// ---------- 🎁 Подарунок дня ----------
+// Дитячий календар нагород: 4 тижні × 7 днів. БЕЗ покарань за пропуск — стрик просто
+// не рухається, наступний claim продовжує з того ж місця. День 7 — фіксований бандл
+// («подарункова коробка»), НІЯКОГО RNG — без FOMO/казино. Формат нагороди:
+// {coins:N} | {crystals:N} | {coins:N, crystals:M}.
+export const GIFT_TABLE = [
+  // тиждень 1
+  [{ coins: 100 }, { coins: 150 }, { crystals: 3 }, { coins: 250 }, { crystals: 5 }, { coins: 400 }, { coins: 300, crystals: 10 }],
+  // тиждень 2
+  [{ coins: 150 }, { coins: 200 }, { crystals: 4 }, { coins: 300 }, { crystals: 6 }, { coins: 500 }, { coins: 400, crystals: 12 }],
+  // тиждень 3
+  [{ coins: 200 }, { coins: 300 }, { crystals: 5 }, { coins: 400 }, { crystals: 8 }, { coins: 600 }, { coins: 500, crystals: 15 }],
+  // тиждень 4+ (кап)
+  [{ coins: 250 }, { coins: 350 }, { crystals: 6 }, { coins: 500 }, { crystals: 10 }, { coins: 700 }, { coins: 600, crystals: 20 }],
+];
+
+export class DailyGift {
+  constructor(game) {
+    this.game = game;
+    // shape-fix існуючого сейва (БЕЗ будь-якої видачі)
+    const s = game.save;
+    if (!s.gift || typeof s.gift !== 'object' || Array.isArray(s.gift)) s.gift = { last: '', streak: 0, week: 1 };
+    if (typeof s.gift.last !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s.gift.last)) s.gift.last = '';
+    if (typeof s.gift.streak !== 'number' || !isFinite(s.gift.streak) || s.gift.streak < 0) s.gift.streak = 0;
+    s.gift.streak = Math.floor(s.gift.streak);
+    if (typeof s.gift.week !== 'number' || !isFinite(s.gift.week) || s.gift.week < 1) s.gift.week = 1;
+  }
+
+  // локальний 'YYYY-MM-DD' — ТОЙ САМИЙ формат, що DailyQuests.todayKey (НЕ UTC/toISOString)
+  dayKey(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // чи є подарунок готовий до отримання (нова доба вперед). Лексикографіка = хронологія.
+  pending(forceKey = null) {
+    const key = forceKey || this.dayKey();
+    // самолікування зіпсованого годинника: last більш ніж на 7 діб у майбутньому →
+    // трактуємо сейв як биту дату, чистимо last (стрик не чіпаємо, наступний claim збереже)
+    const last = this.game.save.gift.last;
+    if (last && /^\d{4}-\d{2}-\d{2}$/.test(last)) {
+      const days = (new Date(last + 'T00:00:00') - new Date(key + 'T00:00:00')) / 86400000;
+      if (days > 7) this.game.save.gift.last = '';
+    }
+    return key > this.game.save.gift.last;
+  }
+
+  // { day: 1..7, week: 1..4, reward, streak } для модалки — рахуємо ДО інкремента
+  dayInfo(forceKey = null) {
+    const g = this.game.save.gift;
+    const streak = g.streak | 0;
+    const day = (streak % 7) + 1;
+    const week = Math.min(4, Math.floor(streak / 7) + 1);
+    const reward = GIFT_TABLE[week - 1][day - 1];
+    return { day, week, reward, streak };
+  }
+
+  // видати подарунок дня. Якщо !pending → null. Стрик росте на 1 (заморозка: пропуск
+  // просто не рухає стрик, наступний claim продовжує з того ж місця).
+  claim(forceKey = null) {
+    const key = forceKey || this.dayKey();
+    if (!this.pending(key)) return null;
+    const info = this.dayInfo(key);
+    const r = info.reward;
+    const game = this.game;
+    game.save.coins += r.coins || 0;
+    game.save.crystals = (game.save.crystals || 0) + (r.crystals || 0);
+    game.save.gift = { last: key, streak: info.streak + 1, week: info.week };
+    game.saveGame();
+    return r;
   }
 }

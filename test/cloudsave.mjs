@@ -138,6 +138,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'cloneSkins',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
       'weapons', 'weekly', 'worldBosses', 'xp', 'radiationCoins',
+      'gift', 'weeklyGoal',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -180,6 +181,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.chapter = saveHasProgress({ ...fresh, chapter: { p: { kill: 5 }, done: false } }) === true;
     out.infected = saveHasProgress({ ...fresh, infected: { cleared: { UKR: true }, done: false } }) === true;
     out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
+    // 🎁 стрик подарунка дня — сам по собі прогрес (зміна пристрою не має обнуляти стрик дитині)
+    out.giftStreak = saveHasProgress({ ...fresh, gift: { last: '2026-01-01', streak: 3, week: 1 } }) === true;
     return out;
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
@@ -197,6 +200,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('кастом-герой → прогрес=true', res.customHero);
   check('ціль → прогрес=true', res.goal);
   check('мега-квест → прогрес=true', res.megaQuest);
+  check('стрик подарунка дня → прогрес=true', res.giftStreak);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);
