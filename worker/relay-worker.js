@@ -239,7 +239,10 @@ export class Room {
 // перезапуститься, картина відновиться за один пінг. Нічого не платимо за сховище.
 // ============================================================
 const LOBBY_TTL = 40_000;
-const LOBBY_MODES = new Set(['campaign', 'storm', 'arena']);
+// повний перелік режимів, які хост реально анонсує (MODE_ICON у src/ui/coopui.js);
+// невідомий режим коерситься в 'campaign' — радіація більше не прикидається кампанією
+const LOBBY_MODES = new Set(['campaign', 'storm', 'arena', 'radiation', 'turretwar',
+  'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 
 export class Lobby {
   constructor(state) {
