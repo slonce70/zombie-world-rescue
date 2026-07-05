@@ -1,9 +1,15 @@
 import { t } from './i18n.js';
 import { xpForLevel, PASS_MAX_LEVEL } from './progress.js';
+import { BESTIARY_TYPE_IDS } from './zombies.js';
 
 // сумарний XP, потрібний для фінального рівня Зоряного шляху (титул «Зоряний гравець»)
 let XP_PASS_CAP = 0;
 for (let l = 1; l < PASS_MAX_LEVEL; l++) XP_PASS_CAP += xpForLevel(l);
+
+// 🦁 кількість видів бестіарію, потрібна для титулу «Зоолог» — рахуємо від єдиного
+// переліку типів (BESTIARY_TYPE_IDS), а не хардкодимо число двічі
+const BESTIARY_ALL_COUNT = BESTIARY_TYPE_IDS.length;
+const bestiaryCollected = (s) => Object.keys((s && s.bestiary) || {}).filter((id) => BESTIARY_TYPE_IDS.includes(id) && s.bestiary[id] > 0).length;
 
 export const TITLES = {
   star_player: {
@@ -115,6 +121,16 @@ export const TITLES = {
     unlocked: (s) => ((s.donations | 0) >= 25),
     current: (s) => (s.donations | 0),
     target: 25,
+  },
+  // 🦁 бестіарій-колекція: зібрати всі види зомбі (без 'golden' — це варіант, не вид)
+  zoologist: {
+    icon: '🦁',
+    name: () => t('Зоолог'),
+    desc: () => t('Зустрінь усіх зомбі бестіарію'),
+    detail: () => t('Відкривається за всі {n} видів зомбі в бестіарії', { n: BESTIARY_ALL_COUNT }),
+    unlocked: (s) => bestiaryCollected(s) >= BESTIARY_ALL_COUNT,
+    current: (s) => bestiaryCollected(s),
+    target: BESTIARY_ALL_COUNT,
   },
 };
 

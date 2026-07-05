@@ -1446,4 +1446,13 @@ export const EN = {
 "🔁 Ще раз": "🔁 Again",
 "🔁 Реванш": "🔁 Rematch",
 "⭐ Ще трохи — і титул «{n}»! {c}/{t}": "⭐ Almost there — the title \"{n}\"! {c}/{t}",
+"📖 БЕСТІАРІЙ: 10 ВИДІВ!": "📖 BESTIARY: 10 SPECIES!",
+"+1000 монет 🪙": "+1000 coins 🪙",
+"📖 БЕСТІАРІЙ: 20 ВИДІВ!": "📖 BESTIARY: 20 SPECIES!",
+"💎 +25": "💎 +25",
+"🦁 БЕСТІАРІЙ ЗІБРАНО ПОВНІСТЮ!": "🦁 BESTIARY FULLY COLLECTED!",
+"💎 +50 · титул «Зоолог» 🎖️": "💎 +50 · title \"Zoologist\" 🎖️",
+"Зоолог": "Zoologist",
+"Зустрінь усіх зомбі бестіарію": "Meet every zombie in the bestiary",
+"Відкривається за всі {n} видів зомбі в бестіарії": "Unlocks after all {n} zombie species in the bestiary",
 };
