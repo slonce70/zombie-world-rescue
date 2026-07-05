@@ -185,8 +185,8 @@ export const MODE_RULES = {
   'soul-collector': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
 };
 
-// 🎲 подієвий мутатор тижня — діє в соло-реплеях кампанії (звільнені країни):
-// там живуть день/ніч, магазин і орди, тож кожен мутатор реально відчувається.
+// 🎲 подієвий мутатор тижня. weeklyMod лишається campaign-only для правил/орди,
+// а weeklyMutator нижче вмикає глобальні solo-ефекти через Zombies.spawn.
 // rules — спред у modeRules; night/horde — точкові хуки (_updateDayNight / _updateHordeWaves).
 // «бос-сюрприз» свідомо ВИКИНУТО: смерть будь-якого 'boss' у кампанії тригерить
 // перемогу країни (_onBossDied → _showVictory) — потрібна окрема механіка міні-боса.
@@ -194,8 +194,11 @@ export const MODIFIERS = {
   night: { icon: '🌙', name: () => t('Нічний рейд'), night: true },
   noshop: { icon: '🚫', name: () => t('Без магазину'), rules: { noShop: true } },
   horde: { icon: '🧟', name: () => t('Навала'), horde: true },
+  tough: { icon: '🦾', name: () => t('Живучий тиждень'), zMul: { hp: 1.35 } },
+  swift: { icon: '⚡', name: () => t('Швидкий тиждень'), zMul: { speed: 1.25 } },
+  elite: { icon: '👿', name: () => t('Елітний тиждень'), eliteChance: 0.15 },
 };
-const WEEKLY_MODIFIER_POOL = ['night', 'noshop', 'horde'];
+const WEEKLY_MODIFIER_POOL = ['night', 'tough', 'swift', 'elite'];
 
 function modeIdFromOpts(opts, worldBossId) {
   if (worldBossId) return 'worldboss';
@@ -1349,7 +1352,7 @@ class Game {
     if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const daily = this.dailyChallengeId();
     const weekly = this.weeklyChallengeId();
-    const wkMod = MODIFIERS[this.weeklyModifierId()];
+    const wkMod = this._modifierById(this.weeklyModifierId());
     const fmtBest = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     // 💀 кнопка складного варіанта — коли і базовий, і перегружений розлочені
     const hardBtn = (m) => {
@@ -2389,17 +2392,19 @@ class Game {
     const isWorldBoss = !!worldBossId;
     const modeId = modeIdFromOpts(opts, worldBossId);
     const baseRules = MODE_RULES[modeId] || MODE_RULES.campaign;
-    // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
-    // без сюрпризів); у коопі — лише явно зі spec (хост = джерело істини)
-    const wkModId = opts.coop
-      ? (opts.weeklyMod || null)
-      : (modeId === 'campaign' && !opts.playground && hasLiberated(this.save.liberated, countryId)
-        ? this.weeklyModifierId() : null);
-    const wkMod = (wkModId && MODIFIERS[wkModId]) || null;
-    const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
-    document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
+    const soloWeeklyModId = (!coop && !isPlayground) ? this.weeklyModifierId() : null;
+    // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
+    // без сюрпризів); у коопі — лише явно зі spec (хост = джерело істини)
+    const wkModId = coop
+      ? (opts.weeklyMod || null)
+      : (modeId === 'campaign' && !opts.playground && hasLiberated(this.save.liberated, countryId)
+        ? soloWeeklyModId : null);
+    const wkMod = this._modifierById(wkModId);
+    const weeklyMutator = this._buildWeeklyMutator(soloWeeklyModId, { coop, isPlayground });
+    const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
+    document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
@@ -2487,6 +2492,7 @@ class Game {
       playgroundGadget: isPlayground ? (GADGETS[opts.gadget] ? opts.gadget : Object.keys(GADGETS)[0]) : null,
       weeklyMod: wkMod,
       weeklyModId: wkModId,
+      weeklyMutator,
       weekly: opts.weekly || null,
       noGadgets: !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
@@ -2969,7 +2975,8 @@ class Game {
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;
-    if (level.weeklyMod) this.hud.toast(t('🗓️ Подія тижня: {i} {n}!', { i: level.weeklyMod.icon, n: level.weeklyMod.name() }));
+    const toastMod = level.weeklyMod || this._modifierById(level.weeklyMutator && level.weeklyMutator.id);
+    if (toastMod) this.hud.toast(t('🗓️ Подія тижня: {i} {n}!', { i: toastMod.icon, n: toastMod.name() }));
     this.paused = false;
     this.deathT = -1;
     this._hitstopT = 0;
@@ -3469,6 +3476,29 @@ class Game {
 
   weeklyModifierId() {
     return WEEKLY_MODIFIER_POOL[this._weekIndex() % WEEKLY_MODIFIER_POOL.length];
+  }
+
+  _modifierById(id) {
+    return id && Object.prototype.hasOwnProperty.call(MODIFIERS, id) ? MODIFIERS[id] : null;
+  }
+
+  _buildWeeklyMutator(id, { coop = null, isPlayground = false } = {}) {
+    if (coop || isPlayground) return null;
+    const mod = this._modifierById(id);
+    if (!mod) return null;
+    const hpMul = (mod.zMul && mod.zMul.hp) || 1;
+    const speedMul = (mod.zMul && mod.zMul.speed) || 1;
+    const eliteChance = mod.eliteChance || 0;
+    const night = !!mod.night;
+    if (hpMul === 1 && speedMul === 1 && eliteChance <= 0 && !night) return null;
+    return {
+      id,
+      hpMul,
+      speedMul,
+      eliteChance,
+      eliteTypes: ['tank', 'shield'],
+      night,
+    };
   }
 
   weeklyBossId() {
@@ -4553,7 +4583,7 @@ class Game {
     else if (ct < 215) k = 1 - (ct - 195) / 20;
     k = k * k * (3 - 2 * k); // плавні переходи
     if (level.infected) k = Math.max(k, 0.45);
-    if (level.weeklyMod && level.weeklyMod.night) k = Math.max(k, 0.75);
+    if ((level.weeklyMod && level.weeklyMod.night) || (level.weeklyMutator && level.weeklyMutator.night)) k = Math.max(k, 0.75);
     level.nightK = k;
     level.world.setNight(k);
     level.player.setLamp(k);
