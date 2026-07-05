@@ -43,6 +43,13 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 }
 #globe-progress span { color: var(--accent); }
 .globe-hint { color: #9fb8d4; font-weight: 700; font-size: 14px; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+/* 🧭 компас «що далі» просто на глобусі — компактна темна плашка над кнопками ГРАТИ */
+#globe-compass {
+  background: rgba(13, 20, 28, 0.72); border: 2px solid var(--ui-border); border-radius: 14px;
+  padding: 8px 16px; max-width: min(92vw, 480px); pointer-events: none;
+  justify-content: center;
+}
+#globe-compass:empty { display: none; }
 #version-tag {
   position: absolute; right: 12px; bottom: 8px; pointer-events: none;
   color: #7a93b0; font-weight: 700; font-size: 12px; text-shadow: 0 2px 6px rgba(0,0,0,.8);
@@ -358,6 +365,7 @@ body.in-level #hud { display: block; }
   animation: float-title 3s ease-in-out infinite;
 }
 .victory-sub { font-size: 18px; }
+.victory-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; }
 #victory-stats { display: flex; flex-direction: column; gap: 7px; margin: 26px auto 8px; max-width: 380px; }
 .stat {
   display: flex; align-items: center; background: rgba(0,0,0,.3);
@@ -1224,7 +1232,8 @@ body.touch-mode #touch-coach.show { display: block; }
   .globe-top { padding-top: 58px; }
   #globe-ui h1 { font-size: clamp(24px, 8vw, 34px); line-height: 1.04; }
   .globe-sub,
-  .globe-hint { display: none; }
+  .globe-hint,
+  #globe-compass { display: none; }
 }
 
 /* короткий ландшафт (телефон боком): тісно по висоті — підтискаємо все */
@@ -1233,6 +1242,7 @@ body.touch-mode #touch-coach.show { display: block; }
   #globe-ui h1 { font-size: clamp(20px, 4vw, 30px); }
   .globe-sub { display: none; }
   .globe-hint { display: none; }
+  #globe-compass { display: none; }
   #globe-progress { font-size: 14px; padding: 6px 14px; }
   .globe-play { font-size: 14px; padding: 9px 18px; }
   .country-item { padding: 5px 9px; }
@@ -1278,6 +1288,7 @@ body.touch-mode #touch-coach.show { display: block; }
   .megabox-box { font-size: 52px; }
   .megabox-title { font-size: 22px; }
   .megabox-reward { font-size: 20px; }
+  /* тач-варіант підказки магазину (🛒) не влазить разом із товарами у надтісний landscape — ховаємо */
   body.touch-mode .shop-key-hint { display: none; }
   body.touch-mode #toasts { left: calc(50% + 72px); top: 32px; bottom: auto; }
   body.touch-mode.banner-active #toasts { display: none; }

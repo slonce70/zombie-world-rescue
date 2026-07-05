@@ -16,7 +16,7 @@ import { Draft } from './draft.js';
 import { RunBuild } from './runbuild.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
-import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen } from './countries.js';
+import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
@@ -560,6 +560,29 @@ class Game {
       this._hideOverlay('overlay-victory');
       this.endLevel();
     });
+    document.getElementById('btn-victory-retry').addEventListener('click', () => {
+      const cid = this.level.countryId;
+      const inf = !!this.level.infected;
+      this._hideOverlay('overlay-victory');
+      this.endLevel();
+      inf ? this.startInfected(cid) : this.startLevel(cid);
+    });
+    document.getElementById('btn-victory-next').addEventListener('click', () => {
+      const nid = nextTarget(this.save.liberated);
+      if (!nid) return;
+      this._hideOverlay('overlay-victory');
+      this.endLevel();
+      this.startLevel(nid);
+    });
+    document.getElementById('btn-death-revenge').addEventListener('click', () => {
+      if (!this.level || this.level.net || this.deathT < 0) return;
+      const cid = this.level.countryId;
+      const inf = !!this.level.infected;
+      this.deathT = -1;
+      this._hideOverlay('overlay-death');
+      this.endLevel();
+      inf ? this.startInfected(cid) : this.startLevel(cid);
+    });
     // панелі глобуса: пасс, завдання, гардероб, шторм
     for (const el of document.querySelectorAll('.panel-close')) {
       el.addEventListener('click', () => {
@@ -1076,6 +1099,12 @@ class Game {
     // 🎁 catch-up продовженого Зоряного шляху (40→65): пропущені по XP рівні видаються разом
     this.progress.grantBacklog();
     this._showGlobeUI(true);
+    // 👋 welcome-back: показуємо прогрес і компас, якщо це не свіжий старт і не автозапуск рівня з URL
+    const libN0 = liberatedCount(this.save.liberated);
+    if (libN0 > 0 && !this.params.get('country')) {
+      const a = this._nextActionInfo();
+      this.hud.toast(t('👋 З поверненням! Звільнено країн: {n}. {i} {x}', { n: libN0, i: a.icon, x: a.text }), 6);
+    }
     this._initVersionCheck();
     this.cloud.bootSync(); // тихо: пуш прогресу або підхоплення хмарного сейва
     this.renderer.setAnimationLoop(() => {
@@ -1177,6 +1206,9 @@ class Game {
     if (!lib.LAB) {
       return { icon: '🧪', title: t('Далі'), text: t('Глава 3: знайди Лігво Вірусу') };
     }
+    // 🎯 кампанія пройдена, але лишились невиконані завдання дня — кличемо туди
+    const qLeft = this.quests.list.filter((q) => !q.done).length;
+    if (qLeft > 0) return { icon: '🎯', title: t('Завдання дня'), text: t('Виконано {d}/{n} — зазирни у 📅 Завдання', { d: 3 - qLeft, n: 3 }) };
     // 🗓️ світ врятовано → спершу кличемо у «випробування тижня», поки недільну нагороду не взято
     const wkMode = SOLO_MODES.find((m) => m.id === this.weeklyChallengeId());
     if (wkMode && !this.save.weekly['W' + this._weekIndex() + ':mode']) {
@@ -1191,7 +1223,7 @@ class Game {
     if (dailyMode) {
       return { icon: '🎯', title: t('Випробування дня'), text: t('{i} {m} — нагорода ×2 сьогодні!', { i: dailyMode.icon, m: dailyMode.name() }) };
     }
-    return { icon: '⭐', title: t('Далі'), text: t('Світ врятовано! Спробуй Шторм або рекорди') };
+    return { icon: '⭐', title: t('Далі'), text: t('Світ врятовано! Щодня — нове випробування, зазирай!') };
   }
 
   _playerCompassHtml() {
@@ -1208,6 +1240,12 @@ class Game {
     if (show) {
       document.getElementById('liberated-count').textContent =
         liberatedCount(this.save.liberated);
+      // 🧭 компас «що далі» просто на глобусі — не чекаючи відкриття меню «Грати»
+      const compassEl = document.getElementById('globe-compass');
+      if (compassEl) {
+        const a = this._nextActionInfo();
+        compassEl.innerHTML = `<b>${a.icon} ${a.title}</b><span>${a.text}</span>`;
+      }
       // бейджі: рівень пасса і незавершені завдання дня
       const passBadge = document.getElementById('pass-badge');
       passBadge.textContent = `⭐${this.progress.level}`;
@@ -3085,6 +3123,9 @@ class Game {
 
   _onPlayerDied() {
     this.level.stats.deaths++;
+    // кнопка реваншу — лише для фінальної соло-гілки кампанії, решта режимів мають свій end-флоу
+    const revengeBtn = document.getElementById('btn-death-revenge');
+    if (revengeBtn) revengeBtn.style.display = 'none';
     if (this.level.bossRush) {
       if (this.level.net) {
         this.deathT = 9999;
@@ -3164,6 +3205,7 @@ class Game {
         ? t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() })
         : t('Не хвилюйся — прогрес місій зберігся.');
     }
+    if (revengeBtn) revengeBtn.style.display = coop ? 'none' : '';
     this.audio.defeat();
     this._showOverlay('overlay-death');
   }
@@ -4120,6 +4162,12 @@ class Game {
       d.style.animationDuration = 2.5 + Math.random() * 2 + 's';
       conf.appendChild(d);
     }
+    // «Ще раз»/«Далі» — лише соло-кампанія; в коопі обидві сторони йдуть через глобус
+    const solo = !this.level.net;
+    const nextBtn = document.getElementById('btn-victory-next');
+    const retryBtn = document.getElementById('btn-victory-retry');
+    nextBtn.style.display = solo && nextTarget(this.save.liberated) !== null ? '' : 'none';
+    retryBtn.style.display = solo ? '' : 'none';
     this._showOverlay('overlay-victory');
   }
 

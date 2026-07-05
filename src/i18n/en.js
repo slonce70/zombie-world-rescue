@@ -1318,7 +1318,9 @@ export const EN = {
 "{f} {n}: звільни країну": "{f} {n}: liberate this country",
 "Глава 2: очисти заражені країни": "Chapter 2: clear infected countries",
 "Острів Динозаврів чекає фінальний бій": "Dinosaur Island awaits the final battle",
-"Світ врятовано! Спробуй Шторм або рекорди": "World saved! Try Storm or records",
+"Світ врятовано! Щодня — нове випробування, зазирай!": "World saved! Come back daily for a new challenge!",
+"Завдання дня": "Daily quests",
+"Виконано {d}/{n} — зазирни у 📅 Завдання": "Done {d}/{n} — check 📅 Quests",
 "Нічний рейд": "Night Raid",
 "Без магазину": "No Shop",
 "Навала": "Onslaught",
@@ -1410,4 +1412,5 @@ export const EN = {
 "Оборона турелі": "Turret Defense",
 "Молот": "Hammer",
 "Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.": "Smash the zombie turret with your hammer and robot before yours falls! Zombie waves every 10s.",
+"👋 З поверненням! Звільнено країн: {n}. {i} {x}": "👋 Welcome back! Countries liberated: {n}. {i} {x}",
 };
