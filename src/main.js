@@ -18,7 +18,7 @@ import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
-import { Progress, DailyQuests, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
+import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
@@ -464,6 +464,7 @@ class Game {
     this.cloud = new CloudSave(this);
     this.progress = new Progress(this);
     this.quests = new DailyQuests(this);
+    this.gift = new DailyGift(this);
     this._soloModeById = new Map(SOLO_MODES.map((mode) => [mode.id, mode]));
 
     this.hud = new HUD(this);
@@ -614,6 +615,11 @@ class Game {
       this._showOverlay('overlay-quests');
       this.audio.click();
     });
+    // 🎁 подарунок дня: чіп на глобусі відкриває модалку, кнопка «Забрати» видає нагороду
+    const giftChip = document.getElementById('gift-chip');
+    if (giftChip) giftChip.addEventListener('click', () => { this.audio.click(); this._openGiftModal(); });
+    const giftClaim = document.getElementById('btn-gift-claim');
+    if (giftClaim) giftClaim.addEventListener('click', () => this._claimGift());
     document.getElementById('btn-wardrobe').addEventListener('click', () => {
       this.renderWardrobe();
       this._showOverlay('overlay-wardrobe');
@@ -759,6 +765,9 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, cloudTs: 0, goal: null,
+      // 🎁 подарунок дня зі стрик-календарем; 🗓️ ціль тижня «300 зомбі → 💎 25»
+      gift: { last: '', streak: 0, week: 1 },
+      weeklyGoal: { week: -1, n: 0, claimed: false },
       stats: { killed: 0, headshots: 0, bosses: 0, megaboxes: 0, golden: 0, bestCombo: 0, coinsSpent: 0, cloneUses: 0, gadgetUses: 0, damageDealt: 0 },
       bestiary: {},
       chapter: { p: {}, done: false }, medals: [], infected: { cleared: {}, done: false },
@@ -869,6 +878,11 @@ class Game {
         if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
         if (typeof out.crystals !== 'number' || !isFinite(out.crystals)) out.crystals = 0;
         if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
+        // 🎁 подарунок дня і 🗓️ ціль тижня — старий сейв без полів дістає дефолти
+        if (!out.gift || typeof out.gift !== 'object' || Array.isArray(out.gift)) out.gift = { last: '', streak: 0, week: 1 };
+        else out.gift = Object.assign({ last: '', streak: 0, week: 1 }, out.gift);
+        if (!out.weeklyGoal || typeof out.weeklyGoal !== 'object' || Array.isArray(out.weeklyGoal)) out.weeklyGoal = { week: -1, n: 0, claimed: false };
+        else out.weeklyGoal = this._sanitizeWeeklyGoal(Object.assign({ week: -1, n: 0, claimed: false }, out.weeklyGoal));
         out.strongZombies = !!out.strongZombies;
         out.toughZombies = !!out.toughZombies;
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
@@ -1105,6 +1119,8 @@ class Game {
       const a = this._nextActionInfo();
       this.hud.toast(t('👋 З поверненням! Звільнено країн: {n}. {i} {x}', { n: libN0, i: a.icon, x: a.text }), 6);
     }
+    // 🎁 автовідкриття подарунка дня — лише для гравця з прогресом, поза автозапуском рівня і тестами
+    if (this.gift.pending() && libN0 > 0 && !this.params.get('country') && !this.testMode) this._openGiftModal();
     this._initVersionCheck();
     this.cloud.bootSync(); // тихо: пуш прогресу або підхоплення хмарного сейва
     this.renderer.setAnimationLoop(() => {
@@ -1254,6 +1270,11 @@ class Game {
       const qBadge = document.getElementById('quest-badge');
       qBadge.textContent = qLeft;
       qBadge.classList.toggle('show', qLeft > 0);
+      // 🎁 чіп подарунка дня — видно лише коли подарунок готовий
+      const giftChip = document.getElementById('gift-chip');
+      if (giftChip) giftChip.classList.toggle('show', this.gift.pending());
+      // 🗓️ ціль тижня — оновлюємо текст/бар
+      this._refreshWeeklyGoalUI();
       if (this._newVersion) this._onNewVersion(this._newVersion);
     }
     if (this.coop) this.coop.updateRoomChip();
@@ -2783,6 +2804,7 @@ class Game {
         lp.health += lp.lifeSteal;
       }
       this.save.stats.killed++;
+      this._bumpWeeklyGoal();
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
       if (z.golden) this.save.stats.golden++;
@@ -3278,6 +3300,94 @@ class Game {
     const d = new Date();
     const key = d.getFullYear() * 372 + d.getMonth() * 31 + (d.getDate() - 1);
     return DAILY_CHALLENGE_POOL[key % DAILY_CHALLENGE_POOL.length];
+  }
+
+  // 🎁 модалка подарунка дня: грід 7 клітинок поточного тижня, підсвічений сьогоднішній день
+  _openGiftModal() {
+    const info = this.gift.dayInfo();
+    const rewardText = (r) => {
+      const parts = [];
+      if (r.coins) parts.push(`🪙 ${r.coins}`);
+      if (r.crystals) parts.push(`💎 ${r.crystals}`);
+      return parts.join(' · ');
+    };
+    const week = GIFT_TABLE[info.week - 1];
+    let cells = '';
+    for (let d = 1; d <= 7; d++) {
+      const r = week[d - 1];
+      const claimed = d < info.day; // дні цього тижня, вже пройдені стриком
+      const today = d === info.day && this.gift.pending();
+      const cls = `gift-cell${today ? ' today' : ''}${claimed ? ' claimed' : ''}${d === 7 ? ' box' : ''}`;
+      cells += `<div class="${cls}">
+        <div class="gift-day">${d === 7 ? '🎁' : t('День {n}', { n: d })}</div>
+        <div class="gift-reward">${rewardText(r)}</div>
+        ${claimed ? '<div class="gift-check">✅</div>' : ''}
+      </div>`;
+    }
+    document.getElementById('gift-week').textContent = t('Тиждень {n}', { n: info.week });
+    document.getElementById('gift-grid').innerHTML = cells;
+    const claimBtn = document.getElementById('btn-gift-claim');
+    if (claimBtn) claimBtn.style.display = this.gift.pending() ? '' : 'none';
+    this._showOverlay('overlay-gift');
+  }
+
+  // 🎁 забрати подарунок дня з модалки: грант, звук, оновити грід і сховати чіп
+  _claimGift() {
+    const r = this.gift.claim();
+    if (!r) return;
+    this.audio.levelUp();
+    const parts = [];
+    if (r.coins) parts.push(t('🪙 {n} монет', { n: r.coins }));
+    if (r.crystals) parts.push(t('💎 {n}', { n: r.crystals }));
+    this.hud.banner(t('🎁 ПОДАРУНОК ДНЯ!'), parts.join(' · '), 4.2);
+    this._openGiftModal();       // перемалювати грід (день зсунувся, кнопка сховається)
+    const giftChip = document.getElementById('gift-chip');
+    if (giftChip) giftChip.classList.remove('show');
+  }
+
+  // 🗓️ оновити текст і бар цілі тижня на глобусі
+  _refreshWeeklyGoalUI() {
+    const el = document.getElementById('weekly-goal');
+    if (!el) return;
+    const wg = this.save.weeklyGoal || { n: 0, claimed: false };
+    const n = Math.min(300, wg.n | 0);
+    const label = el.querySelector('.wg-label');
+    const fill = el.querySelector('.wg-fill');
+    if (wg.claimed) {
+      if (label) label.textContent = t('✅ Ціль тижня: 300/300 · 💎 +25');
+      if (fill) fill.style.width = '100%';
+    } else {
+      if (label) label.textContent = t('🗓️ Ціль тижня: {n}/300 🧟', { n });
+      if (fill) fill.style.width = `${Math.round((n / 300) * 100)}%`;
+    }
+  }
+
+  // 🗓️ ціль тижня «300 зомбі → 💎 25». Forward-only reset нового тижня; переведені
+  // назад години морозять лічильник. Викликається з zombieKilled одразу після stats.killed++.
+  _bumpWeeklyGoal() {
+    const w = this._weekIndex();
+    let wg = this.save.weeklyGoal;
+    if (!wg || typeof wg !== 'object') wg = this.save.weeklyGoal = { week: -1, n: 0, claimed: false };
+    wg = this._sanitizeWeeklyGoal(wg);
+    if (wg.week > w + 1) { wg.week = w; wg.n = 0; wg.claimed = false; } // битий годинник (>+1 тижня вперед) → реініт, цей кіл піде як n=1
+    if (w > wg.week) { wg.week = w; wg.n = 0; wg.claimed = false; }   // новий тиждень — обнуляємо лічильник
+    if (wg.week !== w) return;                                        // переведені назад години (або +1 тижня) → freeze
+    wg.n++;
+    if (!wg.claimed && wg.n >= 300) {
+      wg.claimed = true;
+      this.save.crystals = (this.save.crystals || 0) + 25;
+      this.hud.banner(t('🏆 ЦІЛЬ ТИЖНЯ ВИКОНАНО!'), t('300 зомбі · 💎 +25'), 4.5);
+      this.saveGame();
+    }
+  }
+
+  // 🗓️ приведення полів цілі тижня до безпечних типів (week/n — цілі, claimed — bool).
+  // Мутує переданий об'єкт і повертає його. Спільне місце для _loadSave і _bumpWeeklyGoal.
+  _sanitizeWeeklyGoal(wg) {
+    wg.week = Number.isFinite(wg.week) ? Math.floor(wg.week) : -1;
+    wg.n = Number.isFinite(wg.n) ? Math.floor(wg.n) : 0;
+    wg.claimed = !!wg.claimed;
+    return wg;
   }
 
   // 🗓️ номер тижня від тієї ж лінійної дати, що й daily
