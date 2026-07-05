@@ -96,9 +96,18 @@ try {
 
   // рятувальна місія завершується за ~2с
   await A.waitForFunction(() => window.__game.level.missions.missions[0].state === 'done', null, { timeout: 8000 });
-  await sleep(600);
-  const coinsB1 = await B.evaluate(() => window.__game.save.coins);
-  const doneB = await B.evaluate(() => window.__game.level.missions.missions[0].state);
+  // ГОНКА: хост завершує місію і шле подію 'md' (нагорода +80) гостю асинхронно.
+  // Раніше тут був фіксований sleep(600) + читання монет гостя — під SLOW=2 подія 'md'
+  // інколи долітала ПІЗНІШЕ за 600мс, тож монети читались як 50 (нагорода вже в дорозі, ще не застосована).
+  // Чекаємо саме на стан ГОСТЯ: і 'done', і нараховану нагороду — детерміновано, без гонки.
+  const doneB = await B.waitForFunction(
+    () => window.__game.level.missions.missions[0].state === 'done',
+    null, { timeout: 8000 },
+  ).then(() => 'done').catch(() => 'timeout');
+  const coinsB1 = await B.waitForFunction(
+    () => window.__game.save.coins >= 130 ? window.__game.save.coins : false,
+    null, { timeout: 8000 },
+  ).then((h) => h.jsonValue()).catch(async () => B.evaluate(() => window.__game.save.coins));
   check('місія «порятунок» виконана у гостя теж', doneB === 'done');
   check('гість отримав нагороду місії (+80)', coinsB1 >= 130, `монет: ${coinsB1}`);
 
@@ -164,7 +173,11 @@ try {
 
   // ---- 5. на глобус → обидва в лобі, кімната жива ----
   await A.evaluate(() => document.getElementById('btn-victory-globe').click());
-  await sleep(1500);
+  // ГОНКА: хост тисне «на глобус» і шле гостю намір повернутись у лобі асинхронно.
+  // Фіксований sleep(1500) під SLOW=2 інколи не встигав — гість лишався у 'level'.
+  // Чекаємо детерміновано на автоповернення гостя (і хоста) у лобі.
+  await A.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: 15000 }).catch(() => {});
+  await B.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: 15000 }).catch(() => {});
   const stA = await A.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   const stB = await B.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   check('хост повернувся в лобі', stA.state === 'globe' && stA.coop.state === 'lobby', `${stA.state}/${stA.coop.state}`);
