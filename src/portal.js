@@ -96,6 +96,8 @@ export class PortalMode {
     if (this.closedCount() >= this.target) {
       this.completed = true;
       this.level.game._endPortalRun(true);
+    } else {
+      this.level.game._maybeModeDraft(this.level); // 🎲 драфт при закритті порталу (соло)
     }
   }
 

@@ -78,6 +78,12 @@ export class KnockoutMode {
     for (const z of this.level.zombies.list) {
       if (z.knockout && z.state !== 'dead') this._clampZombie(z);
     }
+    // 🎲 драфт на «межі хвилі»: у Нокауті одна пачка, тож ловимо середину забігу —
+    // коли зачищено половину зомбі (раз за забіг, лише соло).
+    if (!this.over && !this._draftFired && this.remaining() <= Math.floor(this.target / 2)) {
+      this._draftFired = true;
+      this.level.game._maybeModeDraft(this.level);
+    }
     if (!this.over && this.remaining() <= 0) {
       this.completed = true;
       this.level.game._endKnockoutRun();

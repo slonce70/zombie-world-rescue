@@ -72,6 +72,7 @@ const TYPE_STATS = {
   vampire: { hp: 150, speed: 1.7, chaseSpeed: 4.0, aggro: 30, dmg: 14, attackR: 1.9, coins: 24, pitch: 1.15 },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
 };
+const WEEKLY_ELITE_SOURCE_TYPES = new Set(['walker', 'runner', 'headphones', 'boxer', 'mummy', 'imp']);
 
 // 🦁 Бестіарій-колекція (R2-5.3): усі звичайні типи зомбі з TYPE_STATS (включно з 'boss' —
 // його вбивають у кінці кожної глави, тож ціль «усі види» лишається реально досяжною).
@@ -178,8 +179,27 @@ export class Zombies {
       : (this.level.net && this.level.net.authority ? this.level.net.allocId() : ++this._idSeq);
     // зовнішність зомбі — з nid-сідованого RNG: однакова у всіх гравців кооперативу
     const vrng = new RNG((Math.imul(nid, 2654435761) ^ 0x9e3779) >>> 0);
-    const rig = type === 'boss' ? makeBoss(bossStyle) : makeZombie(type, vrng);
-    const stats = { ...TYPE_STATS[type] };
+    let finalType = type;
+    let stats = { ...TYPE_STATS[finalType] };
+    const wm = this.level.weeklyMutator;
+    // 🗓️ Єдина точка перехоплення: не чіпаємо босів, орду, дзеркала коопу
+    // та стилізовані boss-виклики, щоб не складати сценарні ефекти двічі.
+    const weeklyCanTouch = !!(wm && finalType !== 'boss' && !opts.horde && !opts.mirror && !opts.style && !opts.frost);
+    if (weeklyCanTouch) {
+      const weeklyEliteOk = !opts.guard && !opts.zone && !opts.golden && !opts.sleeping && !opts.noCoopScale
+        && WEEKLY_ELITE_SOURCE_TYPES.has(finalType);
+      if (weeklyEliteOk && wm.eliteChance > 0 && this.rng.chance(wm.eliteChance)) {
+        const eliteTypes = Array.isArray(wm.eliteTypes) && wm.eliteTypes.length ? wm.eliteTypes : ['tank', 'shield'];
+        finalType = eliteTypes[Math.floor(this.rng.next() * eliteTypes.length)] || 'tank';
+        stats = { ...TYPE_STATS[finalType] };
+      }
+      if (wm.hpMul && wm.hpMul !== 1) stats.hp *= wm.hpMul;
+      if (wm.speedMul && wm.speedMul !== 1) {
+        stats.speed *= wm.speedMul;
+        stats.chaseSpeed *= wm.speedMul;
+      }
+    }
+    const rig = finalType === 'boss' ? makeBoss(bossStyle) : makeZombie(finalType, vrng);
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
@@ -189,11 +209,11 @@ export class Zombies {
     // noCoopScale — для хвиль Шторму: їх КІЛЬКІСТЬ уже росте з гравцями (+60%/друга),
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
-    const hpScale = type === 'boss' ? 1 : this.diff.hp * coopScale;
+    const hpScale = finalType === 'boss' ? 1 : this.diff.hp * coopScale;
     const maxHp = this.hpWithSettings(stats.hp * hpScale, opts);
     stats.hp = maxHp;
     const z_ = {
-      nid, rig, type, stats,
+      nid, rig, type: finalType, stats,
       hp: maxHp, maxHp,
       x, z, y,
       state: opts.horde ? 'chase' : 'wander',
@@ -221,16 +241,16 @@ export class Zombies {
       revivedOnce: false, // 🪬 шаман воскресає один раз
 
       frost: bossStyle === 'frost',
-      bossStyle: type === 'boss' ? bossStyle : null,
+      bossStyle: finalType === 'boss' ? bossStyle : null,
       noLeash: !!opts.noLeash, // міні-боси шторму гуляють вільно
       // дальній бій (сніговики, плювака, Король Мороз, Шеф Багет)
       ranged: stats.ranged
-        || (type === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
-        || (type === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null)
-        || (type === 'boss' && bossStyle === 'sultan' ? KEBAB_RANGED : null)
-        || (type === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null)
-        || (type === 'boss' && bossStyle === 'matador' ? BANDERILLA_RANGED : null)
-        || (type === 'boss' && bossStyle === 'gladiator' ? PILUM_RANGED : null),
+        || (finalType === 'boss' && bossStyle === 'frost' ? FROST_RANGED : null)
+        || (finalType === 'boss' && bossStyle === 'chef' ? BAGUETTE_RANGED : null)
+        || (finalType === 'boss' && bossStyle === 'sultan' ? KEBAB_RANGED : null)
+        || (finalType === 'boss' && bossStyle === 'pharaoh' ? SCARAB_RANGED : null)
+        || (finalType === 'boss' && bossStyle === 'matador' ? BANDERILLA_RANGED : null)
+        || (finalType === 'boss' && bossStyle === 'gladiator' ? PILUM_RANGED : null),
       rangedCd: this.rng.range(0.5, 2.5),
       throwProj: false,
       // 🛡 щит
@@ -238,7 +258,7 @@ export class Zombies {
       // 🧙 чарівник: таймери призову / лікування / ре-касту щита
       summonCd: 0, healCd: 0, shieldRecastCd: 0, minions: [],
     };
-    if (type === 'shield') {
+    if (finalType === 'shield') {
       z_.shieldHp = z_.shieldMax = stats.shieldHp;
       // 🔥 v47: частина щитоносців на пізніх країнах (де вже є вогнемет) — анти-вогонь.
       // shieldFireproof → вогнемет НЕ ламає щит (гравець мусить обійти збоку), решта шкоди — як завжди.
@@ -250,7 +270,7 @@ export class Zombies {
       rig.body.add(shield.group);
       z_.shieldObj = shield;
     }
-    if (type === 'wizard') {
+    if (finalType === 'wizard') {
       // 🧙 щит чарівника — той самий механізм shieldHp, але менший і відновлюваний
       z_.shieldHp = z_.shieldMax = stats.shieldHp;
       const shield = makeShieldMesh();
@@ -260,7 +280,7 @@ export class Zombies {
       z_.summonCd = this.rng.range(3, 6);
       z_.healCd = this.rng.range(2, 4);
     }
-    if (type === 'robot') {
+    if (finalType === 'robot') {
       // 🤖🛡 щит-гаджет меха — той самий механізм shieldHp (фронтальний, ре-каст), масштабований під великого меха
       z_.shieldHp = z_.shieldMax = stats.shieldHp; // 555
       const shield = makeShieldMesh();
@@ -271,7 +291,7 @@ export class Zombies {
       z_.shieldObj = shield;
       z_.shieldRecastCd = 0; // стартує зі щитом; >0 лише після зламу
     }
-    if (type === 'ironclad') {
+    if (finalType === 'ironclad') {
       // 🦾 нагрудник: окрема група на тулубі (клонована з шаблоном)
       z_.chestHp = z_.chestMax = stats.chestHp;
       rig.body.traverse((o) => {
@@ -282,7 +302,7 @@ export class Zombies {
     } else {
       z_.chestHp = 0;
     }
-    if (type === 'vampire') {
+    if (finalType === 'vampire') {
       // 🔥 вогонь горіння на сонці — per-instance, чіпляємо як щит (на rig.body). Тоглиться вдень в update().
       z_.burnFx = makeBurnFx();
       rig.body.add(z_.burnFx);
@@ -296,7 +316,7 @@ export class Zombies {
     }
     this.byNidMap.set(nid, z_);
     this.list.push(z_);
-    if (type === 'boss') this.boss = z_;
+    if (finalType === 'boss') this.boss = z_;
     if (this.level.net && this.level.net.authority && !opts.mirror) this.level.net.onZombieSpawn(z_);
     return z_;
   }

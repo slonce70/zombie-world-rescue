@@ -24,7 +24,7 @@ const det = await page.evaluate(() => {
   };
 });
 check(det.mode === det.mode2 && typeof det.mode === 'string' && det.mode.length > 0, 'режим тижня стабільний', JSON.stringify(det));
-check(['night', 'noshop', 'horde'].includes(det.mod), 'мутатор тижня з пулу', det.mod);
+check(['night', 'tough', 'swift', 'elite'].includes(det.mod), 'мутатор тижня з пулу', det.mod);
 check(['radiation', 'ice', 'titan'].includes(det.boss), 'бос тижня валідний', det.boss);
 
 // перемога в режимі тижня: монети ×3 і одноразові +25💎 (моки проти протухання опівночі)
