@@ -765,6 +765,9 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, cloudTs: 0, goal: null,
+      // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
+      // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
+      donations: 0, donStars: 0,
       // 🎁 подарунок дня зі стрик-календарем; 🗓️ ціль тижня «300 зомбі → 💎 25»
       gift: { last: '', streak: 0, week: 1 },
       weeklyGoal: { week: -1, n: 0, claimed: false },
@@ -854,6 +857,11 @@ class Game {
         out.soulLevel = Math.floor(out.soulLevel);
         if (typeof out.radiationCoins !== 'number' || !isFinite(out.radiationCoins) || out.radiationCoins < 0) out.radiationCoins = 0;
         out.radiationCoins = Math.floor(out.radiationCoins);
+        // 🌟 донації рятівнику: скінченні цілі ≥0 (зіпсоване/чуже → 0)
+        for (const k of ['donations', 'donStars']) {
+          if (typeof out[k] !== 'number' || !isFinite(out[k]) || out[k] < 0) out[k] = 0;
+          out[k] = Math.floor(out[k]);
+        }
         if (!Array.isArray(out.cloneSkins)) out.cloneSkins = [];
         out.cloneSkins = out.cloneSkins.filter((id, i, arr) => id === 'radiation' && arr.indexOf(id) === i);
         if (out.activeCloneSkin !== 'radiation' || !out.cloneSkins.includes('radiation')) out.activeCloneSkin = 'ninja';
@@ -1472,10 +1480,13 @@ class Game {
     const frac = this.progress.levelFrac();
     const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
     const prestige = this.progress.prestigeStars;
-    document.getElementById('pass-progress').innerHTML = lvl >= PASS_MAX_LEVEL
+    // 🌟 зірки за пожертви рятівнику — окремим рядком (обчислюваний престиж НЕ чіпаємо)
+    const donStars = this.save.donStars || 0;
+    const donLine = donStars > 0 ? `<br>${t('🌟 Зірки пожертв: {n}', { n: donStars })}` : '';
+    document.getElementById('pass-progress').innerHTML = (lvl >= PASS_MAX_LEVEL
       ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl }) + (prestige > 0 ? `<br>${t('🎖️ Ранг Рятівника: {n} ⭐', { n: prestige })}` : '')
       : t('⭐ Рівень {lvl} · до наступного: {a}/{b} XP', { lvl, a: Math.round(frac * need), b: need }) + `
-         <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
+         <div class="xpbar"><div style="width:${Math.round(frac * 100)}%"></div></div>`) + donLine;
     let html = '';
     for (let n = 2; n <= PASS_MAX_LEVEL; n++) {
       const r = PASS_REWARDS[n];

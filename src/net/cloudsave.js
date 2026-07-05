@@ -36,7 +36,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
   'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
   'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
-  'gift', 'weeklyGoal',
+  'gift', 'weeklyGoal', 'donations', 'donStars',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
