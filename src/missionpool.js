@@ -119,7 +119,9 @@ export function rollMissionSet(countryId, seed, runIndex) {
 const SLOT_ALIASES = { rescue: 0, tower: 1, warehouse: 2 };
 
 export class DynamicMissions {
-  constructor(level) {
+  // storyTypes — примусовий набір для сюжетного рівня (StoryMissions передає
+  // storyMissionSet(...)); пріоритет: тестовий хук > сюжет > природний роль
+  constructor(level, storyTypes = null) {
     this.level = level;
     this.L = level.world.layout;
     const game = level.game;
@@ -129,7 +131,7 @@ export class DynamicMissions {
       ? level.runIndex
       : (game.save.missionRuns && game.save.missionRuns[level.countryId]) || 0;
     // тестовий хук: примусовий набір місій
-    const types = game._forceMissionSet || rollMissionSet(level.countryId, level.country.seed, runIndex);
+    const types = game._forceMissionSet || storyTypes || rollMissionSet(level.countryId, level.country.seed, runIndex);
     this.runIndex = runIndex;
 
     // слоти карти: A = хлів, B = вежа, C = склад, D = бонус біля села
