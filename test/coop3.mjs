@@ -60,7 +60,16 @@ try {
   // 2. гість приєднується ПОСЕРЕД гри
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
-  await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
+  // джойн посеред рівня може впертись у 30с welcome-таймаут (coop.js JOIN_WELCOME_TIMEOUT_MS)
+  // на задушеному CI-раннері: welcome віддає event loop хоста, а хост рендерить бій під
+  // SwiftShader. Пробуємо до 3 разів — живий гравець так само тапнув би «Приєднатись» ще раз
+  // (невдалий join сам прибирає напівз'єднання: transport.close() + _reset()).
+  let joined = false;
+  for (let attempt = 1; attempt <= 3 && !joined; attempt++) {
+    joined = await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад').then(() => true, (e) => (console.log('join fail:', e.message), false)), code);
+    if (!joined) console.log(`↻ джойн не пройшов (спроба ${attempt}/3) — повторюємо`);
+  }
+  check('гість зміг приєднатись до кімнати', joined);
   await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
   check('гість одразу потрапив у рівень (mid-join)', true);
   await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: 20000 * SLOW });
