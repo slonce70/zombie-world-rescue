@@ -1,4 +1,5 @@
-import { DynamicMissions } from '../missionpool.js';
+import { DynamicMissions, MISSION_TYPES, rollMissionSet } from '../missionpool.js';
+import { RNG } from '../utils.js';
 import { t } from '../i18n.js';
 import { getCountryStory } from './countryStories.js';
 import { removeStoryNpc, spawnStoryNpc, updateStoryNpc } from './npcs.js';
@@ -11,7 +12,7 @@ const LEGACY_UKR_MISSION_ALIASES = {
 
 const LEGACY_SLOT_IDS = ['rescue', 'tower', 'warehouse'];
 
-const STORY_DELEGATE_MATCHES = {
+export const STORY_DELEGATE_MATCHES = {
   'ukr-rescue': { preferred: ['rescue'] },
   'ukr-signal': { preferred: ['repair'] },
   'ukr-defense': { preferred: ['clear'], compatible: ['defense'] },
@@ -58,6 +59,56 @@ const STORY_DELEGATE_MATCHES = {
   'chn-pit': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
 };
 
+// 📖 Набір місій для СЮЖЕТНОГО рівня. Баг: HUD показує «Врятуй людей із хліва»
+// (preferred=rescue), а делегат грає інший тип (напр. «Набери води з колодязів»),
+// бо rollMissionSet для runIndex>0 може не викинути rescue, а фірмова місія країни
+// (well/bonfire/…) затирає слот. Ліки: гарантуємо, що у перших 3 слотах (A/B/C)
+// присутній preferred[0]-тип КОЖНОЇ сюжетної цілі. Фірмову місію rollMissionSet уже
+// кладе у ЇЇ слот (а там, де вона і є ціллю — це той самий preferred). Евіктимо лише
+// НЕ-preferred типи; фірмові типи (MISSION_TYPES[t].country) не рухаємо — їхні слоти
+// фіксовані. Загальні rescue/repair/clear користуються фіксованими точками світу
+// (хлів/вежа/склад), тож можуть стояти у будь-якому слоті без шкоди для геймплею.
+// Детермінізм за (seed, runIndex) → у коопі хост і гість будують той самий набір.
+export function storyMissionSet(countryId, seed, runIndex) {
+  const set = rollMissionSet(countryId, seed, runIndex).slice();
+  const story = getCountryStory(countryId);
+  if (!story) return set;
+  const required = [];
+  for (const obj of story.objectives) {
+    const pref = (STORY_DELEGATE_MATCHES[obj.id] && STORY_DELEGATE_MATCHES[obj.id].preferred) || [];
+    if (pref[0] && !required.includes(pref[0])) required.push(pref[0]);
+  }
+  const rng = new RNG((seed * 31 + runIndex * 7777 + 91) >>> 0); // окремий сід від rollMissionSet
+  const locked = [false, false, false]; // слоти A/B/C, які вже тримають потрібний тип
+  const satisfied = new Set();
+  for (let i = 0; i < 3; i++) {
+    if (required.includes(set[i]) && !satisfied.has(set[i])) { locked[i] = true; satisfied.add(set[i]); }
+  }
+  // фірмові типи (обмежені слоти) — першими; далі загальні
+  const remaining = required.filter((type) => !satisfied.has(type));
+  remaining.sort((a, b) => (MISSION_TYPES[b].country ? 1 : 0) - (MISSION_TYPES[a].country ? 1 : 0));
+  const natural = { rescue: 0, repair: 1, clear: 2 }; // «рідний» слот загального типу
+  for (const type of remaining) {
+    const isSig = !!MISSION_TYPES[type].country;
+    let free = (isSig
+      ? MISSION_TYPES[type].slots.map((s) => 'ABC'.indexOf(s)).filter((i) => i >= 0 && i < 3)
+      : [0, 1, 2]).filter((i) => !locked[i]);
+    if (!free.length) free = [0, 1, 2].filter((i) => !locked[i]); // страховка (не має статися)
+    let slot;
+    if (!isSig && natural[type] !== undefined && free.includes(natural[type])) slot = natural[type];
+    else slot = free[rng.int(0, free.length - 1)];
+    set[slot] = type;
+    locked[slot] = true;
+    satisfied.add(type);
+  }
+  // 🎁 4-й (бонус) слот не має дублювати перші три
+  if (set.length > 3 && set.slice(0, 3).includes(set[3])) {
+    const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((type) => !set.slice(0, 3).includes(type));
+    if (dPool.length) set[3] = dPool[rng.int(0, dPool.length - 1)];
+  }
+  return set;
+}
+
 export class StoryMissions {
   constructor(level) {
     this.level = level;
@@ -81,7 +132,12 @@ export class StoryMissions {
     this._introShown = false;
     this._introT = 1.1;
     this._activeId = this.objectives[0] ? this.objectives[0].id : null;
-    this.delegate = new DynamicMissions(level);
+    // 📖 набір місій-делегатів гарантовано містить preferred[0] кожної сюжетної цілі
+    // (той самий runIndex, що й обчислює DynamicMissions → у коопі збіг хост/гість)
+    const runIndex = level.runIndex !== undefined
+      ? level.runIndex
+      : (level.game.save.missionRuns && level.game.save.missionRuns[level.countryId]) || 0;
+    this.delegate = new DynamicMissions(level, storyMissionSet(level.countryId, level.country.seed, runIndex));
     this.npcState = spawnStoryNpc(
       level,
       this.story && this.story.npc,

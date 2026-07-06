@@ -119,7 +119,9 @@ export function rollMissionSet(countryId, seed, runIndex) {
 const SLOT_ALIASES = { rescue: 0, tower: 1, warehouse: 2 };
 
 export class DynamicMissions {
-  constructor(level) {
+  // storyTypes — примусовий набір для сюжетного рівня (StoryMissions передає
+  // storyMissionSet(...)); пріоритет: тестовий хук > сюжет > природний роль
+  constructor(level, storyTypes = null) {
     this.level = level;
     this.L = level.world.layout;
     const game = level.game;
@@ -129,7 +131,7 @@ export class DynamicMissions {
       ? level.runIndex
       : (game.save.missionRuns && game.save.missionRuns[level.countryId]) || 0;
     // тестовий хук: примусовий набір місій
-    const types = game._forceMissionSet || rollMissionSet(level.countryId, level.country.seed, runIndex);
+    const types = game._forceMissionSet || storyTypes || rollMissionSet(level.countryId, level.country.seed, runIndex);
     this.runIndex = runIndex;
 
     // слоти карти: A = хлів, B = вежа, C = склад, D = бонус біля села
@@ -1140,7 +1142,8 @@ export class DynamicMissions {
       m.killed = killed;
       if (m.killed < 3) {
         level.bus.emit('toast', t('👹 Еліт переможено ({n}/3)! Наступний — за маркером', { n: m.killed }));
-        level.audio.mission();
+        // проміжний прогрес — чекпойнт, а не «квест виконано» (той лунає у _complete)
+        level.audio.checkpoint();
       }
     }
     if (m.killed >= 3) {
@@ -1330,12 +1333,14 @@ export class DynamicMissions {
     p.done = true;
     m.activated++;
     p.lamp.material.color.set(cfg.color);
-    level.audio.mission();
     level.effects.burst(new THREE.Vector3(p.x, p.y + 1.2, p.z), cfg.color, 14, { speed: 3.5, up: 4, life: 0.7, size: 1.1 });
     level.netEv('mact', m.slotIndex, m.points.indexOf(p));
     if (m.activated < cfg.n) {
+      // проміжна точка — легкий чекпойнт (БЕЗ голосу «квест виконано»)
+      level.audio.checkpoint();
       level.bus.emit('toast', cfg.stepToast.replace('{n}', m.activated).replace('{total}', cfg.n));
     } else {
+      // фінальна точка — джингл грає _complete() (level.audio.mission()), тут НЕ дублюємо
       level.bus.emit('toast', cfg.doneToast);
       this._complete(m.id);
     }
@@ -1655,7 +1660,8 @@ export class DynamicMissions {
     m.activated = m.points.filter((x) => x.done).length;
     p.lamp.material.color.set(cfg.color);
     if (!silent) {
-      this.level.audio.mission();
+      // гість: кожна активована точка — чекпойнт; фінальний джингл дасть netMissionDone
+      this.level.audio.checkpoint();
       this.level.effects.burst(new THREE.Vector3(p.x, p.y + 1.2, p.z), cfg.color, 14, { speed: 3.5, up: 4, life: 0.7, size: 1.1 });
     }
   }
