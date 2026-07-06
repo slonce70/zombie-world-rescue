@@ -502,6 +502,9 @@ export class HostNet {
     }
     const snap = { t: 's', n: this.seq, tm: r1(level.stats.time), pl, z };
     if (level.missions && level.missions.netState) snap.m = level.missions.netState();
+    // ⭐ v298 «Зірки разом»: КОМАНДНИЙ прогрес вторинної цілі → чип гостя тікає наживо
+    // (виконання дублює подія `soc`, але прогрес живе тут). Дефініцію гість уже має зі spec.
+    if (level.secondaryObjective) snap.so = level.secondaryObjective.progress;
     if (level.effects.ball) {
       const bp = level.effects.ball.mesh.position;
       snap.ball = [r1(bp.x), r1(bp.y), r1(bp.z)];
@@ -565,6 +568,12 @@ export class HostNet {
     };
     const state = { t: 'state', zoms, items, world, tm: r1(level.stats.time) };
     if (level.missions && level.missions.netFullState) state.missions = level.missions.netFullState();
+    // ⭐ v298 «Зірки разом»: mid-join/реконект відновлює чип цілі й КОМАНДНИЙ прогрес+виконаність.
+    // (Дефініцію гість також дістає зі spec при вході, але тут несемо id/target для повноти й безпеки.)
+    if (level.secondaryObjective) {
+      const so = level.secondaryObjective;
+      state.so = [so.id, so.target, so.progress, so.done ? 1 : 0];
+    }
     // 🌟 v297: непідібраний супер-пікап переживає mid-join/реконект (nid+позиція; тип лишається
     // у хоста — підбір host-authoritative). Активні сили короткочасні, у стан НЕ пишемо.
     const sp = level.superPickup;
