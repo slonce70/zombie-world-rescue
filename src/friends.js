@@ -348,6 +348,9 @@ export class HiddenRescue {
     if (!save.friends || typeof save.friends !== 'object') save.friends = {};
     save.friends[this.cid] = true;
     this.game.saveGame();
+    // 🥚 R5: кожен 3-й друг дарує яйце петса — main.js слухає й видає (уникаємо import-циклу
+    // eggs.js↔friends.js, тримаючи логіку/тост нагорода-стороною).
+    if (this.level && this.level.bus) this.level.bus.emit('friendRescued', this.cid);
 
     const f = this.friend;
     if (this.rig) setAnim(this.rig, 'cheer');

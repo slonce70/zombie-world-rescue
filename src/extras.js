@@ -232,6 +232,13 @@ export class Pet {
     this.barkCd = 2;
     this.grabCd = 0;
     this.grabbing = null;
+    // 🐾 R5: рівень петса (1..3) → більша модель (×1.12/×1.25) + іскри на Рів.3.
+    const save = level.game && level.game.save;
+    const lv = (save && save.petLevels && save.petLevels[this.id]) | 0;
+    this.petLevel = (lv >= 1 && lv <= 3) ? lv : 1;
+    this._baseScale = ({ 1: 1, 2: 1.12, 3: 1.25 })[this.petLevel] || 1;
+    this.model.group.scale.setScalar(this._baseScale);
+    this._sparkleT = 0;
     level.scene.add(this.model.group);
   }
 
@@ -325,6 +332,15 @@ export class Pet {
     }
     g.group.position.set(this.x, this.y + hopY, this.z);
     g.group.rotation.y += (this.yaw - g.group.rotation.y) * Math.min(1, dt * 9);
+
+    // ✨ Рів.3: періодичні дешеві іскри навколо петса (reuse effects.burst)
+    if (this.petLevel >= 3 && level.effects && level.effects.burst) {
+      this._sparkleT -= dt;
+      if (this._sparkleT <= 0) {
+        this._sparkleT = 0.5;
+        level.effects.burst(new THREE.Vector3(this.x, this.y + 0.7, this.z), 0xffe066, 2, { speed: 0.8, up: 1.2, life: 0.5, size: 0.35 });
+      }
+    }
 
     // гавкає на сплячі сюрпризи й золотого зомбі
     this.barkCd -= dt;

@@ -42,6 +42,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'stars', 'starClaims', 'mercyDeaths',
   // 🤝 R4 «Врятовані друзі»: врятовані НПС і день останнього «щоденного дякую» табору
   'friends', 'friendThanks',
+  // 🥚 R5 «Колекція та яйця»: яйця, видані пороги (зірки/друзі), корм і рівні петсів
+  'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -92,6 +94,11 @@ export function saveHasProgress(s) {
     || !!(s.gift && (s.gift.streak | 0) > 0)                 // стрик подарунка дня — щоб зміна пристрою не обнуляла його
     || (s.stars && typeof s.stars === 'object' && Object.values(s.stars).some((v) => (v | 0) > 0)) // ⭐ зароблені зірки країн
     || (s.friends && typeof s.friends === 'object' && Object.values(s.friends).some((v) => !!v)) // 🤝 врятовані друзі
+    || (s.eggs | 0) > 0                                     // 🥚 зароблені яйця петсів
+    || (Array.isArray(s.eggClaims) && s.eggClaims.length > 0) // видані пороги-яйця (зірки)
+    || (Array.isArray(s.friendEggClaims) && s.friendEggClaims.length > 0) // видані пороги-яйця (друзі)
+    || (s.petFood | 0) > 0                                  // 🍖 корм для росту петсів
+    || (s.petLevels && typeof s.petLevels === 'object' && Object.values(s.petLevels).some((v) => (v | 0) > 1)) // рівні петсів
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

@@ -11,7 +11,7 @@ import { StoryMissions } from './story/storymissions.js';
 import { shouldUseStoryMissions, storyPreview } from './story/countryStories.js';
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
-import { Shop, goalInfo } from './shop.js';
+import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
 import { Draft } from './draft.js';
 import { RunBuild } from './runbuild.js';
 import { Globe } from './globe.js';
@@ -52,6 +52,11 @@ import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapte
 import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
+import {
+  claimStarEggs, claimFriendEggs, claimBacklogEggs, openEgg, eggOddsText, eggPoolPetIds,
+  petLevel, canFeed, feedCost, feedPet, activePetMagnet, PET_MAX_LEVEL,
+  ELITE_CHEST_EGG_CHANCE, GOLDEN_CHEST_EGG_CHANCE,
+} from './eggs.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
@@ -82,7 +87,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 290;
+const APP_VERSION = 291;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -802,6 +807,9 @@ class Game {
       // 🤝 R4 «Врятовані друзі»: врятовані НПС ({ cid: true }) і день останнього «щоденного дякую»
       // з табору (YYYY-MM-DD, формат DailyGift.dayKey — скаляр, НЕ map)
       friends: {}, friendThanks: '',
+      // 🥚 R5 «Колекція та яйця»: лічильник яєць, видані пороги-яйця (зірки/друзі),
+      // корм (з дублікатів) і рівні петсів ({ petId: 1..3 })
+      eggs: 0, eggClaims: [], friendEggClaims: [], petFood: 0, petLevels: {},
     };
   }
 
@@ -925,6 +933,22 @@ class Game {
         } else {
           out.mercyDeaths = { cid: out.mercyDeaths.cid, n: Math.floor(out.mercyDeaths.n) };
         }
+        // 🥚 R5 «Колекція та яйця»: лічильники — цілі ≥0; claim-списки — унікальні пороги;
+        // petLevels — { petId: 1..3 } лише для наявних петсів (зіпсоване/чуже → чисто)
+        if (typeof out.eggs !== 'number' || !isFinite(out.eggs) || out.eggs < 0) out.eggs = 0;
+        out.eggs = Math.floor(out.eggs);
+        if (typeof out.petFood !== 'number' || !isFinite(out.petFood) || out.petFood < 0) out.petFood = 0;
+        out.petFood = Math.floor(out.petFood);
+        if (!Array.isArray(out.eggClaims)) out.eggClaims = [];
+        out.eggClaims = out.eggClaims.filter((n, i, arr) => typeof n === 'number' && isFinite(n) && arr.indexOf(n) === i);
+        if (!Array.isArray(out.friendEggClaims)) out.friendEggClaims = [];
+        out.friendEggClaims = out.friendEggClaims.filter((n, i, arr) => typeof n === 'number' && isFinite(n) && arr.indexOf(n) === i);
+        if (!out.petLevels || typeof out.petLevels !== 'object' || Array.isArray(out.petLevels)) out.petLevels = {};
+        for (const id of Object.keys(out.petLevels)) {
+          const v = out.petLevels[id] | 0;
+          if (!PETS[id] || v <= 1) delete out.petLevels[id];
+          else out.petLevels[id] = Math.min(3, v);
+        }
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!Array.isArray(out.weaponLoadout)) out.weaponLoadout = null;
@@ -966,6 +990,10 @@ class Game {
       }
     }
     syncTitles(out);
+    // 🥚 R5 ретро-нарахування яєць: ветеран з накопиченими зірками/друзями одразу дістає
+    // весь беклог яєць (ідемпотентно через eggClaims/friendEggClaims). Тихо на завантаженні —
+    // тости за live-пороги видаються в _awardStars / _onFriendRescued.
+    claimBacklogEggs(out);
     return out;
   }
 
@@ -1703,10 +1731,110 @@ class Game {
       }
     }
     friendsHtml += '</div>';
-    const soon = (ico) => `<div class="album-soon"><div class="album-soon-ico">${ico}</div><div class="album-soon-text">${t('Скоро!')}</div></div>`;
+
+    // 🥚 R5: відкриття Альбому — робастна точка ретро-нарахування яєць (ідемпотентно, тихо)
+    if (claimBacklogEggs(save) > 0) this.saveGame();
+
+    const nextBadge = `<div class="album-next">${t('🎯 наступна ціль')}</div>`;
+
+    // 🧢 Скіни: картка на кожен обтяжуваний скін (source: HERO_SKINS). Owned → іконка+назва;
+    // ні → силует + чесна підказка (ціна з даних магазину, щоб не дрейфувала). X/Y + «наступна ціль».
+    const skinIds = Object.keys(HERO_SKINS);
+    const ownedSkins = skinIds.filter((id) => save.skins.includes(id));
+    let skinNext = false;
+    let skinsHtml = `<div class="album-counter">🧢 ${ownedSkins.length}/${skinIds.length}</div><div class="album-grid">`;
+    for (const id of skinIds) {
+      const meta = HERO_SKINS[id];
+      if (save.skins.includes(id)) {
+        skinsHtml += `<div class="album-card revealed" data-id="${id}">
+          <div class="album-portrait">${meta.icon}</div>
+          <div class="album-name">${meta.name}</div>
+        </div>`;
+      } else {
+        const isNext = !skinNext; skinNext = true;
+        skinsHtml += `<div class="album-card locked${isNext ? ' next' : ''}" data-id="${id}">
+          ${isNext ? nextBadge : ''}
+          <div class="album-portrait silhouette">${meta.icon}</div>
+          <div class="album-name">???</div>
+          <div class="album-hint">${this._skinHint(id)}</div>
+        </div>`;
+      }
+    }
+    skinsHtml += '</div>';
+
+    // 🐾 Петси: рядок «🥚 Яйця: N — [Відкрити]» з надрукованими шансами; далі картка на кожного
+    // петса з PETS. Owned → іконка+назва+РІВЕНЬ (Рів.1–3 + прогрес годування); ні → силует+підказка.
+    const petIds = Object.keys(PETS);
+    const ownedPets = petIds.filter((id) => save.pets.includes(id));
+    let petNext = false;
+    const eggN = save.eggs || 0;
+    let petsHtml = `<div class="album-egg-row">
+      <span class="album-egg-count">🥚 ${t('Яйця')}: ${eggN}</span>
+      <button class="album-egg-open" ${eggN > 0 ? '' : 'disabled'}>${t('Відкрити')}</button>
+      <div class="album-egg-odds">${eggOddsText()}</div>
+    </div>`;
+    petsHtml += `<div class="album-counter">🐾 ${ownedPets.length}/${petIds.length}</div><div class="album-grid">`;
+    for (const id of petIds) {
+      const meta = PETS[id];
+      if (save.pets.includes(id)) {
+        const lv = petLevel(save, id);
+        const stars = '⭐'.repeat(lv) + '·'.repeat(PET_MAX_LEVEL - lv);
+        const feedRow = lv < PET_MAX_LEVEL
+          ? `<button class="album-feed-btn" data-pet="${id}" ${canFeed(save, id) ? '' : 'disabled'}>${t('Годувати')} (🍖 ${feedCost(lv + 1)})</button>`
+          : `<div class="album-lvl-max">${t('Макс. рівень!')}</div>`;
+        petsHtml += `<div class="album-card revealed" data-id="${id}">
+          <div class="album-portrait">${meta.icon}</div>
+          <div class="album-name">${meta.name}</div>
+          <div class="album-lvl">${t('Рів.')} ${lv} <span class="album-lvl-stars">${stars}</span></div>
+          ${feedRow}
+        </div>`;
+      } else {
+        const isNext = !petNext; petNext = true;
+        petsHtml += `<div class="album-card locked${isNext ? ' next' : ''}" data-id="${id}">
+          ${isNext ? nextBadge : ''}
+          <div class="album-portrait silhouette">${meta.icon}</div>
+          <div class="album-name">???</div>
+          <div class="album-hint">${this._petHint(id)}</div>
+        </div>`;
+      }
+    }
+    petsHtml += '</div>';
+
+    // 👹 Еліти: картка на кожен елітний тип (v287: shield/splitter/exploder/golden). Лічильники —
+    // з персистентного save.bestiary (per-type kill counts вже є). Вбито ≥1 → «Переможено: N».
+    const ELITE_ALBUM = [
+      { key: 'shield', icon: '🛡️', name: t('Щитоносець'), hint: t("З'являється в елітній хвилі") },
+      { key: 'splitter', icon: '🪓', name: t('Розділювач'), hint: t("З'являється в елітній хвилі") },
+      { key: 'exploder', icon: '💥', name: t('Підривник'), hint: t("З'являється в елітній хвилі") },
+      { key: 'golden', icon: '👑', name: t('Золотий зомбі'), hint: t('Тікає — лови!') },
+    ];
+    const bestiary = save.bestiary || {};
+    const killedElites = ELITE_ALBUM.filter((e) => (bestiary[e.key] || 0) > 0).length;
+    let eliteNext = false;
+    let elitesHtml = `<div class="album-counter">👹 ${killedElites}/${ELITE_ALBUM.length}</div><div class="album-grid">`;
+    for (const e of ELITE_ALBUM) {
+      const n = bestiary[e.key] || 0;
+      if (n > 0) {
+        elitesHtml += `<div class="album-card revealed" data-id="${e.key}">
+          <div class="album-portrait">${e.icon}</div>
+          <div class="album-name">${e.name}</div>
+          <div class="album-count">${t('Переможено: {n}', { n })}</div>
+        </div>`;
+      } else {
+        const isNext = !eliteNext; eliteNext = true;
+        elitesHtml += `<div class="album-card locked${isNext ? ' next' : ''}" data-id="${e.key}">
+          ${isNext ? nextBadge : ''}
+          <div class="album-portrait silhouette">${e.icon}</div>
+          <div class="album-name">???</div>
+          <div class="album-hint">${e.hint}</div>
+        </div>`;
+      }
+    }
+    elitesHtml += '</div>';
+
     const pane = (id, body) => `<div class="album-pane" data-tab="${id}" ${this._albumTab === id ? '' : 'hidden'}>${body}</div>`;
     let html = `<div class="ward-tabs album-tabs">${tabs.map(([id, label]) => `<button class="shop-tab album-tab ${this._albumTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
-    html += pane('friends', friendsHtml) + pane('skins', soon('🧢')) + pane('pets', soon('🐾')) + pane('elites', soon('👹'));
+    html += pane('friends', friendsHtml) + pane('skins', skinsHtml) + pane('pets', petsHtml) + pane('elites', elitesHtml);
     const root = document.getElementById('album-content');
     root.innerHTML = html;
     root.querySelectorAll('.album-tab').forEach((el) => {
@@ -1717,6 +1845,35 @@ class Game {
         root.querySelectorAll('.album-pane').forEach((p) => { p.hidden = p.dataset.tab !== this._albumTab; });
       });
     });
+    // 🥚 відкрити яйце → церемонія (петс або дублікат→корм), потім re-render
+    const eggBtn = root.querySelector('.album-egg-open');
+    if (eggBtn) eggBtn.addEventListener('click', () => this._openEggFromAlbum());
+    // 🍖 годувати петса → наступний рівень
+    root.querySelectorAll('.album-feed-btn').forEach((el) => {
+      el.addEventListener('click', () => this._feedPetFromAlbum(el.dataset.pet));
+    });
+  }
+
+  // 🧢 Чесна підказка де здобути скін: ціна з даних магазину (без ручних цифр, що дрейфують),
+  // інакше — опис із HERO_SKINS (бокс/шлях/шторм тощо).
+  _skinHint(id) {
+    const shopItem = SHOP_ITEMS.find((i) => i.skin === id);
+    if (shopItem) {
+      if (shopItem.crystalPrice) return t('Магазин: {n} 💎', { n: shopItem.crystalPrice });
+      if (shopItem.price) return t('Магазин: {n} 💰', { n: shopItem.price });
+    }
+    if (id === 'angel') return t('Набір Ангела');
+    if (id === 'demon') return t('Набір Демона');
+    return HERO_SKINS[id].desc;
+  }
+
+  // 🐾 Чесна підказка де здобути петса: ексклюзиви — своє джерело; магазинні — ціна з даних; решта — з яйця.
+  _petHint(id) {
+    if (id === 'slimepet') return t('Нагорода Глави 3');
+    if (id === 'radiationlizard') return t('Розділ Радіація');
+    const shopItem = SHOP_ITEMS.find((i) => i.id === id && i.pet);
+    if (shopItem && shopItem.price) return t('Магазин: {n} 💰', { n: shopItem.price });
+    return t('З яйця 🥚');
   }
 
   renderWardrobe() {
@@ -2827,6 +2984,8 @@ class Game {
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
     // 🌟 «Магніт-буря»: тягне монети з усієї мапи (радіус ∞) поки сила активна
     level.effects.getSuperMagnet = () => !!(level.player.superPower && level.player.superPower.type === 'magnet');
+    // 🐾 R5: рівень активного петса трохи розширює радіус магніту монет (×1.05/×1.10). Супер виграє.
+    level.effects.getPetMagnet = () => activePetMagnet(this.save);
     level.effects.zombieHitTest = (origin, dir, maxD) => level.zombies.hitTest(origin, dir, maxD);
     const BUFF_INFO = {
       speed: { dur: 20, msg: t('⚡ ТУРБО-ШВИДКІСТЬ на 20 секунд!') },
@@ -2971,7 +3130,9 @@ class Game {
         level.effects.ring(new THREE.Vector3(pos.x, pos.y || 0, pos.z), 0xffd23f, 3.5);
         level.effects.burst(new THREE.Vector3(pos.x, (pos.y || 0) + 1, pos.z), 0xffd23f, 20, { speed: 5, up: 5, life: 0.9, size: 1.4 });
       }
-      this.chestCeremony({ title: t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), items: [{ icon: '💰', n: reward }, { icon: '💎', n: 3 }] });
+      const items = [{ icon: '💰', n: reward }, { icon: '💎', n: 3 }];
+      if (this._rollChestEgg(ELITE_CHEST_EGG_CHANCE)) items.push({ icon: '🥚', label: t('яйце петса!') });
+      this.chestCeremony({ title: t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), items });
       this.saveGame();
     });
     // 👑 v287: золотий зомбі впольовано (solo) — гарантована золота скриня
@@ -2980,9 +3141,13 @@ class Game {
       const reward = 144;
       level.addCoins(reward);
       this.save.crystals = (this.save.crystals || 0) + 5;
-      this.chestCeremony({ title: t('🏆 ЗОЛОТА СКРИНЯ!'), items: [{ icon: '💰', n: reward }, { icon: '💎', n: 5 }] });
+      const items = [{ icon: '💰', n: reward }, { icon: '💎', n: 5 }];
+      if (this._rollChestEgg(GOLDEN_CHEST_EGG_CHANCE)) items.push({ icon: '🥚', label: t('яйце петса!') });
+      this.chestCeremony({ title: t('🏆 ЗОЛОТА СКРИНЯ!'), items });
       this.saveGame();
     });
+    // 🤝 R5: кожен 3-й врятований друг дарує яйце петса — теплий тост від друга
+    level.bus.on('friendRescued', (cid) => this._onFriendRescued(cid));
     // ⭐ зірковий досвід і щоденні завдання
     level.bus.on('zombieKilled', (z) => {
       if (level.playground) return;
@@ -3225,6 +3390,54 @@ class Game {
     if (!this.level) return;
     if (this.level.pet) this.level.pet.dispose();
     this.level.pet = this.save.activePet ? new Pet(this.level, this.save.activePet) : null;
+  }
+
+  // 🥚 R5: чи включити яйце в церемонію скрині (solo-only). Тест форсить через _forceChestEgg.
+  _rollChestEgg(chance) {
+    const roll = typeof this._forceChestEgg === 'boolean' ? (this._forceChestEgg ? 0 : 1) : Math.random();
+    if (roll >= chance) return false;
+    this.save.eggs = (this.save.eggs || 0) + 1;
+    return true;
+  }
+
+  // 🤝 R5: друга врятовано → кожен 3-й дарує яйце (ретро-безпечно через friendEggClaims).
+  _onFriendRescued(cid) {
+    const granted = claimFriendEggs(this.save);
+    if (granted > 0) {
+      const f = friendFor(cid);
+      const who = f ? f.name() : t('Друг');
+      this.hud.toast(t('🥚 {who} дарує тобі яйце петса! Відкрий у Альбомі → 🐾 Петси', { who }), 5);
+      this.saveGame();
+    }
+  }
+
+  // 🥚 відкрити одне яйце з Альбому → церемонія скрині: новий петс АБО дублікат → корм ×2
+  _openEggFromAlbum() {
+    if ((this.save.eggs || 0) <= 0) { this.audio.denied(); return; }
+    const res = openEgg(this.save);
+    if (!res) { this.audio.denied(); return; }
+    const meta = PETS[res.petId];
+    if (res.duplicate) {
+      this.chestCeremony({
+        title: t('🥚 З ЯЙЦЯ!'), sub: t('{i} {n} вже з тобою — це корм!', { i: meta.icon, n: meta.name() }),
+        items: [{ icon: '🍖', label: t('Корм ×{n}', { n: res.food }) }],
+      });
+    } else {
+      this.chestCeremony({ title: t('🥚 НОВИЙ ПЕТС!'), sub: meta.name(), items: [{ icon: meta.icon, label: meta.name() }] });
+    }
+    this.saveGame();
+    this.renderAlbum();
+  }
+
+  // 🍖 годуємо петса кормом → наступний рівень (більший + баф магніту, іскри на Рів.3)
+  _feedPetFromAlbum(id) {
+    const lv = feedPet(this.save, id);
+    if (!lv) { this.audio.denied(); return; }
+    this.audio.purchase();
+    this.hud.toast(t('🍖 {n} виріс до Рівня {lv}!', { n: PETS[id].name(), lv }));
+    if (this.save.activePet === id) this.spawnPet(); // перестворюємо для нового масштабу/іскор
+    this.saveGame();
+    this.renderAlbum();
   }
 
   // ⭐ R3: тік вторинної цілі забігу (⭐2). Викликається з відповідних подій.
@@ -4773,6 +4986,8 @@ class Game {
     this.saveGame();
     // 🎁 тости за розблоковані пороги зірок (після saveGame — стан уже узгоджений)
     if (starInfo) for (const th of starInfo.claimed) this.hud.toast(t('🎉 {l}', { l: th.label() }), 5);
+    // 🥚 тост за зароблене яйце (кожні 6 зірок) — відкрити в Альбомі → Петси
+    if (starInfo && starInfo.eggsGranted > 0) this.hud.toast(t('🥚 Ти заробив {n} яйце петса! Відкрий у Альбомі → 🐾 Петси', { n: starInfo.eggsGranted }), 5);
     // 🤝 бонус за гру РАЗОМ — обом сторонам локально (як _grantWeeklyCoop): wire не чіпаємо
     this._grantCoopWin();
     if (this.level.net && this.level.net.authority) this.level.netEv('vict');
@@ -4869,7 +5084,9 @@ class Game {
     // 🕊️ милосердя скидається після перемоги у цій країні (frustration cleared)
     if (this.save.mercyDeaths && this.save.mercyDeaths.cid === cid) this.save.mercyDeaths = null;
     const claimed = this._claimStarThresholds();
-    return { d1, d2, d3, thisRun, prev, total, secondary: so, claimed };
+    // 🥚 R5: кожні 6 сумарних зірок — яйце петса (окремі claim'и, НЕ чіпають 12/24/36 вище)
+    const eggsGranted = claimStarEggs(this.save);
+    return { d1, d2, d3, thisRun, prev, total, secondary: so, claimed, eggsGranted };
   }
 
   // 🎁 Одноразові пороги зірок (12/24/36). Нараховує нагороду й запам'ятовує поріг.

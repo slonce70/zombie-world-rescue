@@ -1648,7 +1648,9 @@ export class Effects {
         // 🎭 кооп-scout: множник радіуса підбору (pickMult ×1.25); дефолт 1
         const pm = tgt.pickMult || 1;
         // 🌟 «Магніт-буря» (v288): монети з усієї мапи тягнуться до гравця (радіус ∞, швидше)
-        const magnetR = (c.type === 'coin' ? (tgt.superMagnet ? 9999 : tgt.magnet ? 22 : 5) : 2.2) * pm;
+        // 🐾 R5: рівень активного петса ×1.05/×1.10 до радіуса монет (супер-магніт уже ∞ — виграє)
+        const petMag = this.getPetMagnet ? this.getPetMagnet() : 1;
+        const magnetR = (c.type === 'coin' ? (tgt.superMagnet ? 9999 : (tgt.magnet ? 22 : 5) * petMag) : 2.2) * pm;
         if (!pulled && d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? (tgt.superMagnet ? 20 : 14) : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;
