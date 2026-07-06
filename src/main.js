@@ -53,7 +53,7 @@ import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
 import {
-  claimStarEggs, claimFriendEggs, claimBacklogEggs, openEgg, eggOddsText, eggPoolPetIds,
+  claimStarEggs, claimFriendEggs, claimBacklogEggs, openEgg, eggOddsText,
   petLevel, canFeed, feedCost, feedPet, activePetMagnet, PET_MAX_LEVEL,
   ELITE_CHEST_EGG_CHANCE, GOLDEN_CHEST_EGG_CHANCE,
 } from './eggs.js';
