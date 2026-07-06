@@ -115,6 +115,53 @@ const mega = await page.evaluate(() => {
 });
 check(mega.shown, 'openMegaboxReward → церемонія скрині', String(mega.shown));
 
+console.log('▸ v294: соло-церемонія МОРОЗИТЬ сим (постріли не ковтаються, зомбі стоять)');
+const freeze = await page.evaluate(() => {
+  const g = window.__game;
+  const Z = g.level.zombies;
+  g._closeChest && g._closeChest();
+  for (const z of [...Z.list]) { z.gone = true; Z.scene.remove(z.rig.group); Z.byNidMap.delete(z.nid); }
+  Z.list = [];
+  const zb = Z.spawn('walker', g.level.player.pos.x + 8, g.level.player.pos.z, {});
+  zb.aggroed = true; zb.state = 'chase';
+  const t0 = g.level.stats.time;
+  const x0 = zb.x, z0 = zb.z;
+  g.chestCeremony({ title: '🎁 ТЕСТ', items: [{ icon: '🪙', n: 50 }] }); // _chestState виставлено
+  const chestOpen = !!g._chestState;
+  for (let i = 0; i < 10; i++) g._step(0.1, true); // сим має бути заморожений (blocked)
+  const tFrozen = g.level.stats.time;
+  const movedFrozen = Math.hypot(zb.x - x0, zb.z - z0);
+  g._closeChest();
+  for (let i = 0; i < 10; i++) g._step(0.1, true); // після закриття сим знову йде
+  const tAfter = g.level.stats.time;
+  const movedAfter = Math.hypot(zb.x - x0, zb.z - z0);
+  return { chestOpen, t0, tFrozen, tAfter, movedFrozen, movedAfter };
+});
+check(freeze.chestOpen, 'церемонія відкрита (_chestState виставлено)', String(freeze.chestOpen));
+check(Math.abs(freeze.tFrozen - freeze.t0) < 1e-6, 'час рівня НЕ рухається під час церемонії', JSON.stringify(freeze));
+check(freeze.movedFrozen < 1e-3, 'зомбі СТОЇТЬ доки церемонія відкрита (сим заморожено)', String(freeze.movedFrozen));
+check(freeze.tAfter > freeze.tFrozen + 0.5 && freeze.movedAfter > 0.1, 'після закриття сим знову йде (час тикає, зомбі рушив)', JSON.stringify(freeze));
+
+console.log('▸ v294: у коопі openMegaboxReward показує БАНЕР, не блокуючу церемонію');
+const coopMega = await page.evaluate(() => {
+  const g = window.__game;
+  g._closeChest && g._closeChest();
+  const realNet = g.level.net;
+  g.level.net = { authority: false }; // стаб коопу (реальні кооп-шляхи покриває coop.mjs)
+  let bannerCalled = null;
+  const origBanner = g.hud.banner.bind(g.hud);
+  g.hud.banner = (title, sub, dur) => { bannerCalled = { title, sub, dur }; return origBanner(title, sub, dur); };
+  g._megaForce = 0.5; // фонтан монет
+  g.openMegaboxReward(g.level.player.pos.x, g.level.player.pos.z);
+  const ceremonyShown = document.getElementById('chest-ceremony').classList.contains('show');
+  g.hud.banner = origBanner;
+  g.level.net = realNet;
+  g._closeChest();
+  return { bannerCalled: !!bannerCalled, banner: bannerCalled, ceremonyShown };
+});
+check(coopMega.bannerCalled, 'кооп-мегабокс → hud.banner викликано (неблокуючий до-v287 шлях)', JSON.stringify(coopMega.banner));
+check(!coopMega.ceremonyShown, 'кооп-мегабокс НЕ показує fullscreen-церемонію', String(coopMega.ceremonyShown));
+
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 ЕЛІТНА ХВИЛЯ + СКРИНЯ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);

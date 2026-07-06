@@ -69,6 +69,23 @@ check(mercy.st.mercy && mercy.st.mercy.hpMult === 0.9 && mercy.st.mercy.medkitMu
 check(mercy.hpMercy === 90, 'HP звичайного зомбі −10% (100→90)', String(mercy.hpMercy));
 check(mercy.waveCount === 3, 'елітна хвиля −1 (запит 4 → 3)', String(mercy.waveCount));
 
+// ---------- КРИТИЧНО (v294): милосердя НЕ зменшує HP боса ----------
+console.log('▸ Милосердя НЕ зменшує maxHp боса (лише звичайних зомбі)');
+const bossHp = await page.evaluate(() => {
+  const g = window.__game; const Z = g.level.zombies;
+  const active = !!g.level.mercy;                 // милосердя активне на цьому забігу
+  const b1 = Z.spawnBoss(); const withMercy = b1.maxHp; Z.despawnBoss();
+  const normalMercy = Z.hpWithSettings(100);      // контраст: звичайний −10%
+  const saved = g.level.mercy; g.level.mercy = null;
+  const b2 = Z.spawnBoss(); const noMercy = b2.maxHp; Z.despawnBoss();
+  const normalNoMercy = Z.hpWithSettings(100);
+  g.level.mercy = saved;
+  return { active, withMercy, noMercy, normalMercy, normalNoMercy };
+});
+check(bossHp.active, 'милосердя активне (передумова тесту)', String(bossHp.active));
+check(bossHp.withMercy === bossHp.noMercy, 'maxHp боса ІДЕНТИЧНИЙ з милосердям і без нього', JSON.stringify(bossHp));
+check(bossHp.normalMercy === 90 && bossHp.normalNoMercy === 100, 'звичайний зомбі −10% (контроль — флаг boss працює)', JSON.stringify(bossHp));
+
 // ---------- КРИТИЧНО: жодного видимого UI милосердя ----------
 console.log('▸ КРИТИЧНО: жодного видимого «easy mode» / банера / тексту про милосердя');
 const noUi = await page.evaluate(() => {

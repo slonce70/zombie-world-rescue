@@ -1619,6 +1619,9 @@ export class Effects {
     const pickTargets = this.getPickupTargets
       ? this.getPickupTargets()
       : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), superMagnet: this.getSuperMagnet && this.getSuperMagnet(), pid: 1 }] : []);
+    // 🐾 R5: баф магніту активного петса — теж РАЗ на кадр (був per-coin×per-target = тисячі
+    // сканів save-масиву у фонтанах), суперечило сусідньому коментарю. Хойстимо в локал.
+    const petMag = this.getPetMagnet ? this.getPetMagnet() : 1;
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const c = this.coins[i];
       c.t += dt;
@@ -1649,7 +1652,6 @@ export class Effects {
         const pm = tgt.pickMult || 1;
         // 🌟 «Магніт-буря» (v288): монети з усієї мапи тягнуться до гравця (радіус ∞, швидше)
         // 🐾 R5: рівень активного петса ×1.05/×1.10 до радіуса монет (супер-магніт уже ∞ — виграє)
-        const petMag = this.getPetMagnet ? this.getPetMagnet() : 1;
         const magnetR = (c.type === 'coin' ? (tgt.superMagnet ? 9999 : (tgt.magnet ? 22 : 5) * petMag) : 2.2) * pm;
         if (!pulled && d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? (tgt.superMagnet ? 20 : 14) : 8) * dt / Math.max(d, 0.5);

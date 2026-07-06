@@ -954,7 +954,7 @@ export function makeBurnFx() {
 // матеріал per-instance (свій колір) — все одно дешево, бо еліти обмежені кількістю.
 let eliteAuraGeo = null;
 export function makeEliteAura(colorHex = 0xffd23f) {
-  if (!eliteAuraGeo) eliteAuraGeo = new THREE.RingGeometry(0.5, 0.72, 22);
+  if (!eliteAuraGeo) { eliteAuraGeo = new THREE.RingGeometry(0.5, 0.72, 22); eliteAuraGeo.userData.shared = true; }
   const m = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
   const ring = new THREE.Mesh(eliteAuraGeo, m);
   ring.rotation.x = -Math.PI / 2;
@@ -974,6 +974,7 @@ function iconTexture(emoji) {
   ctx.textBaseline = 'middle';
   ctx.fillText(emoji, 32, 36);
   const tex = new THREE.CanvasTexture(c);
+  tex.userData.shared = true; // кеш модуля переживає teardown рівня — не диспозити з рівнем
   iconTexCache.set(emoji, tex);
   return tex;
 }

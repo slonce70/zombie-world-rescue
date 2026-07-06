@@ -104,6 +104,45 @@ console.log('▸ Шанси надруковані (60/30/10)');
 const odds = await page.evaluate(async () => (await import('/src/eggs.js')).eggOddsText());
 check(/60%/.test(odds) && /30%/.test(odds) && /10%/.test(odds), 'eggOddsText показує 60/30/10', odds);
 
+// ---------- 🖱️ UI-шлях: кнопка «Відкрити» в Альбомі (v294 regression) ----------
+// PETS[*].name — РЯДОК (результат t()), не функція. Старий код кликав meta.name() і кидав
+// TypeError ПІСЛЯ openEgg() (сейв уже змінено), тож церемонія/saveGame/renderAlbum не бігли.
+console.log('▸ UI: клік «Відкрити» в Альбомі → церемонія, без page-error, лічильник впав, save збережено');
+await page.evaluate(() => {
+  const g = window.__game;
+  if (g.level) g.endLevel();
+  g.save.eggs = 3;
+  g.save.pets = [];            // гарантуємо «новий петс», без дубля
+  g.save.petLevels = {};
+  g.saveGame();
+});
+await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 15000 });
+await page.click('#btn-menu'); // альбом живе у висувному меню
+await page.waitForSelector('#overlay-menu.show', { timeout: 8000 });
+await page.click('#btn-album');
+await page.waitForSelector('#overlay-album.show', { timeout: 8000 });
+await page.click('#album-content .album-tab[data-tab="pets"]');
+await page.waitForSelector('.album-egg-open', { timeout: 8000 });
+const errBefore = errors.length;
+const uiOpen = await page.evaluate(() => {
+  const btn = document.querySelector('.album-egg-open');
+  const countBefore = document.querySelector('.album-egg-count').textContent;
+  btn.click(); // → _openEggFromAlbum: openEgg → chestCeremony → saveGame → renderAlbum
+  return {
+    countBefore,
+    ceremony: document.getElementById('chest-ceremony').classList.contains('show'),
+    countAfter: document.querySelector('.album-egg-count').textContent, // renderAlbum оновив DOM
+    eggsSave: window.__game.save.eggs,
+  };
+});
+const persisted = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('zr-save-v1')).eggs; } catch (e) { return 'ERR'; } });
+check(errors.length === errBefore, 'клік «Відкрити» БЕЗ page-error (meta.name — рядок, не виклик)', errors.slice(errBefore).join(' | '));
+check(uiOpen.ceremony, 'церемонія-оверлей зʼявився після кліку', String(uiOpen.ceremony));
+check(/3/.test(uiOpen.countBefore) && /2/.test(uiOpen.countAfter), 'лічильник яєць у DOM впав 3→2 після церемонії', JSON.stringify(uiOpen));
+check(uiOpen.eggsSave === 2, 'save.eggs зменшено (списано яйце)', String(uiOpen.eggsSave));
+check(persisted === 2, 'save.eggs=2 персистовано у localStorage', String(persisted));
+await page.evaluate(() => { window.__game._closeChest(); const ov = document.getElementById('overlay-album'); if (ov) ov.classList.remove('show'); });
+
 // ---------- ріст: годування → рівень → масштаб + баф ----------
 console.log('▸ Годування: Рів.1→2 (3🍖), Рів.2→3 (6🍖); баф магніту активного петса');
 const feed = await page.evaluate(async () => {

@@ -201,4 +201,14 @@ export class Sandstorm {
       this._coinBoosted = false;
     }
   }
+
+  // 🧹 v294: coinMat — сесійно-кешований toon-матеріал, який teardown рівня пропускає
+  // (userData.shared). Якщо кинути/виграти рівень ПОСЕРЕД бурі, підсилене свічення (0.45→~1.45)
+  // лишилося б увімкненим на весь сеанс. endLevel викликає dispose() — форс-відновлюємо базу.
+  dispose() {
+    const eff = this.level && this.level.effects;
+    if (eff && eff.coinMat) eff.coinMat.emissiveIntensity = 0.45;
+    this._coinBoosted = false;
+    if (this._sand && this.level && this.level.scene) this.level.scene.remove(this._sand);
+  }
 }

@@ -181,8 +181,10 @@ export class Zombies {
   }
 
   hpWithSettings(baseHp, opts = {}) {
-    // 🕊️ R3 невидиме милосердя: −10% HP звичайних зомбі (не боса) після 2+ смертей поспіль
-    const mercy = this.level.mercy ? this.level.mercy.hpMult : 1;
+    // 🕊️ R3 невидиме милосердя: −10% HP звичайних зомбі (НЕ боса) після 2+ смертей поспіль.
+    // opts.boss пропускає милосердя, щоб maxHp боса й дріб смужки не стрибали між спробами
+    // (weekly/складність уже складені у baseHp; tough-бонус лишається).
+    const mercy = (this.level.mercy && !opts.boss) ? this.level.mercy.hpMult : 1;
     return Math.max(1, Math.round(baseHp * mercy) + this._toughHpBonus(opts));
   }
 
@@ -346,8 +348,9 @@ export class Zombies {
       z_.stats.coins = 4;
       this.setConfiguredHp(z_, 18, opts);
     }
-    // 👑 золотий: зникає за 12с, якщо не встигли вбити (спавн-таймер лову)
-    if (opts.golden) z_.goldenTtl = 12;
+    // 👑 золотий: TTL лише для АМБІЄНТНОГО золотого (v287-подія «дожени за 25с»). Золоті на
+    // мапах (populate/goldenZombie) і в коопі роумлять, поки їх не вб'ють — жодного TTL.
+    if (opts.ambientGolden) z_.goldenTtl = 25;
     if (opts.sleeping) {
       z_.sleeping = true;
       setAnim(rig, 'idle');
@@ -488,22 +491,43 @@ export class Zombies {
     }
   }
 
-  spawnGolden() {
-    // десь на околиці, далеко від місій
+  // ambient=false: золотий на мапі (populate) — роумить біля околиці, поки не вб'ють (без TTL).
+  // ambient=true: v287-подія — спавн 30–60м ВІД ГРАВЦЯ + TTL 25с, щоб «дожени — гарантована скриня!»
+  // була чесною обіцянкою (80–150м від центру були недосяжні за 12с).
+  spawnGolden(ambient = false) {
     let x = 0, z = 0;
-    for (let tries = 0; tries < 20; tries++) {
-      const a = this.rng.next() * Math.PI * 2;
-      const r = this.rng.range(80, 150);
-      x = Math.cos(a) * r;
-      z = Math.sin(a) * r;
-      let ok = true;
-      for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
-        const s = this.L[key];
-        if (Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
+    if (ambient) {
+      const p = this.level.player.pos;
+      for (let tries = 0; tries < 20; tries++) {
+        const a = this.rng.next() * Math.PI * 2;
+        const r = this.rng.range(30, 60);
+        x = p.x + Math.cos(a) * r;
+        z = p.z + Math.sin(a) * r;
+        const dB = Math.hypot(x, z);
+        if (dB > this.L.BOUND - 6) { x *= (this.L.BOUND - 8) / dB; z *= (this.L.BOUND - 8) / dB; }
+        let ok = true;
+        for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
+          const s = this.L[key];
+          if (s && Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
+        }
+        if (ok) break;
       }
-      if (ok) break;
+    } else {
+      // десь на околиці, далеко від місій
+      for (let tries = 0; tries < 20; tries++) {
+        const a = this.rng.next() * Math.PI * 2;
+        const r = this.rng.range(80, 150);
+        x = Math.cos(a) * r;
+        z = Math.sin(a) * r;
+        let ok = true;
+        for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
+          const s = this.L[key];
+          if (Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
+        }
+        if (ok) break;
+      }
     }
-    const z_ = this.spawn('walker', x, z, { golden: true });
+    const z_ = this.spawn('walker', x, z, { golden: true, ambientGolden: ambient });
     this.setConfiguredHp(z_, 80);
     z_.anchor = { x, z, r: 30 };
     return z_;
@@ -566,7 +590,7 @@ export class Zombies {
     this._ambientGoldenT -= dt;
     if (this._ambientGoldenT <= 0) {
       this._ambientGoldenDone = true;
-      this.spawnGolden();
+      this.spawnGolden(true);
       level.bus.emit('toast', t('✨ Десь блукає ЗОЛОТИЙ зомбі! Дожени — гарантована скриня!'));
     }
   }
@@ -621,7 +645,7 @@ export class Zombies {
     // 🤝 кооп: бос міцніший пропорційно команді (×N гравців)
     // ⭐ зірки (M7): бос масштабується м'якше (×0.5/зірка), щоб не став «губкою для куль»; на ★1 — ×1.
     const _bs = this.diffStar > 1 ? (1 + 0.5 * (this.diffStar - 1)) : 1;
-    const bossHp = this.hpWithSettings(cfg.hp * this.coopMul() * _bs);
+    const bossHp = this.hpWithSettings(cfg.hp * this.coopMul() * _bs, { boss: true });
     b.maxHp = bossHp;
     b.hp = hp !== null ? Math.min(bossHp, Math.max(150, hp)) : bossHp;
     b.stats = { ...b.stats, hp: bossHp };
@@ -1100,7 +1124,7 @@ export class Zombies {
       // і гравець бачать гірше — можна прокрастися або перевести дух)
       const nightAggro = (1 + (level.nightK || 0) * 0.5)
         * (level.sandstorm && level.sandstorm.active ? 0.5 : 1);
-      // золотий зомбі: побачив гравця — тікає; зникає за 12с, якщо не встигли вбити
+      // золотий зомбі: побачив гравця — тікає; амбієнтний зникає за goldenTtl (мапні — ні)
       if (z.golden && z.state !== 'dead') {
         if (z.goldenTtl !== undefined) {
           z.goldenTtl -= dt;

@@ -9,7 +9,8 @@
 import * as THREE from 'three';
 import { t, interactKey } from './i18n.js';
 import { CAMPAIGN_ORDER, COUNTRIES } from './countries.js';
-import { makeCivilian, setAnim, updateRig } from './characters.js';
+import { makeCivilian, setAnim, updateRig, disposeRigSkeleton } from './characters.js';
+import { disposeObject } from './utils.js';
 
 // Реєстр друзів: по одному на країну CAMPAIGN_ORDER (12; секретні LAB/LOST — без друга).
 // kind — ріг громадянина (makeCivilian: 'kid'|'granny'|'medic'). emoji — портрет для альбому.
@@ -365,28 +366,39 @@ export class HiddenRescue {
       this.game.hud.banner(`${f.emoji} ${f.name()}`, f.thanks(), 5);
       this.game.hud.toast(t('🤝 Друга врятовано! Він оселився у таборі'));
     }
-    if (this.beam && this.level.scene) { this.level.scene.remove(this.beam); this.beam = null; }
+    // 🤝 makeBeam повертає ХЕНДЛ {group, remove()}, а не Object3D — scene.remove(handle) був
+    // би нопом і промінь+спрайт світилися б над порожньою кліткою весь рівень. remove() чистить.
+    if (this.beam) { this.beam.remove(); this.beam = null; }
     this._despawnT = 1.6;
   }
 
   _finishDespawn() {
     if (this.game.hud) this.game.hud.toast(t('🏕️ {name} побіг у табір!', { name: this.friend.name() }));
     if (this.rig && this.rig.group && this.level.scene) this.level.scene.remove(this.rig.group);
-    if (this.group && this.level.scene) this.level.scene.remove(this.group);
+    if (this.rig) disposeRigSkeleton(this.rig);
+    this._disposeCage();
     this.rig = null;
     this.group = null;
     this.active = false;
     this._despawnT = -1;
   }
 
+  // 🧹 v294: клітка тримає per-instance гео/матеріали (BoxGeometry прути в InstancedMesh + два
+  // TorusGeometry обіди + 2 Lambert) — endLevel викликає dispose() ДО обходу сцени, тож інакше
+  // до них не дійде. Звільняємо тут за домашнім патерном (disposeObject береже userData.shared).
+  _disposeCage() {
+    if (!this.group) return;
+    if (this.level && this.level.scene) this.level.scene.remove(this.group);
+    disposeObject(this.group);
+  }
+
   dispose() {
     this.prompt = null;
-    if (this.level && this.level.scene) {
-      if (this.rig && this.rig.group) this.level.scene.remove(this.rig.group);
-      if (this.group) this.level.scene.remove(this.group);
-      if (this.beam) this.level.scene.remove(this.beam);
-    }
-    this.rig = null; this.group = null; this.beam = null; this.guards = [];
+    if (this.rig && this.rig.group && this.level && this.level.scene) this.level.scene.remove(this.rig.group);
+    if (this.rig) disposeRigSkeleton(this.rig);
+    this._disposeCage();
+    if (this.beam) { this.beam.remove(); this.beam = null; }
+    this.rig = null; this.group = null; this.guards = [];
   }
 }
 

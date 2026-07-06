@@ -137,7 +137,7 @@ const shootFar = await page.evaluate(() => {
 check(shootFar.exploded && shootFar.dead, 'постріл підриває підривника на місці', JSON.stringify(shootFar));
 check(shootFar.playerSafe, 'здалеку вибух безпечний для гравця', String(shootFar.playerSafe));
 
-console.log('▸ 👑 Золотий: тікає, зникає за 12с, по смерті — скриня');
+console.log('▸ 👑 Золотий (мапний, без opts): тікає, БЕЗ TTL, по смерті — скриня');
 await clearAll();
 const golden = await page.evaluate(() => {
   const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
@@ -154,20 +154,37 @@ const golden = await page.evaluate(() => {
   out.chest = chest;
   return out;
 });
-check(golden.isGolden && golden.ttl0 === 12, '👑 золотий має 12с таймер', JSON.stringify({ g: golden.isGolden, t: golden.ttl0 }));
+// 🩹 v294: мапні/populate/коопні золоті НЕ мають TTL — роумлять, поки їх не вб'ють.
+check(golden.isGolden && golden.ttl0 === undefined, '👑 мапний золотий БЕЗ TTL (роумить до вбивства)', JSON.stringify({ g: golden.isGolden, t: golden.ttl0 }));
 check(golden.flees, 'золотий тікає від гравця', String(golden.flees));
 check(golden.dead && golden.chest && typeof golden.chest.x === 'number', 'по смерті золотий дарує скриню (goldenChest)', JSON.stringify(golden.chest));
 
-console.log('▸ 👑 Золотий зникає, якщо не вбити за 12с');
+console.log('▸ 👑 Мапний золотий ВИЖИВАЄ >12с симуляції (без TTL)');
 await clearAll();
-const despawn = await page.evaluate(() => {
+const survives = await page.evaluate(() => {
   const g = window.__game; const Z = g.level.zombies; const p = g.level.player;
   const z = Z.spawn('walker', p.pos.x + 60, p.pos.z, { golden: true }); // далеко — не тікає активно
   const nid = z.nid;
-  for (let i = 0; i < 30; i++) Z.update(0.5); // 15с
-  return { gone: !Z.byNid(nid) };
+  for (let i = 0; i < 30; i++) Z.update(0.5); // 15с > старий 12с TTL
+  return { alive: !!Z.byNid(nid), ttl: z.goldenTtl };
 });
-check(despawn.gone, 'золотий зник за ~12с без вбивства', String(despawn.gone));
+check(survives.alive && survives.ttl === undefined, 'мапний золотий живий після 15с (жодного TTL)', JSON.stringify(survives));
+
+console.log('▸ 👑 Амбієнтний золотий (spawnGolden(true)): TTL 25с і зникає');
+await clearAll();
+const ambient = await page.evaluate(() => {
+  const g = window.__game; const Z = g.level.zombies;
+  const z = Z.spawnGolden(true); // v287-подія: спавн 30–60м ВІД гравця + TTL 25с
+  const nid = z.nid;
+  const ttl0 = z.goldenTtl;
+  const p = g.level.player;
+  const dist = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
+  for (let i = 0; i < 60; i++) Z.update(0.5); // 30с > 25с TTL
+  return { ttl0, dist, gone: !Z.byNid(nid) };
+});
+check(ambient.ttl0 === 25, 'амбієнтний золотий має TTL 25с', String(ambient.ttl0));
+check(ambient.dist >= 25 && ambient.dist <= 65, 'амбієнтний золотий спавниться 30–60м від гравця (досяжно)', String(ambient.dist));
+check(ambient.gone, 'амбієнтний золотий зник за ~25с без вбивства', String(ambient.gone));
 
 console.log('▸ Бестіарій рахує нові види як звичайні');
 const bestiary = await page.evaluate(async () => {
