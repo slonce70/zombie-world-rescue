@@ -144,6 +144,10 @@ check(overloadedStarted.weapons.length === 1 && overloadedStarted.weapons[0] ===
 
 const dropTypes = await page.evaluate(() => {
   const g = window.__game;
+  // вбивство всіх 20 зомбі органічно завершить забіг на наступному кадрі зі СПРАВЖНІМ
+  // Math.random (finally нижче його повертає): з шансом 12% посох випадав достроково
+  // і ламав секцію «roll 0.11». Пінимо ролл у гілку кристалів.
+  g.test.knockoutForce(0.5);
   const oldRandom = Math.random;
   Math.random = () => 0;
   try {
@@ -193,6 +197,9 @@ await page.evaluate(async () => {
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
 const rewardStaff = await page.evaluate(() => {
   const g = window.__game;
+  // страховка: посох видається лише коли його ще немає в сейві — прибираємо можливий
+  // достроковий дроп, щоб roll 0.11 гарантовано пройшов гілку giveWeapon
+  g.save.weapons = g.save.weapons.filter((w) => w !== 'staff');
   g.test.knockoutForce(0.11);
   g.test.finishKnockout();
   return {
