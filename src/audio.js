@@ -247,6 +247,26 @@ export class AudioMan {
     });
   }
 
+  // 🌟 супер-сила схоплена — гучний висхідний стінгер (соковитіший за powerup)
+  superStart(type) {
+    this.voiceOnce('super', 6);
+    const t = this.t;
+    const notes = type === 'shkval' ? [60, 64, 67, 72, 76, 79] : [62, 66, 69, 74, 78, 81];
+    notes.forEach((m, i) => {
+      this._osc('square', midi(m), t + i * 0.05, 0.18, 0.18);
+      this._osc('triangle', midi(m + 12), t + i * 0.05, 0.14, 0.09);
+    });
+    this._osc('triangle', midi(notes[notes.length - 1] + 5), t + 0.42, 0.5, 0.16);
+  }
+
+  // 🌟 супер-сила скінчилась — м'який низхідний дзвіночок
+  superEnd() {
+    const t = this.t;
+    [76, 72, 67].forEach((m, i) => {
+      this._osc('sine', midi(m), t + i * 0.09, 0.24, 0.12);
+    });
+  }
+
   // 🎖️ новий зірковий рівень — урочистий фанфар
   levelUp() {
     this.voiceOnce('levelup', 8);

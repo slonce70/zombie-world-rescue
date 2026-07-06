@@ -1617,4 +1617,10 @@ export const EN = {
 "🎁 СКРИНЯ!": "🎁 CHEST!",
 "фонтан!": "fountain!",
 "Тап, щоб пропустити ✨": "Tap to skip ✨",
+"🌟 СУПЕРСИЛА з'явилась — знайди сяйво!": "🌟 SUPERPOWER appeared — find the glow!",
+"Суперсила скінчилась": "Superpower ended",
+"🔥 ШКВАЛ": "🔥 BARRAGE",
+"🧲 МАГНІТ-БУРЯ": "🧲 MAGNET STORM",
+"Безлім патронів + скорострільність!": "Infinite ammo + fire rate!",
+"Магніт монет + швидкість!": "Coin magnet + speed!",
 };

@@ -69,6 +69,10 @@ export class Player {
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
     this.gadgetShield = 0; // 🛡️ гаджет-щит: поглинає шкоду повністю, поки не розіб'ється
     this.infiniteAmmoT = 0;
+    // 🌟 «момент могутності» (v288): супер-пікап дає одну з двох сил на 12–15с.
+    // { type: 'shkval'|'magnet', t, dur } — run-only, без персисту; згасання емітить superPowerEnd.
+    this.superPower = null;
+    this._superSparkT = 0;
     this.stunAmmoT = 0; // 💫 гаджет «Оглушливі кулі»: кулі пістолета/магнума оглушують зомбі
     this.invisibleT = 0;
     this.invisibleRegenRate = 0;
@@ -405,6 +409,22 @@ export class Player {
       if (this.buffs[k] > 0) this.buffs[k] -= dt;
     }
     if (this.infiniteAmmoT > 0) this.infiniteAmmoT = Math.max(0, this.infiniteAmmoT - dt);
+    // 🌟 супер-сила: відлік + іскровий шлейф для «Магніт-бурі», емісія кінця
+    if (this.superPower) {
+      this.superPower.t -= dt;
+      if (this.superPower.type === 'magnet') {
+        this._superSparkT -= dt;
+        if (this._superSparkT <= 0) {
+          this._superSparkT = 0.12;
+          this.level.effects.burst(new THREE.Vector3(this.pos.x, this.pos.y + 0.35, this.pos.z), 0x66ddff, 3, { speed: 1.3, up: 2, life: 0.5, size: 0.6 });
+        }
+      }
+      if (this.superPower.t <= 0) {
+        const ended = this.superPower;
+        this.superPower = null;
+        this.level.bus.emit('superPowerEnd', ended);
+      }
+    }
     if (this.stunAmmoT > 0) this.stunAmmoT = Math.max(0, this.stunAmmoT - dt);
     if (this.invisibleT > 0) {
       const activeDt = Math.min(dt, this.invisibleT);
@@ -441,7 +461,9 @@ export class Player {
       this.rideSpeed = 0;
       this._rideSteer = damp(this._rideSteer, 0, 7, dt);
       const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
-      const speed = 5.6 * this.speedMult * buffSpeed * (sprint ? 1.55 : 1);
+      // 🧲 «Магніт-буря»: +20% швидкості поки сила активна
+      const superSpeed = (this.superPower && this.superPower.type === 'magnet') ? 1.2 : 1;
+      const speed = 5.6 * this.speedMult * buffSpeed * superSpeed * (sprint ? 1.55 : 1);
       let tx = 0, tz = 0;
       if (moving) {
         const len = Math.max(1, Math.hypot(mx, mz));
@@ -566,7 +588,7 @@ export class Player {
         const trigger = w.auto ? input.mouseDown : (input.justClicked || this._clickBuffer > 0);
         if (trigger && this.shootCd <= 0) {
           this._clickBuffer = 0;
-          if (this.curAmmo.mag > 0 || (this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg'))) this._shoot();
+          if (this.curAmmo.mag > 0 || (this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg')) || (this.superPower && this.superPower.type === 'shkval')) this._shoot();
           else {
             this.level.audio.empty();
             this.shootCd = 0.35;
@@ -715,9 +737,13 @@ export class Player {
     const w = this.weapon;
     const a = this.curAmmo;
     const level = this.level;
-    const infAmmo = this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg');
+    // ♾️ гаджет-безлім (тільки автомат/швидкостріл) АБО 🔥 «Шквал» (усі зброї) — не їсть магазин
+    const gadgetInf = this.infiniteAmmoT > 0 && (this.cur === 'rifle' || this.cur === 'smg');
+    const shkval = !!(this.superPower && this.superPower.type === 'shkval');
+    const infAmmo = gadgetInf || shkval;
     if (!infAmmo) a.mag--;
-    this.shootCd = (60 / w.rpm) * (infAmmo ? 0.45 : 1);
+    // «Шквал»: скорострільність ×1.8 (композиться з гаджет-прискоренням 0.45)
+    this.shootCd = (60 / w.rpm) * (gadgetInf ? 0.45 : 1) / (shkval ? 1.8 : 1);
     this.gunKick = 1;
     level.stats.shotsFired++;
     const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
@@ -745,7 +771,7 @@ export class Player {
     }
 
     level.audio.shot(this.cur);
-    level.effects.muzzleFlash(this._muzzlePos);
+    level.effects.muzzleFlash(this._muzzlePos, shkval ? 1.7 : 1); // 🔥 «Шквал» — соковитіший спалах
     // 🟡 гільза вилітає праворуч-вгору від дула
     if (SHELL_WEAPONS.has(this.cur)) level.effects.ejectShell(this._muzzlePos, Math.cos(this.yaw), -Math.sin(this.yaw));
 
@@ -920,17 +946,18 @@ export class Player {
   // held — тримають вогонь (mouseDown). При fuel<=0 — клац-порожньо.
   _fireContinuous(dt, held) {
     const w = this.weapon;
+    const shkval = !!(this.superPower && this.superPower.type === 'shkval');
     const fuel = this.fuel[this.cur] || 0;
     if (!held) { this._contWasEmpty = false; return; }
-    if (fuel <= 0) {
+    if (fuel <= 0 && !shkval) {
       // балон вичерпано → автоматична перезарядка (разовий «клац», далі reload)
       if (!this._contWasEmpty) { this._contWasEmpty = true; this.level.audio.empty(); }
       this.startReload();
       return;
     }
     this._contWasEmpty = false;
-    // дренаж палива (не нижче 0)
-    this.fuel[this.cur] = Math.max(0, fuel - dt);
+    // дренаж палива (не нижче 0) — «Шквал» тримає балон повним
+    if (!shkval) this.fuel[this.cur] = Math.max(0, fuel - dt);
     this.gunKick = Math.min(0.5, this.gunKick + dt * 2); // легке тремтіння ствола
     const level = this.level;
     const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
