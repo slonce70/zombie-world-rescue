@@ -1616,6 +1616,8 @@ export const EN = {
 "Готуйся — йдуть еліти! 👹": "Get ready — elites incoming! 👹",
 "🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!": "🎁 ELITE WAVE CHEST!",
 "🏆 ЗОЛОТА СКРИНЯ!": "🏆 GOLDEN CHEST!",
+"+{c} 💰   +{k} 💎": "+{c} 💰   +{k} 💎",
+"🥚 У скрині було яйце!": "🥚 There was an egg in the chest!",
 "🎁 СКРИНЯ!": "🎁 CHEST!",
 "фонтан!": "fountain!",
 "Тап, щоб пропустити ✨": "Tap to skip ✨",

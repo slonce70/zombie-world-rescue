@@ -88,7 +88,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 295;
+const APP_VERSION = 296;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3127,9 +3127,15 @@ class Game {
       this.progress.addXp(XP_VALUES.horde);
       this.quests.onEvent('horde');
     });
-    // 👹 v287: скриня по зачистці елітної хвилі (solo-only) — церемонія + монети/кристали
+    // 👹 v287: скриня по зачистці елітної хвилі — церемонія + монети/кристали.
+    // 🤝 v296: у коопі кожен гравець нараховує собі локально неблокуючим банером
+    // (без fullscreen-церемонії — рішення v294). Хост шле `ewc` решті і кредитує себе.
     level.bus.on('eliteWaveCleared', (pos) => {
-      if (level.playground || level.net) return;
+      if (level.playground) return;
+      if (level.net) {
+        if (level.net.authority) { level.netEv('ewc'); this._grantEliteChestCoop(); }
+        return;
+      }
       const reward = 120;
       level.addCoins(reward);
       this.save.crystals = (this.save.crystals || 0) + 3;
@@ -3143,9 +3149,15 @@ class Game {
       this.chestCeremony({ title: t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), items });
       this.saveGame();
     });
-    // 👑 v287: золотий зомбі впольовано (solo) — гарантована золота скриня
+    // 👑 v287: золотий зомбі впольовано — гарантована золота скриня.
+    // 🤝 v296: у коопі кожен гравець нараховує собі локально (ті самі числа) банером.
+    // Хост шле `gch` решті і кредитує себе.
     level.bus.on('goldenChest', (pos) => {
-      if (level.playground || level.net) return;
+      if (level.playground) return;
+      if (level.net) {
+        if (level.net.authority) { level.netEv('gch'); this._grantGoldenChestCoop(); }
+        return;
+      }
       const reward = 144;
       level.addCoins(reward);
       this.save.crystals = (this.save.crystals || 0) + 5;
@@ -3398,6 +3410,30 @@ class Game {
     if (!this.level) return;
     if (this.level.pet) this.level.pet.dispose();
     this.level.pet = this.save.activePet ? new Pet(this.level, this.save.activePet) : null;
+  }
+
+  // 🤝 v296 «Еліти разом»: нагорода зачистки елітної хвилі в коопі — КОЖЕН гравець
+  // (і хост, і гість по ev `ewc`) нараховує собі локально ті самі числа, що соло,
+  // але без блокуючої церемонії (рішення v294): неблокуючий банер зі складом.
+  _grantEliteChestCoop() {
+    const reward = 120, crystals = 3;
+    this.level.addCoins(reward);
+    this.save.crystals = (this.save.crystals || 0) + crystals;
+    const gotEgg = this._rollChestEgg(ELITE_CHEST_EGG_CHANCE); // незалежний рол у кожного
+    this.hud.banner(t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), t('+{c} 💰   +{k} 💎', { c: reward, k: crystals }), 4.5);
+    if (gotEgg) this.hud.toast(t('🥚 У скрині було яйце!'), 5);
+    this.saveGame();
+  }
+
+  // 🤝 v296: золота скриня в коопі — той самий локальний, неблокуючий шлях (числа соло: 144🪙+5💎).
+  _grantGoldenChestCoop() {
+    const reward = 144, crystals = 5;
+    this.level.addCoins(reward);
+    this.save.crystals = (this.save.crystals || 0) + crystals;
+    const gotEgg = this._rollChestEgg(GOLDEN_CHEST_EGG_CHANCE);
+    this.hud.banner(t('🏆 ЗОЛОТА СКРИНЯ!'), t('+{c} 💰   +{k} 💎', { c: reward, k: crystals }), 4.5);
+    if (gotEgg) this.hud.toast(t('🥚 У скрині було яйце!'), 5);
+    this.saveGame();
   }
 
   // 🥚 R5: чи включити яйце в церемонію скрині (solo-only). Тест форсить через _forceChestEgg.
@@ -5529,6 +5565,16 @@ class Game {
       spawnSuper: () => { if (g.level) g._trySuperPickup(g.level); return !!(g.level && g.level.superPickup); },
       grabSuper: () => { if (g.level && g.level.superPickup) { g.level.superPickup.grab(); return true; } return false; },
       superState: () => (g.level && g.level.player.superPower ? { ...g.level.player.superPower } : null),
+      // 👹 v296: форс елітної хвилі на ХОСТІ — телеграф (банер+стінгер+ev `ew`) і 2–4 еліти.
+      // Гість бачить хвилю через onZombieSpawn (zs з o.e) і `ew`; на гості — no-op.
+      forceEliteWave: () => {
+        const level = g.level;
+        if (level.net && !level.net.authority) return 0;
+        level.audio.eliteWave();
+        level.bus.emit('eliteWaveWarning'); // хост-банер локально (як реальний шлях)
+        if (level.net) level.netEv('ew');   // телеграф гостям
+        return level.zombies.spawnEliteWave().length;
+      },
       finishHorde: () => {
         const zm = g.level.zombies;
         if (g.level.missions) g.level.missions.pendingHorde = null;

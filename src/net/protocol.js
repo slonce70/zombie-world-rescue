@@ -2,7 +2,7 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 10; // v285: spec.mut/wb (мутатор тижня + світовий бос у коопі), hello.role + msg 'role' (кооп-ролі), snap.m worldboss, zs/captureState прапори o.wb/o.wbm
+export const PROTO_VERSION = 11; // v296 «Еліти разом»: нові ev-коди ew/ewc/gch (елітні хвилі + скарби в кооп-кампанії)
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {

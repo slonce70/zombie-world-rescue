@@ -537,7 +537,9 @@ export class Zombies {
   // він амбієнтний). Не позначаємо horde:true (щоб не плутати лічильник орди) — трек окремо.
   // По зачистці всіх еліт падає скриня на позиції останнього (подія eliteWaveCleared).
   spawnEliteWave(n) {
-    if (this.level.net) return []; // еліт-хвиля лише у соло
+    // v296: у коопі елітну хвилю спавнить ХОСТ (authority); гість бачить еліт-puppet'ів
+    // через onZombieSpawn (zs з прапором o.e). Гість сам ніколи не спавнить хвилю.
+    if (this.level.net && !this.level.net.authority) return [];
     const player = this.level.player;
     let count = Math.max(2, Math.min(4, n || (2 + Math.floor(this.rng.next() * 3))));
     // 🕊️ R3 невидиме милосердя: −1 еліт у хвилі (мін. 1) після 2+ смертей поспіль
@@ -967,17 +969,12 @@ export class Zombies {
     }
     if (z.golden) {
       level.audio.goldenJingle(false);
-      // 👑 v287: у СОЛО золотий дарує скриню-церемонію (гарантована). Кооп лишаємо як було —
-      // фонтан монет + тост (церемонія — соло-фіча, кооп не чіпаємо).
-      if (!level.net) {
+      // 👑 v287: у СОЛО золотий дарує скриню-церемонію (гарантована).
+      // 👑 v296 «Еліти разом»: у коопі золоту скриню отримує КОЖЕН гравець локально
+      // (ті самі числа, що соло), неблокуючим банером. Хост нараховує собі і шле `gch`.
+      // Гілку виконує лише authority (у гостя смерть зомбі — через puppetDie).
+      if (!level.net || level.net.authority) {
         level.bus.emit('goldenChest', { x: z.x, z: z.z, y: z.y });
-      } else {
-        for (let i = 0; i < 12; i++) {
-          const a = (i / 12) * Math.PI * 2;
-          level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
-        }
-        level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
-        level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
       }
     }
     if (z.type === 'boss') {
