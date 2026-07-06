@@ -919,10 +919,10 @@ export class Effects {
     this.flashT = Math.max(this.flashT, hyper ? 0.12 : 0.09);
   }
 
-  muzzleFlash(pos) {
+  muzzleFlash(pos, boost = 1) {
     this.flashLight.position.copy(pos);
     this.flashLight.color.setHex(0xffc966);
-    this.flashLight.intensity = 14;
+    this.flashLight.intensity = 14 * boost;
     this.flashT = 0.05;
     // 💥 зірка-спалах: короткоживучий спрайт із випадковим поворотом
     const f = this.flashSprites[this._flashIdx];
@@ -930,7 +930,7 @@ export class Effects {
     f.spr.position.copy(pos);
     f.spr.material.rotation = Math.random() * Math.PI * 2;
     f.spr.material.opacity = 1;
-    f.spr.scale.setScalar(0.28 + Math.random() * 0.14);
+    f.spr.scale.setScalar((0.28 + Math.random() * 0.14) * boost);
     f.spr.visible = true;
     f.life = 0.05;
   }
@@ -1618,7 +1618,7 @@ export class Effects {
     // цілі підбору рахуємо РАЗ на кадр, а не на кожну монету (фонтан боса/золотого = десятки монет → десятки алокацій/кадр)
     const pickTargets = this.getPickupTargets
       ? this.getPickupTargets()
-      : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), pid: 1 }] : []);
+      : (pp ? [{ pos: pp, magnet: this.getMagnetActive && this.getMagnetActive(), superMagnet: this.getSuperMagnet && this.getSuperMagnet(), pid: 1 }] : []);
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const c = this.coins[i];
       c.t += dt;
@@ -1647,9 +1647,10 @@ export class Effects {
         const d = Math.hypot(dx, dz);
         // 🎭 кооп-scout: множник радіуса підбору (pickMult ×1.25); дефолт 1
         const pm = tgt.pickMult || 1;
-        const magnetR = (c.type === 'coin' ? (tgt.magnet ? 22 : 5) : 2.2) * pm;
+        // 🌟 «Магніт-буря» (v288): монети з усієї мапи тягнуться до гравця (радіус ∞, швидше)
+        const magnetR = (c.type === 'coin' ? (tgt.superMagnet ? 9999 : tgt.magnet ? 22 : 5) : 2.2) * pm;
         if (!pulled && d < magnetR && d > 0.01) {
-          const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
+          const pull = (c.type === 'coin' ? (tgt.superMagnet ? 20 : 14) : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;
           c.mesh.position.z += dz * pull;
           pulled = true;

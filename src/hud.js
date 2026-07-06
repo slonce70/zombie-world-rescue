@@ -156,6 +156,15 @@ export class HUD {
     this.vignetteT = 0.7;
   }
 
+  // 🌟 золотий екранний спалах при активації супер-сили (самодостатній оверлей)
+  powerFlash(color = 'rgba(255,224,102,0.55)') {
+    const div = document.createElement('div');
+    div.style.cssText = `position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0;transition:opacity .5s ease-out;background:radial-gradient(circle at 50% 45%, ${color} 0%, rgba(0,0,0,0) 70%);`;
+    document.body.appendChild(div);
+    requestAnimationFrame(() => { div.style.opacity = '1'; requestAnimationFrame(() => { div.style.opacity = '0'; }); });
+    setTimeout(() => div.remove(), 700);
+  }
+
   comboPop() {
     // плавний поп обробляється в update через _lastCombo
   }
@@ -203,6 +212,11 @@ export class HUD {
       if (p.buffs[k] > 0) {
         buffHtml += `<div class="buff"><span class="buff-icon">${icon}</span><span class="buff-t">${Math.ceil(p.buffs[k])}</span></div>`;
       }
+    }
+    // 🌟 супер-сила «моменту могутності» — окремий чип із відліком
+    if (p.superPower && p.superPower.t > 0) {
+      const sIcon = p.superPower.type === 'shkval' ? '🔥' : '🧲';
+      buffHtml += `<div class="buff buff-super"><span class="buff-icon">${sIcon}</span><span class="buff-t">${Math.ceil(p.superPower.t)}</span></div>`;
     }
     if (this._lastBuffHtml !== buffHtml) {
       this.el.buffs.innerHTML = buffHtml;

@@ -19,7 +19,7 @@ import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
-import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS } from './extras.js';
+import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS, SuperPickup } from './extras.js';
 import { StormMode } from './storm.js';
 import { BossRush } from './bossrush.js';
 import {
@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 287;
+const APP_VERSION = 288;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2652,10 +2652,16 @@ class Game {
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!coop && !isPlayground) level.runBuild = new RunBuild();
+      // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень лише у соло-кампанії
+      if (!coop && !isPlayground) level.superEligible = true;
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
     level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    // 🌟 супер-пікап: стан на рівні (спавн — через _trySuperPickup на 2-й місії/елітній хвилі)
+    level.superPickup = null;
+    level.superSpawned = false;
+    level.superMissions = 0;
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
@@ -2711,6 +2717,8 @@ class Game {
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
+    // 🌟 «Магніт-буря»: тягне монети з усієї мапи (радіус ∞) поки сила активна
+    level.effects.getSuperMagnet = () => !!(level.player.superPower && level.player.superPower.type === 'magnet');
     level.effects.zombieHitTest = (origin, dir, maxD) => level.zombies.hitTest(origin, dir, maxD);
     const BUFF_INFO = {
       speed: { dur: 20, msg: t('⚡ ТУРБО-ШВИДКІСТЬ на 20 секунд!') },
@@ -2918,6 +2926,18 @@ class Game {
       // такий самий патерн, як ?test-вимкнення хмари з опцією &cloud.
       if (!level.net && level.runBuild && !level.storm && !this.victoryShown && this.draft
         && level.player.health > 0 && (!this.testMode || this.params.has('draft'))) this.draft.open();
+      // 🌟 «момент могутності»: супер-пікап на 2-й зданій місії (або раніше на елітній хвилі)
+      level.superMissions = (level.superMissions || 0) + 1;
+      if (level.superMissions >= 2) this._trySuperPickup(level);
+    });
+    // 🌟 елітна хвиля стартує раніше за 2-гу місію → супер-пікап тут (що настане першим)
+    level.bus.on('eliteWaveWarning', () => this._trySuperPickup(level));
+    // 🌟 схопив супер-пікап → активація сили зі слоу-мо, банером і стінгером
+    level.bus.on('superPickupGrabbed', (type) => this._activateSuperPower(level, type));
+    level.bus.on('superPowerEnd', () => {
+      if (level.net) return;
+      this.audio.superEnd();
+      this.hud.toast(t('Суперсила скінчилась'));
     });
     level.bus.on('gadgetUsed', (id) => {
       if (!level.playground) {
@@ -3095,6 +3115,39 @@ class Game {
     if (!this.level) return;
     if (this.level.pet) this.level.pet.dispose();
     this.level.pet = this.save.activePet ? new Pet(this.level, this.save.activePet) : null;
+  }
+
+  // 🌟 «момент могутності» (v288): спавн супер-пікапа 1×/соло-рівень.
+  // Тригер — перше з: 2-га здана місія АБО старт елітної хвилі. Гарантовано соло.
+  _trySuperPickup(level) {
+    if (!level || level.net || !level.superEligible) return;
+    if (level.superSpawned || level.superPickup) return;
+    if (level.player.health <= 0) return;
+    level.superSpawned = true;
+    level.superPickup = new SuperPickup(level, this._forceSuperPower || null);
+  }
+
+  // 🌟 активація сили: слоу-мо 0.5с (reuse hitstop), золотий спалах, банер, стінгер
+  _activateSuperPower(level, type) {
+    if (level.net) return;
+    const DUR = { shkval: 12, magnet: 15 };
+    const dur = DUR[type] || 12;
+    level.player.superPower = { type, t: dur, dur };
+    this._hitstopT = Math.max(this._hitstopT, 0.5); // 0.5с слоу-мо (той самий хук, що хітстоп)
+    this.audio.superStart(type);
+    this.hud.powerFlash(type === 'shkval' ? 'rgba(255,120,60,0.55)' : 'rgba(102,221,255,0.55)');
+    if (level.effects) {
+      const p = level.player;
+      const col = type === 'shkval' ? 0xff7a3c : 0x66ddff;
+      level.effects.ring(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), col, 4);
+      level.effects.burst(new THREE.Vector3(p.pos.x, p.pos.y + 1, p.pos.z), col, 24, { speed: 6, up: 6, life: 0.9, size: 1.4 });
+    }
+    const name = type === 'shkval' ? t('🔥 ШКВАЛ') : t('🧲 МАГНІТ-БУРЯ');
+    const sub = type === 'shkval'
+      ? t('Безлім патронів + скорострільність!')
+      : t('Магніт монет + швидкість!');
+    this.hud.banner(name, sub, 3.4);
+    level.superPickup = null;
   }
 
   // 🦙 нагорода Мегабокса: pity гарантує круте після 2 невдач
@@ -4749,6 +4802,9 @@ class Game {
         if (this.level.megabox && !this.level.megabox.done) {
           this.level.megabox.update(simDt, this.input, allowControl);
         }
+        if (this.level.superPickup && !this.level.superPickup.done) {
+          this.level.superPickup.update(simDt);
+        }
         if (!this.level.noGadgets || this.level.modeShield) this.level.gadgets.update(simDt, this.input, allowControl);
         if (this.level.net) this._updateRevive(simDt, allowControl);
         if (this.level.pet) this.level.pet.update(simDt);
@@ -4867,8 +4923,12 @@ class Game {
           firstPerson: g.level.player.firstPerson,
           armor: g.level.player.armor, maxArmor: g.level.player.maxArmor,
           buffs: { ...g.level.player.buffs },
+          superPower: g.level.player.superPower ? { ...g.level.player.superPower } : null,
           rockets: g.level.player.ammo.bazooka.reserve + g.level.player.ammo.bazooka.mag,
         } : null,
+        superPickup: g.level && g.level.superPickup && !g.level.superPickup.done
+          ? { type: g.level.superPickup.type, x: g.level.superPickup.x, z: g.level.superPickup.z } : null,
+        superSpawned: g.level ? !!g.level.superSpawned : false,
         // id — стабільні назви слотів (сумісність зі старими тестами), type — справжній тип
         missions: g.level ? g.level.missions.missions.map((m, i) => ({
           id: ['rescue', 'tower', 'warehouse'][i] || m.id, type: m.type || m.id, state: m.state,
@@ -4982,6 +5042,11 @@ class Game {
         }
       },
       completeMission: (id) => g.level.missions._complete(id),
+      // 🌟 супер-пікап: детермінований тип для тестів + примусовий спавн/грабіж
+      forceSuperPower: (type) => { g._forceSuperPower = type; },
+      spawnSuper: () => { if (g.level) g._trySuperPickup(g.level); return !!(g.level && g.level.superPickup); },
+      grabSuper: () => { if (g.level && g.level.superPickup) { g.level.superPickup.grab(); return true; } return false; },
+      superState: () => (g.level && g.level.player.superPower ? { ...g.level.player.superPower } : null),
       finishHorde: () => {
         const zm = g.level.zombies;
         if (g.level.missions) g.level.missions.pendingHorde = null;

@@ -118,6 +118,104 @@ export class Megabox {
 }
 
 // ============================================================
+// 🌟 Супер-пікап «момент могутності» (v288): 1×/соло-рівень падає сяюча
+// зірка ~10–15м від гравця. Схопив → одна з двох сил (Шквал/Магніт-буря).
+// Тільки соло-кампанія (гейт у main.js); тягне промінь-стовп, щоб діти помітили.
+// ============================================================
+function makeSuperPickupMesh() {
+  const g = new THREE.Group();
+  // ядро-зірка (октаедр) — яскраве, самосвітне
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.5, 0),
+    new THREE.MeshBasicMaterial({ color: 0xffe066 }),
+  );
+  g.add(core);
+  g.userData.core = core;
+  // м'яка аура-сфера (адитивна, без запису глибини — дешево)
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.82, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  g.add(glow);
+  // пульсуюче кільце навколо
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.9, 0.055, 8, 22),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  g.userData.ring = ring;
+  return g;
+}
+
+export class SuperPickup {
+  constructor(level, forceType = null) {
+    this.level = level;
+    this.t = 0;
+    this.done = false;
+    this.grabbed = false;
+    // тип сили: forceType для тестів, інакше 50/50
+    this.type = (forceType === 'shkval' || forceType === 'magnet')
+      ? forceType
+      : (Math.random() < 0.5 ? 'shkval' : 'magnet');
+    // позиція: ~10–15м від гравця, на прохідному ґрунті й не в місії/на дорозі
+    const world = level.world;
+    const p = level.player;
+    let x = p.pos.x + 12, z = p.pos.z;
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 10 + Math.random() * 5;
+      const tx = p.pos.x + Math.cos(a) * r;
+      const tz = p.pos.z + Math.sin(a) * r;
+      if (world._farFromSites(tx, tz, 6) && world.roadDist(tx, tz) > 2) { x = tx; z = tz; break; }
+    }
+    this.x = x; this.z = z;
+    this.y = world.groundH(x, z);
+    this.mesh = makeSuperPickupMesh();
+    this.mesh.position.set(x, this.y + 1.15, z);
+    level.scene.add(this.mesh);
+    this.beam = level.effects.makeBeam(x, z, 0xffe066, '🌟');
+    level.bus.emit('toast', t('🌟 СУПЕРСИЛА з\'явилась — знайди сяйво!'));
+  }
+
+  update(dt) {
+    if (this.done) return;
+    this.t += dt;
+    this.mesh.position.y = this.y + 1.15 + Math.abs(Math.sin(this.t * 2.2)) * 0.28;
+    this.mesh.rotation.y += dt * 1.4;
+    const ring = this.mesh.userData.ring;
+    if (ring) { const s = 1 + Math.sin(this.t * 3) * 0.18; ring.scale.set(s, s, s); }
+    if (this.beam) this.beam.update(dt);
+    const p = this.level.player;
+    if (!this.grabbed && p.health > 0) {
+      const d = Math.hypot(p.pos.x - this.x, p.pos.z - this.z);
+      if (d < 3.4) this.grab();
+    }
+  }
+
+  grab() {
+    if (this.grabbed) return;
+    this.grabbed = true;
+    const type = this.type;
+    this._cleanup();
+    this.done = true;
+    this.level.bus.emit('superPickupGrabbed', type);
+  }
+
+  _cleanup() {
+    this.level.scene.remove(this.mesh);
+    disposeObject(this.mesh);
+    if (this.beam) { this.beam.remove(); this.beam = null; }
+  }
+
+  remove() {
+    if (this.done) return;
+    this._cleanup();
+    this.done = true;
+  }
+}
+
+// ============================================================
 // 🐶 Пес Дружок: біжить поруч, збирає монети, гавкає на сюрпризи
 // ============================================================
 export class Pet {
