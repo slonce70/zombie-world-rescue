@@ -50,6 +50,7 @@ import { RescueHQ } from './ui/hq.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
+import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
@@ -80,7 +81,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 288;
+const APP_VERSION = 289;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -785,6 +786,9 @@ class Game {
       bestiaryGoals: { b10: false, b20: false, all: false },
       chapter: { p: {}, done: false }, medals: [], infected: { cleared: {}, done: false },
       diffStar: 1,
+      // ⭐ R3 «Зірки та милосердя»: зірки країн (0..3), видані пороги-нагороди (12/24/36),
+      // milosердя — лічильник смертей поспіль на одній країні ({ cid, n } | null, БЕЗ UI)
+      stars: {}, starClaims: [], mercyDeaths: null,
       // 🎓 разові підказки-знайомства (вежа/самокат/гаджет/робот): { ключ: 1 } = вже показано
       hints: {},
     };
@@ -893,6 +897,23 @@ class Game {
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
         if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
         out.diffStar = Math.round(out.diffStar);
+        // ⭐ R3 зірки країн: об'єкт { cid: 0..3 }; зіпсоване/чуже значення → чисто
+        if (!out.stars || typeof out.stars !== 'object' || Array.isArray(out.stars)) out.stars = {};
+        for (const id of Object.keys(out.stars)) {
+          const v = out.stars[id] | 0;
+          if (v <= 0) delete out.stars[id];
+          else out.stars[id] = Math.min(STARS_PER_COUNTRY, v);
+        }
+        if (!Array.isArray(out.starClaims)) out.starClaims = [];
+        out.starClaims = out.starClaims.filter((n, i, arr) => STAR_THRESHOLDS.some((th) => th.at === n) && arr.indexOf(n) === i);
+        // 🕊️ невидиме милосердя: { cid, n } | null (валідні поля або скидання)
+        if (!out.mercyDeaths || typeof out.mercyDeaths !== 'object' || Array.isArray(out.mercyDeaths)
+          || typeof out.mercyDeaths.cid !== 'string' || typeof out.mercyDeaths.n !== 'number'
+          || !isFinite(out.mercyDeaths.n) || out.mercyDeaths.n < 0) {
+          out.mercyDeaths = null;
+        } else {
+          out.mercyDeaths = { cid: out.mercyDeaths.cid, n: Math.floor(out.mercyDeaths.n) };
+        }
         // критичні поля валідуємо за формою — зіпсований/чужий сейв не має ламати завантаження
         if (!Array.isArray(out.weapons)) out.weapons = ['pistol'];
         if (!Array.isArray(out.weaponLoadout)) out.weaponLoadout = null;
@@ -924,6 +945,13 @@ class Game {
       for (const id of liberatedIds(out.liberated)) {
         const w = COUNTRIES[id] && COUNTRIES[id].weaponReward;
         if (w && !out.weapons.includes(w)) out.weapons.push(w);
+      }
+    }
+    // ⭐ R3 ретро-нарахування: кожній ВЖЕ звільненій країні кампанії без зірок — 1 зірка
+    // (за перемогу). Ветеран не має побачити обнулений зірковий прогрес при міграції.
+    if (out.stars && typeof out.stars === 'object' && out.liberated && typeof out.liberated === 'object') {
+      for (const id of CAMPAIGN_ORDER) {
+        if (out.liberated[id] && !((out.stars[id] | 0) > 0)) out.stars[id] = 1;
       }
     }
     syncTitles(out);
@@ -1283,6 +1311,9 @@ class Game {
     if (show) {
       document.getElementById('liberated-count').textContent =
         liberatedCount(this.save.liberated);
+      // ⭐ R3: сумарний лічильник зірок кампанії «X/36» на глобусі
+      const starTotalEl = document.getElementById('star-total');
+      if (starTotalEl) starTotalEl.textContent = `${starTotal(this.save)}/${CAMPAIGN_STAR_MAX}`;
       // 🧭 компас «що далі» просто на глобусі — не чекаючи відкриття меню «Грати»
       const compassEl = document.getElementById('globe-compass');
       if (compassEl) {
@@ -2521,10 +2552,14 @@ class Game {
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
+    // 💸 R3 «Поразка теж платить»: знімок XP на старті — щоб показати ЗДОБУТЕ за забіг на екрані смерті
+    level._startXp = this.save.xp || 0;
+    // ⭐ R3 зірки/милосердя (solo-only, лише країни кампанії) виставляються нижче після вибору місій
     level.addCoins = (n) => {
       if (level.playground) return;
       this.save.coins += n;
       level.stats.coinsEarned += n;
+      this._bumpSecondary(level, 'coins', n); // ⭐2 «Збери N монет за забіг»
       this.quests.onEvent('coins', { n });
       this.saveGame();
     };
@@ -2654,6 +2689,15 @@ class Game {
       if (!coop && !isPlayground) level.runBuild = new RunBuild();
       // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень лише у соло-кампанії
       if (!coop && !isPlayground) level.superEligible = true;
+      // ⭐ R3 «Зірки та милосердя»: лише СОЛО-забіг країни кампанії (не інфекція/кооп/полігон).
+      if (!coop && !isPlayground && !isInfected && CAMPAIGN_ORDER.includes(countryId)) {
+        // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип)
+        const runIdx = (this.save.missionRuns[countryId] || 0);
+        level.secondaryObjective = pickSecondaryObjective(country, country.seed + runIdx * 3, this._forceSecondary || null);
+        // 🕊️ невидиме милосердя: після 2+ смертей поспіль у ЦІЙ країні — тихі послаблення (БЕЗ UI).
+        const md = this.save.mercyDeaths;
+        level.mercy = (md && md.cid === countryId && md.n >= 2) ? { hpMult: 0.9, medkitMult: 1.5, eliteMinus: 1 } : null;
+      }
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -2888,6 +2932,7 @@ class Game {
         lp.health += lp.lifeSteal;
       }
       this.save.stats.killed++;
+      if (z.elite) this._bumpSecondary(level, 'elite'); // ⭐2 «Убий N елітних зомбі»
       this._bumpWeeklyGoal();
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
@@ -2952,13 +2997,14 @@ class Game {
       ch.progress = Math.min(ch.target, ch.progress + 1);
       ch.done = ch.progress >= ch.target;
     });
-    level.bus.on('hitmarker', (crit) => { if (!level.playground && crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; } });
+    level.bus.on('hitmarker', (crit) => { if (!level.playground && crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; this._bumpSecondary(level, 'headshot'); } }); // ⭐2 «Зроби N хедшотів»
     level.bus.on('shieldBroken', () => { if (!level.playground) this.quests.onEvent('shield'); });
     level.bus.on('megaboxOpened', () => {
       if (level.playground) return;
       this.progress.addXp(XP_VALUES.megabox);
       this.quests.onEvent('megabox');
       this.save.stats.megaboxes++;
+      this._bumpSecondary(level, 'megabox'); // ⭐2 «Відкрий мегабокс»
     });
     level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
@@ -3115,6 +3161,19 @@ class Game {
     if (!this.level) return;
     if (this.level.pet) this.level.pet.dispose();
     this.level.pet = this.save.activePet ? new Pet(this.level, this.save.activePet) : null;
+  }
+
+  // ⭐ R3: тік вторинної цілі забігу (⭐2). Викликається з відповідних подій.
+  // Соло-only через level.secondaryObjective (виставляється лише у соло-кампанії).
+  _bumpSecondary(level, ev, n = 1) {
+    const so = level && level.secondaryObjective;
+    if (!so || so.done || so.ev !== ev) return;
+    so.progress = Math.min(so.target, so.progress + n);
+    if (so.progress >= so.target) {
+      so.done = true;
+      this.audio.questDone();       // 🔔 дзвіночок «ціль виконана»
+      this.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
+    }
   }
 
   // 🌟 «момент могутності» (v288): спавн супер-пікапа 1×/соло-рівень.
@@ -3404,6 +3463,16 @@ class Game {
 
   _onPlayerDied() {
     this.level.stats.deaths++;
+    // 🕊️ R3 невидиме милосердя: смерті ПОСПІЛЬ на одній країні кампанії (solo). БЕЗ жодного UI.
+    // Наступний забіг цієї країни при n≥2 дістане тихі послаблення (див. створення рівня).
+    // secondaryObjective виставляється РІВНО для соло-забігу країни кампанії (не інфекція/кооп/
+    // спецрежими) — тож це точний гейт «зірково-милосердний забіг», а не просто campaign countryId.
+    if (this.level.secondaryObjective && !this.level.net) {
+      const cid = this.level.countryId;
+      const md = this.save.mercyDeaths;
+      this.save.mercyDeaths = (md && md.cid === cid) ? { cid, n: md.n + 1 } : { cid, n: 1 };
+      this.saveGame();
+    }
     // кнопка реваншу — лише для фінальної соло-гілки кампанії, решта режимів мають свій end-флоу
     const revengeBtn = document.getElementById('btn-death-revenge');
     if (revengeBtn) revengeBtn.style.display = 'none';
@@ -3485,6 +3554,18 @@ class Game {
       card.textContent = coop
         ? t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() })
         : t('Не хвилюйся — прогрес місій зберігся.');
+    }
+    // 💸 R3 «Поразка теж платить» (solo): показуємо ЗДОБУТЕ за забіг (монети й XP уже збережені)
+    const earnedEl = document.getElementById('death-earned');
+    if (earnedEl) {
+      const earnedCoins = Math.max(0, this.level.stats.coinsEarned | 0);
+      const earnedXp = Math.max(0, (this.save.xp | 0) - (this.level._startXp | 0));
+      if (!coop && (earnedCoins > 0 || earnedXp > 0)) {
+        earnedEl.textContent = t('Ти все одно здобув: 💰{c} · ⚡{x} XP', { c: earnedCoins, x: earnedXp });
+        earnedEl.style.display = '';
+      } else {
+        earnedEl.style.display = 'none';
+      }
     }
     if (revengeBtn) revengeBtn.style.display = coop ? 'none' : '';
     this.audio.defeat();
@@ -4619,9 +4700,14 @@ class Game {
       }
     }
     if (infectedFirstWin) this._grantInfectedWin(country.id, s);
+    // ⭐ R3 «Зірки та милосердя»: нараховуємо зірки за перемогу (solo-only, лише країни кампанії).
+    // Кооп/інфекція/LAB/LOST зірок НЕ дають. Пороги-нагороди — всередині _awardStars.
+    const starInfo = (!this.level.net && CAMPAIGN_ORDER.includes(country.id)) ? this._awardStars(country.id, s) : null;
     this.progress.addXp(XP_VALUES.country);
     if (!wasLiberated) this.quests.onEvent('country');
     this.saveGame();
+    // 🎁 тости за розблоковані пороги зірок (після saveGame — стан уже узгоджений)
+    if (starInfo) for (const th of starInfo.claimed) this.hud.toast(t('🎉 {l}', { l: th.label() }), 5);
     // 🤝 бонус за гру РАЗОМ — обом сторонам локально (як _grantWeeklyCoop): wire не чіпаємо
     this._grantCoopWin();
     if (this.level.net && this.level.net.authority) this.level.netEv('vict');
@@ -4661,6 +4747,8 @@ class Game {
       d.style.animationDuration = 2.5 + Math.random() * 2 + 's';
       conf.appendChild(d);
     }
+    // ⭐ R3: 3 зірки країни спливають по одній (filled/empty) з причинами
+    this._renderVictoryStars(starInfo);
     // «Ще раз»/«Далі» — лише соло-кампанія; в коопі обидві сторони йдуть через глобус
     const solo = !this.level.net;
     const nextBtn = document.getElementById('btn-victory-next');
@@ -4699,6 +4787,59 @@ class Game {
       if (!this.save.medals.includes(CHAPTER2.id)) this.save.medals.push(CHAPTER2.id);
       this.hud.banner(t('🎖️ ГЛАВУ 2 ПРОЙДЕНО!'), t('{m}: +1200 монет і 💎 10', { m: CHAPTER2.medalName }), 4.5);
     }
+  }
+
+  // ⭐ R3: нарахування зірок за перемогу в країні кампанії (solo). Зберігаємо MAX (реплей
+  // не втрачає зірок). Повертає інфо для екрана перемоги + список розблокованих порогів.
+  _awardStars(cid, stats) {
+    const so = this.level.secondaryObjective;
+    const d1 = true;                          // ⭐1 перемога (бос упав)
+    const d2 = !!(so && so.done);             // ⭐2 вторинна ціль забігу
+    const d3 = (stats.deaths | 0) === 0;      // ⭐3 без жодної смерті
+    const thisRun = (d1 ? 1 : 0) + (d2 ? 1 : 0) + (d3 ? 1 : 0);
+    const prev = countryStars(this.save, cid);
+    const total = Math.max(prev, thisRun);
+    if (!this.save.stars || typeof this.save.stars !== 'object') this.save.stars = {};
+    this.save.stars[cid] = total;
+    // 🕊️ милосердя скидається після перемоги у цій країні (frustration cleared)
+    if (this.save.mercyDeaths && this.save.mercyDeaths.cid === cid) this.save.mercyDeaths = null;
+    const claimed = this._claimStarThresholds();
+    return { d1, d2, d3, thisRun, prev, total, secondary: so, claimed };
+  }
+
+  // 🎁 Одноразові пороги зірок (12/24/36). Нараховує нагороду й запам'ятовує поріг.
+  _claimStarThresholds() {
+    const tot = starTotal(this.save);
+    if (!Array.isArray(this.save.starClaims)) this.save.starClaims = [];
+    const claimed = [];
+    for (const th of STAR_THRESHOLDS) {
+      if (tot < th.at || this.save.starClaims.includes(th.at)) continue;
+      this.save.starClaims.push(th.at);
+      if (th.type === 'coins') this.save.coins += th.n;
+      else if (th.type === 'crystals') this.save.crystals = (this.save.crystals || 0) + th.n;
+      else if (th.type === 'title' && th.id && !this.save.titles.includes(th.id)) this.save.titles.push(th.id);
+      claimed.push(th);
+    }
+    return claimed;
+  }
+
+  // ⭐ R3: три зірки на екрані перемоги спливають по одній (filled/empty) з причинами.
+  _renderVictoryStars(info) {
+    const box = document.getElementById('victory-stars');
+    if (!box) return;
+    if (!info) { box.innerHTML = ''; box.style.display = 'none'; return; }
+    box.style.display = '';
+    const rows = [
+      { on: info.d1, label: t('Перемога') },
+      { on: info.d2, label: info.secondary ? info.secondary.label() : t('Вторинна ціль забігу') },
+      { on: info.d3, label: t('Без жодної смерті') },
+    ];
+    const stars = rows.map((r, i) =>
+      `<div class="vstar ${r.on ? 'earned' : ''}" style="animation-delay:${(0.2 + i * 0.35).toFixed(2)}s">`
+      + `<span class="vstar-ic">${r.on ? '⭐' : '☆'}</span>`
+      + `<span class="vstar-lbl">${r.label}</span></div>`).join('');
+    box.innerHTML = `<div class="vstar-title">${t('Зірки країни: {n}/{m}', { n: info.total, m: STARS_PER_COUNTRY })}</div>`
+      + `<div class="vstar-row">${stars}</div>`;
   }
 
   // ---------- цикл ----------
@@ -5042,6 +5183,22 @@ class Game {
         }
       },
       completeMission: (id) => g.level.missions._complete(id),
+      // ⭐ R3 «Зірки та милосердя»: інтроспекція + детермінізм для тестів
+      forceSecondary: (id) => { g._forceSecondary = id; }, // форс типу вторинної цілі на наступний старт
+      secondaryState: () => {
+        const so = g.level && g.level.secondaryObjective;
+        return so ? { id: so.id, ev: so.ev, target: so.target, progress: so.progress, done: so.done, label: so.label() } : null;
+      },
+      starState: () => ({
+        stars: { ...(g.save.stars || {}) },
+        total: starTotal(g.save),
+        claims: [...(g.save.starClaims || [])],
+      }),
+      mercyState: () => ({
+        deaths: g.save.mercyDeaths ? { ...g.save.mercyDeaths } : null,
+        active: !!(g.level && g.level.mercy),   // ЖИВИЙ модифікатор на поточному рівні
+        mercy: g.level && g.level.mercy ? { ...g.level.mercy } : null,
+      }),
       // 🌟 супер-пікап: детермінований тип для тестів + примусовий спавн/грабіж
       forceSuperPower: (type) => { g._forceSuperPower = type; },
       spawnSuper: () => { if (g.level) g._trySuperPickup(g.level); return !!(g.level && g.level.superPickup); },

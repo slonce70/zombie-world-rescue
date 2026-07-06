@@ -1,7 +1,8 @@
 // Глобальна карта: 3D-глобус, захоплені країни, прогресія кампанії
 import * as THREE from 'three';
 import { t } from './i18n.js';
-import { COUNTRIES, nextTarget, isCountryOpen } from './countries.js';
+import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
+import { countryStars, STARS_PER_COUNTRY } from './stars.js';
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
   const phi = (lon + 180) * Math.PI / 180;
@@ -358,7 +359,11 @@ export class Globe {
       tooltip.style.top = (e.clientY - 10) + 'px';
       const known = COUNTRIES[c.id];
       if ((this.game.save.liberated || {})[c.id]) {
-        tooltip.innerHTML = t('✅ <b>{n}</b> — звільнено! Натисни, щоб зіграти ще раз', { n: known ? known.name : c.name });
+        // ⭐ R3: для країн кампанії показуємо зірки (X/3) у тултипі звільненої країни
+        const starLine = CAMPAIGN_ORDER.includes(c.id)
+          ? t('<br>⭐ {n}/{m} зірок', { n: countryStars(this.game.save, c.id), m: STARS_PER_COUNTRY })
+          : '';
+        tooltip.innerHTML = t('✅ <b>{n}</b> — звільнено! Натисни, щоб зіграти ще раз', { n: known ? known.name : c.name }) + starLine;
         tooltip.classList.add('available');
       } else if (isCountryOpen(this.game.save.liberated, c.id)) {
         tooltip.innerHTML = t('🔴 {f} <b>{n}</b> — тут зомбі! Натисни, щоб звільнити', { f: known ? known.flag : '', n: known ? known.name : c.name });

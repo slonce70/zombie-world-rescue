@@ -181,7 +181,9 @@ export class Zombies {
   }
 
   hpWithSettings(baseHp, opts = {}) {
-    return Math.max(1, Math.round(baseHp) + this._toughHpBonus(opts));
+    // 🕊️ R3 невидиме милосердя: −10% HP звичайних зомбі (не боса) після 2+ смертей поспіль
+    const mercy = this.level.mercy ? this.level.mercy.hpMult : 1;
+    return Math.max(1, Math.round(baseHp * mercy) + this._toughHpBonus(opts));
   }
 
   setConfiguredHp(z, baseHp, opts = {}) {
@@ -513,7 +515,9 @@ export class Zombies {
   spawnEliteWave(n) {
     if (this.level.net) return []; // еліт-хвиля лише у соло
     const player = this.level.player;
-    const count = Math.max(2, Math.min(4, n || (2 + Math.floor(this.rng.next() * 3))));
+    let count = Math.max(2, Math.min(4, n || (2 + Math.floor(this.rng.next() * 3))));
+    // 🕊️ R3 невидиме милосердя: −1 еліт у хвилі (мін. 1) після 2+ смертей поспіль
+    if (this.level.mercy) count = Math.max(1, count - this.level.mercy.eliteMinus);
     const types = ['shield', 'splitter', 'exploder'];
     const list = [];
     for (let i = 0; i < count; i++) {
@@ -896,7 +900,7 @@ export class Zombies {
         if (this.boss) {
           // під час бою з босом міньйони гарантовано дають патрони
           level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
-        } else if (this.rng.chance(0.07)) level.effects.spawnPickup(z.x + 1, z.z, 'medkit');
+        } else if (this.rng.chance(0.07 * (level.mercy ? level.mercy.medkitMult : 1))) level.effects.spawnPickup(z.x + 1, z.z, 'medkit'); // 🕊️ R3 милосердя: +50% аптечок
         else if (this.rng.chance(0.13)) level.effects.spawnPickup(z.x - 1, z.z, 'ammo');
         else if (this.rng.chance(0.02)) {
           // рідкісний сюрприз: тимчасове підсилення

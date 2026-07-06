@@ -141,6 +141,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'gift', 'weeklyGoal', 'donations', 'donStars',
       'coopWins', 'coopBonusDay',
       'coopRole',
+      // ⭐ R3 «Зірки та милосердя»
+      'stars', 'starClaims', 'mercyDeaths',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -149,6 +151,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'bestiary', 'bestiaryGoals', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
+      'stars', 'starClaims', 'mercyDeaths',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -187,6 +190,9 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.megaQuest = saveHasProgress({ ...fresh, megaQuests: { countries8: { progress: 1, done: false } } }) === true;
     // 🎁 стрик подарунка дня — сам по собі прогрес (зміна пристрою не має обнуляти стрик дитині)
     out.giftStreak = saveHasProgress({ ...fresh, gift: { last: '2026-01-01', streak: 3, week: 1 } }) === true;
+    // ⭐ зароблені зірки країн — теж прогрес (зміна пристрою не має їх обнуляти)
+    out.stars = saveHasProgress({ ...fresh, stars: { UKR: 3 } }) === true;
+    out.zeroStarsNotProgress = saveHasProgress({ ...fresh, stars: { UKR: 0 } }) === false;
     return out;
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
@@ -205,6 +211,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('ціль → прогрес=true', res.goal);
   check('мега-квест → прогрес=true', res.megaQuest);
   check('стрик подарунка дня → прогрес=true', res.giftStreak);
+  check('⭐ зірки країн → прогрес=true', res.stars);
+  check('⭐ 0 зірок ≠ прогрес', res.zeroStarsNotProgress);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);

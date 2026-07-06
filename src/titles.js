@@ -1,6 +1,7 @@
 import { t } from './i18n.js';
 import { xpForLevel, PASS_MAX_LEVEL } from './progress.js';
 import { BESTIARY_TYPE_IDS } from './zombies.js';
+import { starTotal, CAMPAIGN_STAR_MAX } from './stars.js';
 
 // сумарний XP, потрібний для фінального рівня Зоряного шляху (титул «Зоряний гравець»)
 let XP_PASS_CAP = 0;
@@ -121,6 +122,16 @@ export const TITLES = {
     unlocked: (s) => ((s.donations | 0) >= 25),
     current: (s) => (s.donations | 0),
     target: 25,
+  },
+  // ⭐ R3: 36 зірок кампанії (по 3 за кожну з 12 країн) — фінальна нагорода зіркової системи
+  star_savior: {
+    icon: '⭐',
+    name: () => t('Зоряний рятівник'),
+    desc: () => t('Збери всі {n} зірок кампанії', { n: CAMPAIGN_STAR_MAX }),
+    detail: () => t('Відкривається за {n} зірок країн (по 3 за кожну)', { n: CAMPAIGN_STAR_MAX }),
+    unlocked: (s) => starTotal(s) >= CAMPAIGN_STAR_MAX,
+    current: (s) => starTotal(s),
+    target: CAMPAIGN_STAR_MAX,
   },
   // 🦁 бестіарій-колекція: зібрати всі види зомбі (без 'golden' — це варіант, не вид)
   zoologist: {

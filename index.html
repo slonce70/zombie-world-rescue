@@ -44,7 +44,7 @@
         <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
         <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
-      <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span></div>
+      <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span> · ⭐ <span id="star-total">0/36</span></div>
       <div id="weekly-goal">
         <span class="wg-label">🗓️ Ціль тижня: 0/300 🧟</span>
         <div class="wg-bar"><div class="wg-fill"></div></div>
@@ -282,6 +282,7 @@
     <div class="overlay-card death-card">
       <h2>💀 Зомбі тебе схопили!</h2>
       <p>Не хвилюйся — прогрес місій зберігся.</p>
+      <p id="death-earned" class="death-earned" style="display:none"></p>
       <div id="death-countdown" class="countdown">3</div>
       <button id="btn-death-revenge" class="btn btn-primary">🔁 Реванш</button>
     </div>
@@ -292,6 +293,7 @@
     <div class="overlay-card victory-card">
       <h1>🇺🇦 УКРАЇНУ ЗВІЛЬНЕНО!</h1>
       <p class="victory-sub">Ти переміг Зомбі-Короля і врятував країну!</p>
+      <div id="victory-stars" class="victory-stars"></div>
       <div id="victory-stats"></div>
       <div class="victory-actions">
         <button id="btn-victory-next" class="btn btn-primary big">▶️ Далі</button>
