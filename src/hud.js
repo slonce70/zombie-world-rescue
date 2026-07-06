@@ -365,7 +365,9 @@ export class HUD {
     if (this.el.missions.innerHTML !== html) this.el.missions.innerHTML = html;
 
     // підказка взаємодії
-    const prompt = level.missions.prompt;
+    let prompt = level.missions.prompt;
+    // 🤝 резерв: підказка/прогрес звільнення друга з клітки (коли нема місійної підказки)
+    if (!prompt && level.rescueCage && level.rescueCage.prompt) prompt = level.rescueCage.prompt;
     if (prompt) {
       this.el.prompt.classList.add('show');
       if (this.el.tbInteract) this.el.tbInteract.classList.add('avail'); // ✋ поряд є ціль — підсвічуємо кнопку
@@ -457,6 +459,11 @@ export class HUD {
     const ms = level.missions;
     const boss = level.zombies.boss;
     if (boss && boss.state !== 'dead') return { x: boss.x, z: boss.z, y: boss.y + boss.rig.height + 1, icon: '👑' };
+    // 🤝 після основних місій (до бою з босом) веди до клітки схованого друга
+    const cage = level.rescueCage;
+    if (cage && cage.active && !cage.rescued && cage.hintShown && !ms.bossStarted) {
+      return { x: cage.cageX, z: cage.cageZ, icon: '🤝' };
+    }
     const mk = ms.getMarkers ? ms.getMarkers() : [];
     if (mk.length) return { x: mk[0].x, z: mk[0].z, icon: mk[0].icon };
     return null;

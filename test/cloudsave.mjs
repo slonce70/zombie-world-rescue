@@ -143,6 +143,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'coopRole',
       // ⭐ R3 «Зірки та милосердя»
       'stars', 'starClaims', 'mercyDeaths',
+      // 🤝 R4 «Врятовані друзі»
+      'friends', 'friendThanks',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -151,7 +153,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'bestiary', 'bestiaryGoals', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
-      'stars', 'starClaims', 'mercyDeaths',
+      'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -193,6 +195,9 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     // ⭐ зароблені зірки країн — теж прогрес (зміна пристрою не має їх обнуляти)
     out.stars = saveHasProgress({ ...fresh, stars: { UKR: 3 } }) === true;
     out.zeroStarsNotProgress = saveHasProgress({ ...fresh, stars: { UKR: 0 } }) === false;
+    // 🤝 врятований друг — теж прогрес (зміна пристрою не має його обнуляти)
+    out.friends = saveHasProgress({ ...fresh, friends: { UKR: true } }) === true;
+    out.falseFriendNotProgress = saveHasProgress({ ...fresh, friends: { UKR: false } }) === false;
     return out;
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
@@ -213,6 +218,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('стрик подарунка дня → прогрес=true', res.giftStreak);
   check('⭐ зірки країн → прогрес=true', res.stars);
   check('⭐ 0 зірок ≠ прогрес', res.zeroStarsNotProgress);
+  check('🤝 врятований друг → прогрес=true', res.friends);
+  check('🤝 friends:false ≠ прогрес', res.falseFriendNotProgress);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);

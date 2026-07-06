@@ -863,6 +863,29 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .ward-progress { width: 100%; height: 6px; background: rgba(255,255,255,0.12); border-radius: 4px; margin-top: 5px; overflow: hidden; }
 .ward-progress-fill { height: 100%; background: var(--accent); border-radius: 4px; }
 .ward-progress-text { font-size: 11px; font-weight: 700; color: #9fb8d4; margin-top: 2px; }
+
+/* 📖 R4 «Альбом»: колекція друзів (жива) + заглушки. Responsive через auto-fill грід. */
+.album-tabs { margin-bottom: 12px; }
+.album-counter { color: var(--accent); font-weight: 900; font-size: 16px; margin: 2px 0 10px; }
+.album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.album-card {
+  background: rgba(255,255,255,0.07); border: 2px solid var(--ui-border); border-radius: 14px;
+  padding: 12px 8px; text-align: center;
+}
+.album-card.revealed { border-color: #58c14c; background: rgba(88, 193, 76, 0.12); }
+.album-card.locked { opacity: 0.8; }
+.album-portrait { font-size: 40px; line-height: 1; }
+.album-portrait.silhouette { filter: brightness(0) opacity(0.45); }
+.album-name { color: #fff; font-weight: 900; font-size: 14px; margin-top: 6px; }
+.album-role { color: #cfe0f5; font-weight: 700; font-size: 12px; margin-top: 3px; }
+.album-flag { color: #9fb8d4; font-weight: 700; font-size: 12px; margin-top: 4px; }
+.album-hint { color: #9fb8d4; font-weight: 700; font-size: 11px; margin-top: 4px; line-height: 1.25; }
+.album-soon {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 48px 12px; text-align: center;
+}
+.album-soon-ico { font-size: 56px; opacity: 0.5; }
+.album-soon-text { color: var(--accent); font-weight: 900; font-size: 20px; letter-spacing: 1px; }
 .ward-try {
   margin-top: 7px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--ui-border);
   background: rgba(255,210,63,.16); color: var(--accent); font: inherit; font-size: 12px; font-weight: 900; cursor: pointer;
