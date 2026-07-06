@@ -137,6 +137,7 @@ check(r7.prog === `${r7.goal}/${r7.goal}` && r7.claimVisible, '7: панель �
 // 8. hintOnce: показ РІВНО раз, збереження прапорця у save.hints
 const r8 = await page.evaluate(() => {
   const g = window.__game;
+  g.hud.clearBanners(); // v300: прапорець пишеться при ПОКАЗІ — звільняємо банер від тесту 7
   delete g.save.hints.album1;
   const before = !!g.save.hints.album1;
   g.hud.hintOnce('album1', 'T', 'S');   // перший раз — показ, прапорець
@@ -146,6 +147,33 @@ const r8 = await page.evaluate(() => {
   return { before, after1, after2 };
 });
 check(!r8.before && r8.after1 === 1 && r8.after2 === 1, '8: hintOnce показує раз і зберігає прапорець', JSON.stringify(r8));
+
+// 9. v300: сейв «з майбутнього» (>1 тижня вперед — збитий годинник) → чистий старт, не фриз
+const r9 = await page.evaluate(async () => {
+  const m = await import('/src/weeklycamp.js');
+  const save = { weeklyCamp: { wk: 1052, q: 'elite', p: 3, claimed: true } };
+  const wc = m.ensureWeeklyCamp(save, 1000);
+  return { wk: wc.wk, p: wc.p, claimed: wc.claimed };
+});
+check(r9.wk === 1000 && r9.p === 0 && !r9.claimed, '9: майбутнє >1 тижня → скидання на поточний тиждень', JSON.stringify(r9));
+
+// 10. v300: майбутнє РІВНО на 1 тиждень (часовий пояс) → толеранс-фриз, без покарання
+const r10 = await page.evaluate(async () => {
+  const m = await import('/src/weeklycamp.js');
+  const save = { weeklyCamp: { wk: 1001, q: 'rescue', p: 5, claimed: false } };
+  const wc = m.ensureWeeklyCamp(save, 1000);
+  return { wk: wc.wk, q: wc.q, p: wc.p };
+});
+check(r10.wk === 1001 && r10.q === 'rescue' && r10.p === 5, '10: майбутнє на 1 тиждень → фриз без скидання', JSON.stringify(r10));
+
+// 11. v300: невідомий id квесту (сейв новішої версії) → свіжий квест тижня, прогрес НЕ переноситься
+const r11 = await page.evaluate(async () => {
+  const m = await import('/src/weeklycamp.js');
+  const save = { weeklyCamp: { wk: 1000, q: 'coins', p: 14, claimed: false } };
+  const st = m.weeklyCampState(save, 1000);
+  return { id: st.id, p: st.p, claimable: st.claimable };
+});
+check(r11.id !== 'coins' && r11.p === 0 && !r11.claimable, '11: невідомий квест → чистий старт без миттєвого клейму', JSON.stringify(r11));
 
 check(errors.length === 0, 'без JS-помилок', errors.join(' | '));
 

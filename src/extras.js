@@ -101,6 +101,11 @@ export class Megabox {
     if (byPid === 1) {
       level.game.openMegaboxReward(this.x, this.z);
       level.bus.emit('megaboxOpened');
+    } else {
+      // 🤝 v300: мегабокс відкрив ГІСТЬ — командна ціль ⭐2 «Відкрий мегабокс» тікає на
+      // авторитеті (хості) і розійдеться всім через soc. XP/квест/нагороду гість дає
+      // собі сам у openNet — тут лише ціль, інакше вона не виконувалась ніколи.
+      level.game._bumpSecondary(level, 'megabox');
     }
   }
 

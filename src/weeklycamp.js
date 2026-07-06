@@ -54,9 +54,12 @@ export function sanitizeWeeklyCamp(wc, weekIndex) {
   if (!wc || typeof wc !== 'object') return freshCamp(weekIndex);
   const wk = Number.isFinite(wc.wk) ? Math.floor(wc.wk) : (Number.isFinite(weekIndex) ? Math.floor(weekIndex) : 0);
   const known = weeklyCampQuestById(wc.q);
+  // v300: невідомий id квесту (сейв з новішої версії) → чистий старт квесту тижня.
+  // Прогрес НЕ переносимо: p чужого квесту робив би підмінений миттєво «виконаним».
+  if (!known) return freshCamp(wk);
   return {
     wk,
-    q: known ? wc.q : weeklyCampQuestFor(wk).id,
+    q: wc.q,
     p: Number.isFinite(wc.p) ? Math.max(0, Math.floor(wc.p)) : 0,
     claimed: !!wc.claimed,
   };
@@ -72,7 +75,14 @@ export function ensureWeeklyCamp(save, weekIndex) {
   save.weeklyCamp = wc;
   const wk = Number.isFinite(weekIndex) ? Math.floor(weekIndex) : 0;
   if (wc.wk === wk) return wc;
-  if (wc.wk > wk) return wc; // годинник назад — фриз, без покарання
+  // v300: сейв «з майбутнього» більш ніж на тиждень (збитий годинник/чужий пристрій) —
+  // це сміття, а не фриз: без скидання табір мовчав би, поки реальний час не наздожене.
+  if (wc.wk > wk + 1) {
+    wc = freshCamp(wk);
+    save.weeklyCamp = wc;
+    return wc;
+  }
+  if (wc.wk > wk) return wc; // тиждень уперед у межах толерансу (часовий пояс) — фриз, без покарання
   // тиждень змінився вперед:
   const def = weeklyCampQuestById(wc.q);
   const doneUnclaimed = def && wc.p >= def.goal && !wc.claimed;

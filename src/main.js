@@ -91,7 +91,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 299;
+const APP_VERSION = 300;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -517,7 +517,8 @@ class Game {
       }
     };
     this.input.onLockChange = (locked) => {
-      if (!locked && this.state === 'level' && !this.shop.isOpen
+      // 🎁 v300: церемонія скрині сама відпускає lock (v295) — це НЕ вихід гравця, паузу не відкривати
+      if (!locked && this.state === 'level' && !this.shop.isOpen && !this._chestState
         && this.deathT < 0 && !this.victoryShown && !this.testMode
         && !document.getElementById('overlay-start').classList.contains('show')) {
         this.showPause();
@@ -3163,7 +3164,12 @@ class Game {
     level.bus.on('eliteWaveCleared', (pos) => {
       if (level.playground) return;
       if (level.net) {
-        if (level.net.authority) { level.netEv('ewc'); this._grantEliteChestCoop(); }
+        // v300 (PROTO 14): seq — щоб повторно доставлена пачка не кредитувала двічі
+        if (level.net.authority) {
+          level._chestEvSeq = (level._chestEvSeq || 0) + 1;
+          level.netEv('ewc', level._chestEvSeq);
+          this._grantEliteChestCoop();
+        }
         return;
       }
       const reward = 120;
@@ -3185,7 +3191,11 @@ class Game {
     level.bus.on('goldenChest', (pos) => {
       if (level.playground) return;
       if (level.net) {
-        if (level.net.authority) { level.netEv('gch'); this._grantGoldenChestCoop(); }
+        if (level.net.authority) {
+          level._chestEvSeq = (level._chestEvSeq || 0) + 1;
+          level.netEv('gch', level._chestEvSeq);
+          this._grantGoldenChestCoop();
+        }
         return;
       }
       const reward = 144;
@@ -3752,8 +3762,11 @@ class Game {
     // 🎁 v287: замість миттєвого банера — соковита церемонія скрині (нагороди ті самі)
     // 🤝 v294: у коопі церемонія морозила б лише когось одного / ковтала постріли — тому в коопі
     // повертаємо до-v287 неблокуючий банер (нагороди вже видані вище).
-    if (level && level.net) this.hud.banner(title, sub, 4.5);
-    else this.chestCeremony({ title, sub, items });
+    if (level && level.net) {
+      // v300: банер губив items — 💎-грант ішов мовчки (решта нагород уже описана в sub)
+      const extra = items.filter((it) => it.icon === '💎' && typeof it.n === 'number').map((it) => `${it.icon} +${it.n}`).join(' · ');
+      this.hud.banner(title, extra ? (sub ? `${sub} · ${extra}` : extra) : sub, 4.5);
+    } else this.chestCeremony({ title, sub, items });
     this.saveGame();
   }
 
@@ -3763,8 +3776,11 @@ class Game {
   chestCeremony({ title = t('🎁 СКРИНЯ!'), sub = '', items = [] } = {}) {
     const root = document.getElementById('chest-ceremony');
     if (!root) return;
-    // якщо попередня церемонія ще йде — миттєво закриваємо (черга не потрібна дітям)
-    if (this._chestState) this._closeChest();
+    // якщо попередня церемонія ще йде — миттєво закриваємо (черга не потрібна дітям).
+    // v300: relock успадковуємо від перерваної церемонії — document.pointerLockElement
+    // зараз null (lock уже відпущено), і без цього другий поспіль сундук губив мишу.
+    const prevRelock = !!(this._chestState && this._chestState.relock);
+    if (this._chestState) this._closeChest(true);
     this.audio.megabox(); // барабанний дріб + «тада!» (reuse наявного стінгера)
     const iconEl = root.querySelector('.chest-icon');
     const titleEl = root.querySelector('.chest-title');
@@ -3781,7 +3797,7 @@ class Game {
     this._chestState = state;
     // 🖱️ v295: pointer lock перехоплює ВСІ mouse-події на #chest-ceremony (клік миші не спрацьовував,
     // хоч тач і працював) — тож на час церемонії відпускаємо lock і повертаємо його по закриттю.
-    state.relock = !!document.pointerLockElement;
+    state.relock = prevRelock || !!document.pointerLockElement;
     this.input.exitLock();
     // ⌨️ v295: клавіатурний скіп (пробіл/ентер) — той самий обробник, що й клік по оверлею.
     state.onKey = (e) => {
@@ -3836,7 +3852,9 @@ class Game {
     };
   }
 
-  _closeChest() {
+  // skipRelock — виклик із chestCeremony(): наступна церемонія стартує одразу і сама
+  // вирішить долю lock'а (успадкований relock), тож проміжний request() лише заважає.
+  _closeChest(skipRelock = false) {
     const root = document.getElementById('chest-ceremony');
     let relock = false;
     if (this._chestState) {
@@ -3853,7 +3871,7 @@ class Game {
     if (cf) cf.innerHTML = '';
     // 🖱️ v295: повертаємо pointer lock, якщо його тримали до церемонії і гру не блокує щось інше
     // (пауза/перемога/магазин/драфт) — інакше нав'язали б захоплення миші поверх іншого UI.
-    if (relock && this.level && !this.paused && !this.victoryShown && !this.shop.isOpen && !this.draft.isOpen) this.input.request();
+    if (!skipRelock && relock && this.level && !this.paused && !this.victoryShown && !this.shop.isOpen && !this.draft.isOpen) this.input.request();
   }
 
   _spawnChestConfetti(root) {

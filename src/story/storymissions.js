@@ -219,7 +219,7 @@ export class StoryMissions {
     }
     const game = this.level.game;
     if (game && game.hud && typeof game.hud.banner === 'function') {
-      game.hud.banner(`📖 ${title}`, name && intro ? `${name}: ${intro}` : intro, 6);
+      game.hud.banner(`📖 ${title}`, name && intro ? `${name}: ${intro}` : intro, 6, { prio: 1 }); // v300: інтро глави перебиває банер країни (як до черги)
     } else {
       this.level.bus.emit('toast', `📖 ${title}`);
     }

@@ -67,9 +67,10 @@ export class HUD {
     this.ctx = this.el.minimap.getContext('2d');
     this.bannerT = 0;
     // 🪧 пріоритетна черга банерів (v299): поточний + черга; критичні (prio≥1) перебивають
-    this._bnCur = null;      // { title, sub, dur, prio }
+    this._bnCur = null;      // { title, sub, dur, prio, onShow?, onDrop? }
     this._bnElapsed = 0;     // скільки поточний уже показується
     this._bnQueue = [];
+    this._hintPending = new Set(); // 🎓 hintOnce-ключі, що чекають показу в черзі
     this.hitT = 0;
     this.vignetteT = 0;
     this.lastHealth = 100;
@@ -128,14 +129,24 @@ export class HUD {
   }
 
   // 🎓 Разова підказка-знайомство: ВЕЛИКИЙ банер РІВНО ОДИН раз назавжди (прапорець у save.hints).
+  // v300: прапорець пишемо лише коли банер РЕАЛЬНО показано (onShow) — інакше витіснення з
+  // черги чи clearBanners() спалювали б разову підказку назавжди, так і не показавши її.
+  // _hintPending тримає ключі, що вже стоять у черзі, щоб повторні виклики не дублювали банер.
   hintOnce(key, title, sub = '') {
     const save = this.game && this.game.save;
     if (!save || !save.hints) return;
     if (save.hints[key]) return;
+    if (this._hintPending.has(key)) return;
     if (this.game.level && this.game.level.playground) return;
-    save.hints[key] = 1;
-    if (this.game.saveGame) this.game.saveGame();
-    this.banner(title, sub, 4.5);
+    this._hintPending.add(key);
+    this.banner(title, sub, 4.5, {
+      onShow: () => {
+        this._hintPending.delete(key);
+        save.hints[key] = 1;
+        if (this.game.saveGame) this.game.saveGame();
+      },
+      onDrop: () => this._hintPending.delete(key),
+    });
   }
 
   // 🪧 Банер із пріоритетною чергою (v299). Сигнатура сумісна: усі наявні виклики
@@ -145,11 +156,13 @@ export class HUD {
   // низькопріоритетний). Мінімальний показ поточного — BANNER_MIN_SHOW.
   banner(title, sub = '', dur = 3.2, opts = {}) {
     const prio = (opts && opts.prio) | 0;
-    const item = { title, sub, dur, prio };
+    const item = { title, sub, dur, prio, onShow: opts && opts.onShow, onDrop: opts && opts.onDrop };
     if (!this._bnCur) { this._showBanner(item); return; }
-    if (prio >= 1 && prio > (this._bnCur.prio | 0)) {
+    // v300: рівний prio ТЕЖ перебиває — свіжіший телеграф (еліт-хвиля поверх «УВАГА!»)
+    // несе актуальнішу небезпеку; до черги (v298-) найновіший банер завжди вигравав.
+    if (prio >= 1 && prio >= (this._bnCur.prio | 0)) {
       this._bnQueue.unshift(this._bnCur); // витіснений — назад у чергу (у голову)
-      this._trimBannerQueue();
+      this._trimBannerQueue(1); // v300: щойно витіснений (індекс 0) не викидати — він недодивлений
       this._showBanner(item);
       return;
     }
@@ -165,13 +178,19 @@ export class HUD {
     this.el.bannerSub.textContent = item.sub;
     this.el.banner.classList.add('show');
     document.body.classList.add('banner-active');
+    if (item.onShow) { const fn = item.onShow; item.onShow = null; fn(); }
   }
 
-  _trimBannerQueue() {
+  // spareHead — не чіпати перші N елементів (щойно витіснений поточний банер)
+  _trimBannerQueue(spareHead = 0) {
     while (this._bnQueue.length > BANNER_QUEUE_MAX) {
-      let idx = this._bnQueue.findIndex((b) => (b.prio | 0) < 1); // найстаріший низькопріоритетний
-      if (idx < 0) idx = 0; // усі пріоритетні — викидаємо найстаріший
-      this._bnQueue.splice(idx, 1);
+      let idx = -1;
+      for (let i = spareHead; i < this._bnQueue.length; i++) {
+        if ((this._bnQueue[i].prio | 0) < 1) { idx = i; break; } // найстаріший низькопріоритетний
+      }
+      if (idx < 0) idx = Math.min(spareHead, this._bnQueue.length - 1); // усі пріоритетні
+      const [dropped] = this._bnQueue.splice(idx, 1);
+      if (dropped && dropped.onDrop) dropped.onDrop();
     }
   }
 
@@ -198,6 +217,7 @@ export class HUD {
 
   // 🧹 очистити чергу банерів (виклик з endLevel/зміни стану гри)
   clearBanners() {
+    for (const b of this._bnQueue) if (b.onDrop) b.onDrop(); // разові підказки не згорають
     this._bnQueue = [];
     this._bnCur = null;
     this._bnElapsed = 0;

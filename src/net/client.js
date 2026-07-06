@@ -217,6 +217,18 @@ export class GuestNet {
     }
   }
 
+  // v300: exactly-once для грантових подій скринь (ewc/gch). Хост шле seq — повторна
+  // доставка тієї самої пачки (reconnect) не має кредитувати нагороду двічі. seq без
+  // значення (старий формат/сміття) — пропускаємо грант як раніше, без дедуплікації.
+  _chestEvOnce(kind, seq) {
+    if (!Number.isFinite(seq)) return true;
+    if (!this._seenChestEv) this._seenChestEv = new Set();
+    const key = `${kind}:${seq}`;
+    if (this._seenChestEv.has(key)) return false;
+    this._seenChestEv.add(key);
+    return true;
+  }
+
   _applyEv(e) {
     const level = this.level;
     const game = this.game;
@@ -340,12 +352,14 @@ export class GuestNet {
       // отримує зірку окремою подією `spx`, а не через локальний тригер.
       case 'ew':
         level.audio.eliteWave();
-        game.hud.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4);
+        game.hud.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4, { prio: 1 }); // v300: телеграф як у соло
         break;
-      // хвилю зачищено → нагорода кожному локально (гроші/кристали/рол яйця + банер)
-      case 'ewc': game._grantEliteChestCoop(); break;
-      // золоту скриню взято → нагорода кожному локально
-      case 'gch': game._grantGoldenChestCoop(); break;
+      // хвилю зачищено → нагорода кожному локально (гроші/кристали/рол яйця + банер).
+      // v300 (PROTO 14): a[0] — seq від хоста; повторно доставлена пачка (reconnect,
+      // та сама небезпека, що в `lt`) не кредитує двічі.
+      case 'ewc': if (this._chestEvOnce('ewc', a[0])) game._grantEliteChestCoop(); break;
+      // золоту скриню взято → нагорода кожному локально (a[0] — seq, exactly-once)
+      case 'gch': if (this._chestEvOnce('gch', a[0])) game._grantGoldenChestCoop(); break;
       // 🌟 v297 «Сила разом»: хост заспавнив супер-пікап → малюємо дзеркальну зірку (лише візуал)
       case 'spx': game._spawnSuperMirror(a[0], a[1], a[2]); break;
       // 🌟 хост вирішив, хто схопив: despawn у всіх; активація сили в грабера, банер решті

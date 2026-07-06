@@ -68,6 +68,38 @@ const r4 = await page.evaluate(() => {
 });
 check(r4.cur === null && r4.qlen === 0 && !r4.shown, '4: clearBanners чистить усе', JSON.stringify(r4));
 
+// 5. v300: при витісненні prio-банером щойно витіснений НЕ викидається трімом (переповнення)
+const r5 = await page.evaluate(() => {
+  const h = window.__game.hud;
+  h.clearBanners();
+  h.banner('cur', '', 3.2);
+  h.banner('q1'); h.banner('q2'); h.banner('q3'); // черга повна (3)
+  h.banner('P', '', 3.2, { prio: 1 });            // перебиває: cur → у голову черги
+  return { cur: h._bnCur.title, titles: h._bnQueue.map((b) => b.title) };
+});
+check(r5.cur === 'P' && r5.titles[0] === 'cur', '5: витіснений банер уцілів у голові черги', JSON.stringify(r5));
+
+// 6. v300: hintOnce, викинутий із черги (clearBanners), НЕ спалює прапорець — покажеться пізніше
+const r6 = await page.evaluate(() => {
+  const h = window.__game.hud;
+  const g = window.__game;
+  delete g.save.hints.evtest;
+  h.clearBanners();
+  h.banner('busy', '', 3.2);              // зайнято → хінт піде в чергу
+  h.hintOnce('evtest', 'H', 'h');
+  const queued = { flag: g.save.hints.evtest || 0, qlen: h._bnQueue.length };
+  h.clearBanners();                        // хінт викинуто, так і не показавши
+  const cleared = { flag: g.save.hints.evtest || 0 };
+  h.hintOnce('evtest', 'H', 'h');          // вільно → показ одразу, прапорець пишеться
+  const shown = { flag: g.save.hints.evtest || 0, cur: h._bnCur && h._bnCur.title };
+  delete g.save.hints.evtest;
+  h.clearBanners();
+  return { queued, cleared, shown };
+});
+check(r6.queued.flag === 0 && r6.queued.qlen === 1, '6: хінт у черзі — прапорець ще не записано', JSON.stringify(r6.queued));
+check(r6.cleared.flag === 0, '6: викинутий хінт не спалив прапорець', JSON.stringify(r6.cleared));
+check(r6.shown.flag === 1 && r6.shown.cur === 'H', '6: наступна нагода — хінт показано і прапорець записано', JSON.stringify(r6.shown));
+
 check(errors.length === 0, 'без JS-помилок', errors.join(' | '));
 
 await browser.close();
