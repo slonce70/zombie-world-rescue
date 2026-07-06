@@ -149,25 +149,34 @@ function makeSuperPickupMesh() {
 }
 
 export class SuperPickup {
-  constructor(level, forceType = null) {
+  constructor(level, forceType = null, opts = {}) {
     this.level = level;
     this.t = 0;
     this.done = false;
     this.grabbed = false;
+    // 🤝 кооп: мережевий id (host-authoritative підбір) і прапор дзеркала гостя.
+    // У гостя зірка — лише візуал: підбір вирішує хост (див. _updateCoopSuper у main.js).
+    this.nid = opts.nid || null;
+    this.mirror = !!opts.mirror;
     // тип сили: forceType для тестів, інакше 50/50
     this.type = (forceType === 'shkval' || forceType === 'magnet')
       ? forceType
       : (Math.random() < 0.5 ? 'shkval' : 'magnet');
-    // позиція: ~10–15м від гравця, на прохідному ґрунті й не в місії/на дорозі
+    // позиція: ~10–15м від гравця, на прохідному ґрунті й не в місії/на дорозі.
+    // Кооп: якщо позицію задав хост (opts.x/z) — беремо її байт-у-байт (дзеркало/детермінізм).
     const world = level.world;
     const p = level.player;
     let x = p.pos.x + 12, z = p.pos.z;
-    for (let i = 0; i < 40; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = 10 + Math.random() * 5;
-      const tx = p.pos.x + Math.cos(a) * r;
-      const tz = p.pos.z + Math.sin(a) * r;
-      if (world._farFromSites(tx, tz, 6) && world.roadDist(tx, tz) > 2) { x = tx; z = tz; break; }
+    if (opts.x !== undefined && opts.z !== undefined) {
+      x = opts.x; z = opts.z;
+    } else {
+      for (let i = 0; i < 40; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = 10 + Math.random() * 5;
+        const tx = p.pos.x + Math.cos(a) * r;
+        const tz = p.pos.z + Math.sin(a) * r;
+        if (world._farFromSites(tx, tz, 6) && world.roadDist(tx, tz) > 2) { x = tx; z = tz; break; }
+      }
     }
     this.x = x; this.z = z;
     this.y = world.groundH(x, z);
@@ -186,8 +195,10 @@ export class SuperPickup {
     const ring = this.mesh.userData.ring;
     if (ring) { const s = 1 + Math.sin(this.t * 3) * 0.18; ring.scale.set(s, s, s); }
     if (this.beam) this.beam.update(dt);
+    // Соло: авто-підбір локального гравця. Кооп (level.net): підбір host-authoritative
+    // (хост перебирає ВСІХ живих гравців у _updateCoopSuper), тож локальний grab вимкнено.
     const p = this.level.player;
-    if (!this.grabbed && p.health > 0) {
+    if (!this.level.net && !this.grabbed && p.health > 0) {
       const d = Math.hypot(p.pos.x - this.x, p.pos.z - this.z);
       if (d < 3.4) this.grab();
     }

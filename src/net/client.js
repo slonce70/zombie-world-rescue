@@ -315,7 +315,8 @@ export class GuestNet {
       case 'twend': game._endTurretWarRun(!!a[0], a[1] || 'turret'); break;
       case 'arenaend': game._endArenaRun(); break;
       // 👹 v296 «Еліти разом»: телеграф елітної хвилі — той самий банер+стінгер, що в соло.
-      // Не емітимо eliteWaveWarning (він у соло-грі тягне _trySuperPickup — R2, ще не в коопі).
+      // Не емітимо eliteWaveWarning: тригери супер-пікапа живуть ЛИШЕ на хості (v297), гість
+      // отримує зірку окремою подією `spx`, а не через локальний тригер.
       case 'ew':
         level.audio.eliteWave();
         game.hud.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4);
@@ -324,6 +325,15 @@ export class GuestNet {
       case 'ewc': game._grantEliteChestCoop(); break;
       // золоту скриню взято → нагорода кожному локально
       case 'gch': game._grantGoldenChestCoop(); break;
+      // 🌟 v297 «Сила разом»: хост заспавнив супер-пікап → малюємо дзеркальну зірку (лише візуал)
+      case 'spx': game._spawnSuperMirror(a[0], a[1], a[2]); break;
+      // 🌟 хост вирішив, хто схопив: despawn у всіх; активація сили в грабера, банер решті
+      case 'spg': {
+        if (level.superPickup) { level.superPickup.remove(); level.superPickup = null; }
+        if (a[1] === me) game._activateSuperPower(level, a[2]); // мій pid — сила локально в мене
+        else game._superBannerFor(a[1], a[2]);                  // друг схопив — банер + стінгер
+        break;
+      }
       case 'hw': level.bus.emit('hordeWarning', 5); break;
       case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;
       case 'he': level.bus.emit('hordeEnd'); break;
@@ -392,6 +402,10 @@ export class GuestNet {
       this.game.makeGuestMegabox(w.megabox);
     }
     if (st.missions && level.missions.applyNetFull) level.missions.applyNetFull(st.missions);
+    // 🌟 v297: непідібраний супер-пікап (mid-join/реконект) → дзеркало. Активні сили — короткочасні,
+    // у стані НЕ синкаються: гравець, що приєднався посеред сили, її просто не побачить (за задумом).
+    if (st.spu) this.game._spawnSuperMirror(st.spu[0], st.spu[1], st.spu[2]);
+    else if (level.superPickup) { level.superPickup.remove(); level.superPickup = null; }
     this._ready = true;
     this.lastSnapAt = performance.now();
   }

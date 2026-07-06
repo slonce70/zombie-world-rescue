@@ -88,7 +88,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 296;
+const APP_VERSION = 297;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2916,8 +2916,9 @@ class Game {
       if (useStory && countryId === 'EGY' && !isInfected) level.sandstorm = new Sandstorm(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!coop && !isPlayground) level.runBuild = new RunBuild();
-      // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень лише у соло-кампанії
-      if (!coop && !isPlayground) level.superEligible = true;
+      // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень у соло-кампанії ТА кооп-кампанії.
+      // v297 «Сила разом»: рішення про спавн приймає ХОСТ (гість малює дзеркало по `spx`).
+      if ((!coop || coop.role === 'host') && !isPlayground) level.superEligible = true;
       // ⭐ R3 «Зірки та милосердя»: лише СОЛО-забіг країни кампанії (не інфекція/кооп/полігон).
       if (!coop && !isPlayground && !isInfected && CAMPAIGN_ORDER.includes(countryId)) {
         // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип)
@@ -2935,6 +2936,9 @@ class Game {
     level.superPickup = null;
     level.superSpawned = false;
     level.superMissions = 0;
+    // 🌟 кооп-хост: активні супер-сили гостей (pid→{power,ttl}) — джерело істини для
+    // магніт-бурі у хостовому лут-циклі (getPickupTargets). Тикається у _updateCoopSuper.
+    level.superActive = new Map();
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
@@ -3229,7 +3233,8 @@ class Game {
     // 🌟 схопив супер-пікап → активація сили зі слоу-мо, банером і стінгером
     level.bus.on('superPickupGrabbed', (type) => this._activateSuperPower(level, type));
     level.bus.on('superPowerEnd', () => {
-      if (level.net) return;
+      // superPower має ЛИШЕ той, хто взяв силу (соло-гравець або кооп-грабер) — тож у коопі
+      // ця подія б'є тільки в нього. Кінець сили відчуває саме він, як у соло.
       this.audio.superEnd();
       this.hud.toast(t('Суперсила скінчилась'));
     });
@@ -3316,6 +3321,11 @@ class Game {
             out.push({
               pos: pl.pos,
               magnet: pl.pid === 1 ? level.player.buffs.magnet > 0 : !!pl.magnet,
+              // 🌟 «Магніт-буря» в коопі: монети тягне ∞-радіусом ЛИШЕ гравцю з активною
+              // силою «магніт». pid 1 (хост) — свій player.superPower; гості — мапа superActive.
+              superMagnet: pl.pid === 1
+                ? !!(level.player.superPower && level.player.superPower.type === 'magnet')
+                : ((level.superActive && level.superActive.get(pl.pid) || {}).power === 'magnet'),
               pid: pl.pid,
               // pid 1 — снапшот у player.pickupMult (заморожено на старті); гості — роль з ростера
               pickMult: pl.pid === 1 ? (level.player.pickupMult || 1) : (remoteScout ? 1.25 : 1),
@@ -3497,19 +3507,85 @@ class Game {
     }
   }
 
-  // 🌟 «момент могутності» (v288): спавн супер-пікапа 1×/соло-рівень.
-  // Тригер — перше з: 2-га здана місія АБО старт елітної хвилі. Гарантовано соло.
+  // 🌟 «момент могутності» (v288): спавн супер-пікапа 1×/рівень.
+  // Тригер — перше з: 2-га здана місія АБО старт елітної хвилі.
+  // v297 «Сила разом»: у коопі спавнить ЛИШЕ хост (authority) — гість малює дзеркало по `spx`.
   _trySuperPickup(level) {
-    if (!level || level.net || !level.superEligible) return;
+    if (!level || (level.net && !level.net.authority) || !level.superEligible) return;
     if (level.superSpawned || level.superPickup) return;
     if (level.player.health <= 0) return;
     level.superSpawned = true;
-    level.superPickup = new SuperPickup(level, this._forceSuperPower || null);
+    const nid = (level.net && level.net.authority) ? level.net.allocId() : null;
+    level.superPickup = new SuperPickup(level, this._forceSuperPower || null, nid ? { nid } : {});
+    // кооп-хост: телеграф гостям — дзеркальна зірка (позиція від хоста; тип лишається у хоста,
+    // бо підбір host-authoritative — гість дізнається силу лише при `spg`).
+    if (nid) {
+      const sp = level.superPickup;
+      level.netEv('spx', nid, Math.round(sp.x * 10) / 10, Math.round(sp.z * 10) / 10);
+    }
   }
 
-  // 🌟 активація сили: слоу-мо 0.5с (reuse hitstop), золотий спалах, банер, стінгер
+  // 🌟 кооп-дзеркало супер-пікапа в гостя (події `spx` / state-синк mid-join). Лише візуал.
+  _spawnSuperMirror(nid, x, z) {
+    const level = this.level;
+    if (!level) return;
+    if (level.superPickup) { level.superPickup.remove(); level.superPickup = null; }
+    level.superPickup = new SuperPickup(level, null, { nid, x, z, mirror: true });
+    level.superSpawned = true;
+  }
+
+  // 🌟 кооп-тік host-authority: підбір зірки будь-яким живим гравцем + згасання сил гостей.
+  _updateCoopSuper(level, dt) {
+    const net = level.net;
+    if (!net || !net.authority) return;
+    // згасання активних сил гостей (ttl для магніт-бурі у getPickupTargets)
+    if (level.superActive) {
+      for (const [pid, s] of level.superActive) {
+        s.t -= dt;
+        if (s.t <= 0) level.superActive.delete(pid);
+      }
+    }
+    const sp = level.superPickup;
+    if (!sp || sp.done || !sp.nid) return;
+    // перший живий гравець у радіусі бере зірку (радіус трохи щедріший за соло — лаг гостей)
+    for (const pl of level.players || []) {
+      if (pl.health <= 0) continue;
+      if (Math.hypot(pl.pos.x - sp.x, pl.pos.z - sp.z) < 3.6) {
+        this._grantSuperCoop(level, pl.pid, sp);
+        break;
+      }
+    }
+  }
+
+  // 🌟 кооп-хост роздає силу: despawn у всіх, активація в грабера, банер решті.
+  _grantSuperCoop(level, pid, sp) {
+    const power = sp.type;
+    const nid = sp.nid;
+    sp.remove();
+    level.superPickup = null;
+    level.netEv('spg', nid, pid, power); // гостям: активація у грабера, банер решті
+    const DUR = { shkval: 12, magnet: 15 };
+    // силу гостя хост тримає в мапі (магніт-буря в лут-циклі + знання про Шквал гостя).
+    // Свою (pid 1) не пишемо — читаємо player.superPower напряму (див. getPickupTargets).
+    if (pid !== 1 && level.superActive) level.superActive.set(pid, { power, t: DUR[power] || 12 });
+    if (pid === 1) this._activateSuperPower(level, power); // хост схопив сам → локальна активація
+    else this._superBannerFor(pid, power);                 // друг схопив → у хоста лише банер
+  }
+
+  // 🌟 банер «друг схопив силу» + короткий стінгер (реюз звуку супера) — у всіх, крім грабера.
+  _superBannerFor(pid, power) {
+    const roster = this.coop && this.coop.session && this.coop.session.roster;
+    const r = roster && roster.get(pid);
+    const nick = (r && r.nick) || t('Друг');
+    const label = power === 'shkval' ? t('🔥 ШКВАЛ') : t('🧲 МАГНІТ-БУРЯ');
+    this.hud.banner(t('⭐ {n} схопив {p}!', { n: nick, p: label }), t('Сила разом! 💪'), 3.2);
+    this.audio.superStart(power);
+  }
+
+  // 🌟 активація сили: слоу-мо 0.5с (reuse hitstop), золотий спалах, банер, стінгер.
+  // Соло — через bus 'superPickupGrabbed'; кооп — прямий виклик у грабера (`spg`/хост-підбір).
+  // Спрацьовує ЛИШЕ в того, хто взяв: слоу-мо/спалах/чип відліку бачить тільки він.
   _activateSuperPower(level, type) {
-    if (level.net) return;
     const DUR = { shkval: 12, magnet: 15 };
     const dur = DUR[type] || 12;
     level.player.superPower = { type, t: dur, dur };
@@ -5305,6 +5381,8 @@ class Game {
         if (this.level.superPickup && !this.level.superPickup.done) {
           this.level.superPickup.update(simDt);
         }
+        // 🌟 кооп: host-authoritative підбір зірки + згасання сил гостей (у гостя — no-op)
+        if (this.level.net) this._updateCoopSuper(this.level, simDt);
         if (!this.level.noGadgets || this.level.modeShield) this.level.gadgets.update(simDt, this.input, allowControl);
         if (this.level.net) this._updateRevive(simDt, allowControl);
         if (this.level.pet) this.level.pet.update(simDt);
