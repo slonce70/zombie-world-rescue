@@ -507,6 +507,66 @@ export class Zombies {
     return z_;
   }
 
+  // 👹 Елітна хвиля (v287, solo-only): 2–4 еліти навколо гравця (золотий виключений —
+  // він амбієнтний). Не позначаємо horde:true (щоб не плутати лічильник орди) — трек окремо.
+  // По зачистці всіх еліт падає скриня на позиції останнього (подія eliteWaveCleared).
+  spawnEliteWave(n) {
+    if (this.level.net) return []; // еліт-хвиля лише у соло
+    const player = this.level.player;
+    const count = Math.max(2, Math.min(4, n || (2 + Math.floor(this.rng.next() * 3))));
+    const types = ['shield', 'splitter', 'exploder'];
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      const a = this.rng.next() * Math.PI * 2;
+      const r = this.rng.range(30, 44);
+      let x = player.pos.x + Math.cos(a) * r;
+      let z = player.pos.z + Math.sin(a) * r;
+      const dB = Math.hypot(x, z);
+      if (dB > this.L.BOUND - 6) { x *= (this.L.BOUND - 8) / dB; z *= (this.L.BOUND - 8) / dB; }
+      const type = types[Math.floor(this.rng.next() * types.length)];
+      const z_ = this.spawn(type, x, z, { elite: true });
+      z_.aggroed = true;
+      z_.state = 'chase';
+      z_.eliteWave = true;
+      list.push(z_);
+    }
+    this._eliteWave = { list, done: false, lastAlive: list[list.length - 1] };
+    this.level.bus.emit('eliteWaveStart', count);
+    return list;
+  }
+
+  // Скриня по зачистці елітної хвилі — на позиції останнього живого еліта.
+  _updateEliteWave() {
+    const ew = this._eliteWave;
+    if (!ew || ew.done) return;
+    const alive = ew.list.filter((z) => z.state !== 'dead' && !z.gone);
+    if (alive.length > 0) { ew.lastAlive = alive[alive.length - 1]; return; }
+    ew.done = true;
+    const last = ew.lastAlive || ew.list[ew.list.length - 1];
+    const pos = last ? { x: last.x, z: last.z, y: last.y } : { x: this.level.player.pos.x, z: this.level.player.pos.z, y: 0 };
+    this.level.bus.emit('eliteWaveCleared', pos);
+  }
+
+  // 👑 Амбієнтний золотий (v287): рідкісний, ~1 раз/рівень. Лише соло-кампанія (не кімнатні
+  // режими, не карти, де золотий уже спавниться в populate) — щоб не було двох на рівень.
+  _updateAmbientGolden(dt) {
+    const level = this.level;
+    if (level.net) return;
+    if (level.knockout || level.defense || level.pvp || level.bank || level.portal
+      || level.maze || level.humans || level.soulCollector || level.turretwar
+      || level.radiation || level.worldBoss || level.bossRush || level.storm) return;
+    const mapGolden = level.country && level.country.map && level.country.map.fun && level.country.map.fun.goldenZombie;
+    if (mapGolden) return; // такі карти вже мають золотого з populate()
+    if (this._ambientGoldenDone) return;
+    if (this._ambientGoldenT === undefined) this._ambientGoldenT = this.rng.range(45, 90);
+    this._ambientGoldenT -= dt;
+    if (this._ambientGoldenT <= 0) {
+      this._ambientGoldenDone = true;
+      this.spawnGolden();
+      level.bus.emit('toast', t('✨ Десь блукає ЗОЛОТИЙ зомбі! Дожени — гарантована скриня!'));
+    }
+  }
+
   countAliveInZone(zone) {
     return this.list.filter((z) => z.zone === zone && z.state !== 'dead').length;
   }
@@ -944,6 +1004,9 @@ export class Zombies {
 
     // спавн орди хвилями
     this._updateHordeWaves(dt, players, player);
+    // 👹 елітна хвиля: скриня по зачистці; 👑 амбієнтний золотий (обидва solo-only)
+    this._updateEliteWave();
+    this._updateAmbientGolden(dt);
 
     // 🧛 нічний спавнер вампірів + 🔥 урон горіння на сонці — обидва host/solo-only (вже ПІСЛЯ mirror-гарду).
     this._spawnNightVampires(dt, players);

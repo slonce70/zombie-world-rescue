@@ -1,0 +1,123 @@
+// 👹 Елітна хвиля (v287): кожна ~3-тя орда у СОЛО — банер «⚠️ Елітна хвиля!» за 3с +
+// стінгер, 2–4 еліти; по зачистці падає скриня. 🎁 Церемонія скрині: DOM-оверлей
+// зʼявляється й видає нагороду. Reuse для мегабокса й подарунка дня — теж церемонія.
+import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
+
+const { base: BASE, close: closeServer } = await ensureWebServer();
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+let failed = 0;
+const errors = [];
+const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+
+await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
+
+console.log('▸ Кожна ~3-тя орда у соло — елітна хвиля (банер + стінгер)');
+const sched = await page.evaluate(() => {
+  const g = window.__game; const mp = g.level.missions;
+  const warns = [];
+  // читаємо банер У МОМЕНТ попередження (HUD-хендлер спрацьовує на тому ж emit раніше за нас)
+  g.level.bus.on('eliteWaveWarning', () => warns.push(document.getElementById('banner-title').textContent));
+  const active = mp.missions.filter((m) => m.state === 'active').slice(0, 3);
+  const seq = [];
+  for (const m of active) {
+    mp.pendingHorde = null;         // кожна нова орда — «свіжа» (у грі вони рознесені у часі)
+    const before = warns.length;
+    mp._complete(m.id);
+    seq.push({ elite: !!(mp.pendingHorde && mp.pendingHorde.elite), warned: warns.length > before, t: mp.pendingHorde ? mp.pendingHorde.t : null });
+  }
+  return { seq, bannerTitle: warns[warns.length - 1] || '' };
+});
+check(sched.seq.length === 3, 'зіграно 3 орди', JSON.stringify(sched.seq.map((s) => s.elite)));
+check(!sched.seq[0].elite && !sched.seq[1].elite, '1-ша й 2-га орди — звичайні', JSON.stringify(sched.seq));
+check(sched.seq[2].elite === true, '3-тя орда — ЕЛІТНА', JSON.stringify(sched.seq[2]));
+check(sched.seq[2].warned === true && sched.seq[2].t === 3, 'еліт-банер за 3с (pendingHorde.t=3)', JSON.stringify(sched.seq[2]));
+check(sched.bannerTitle.includes('Елітна хвиля'), 'HUD показує банер «Елітна хвиля»', sched.bannerTitle);
+
+console.log('▸ spawnEliteWave: 2–4 еліти, golden виключений');
+const spawn = await page.evaluate(() => {
+  const g = window.__game; const Z = g.level.zombies;
+  for (const z of Z.list) { z.gone = true; Z.scene.remove(z.rig.group); Z.byNidMap.delete(z.nid); }
+  Z.list = [];
+  const list = Z.spawnEliteWave();
+  return {
+    count: list.length,
+    allElite: list.every((z) => z.elite === true),
+    types: list.map((z) => z.type),
+    noGolden: list.every((z) => !z.golden),
+    aggro: list.every((z) => z.aggroed && z.state === 'chase'),
+  };
+});
+check(spawn.count >= 2 && spawn.count <= 4, 'спавнилось 2–4 еліти', String(spawn.count));
+check(spawn.allElite, 'усі позначені як elite (аура+іконка)', JSON.stringify(spawn.types));
+check(spawn.noGolden && spawn.types.every((t) => ['shield', 'splitter', 'exploder'].includes(t)), 'типи з пулу хвилі, без golden', JSON.stringify(spawn.types));
+check(spawn.aggro, 'еліти одразу біжать на гравця', String(spawn.aggro));
+
+console.log('▸ Зачистка хвилі → церемонія скрині + нагорода');
+const cleared = await page.evaluate(() => {
+  const g = window.__game; const Z = g.level.zombies;
+  // ізолюємо: лишаємо тільки еліт-хвилю
+  for (const z of Z.list) { z.gone = true; Z.scene.remove(z.rig.group); Z.byNidMap.delete(z.nid); }
+  Z.list = [];
+  const list = Z.spawnEliteWave();
+  let evt = null;
+  g.level.bus.on('eliteWaveCleared', (p) => { evt = p; });
+  const coins0 = g.save.coins;
+  const cry0 = g.save.crystals || 0;
+  // вбиваємо всіх еліт (гасимо щити, щоб напевно дійшло до тіла)
+  for (const z of list) { z.shieldHp = 0; z.damage(999999, { x: 1, z: 0 }, false); }
+  Z.update(0.1); // детект зачистки
+  const root = document.getElementById('chest-ceremony');
+  return {
+    evtFired: !!evt,
+    shown: root.classList.contains('show'),
+    coinsUp: g.save.coins - coins0,
+    cryUp: (g.save.crystals || 0) - cry0,
+  };
+});
+check(cleared.evtFired, 'подія eliteWaveCleared спрацювала', String(cleared.evtFired));
+check(cleared.shown, '🎁 церемонія скрині зʼявилась (overlay show)', String(cleared.shown));
+check(cleared.coinsUp >= 120 && cleared.cryUp >= 3, 'нагорода видана (монети + кристали)', JSON.stringify({ c: cleared.coinsUp, cr: cleared.cryUp }));
+
+console.log('▸ Церемонія reuse: подарунок дня видає через скриню');
+const gift = await page.evaluate(() => {
+  const g = window.__game;
+  g._closeChest && g._closeChest();
+  // форсимо доступний подарунок
+  g.gift.claim(); // спорожнити, якщо був
+  g.save.giftClaimedDay = -1;
+  const before = document.getElementById('chest-ceremony').classList.contains('show');
+  let ok = false;
+  try {
+    g.chestCeremony({ title: '🎁 ТЕСТ', items: [{ icon: '🪙', n: 50 }, { icon: '💎', n: 5 }] });
+    ok = document.getElementById('chest-ceremony').classList.contains('show');
+  } catch (e) { /* ignore */ }
+  const items = document.querySelectorAll('#chest-ceremony .chest-item').length;
+  g._closeChest();
+  return { before, ok, items };
+});
+check(gift.ok, 'chestCeremony() reusable — overlay показується', String(gift.ok));
+
+console.log('▸ Мегабокс тепер теж через церемонію (openMegaboxReward)');
+const mega = await page.evaluate(() => {
+  const g = window.__game;
+  g._closeChest && g._closeChest();
+  g._megaForce = 0.5; // фонтан монет
+  const c0 = g.save.coins;
+  g.openMegaboxReward(g.level.player.pos.x, g.level.player.pos.z);
+  const shown = document.getElementById('chest-ceremony').classList.contains('show');
+  g._closeChest();
+  return { shown };
+});
+check(mega.shown, 'openMegaboxReward → церемонія скрині', String(mega.shown));
+
+console.log('');
+if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
+console.log(failed === 0 ? '🎉 ЕЛІТНА ХВИЛЯ + СКРИНЯ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
+await browser.close();
+closeServer();
+process.exit(failed === 0 ? 0 : 1);
