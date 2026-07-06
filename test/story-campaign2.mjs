@@ -109,7 +109,7 @@ for (const [cid, exp] of Object.entries(EXPECTED_STORY_SHAPE)) {
 // 🗺️ storySites: кожна ціль і НПС мають точку на карті своєї країни
 const MAP_BY_COUNTRY = {
   DEU: 'germany', FRA: 'france', ESP: 'spain', PRT: 'portugal', ITA: 'italy',
-  TUR: 'turkey', SWE: 'poland', JPN: 'japan', CHN: 'china',
+  TUR: 'turkey', SWE: 'sweden', JPN: 'japan', CHN: 'china',
 };
 for (const [cid, mapName] of Object.entries(MAP_BY_COUNTRY)) {
   const map = await loadMapModule(mapName);

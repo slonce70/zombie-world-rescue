@@ -21,6 +21,7 @@ import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS, SuperPickup } from './extras.js';
 import { StormMode } from './storm.js';
+import { Sandstorm } from './sandstorm.js';
 import { BossRush } from './bossrush.js';
 import {
   KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE,
@@ -87,7 +88,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 292;
+const APP_VERSION = 293;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2722,6 +2723,7 @@ class Game {
      *   maze     — тільки в режимі Лабіринт; інакше — undefined.
      *   humans   — тільки в режимі Зомбі проти людей; інакше — undefined.
      *   worldBoss — тільки в режимі Світового боса; інакше — undefined.
+     *   sandstorm — тільки соло-кампанія EGY (піщана буря); інакше — null/undefined.
      *   radiation — тільки в режимі Радіація; інакше — undefined.
      *   megabox  — null для гостя (isGuest) або арени (isArena); інакше new Megabox(...).
      *
@@ -2906,6 +2908,12 @@ class Game {
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
       if (useStory) level.rescueCage = new HiddenRescue(level);
+      // 🌪️ Фірмовий хазард Єгипту (v293): піщана буря ЛИШЕ у соло-кампанії EGY.
+      // useStory ⇒ campaign + !guest + !coop + !playground; додатково виключаємо
+      // інфекцію (Глава 2). Кооп/спецрежими/PROTO лишаються без бурі (синк погоди
+      // хостом поза скоупом).
+      level.sandstorm = null;
+      if (useStory && countryId === 'EGY' && !isInfected) level.sandstorm = new Sandstorm(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!coop && !isPlayground) level.runBuild = new RunBuild();
       // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень лише у соло-кампанії
@@ -5237,6 +5245,8 @@ class Game {
         this.level.effects.update(simDt);
         this.level.stats.time += timerDt;
         this._updateDayNight();
+        // 🌪️ піщана буря Єгипту: оверлей туману лягає ПІСЛЯ нічного перерахунку
+        if (this.level.sandstorm) this.level.sandstorm.update(simDt);
         // комбо згасає разом із симуляцією: freeze-frame не краде серію
         if (this.level.combo.t > 0) {
           this.level.combo.t -= simDt;
@@ -5534,6 +5544,9 @@ class Game {
       },
       dismountScooter: () => g.level.vehicles.dismount(),
       startStorm: (c) => g.startStorm(c),
+      // 🌪️ піщана буря EGY: форс-старт + інтроспекція стану для тестів
+      startSandstorm: () => (g.level && g.level.sandstorm ? g.level.sandstorm.forceStart() : false),
+      sandstormState: () => (g.level && g.level.sandstorm ? g.level.sandstorm.state() : null),
       startArena: () => g.startArena(),
       startKnockout: () => g.startKnockout(),
       startOverloadedKnockout: () => {

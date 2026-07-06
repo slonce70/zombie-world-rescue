@@ -218,6 +218,10 @@ export class HUD {
       const sIcon = p.superPower.type === 'shkval' ? '🔥' : '🧲';
       buffHtml += `<div class="buff buff-super"><span class="buff-icon">${sIcon}</span><span class="buff-t">${Math.ceil(p.superPower.t)}</span></div>`;
     }
+    // 🌪️ піщана буря Єгипту — чип із відліком, поки буря активна
+    if (level && level.sandstorm && level.sandstorm.active) {
+      buffHtml += `<div class="buff buff-super"><span class="buff-icon">🌪️</span><span class="buff-t">${Math.ceil(level.sandstorm.t)}</span></div>`;
+    }
     if (this._lastBuffHtml !== buffHtml) {
       this.el.buffs.innerHTML = buffHtml;
       this._lastBuffHtml = buffHtml;
