@@ -142,6 +142,20 @@ check(Math.abs(freeze.tFrozen - freeze.t0) < 1e-6, 'час рівня НЕ ру�
 check(freeze.movedFrozen < 1e-3, 'зомбі СТОЇТЬ доки церемонія відкрита (сим заморожено)', String(freeze.movedFrozen));
 check(freeze.tAfter > freeze.tFrozen + 0.5 && freeze.movedAfter > 0.1, 'після закриття сим знову йде (час тикає, зомбі рушив)', JSON.stringify(freeze));
 
+console.log('▸ v295: клавіатурний скіп церемонії (пробіл) працює без миші/pointer lock');
+const kbSkip = await page.evaluate(() => {
+  const g = window.__game;
+  g._closeChest && g._closeChest();
+  g.chestCeremony({ title: '🎁 ТЕСТ', items: [{ icon: '🪙', n: 5 }] });
+  const root = document.getElementById('chest-ceremony');
+  const shown = root.classList.contains('show');
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })); // 1-ше: burst/скіп анімації
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })); // 2-ге: закриття
+  return { shown, closed: !root.classList.contains('show'), stateGone: !g._chestState };
+});
+check(kbSkip.shown, 'церемонія показалась перед клавіатурним скіпом', String(kbSkip.shown));
+check(kbSkip.closed && kbSkip.stateGone, 'подвійний Space пропускає й закриває церемонію', JSON.stringify(kbSkip));
+
 console.log('▸ v294: у коопі openMegaboxReward показує БАНЕР, не блокуючу церемонію');
 const coopMega = await page.evaluate(() => {
   const g = window.__game;

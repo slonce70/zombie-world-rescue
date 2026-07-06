@@ -88,7 +88,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 294;
+const APP_VERSION = 295;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3587,6 +3587,18 @@ class Game {
     root.setAttribute('aria-hidden', 'false');
     const state = { timers: [], busted: false };
     this._chestState = state;
+    // 🖱️ v295: pointer lock перехоплює ВСІ mouse-події на #chest-ceremony (клік миші не спрацьовував,
+    // хоч тач і працював) — тож на час церемонії відпускаємо lock і повертаємо його по закриттю.
+    state.relock = !!document.pointerLockElement;
+    this.input.exitLock();
+    // ⌨️ v295: клавіатурний скіп (пробіл/ентер) — той самий обробник, що й клік по оверлею.
+    state.onKey = (e) => {
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') {
+        e.preventDefault();
+        if (root.onclick) root.onclick();
+      }
+    };
+    window.addEventListener('keydown', state.onKey);
     const T = (fn, ms) => { const id = setTimeout(fn, this.testMode ? 0 : ms); state.timers.push(id); return id; };
     const revealItem = (it) => {
       const chip = document.createElement('div');
@@ -3634,13 +3646,22 @@ class Game {
 
   _closeChest() {
     const root = document.getElementById('chest-ceremony');
-    if (this._chestState) { this._chestState.timers.forEach(clearTimeout); this._chestState = null; }
+    let relock = false;
+    if (this._chestState) {
+      this._chestState.timers.forEach(clearTimeout);
+      if (this._chestState.onKey) window.removeEventListener('keydown', this._chestState.onKey);
+      relock = !!this._chestState.relock;
+      this._chestState = null;
+    }
     if (!root) return;
     root.classList.remove('show', 'shaking', 'burst');
     root.setAttribute('aria-hidden', 'true');
     root.onclick = null;
     const cf = root.querySelector('.chest-confetti');
     if (cf) cf.innerHTML = '';
+    // 🖱️ v295: повертаємо pointer lock, якщо його тримали до церемонії і гру не блокує щось інше
+    // (пауза/перемога/магазин/драфт) — інакше нав'язали б захоплення миші поверх іншого UI.
+    if (relock && this.level && !this.paused && !this.victoryShown && !this.shop.isOpen && !this.draft.isOpen) this.input.request();
   }
 
   _spawnChestConfetti(root) {
