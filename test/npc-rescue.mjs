@@ -97,6 +97,40 @@ st = await page.evaluate(async () => {
 });
 check(st.cageUndefined && st.kind === 'DynamicMissions', 'не-сторі рівень (LOST) → клітки нема (гейт useStory)', JSON.stringify(st));
 
+// 7) 🤝 v294: промінь-вейпоінт МУСИТЬ зникнути після порятунку. makeBeam() повертає ХЕНДЛ
+//    {group, remove()}, а не Object3D — старий scene.remove(handle) був silent no-op і промінь
+//    світився над порожньою кліткою весь рівень. Тепер _rescue() кличе this.beam.remove().
+st = await page.evaluate(async () => {
+  window.__game.endLevel();
+  window.__game.save.friends = {};
+  await window.__game.startLevel('UKR');
+  const g = window.__game;
+  const c = g.level.rescueCage;
+  const scene = g.level.scene;
+  // створюємо промінь (як у грі — після зачистки основних місій, гравець далеко)
+  c.guards.forEach((z) => z.damage && z.damage(99999, null, false));
+  g.level.missions.bossUnlocked = true;
+  g.test.teleport(c.cageX + 120, c.cageZ + 120);
+  c.update(0.1, { down: () => false }, true); // → beam створено
+  const beamMade = !!c.beam;
+  const beamGroup = c.beam ? c.beam.group : null;
+  const inSceneBefore = beamGroup ? scene.children.includes(beamGroup) : false;
+  // рятуємо друга (підходимо + тримаємо взаємодію)
+  g.test.teleport(c.cageX, c.cageZ);
+  const fake = { down: () => true };
+  for (let i = 0; i < 40; i++) c.update(0.1, fake, true);
+  return {
+    beamMade, inSceneBefore,
+    rescued: c.rescued,
+    beamNulled: c.beam === null,
+    inSceneAfter: beamGroup ? scene.children.includes(beamGroup) : false,
+    groupParentNull: beamGroup ? beamGroup.parent === null : false,
+  };
+});
+check(st.beamMade && st.inSceneBefore, 'промінь створено й доданий у сцену перед порятунком', JSON.stringify(st));
+check(st.rescued && st.beamNulled, 'після порятунку c.beam === null (remove() викликано)', JSON.stringify(st));
+check(!st.inSceneAfter && st.groupParentNull, 'group променя ЗНИКЛА зі сцени (не silent no-op)', JSON.stringify(st));
+
 check(errors.length === 0, `без JS-помилок (${errors.slice(0, 2).join(' | ')})`);
 console.log(failed === 0 ? '🎉 NPC-RESCUE OK' : `❌ ПРОВАЛЕНО: ${failed}`);
 await browser.close();

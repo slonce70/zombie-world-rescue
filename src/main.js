@@ -3427,11 +3427,11 @@ class Game {
     const meta = PETS[res.petId];
     if (res.duplicate) {
       this.chestCeremony({
-        title: t('🥚 З ЯЙЦЯ!'), sub: t('{i} {n} вже з тобою — це корм!', { i: meta.icon, n: meta.name() }),
+        title: t('🥚 З ЯЙЦЯ!'), sub: t('{i} {n} вже з тобою — це корм!', { i: meta.icon, n: meta.name }),
         items: [{ icon: '🍖', label: t('Корм ×{n}', { n: res.food }) }],
       });
     } else {
-      this.chestCeremony({ title: t('🥚 НОВИЙ ПЕТС!'), sub: meta.name(), items: [{ icon: meta.icon, label: meta.name() }] });
+      this.chestCeremony({ title: t('🥚 НОВИЙ ПЕТС!'), sub: meta.name, items: [{ icon: meta.icon, label: meta.name }] });
     }
     this.saveGame();
     this.renderAlbum();
@@ -3442,7 +3442,7 @@ class Game {
     const lv = feedPet(this.save, id);
     if (!lv) { this.audio.denied(); return; }
     this.audio.purchase();
-    this.hud.toast(t('🍖 {n} виріс до Рівня {lv}!', { n: PETS[id].name(), lv }));
+    this.hud.toast(t('🍖 {n} виріс до Рівня {lv}!', { n: PETS[id].name, lv }));
     if (this.save.activePet === id) this.spawnPet(); // перестворюємо для нового масштабу/іскор
     this.saveGame();
     this.renderAlbum();
@@ -3558,7 +3558,10 @@ class Game {
       }
     }
     // 🎁 v287: замість миттєвого банера — соковита церемонія скрині (нагороди ті самі)
-    this.chestCeremony({ title, sub, items });
+    // 🤝 v294: у коопі церемонія морозила б лише когось одного / ковтала постріли — тому в коопі
+    // повертаємо до-v287 неблокуючий банер (нагороди вже видані вище).
+    if (level && level.net) this.hud.banner(title, sub, 4.5);
+    else this.chestCeremony({ title, sub, items });
     this.saveGame();
   }
 
@@ -3704,6 +3707,8 @@ class Game {
       // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
       if (this.level.worldBoss && this.level.worldBoss.dispose) this.level.worldBoss.dispose();
       if (this.level.rescueCage && this.level.rescueCage.dispose) this.level.rescueCage.dispose();
+      // 🌪️ буря чіпає сесійно-кешований coinMat — форс-відновлюємо, поки рівень цілий (до обходу сцени)
+      if (this.level.sandstorm && this.level.sandstorm.dispose) this.level.sandstorm.dispose();
       if (this.level.effects && this.level.effects.dispose) this.level.effects.dispose();
       // звільняємо ресурси сцени — але НЕ спільні кешовані (matCache/geoCache/gradMap/bakedMat
       // із characters.js): вони живуть на весь сеанс і переюзаються наступними рівнями.
@@ -4987,8 +4992,11 @@ class Game {
     }
     if (infectedFirstWin) this._grantInfectedWin(country.id, s);
     // ⭐ R3 «Зірки та милосердя»: нараховуємо зірки за перемогу (solo-only, лише країни кампанії).
-    // Кооп/інфекція/LAB/LOST зірок НЕ дають. Пороги-нагороди — всередині _awardStars.
-    const starInfo = (!this.level.net && CAMPAIGN_ORDER.includes(country.id)) ? this._awardStars(country.id, s) : null;
+    // Кооп/інфекція/LAB/LOST зірок НЕ дають. level.secondaryObjective виставляється РІВНО для
+    // зіркового забігу (соло, кампанія, story/dynamic, !isInfected) — гейтимо на ньому (як у v289
+    // при нарахуванні mercyDeaths), інакше заражений забіг главы 2 хибно давав би зірки, пороги
+    // 12/24/36, яйця-мілстоуни й скидав би mercyDeaths. Пороги-нагороди — всередині _awardStars.
+    const starInfo = (this.level.secondaryObjective && !this.level.net) ? this._awardStars(country.id, s) : null;
     this.progress.addXp(XP_VALUES.country);
     if (!wasLiberated) this.quests.onEvent('country');
     this.saveGame();
@@ -5216,7 +5224,9 @@ class Game {
     } else if (this.state === 'level' && this.level) {
       const isCoop = !!this.level.net;
       // кооп: пауза/магазин ховають керування, але світ ЖИВЕ (інші ж грають!)
-      const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.draft.isOpen || this.victoryShown);
+      // 🎁 v294: соло-церемонія скрині морозить сим (як draft) — fullscreen-оверлей інакше
+      // ковтав би постріли посеред бою (мегабокс/еліт/золото). Тап-пропуск працює на DOM-кліку.
+      const blocked = isCoop ? this.victoryShown : (this.paused || this.shop.isOpen || this.draft.isOpen || this.victoryShown || !!this._chestState);
       const hitstopScale = this._hitstopT > 0 ? 0.15 : 1;
       if (this._hitstopT > 0) this._hitstopT = Math.max(0, this._hitstopT - timerDt);
       const simDt = dt * hitstopScale;

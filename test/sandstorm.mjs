@@ -69,6 +69,28 @@ const fogRestored = run.after.c === run.before.c && run.after.n === run.before.n
 check(fogRestored, 'туман ВІДНОВЛЕНО рівно до стану до бурі', `${JSON.stringify(run.before)} vs ${JSON.stringify(run.after)}`);
 check(run.second === true, 'друга буря може стартувати');
 
+console.log('▸ endLevel ПОСЕРЕД бурі відновлює coinMat.emissiveIntensity (v294 leak-фікс)');
+const restore = await page.evaluate(() => {
+  const g = window.__game;
+  const L = g.level;
+  const ss = L.sandstorm;
+  const coinMat = L.effects.coinMat;      // сесійно-кешований (userData.shared) — переживе teardown рівня
+  const base = coinMat.emissiveIntensity; // 0.45
+  ss.phase = 'idle'; ss.timer = 999;      // гарантуємо, що forceStart спрацює (не в warn з другої бурі)
+  ss.forceStart();
+  let boosted = base;
+  for (let i = 0; i < 150; i++) { ss.update(1 / 12); boosted = Math.max(boosted, coinMat.emissiveIntensity); }
+  const beforeEnd = coinMat.emissiveIntensity; // ще в активній бурі → підсилено
+  g.endLevel();                                 // кидаємо рівень ПОСЕРЕД бурі
+  const afterEnd = coinMat.emissiveIntensity;
+  return { base, boosted, beforeEnd, afterEnd, shared: !!(coinMat.userData && coinMat.userData.shared) };
+});
+check(Math.abs(restore.base - 0.45) < 1e-6, 'база coinMat.emissiveIntensity = 0.45', String(restore.base));
+check(restore.boosted > 1.0, 'під час бурі свічення підсилене (0.45→~1.45)', String(restore.boosted));
+check(restore.beforeEnd > 0.6, 'на момент endLevel матеріал ще підсилений (буря активна)', String(restore.beforeEnd));
+check(Math.abs(restore.afterEnd - 0.45) < 1e-6, 'endLevel ВІДНОВИВ 0.45 (Sandstorm.dispose форсує базу)', JSON.stringify(restore));
+check(restore.shared, 'coinMat справді сесійний (userData.shared) — teardown його пропускає', String(restore.shared));
+
 console.log('▸ Поза EGY-соло бурі немає');
 await page.goto(`${BASE}/?test&fresh&country=JPN`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level' && window.__game.level.countryId === 'JPN', null, { timeout: 30000 });

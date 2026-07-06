@@ -194,6 +194,37 @@ const globeStar = await rp.evaluate(() => document.getElementById('star-total') 
 check(globeStar === '3/36', 'лічильник глобуса «⭐ 3/36»', String(globeStar));
 await rp.close();
 
+// ---------- 🧟 Заражений забіг (глава 2) НЕ дає зірок/порогів і НЕ чіпає милосердя (v294) ----------
+console.log('▸ Заражений win на UKR → без зірок, без порогів 12/24/36, mercyDeaths недоторканий');
+await page.evaluate(async () => {
+  const g = window.__game;
+  if (g.level) g.endLevel();
+  g.save.stars = { POL: 3, DEU: 3, FRA: 3, ESP: 3 }; // 12 сумарно — але UKR-win НЕ має додати поріг
+  g.save.starClaims = [];
+  g.save.mercyDeaths = { cid: 'UKR', n: 2 };         // активне милосердя на UKR
+  g.save.infected = { cleared: {}, done: false };
+  g.victoryShown = false;
+  await g.startLevel('UKR', { infected: true }); // прямий заражений забіг (без гейта розблокування Глави 2)
+});
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.infected, null, { timeout: 30000 });
+const infRes = await page.evaluate(() => {
+  const g = window.__game;
+  g.level.stats.deaths = 0;      // ідеальний забіг — усе одно без зірок
+  g.victoryShown = false;
+  g._showVictory();
+  return {
+    hasSecondary: !!g.level.secondaryObjective,
+    net: g.level.net,
+    starUKR: (g.save.stars || {}).UKR,
+    claims: [...(g.save.starClaims || [])],
+    mercy: g.save.mercyDeaths ? { ...g.save.mercyDeaths } : null,
+  };
+});
+check(!infRes.hasSecondary && infRes.net === null, 'заражений забіг — solo, без secondaryObjective (гейт зірок)', JSON.stringify(infRes));
+check(infRes.starUKR === undefined, 'UKR НЕ отримала зірок за зараження', JSON.stringify(infRes.starUKR));
+check(infRes.claims.length === 0, 'жоден поріг 12/24/36 не нараховано (claims порожній)', JSON.stringify(infRes.claims));
+check(infRes.mercy && infRes.mercy.cid === 'UKR' && infRes.mercy.n === 2, 'mercyDeaths недоторканий (зараження не скидає)', JSON.stringify(infRes.mercy));
+
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 3).join(' | '));
 console.log(fail === 0 ? '\n🎉 ЗІРКИ OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
 await browser.close();
