@@ -6,6 +6,11 @@ import { WEAPONS } from './player.js';
 import { GADGETS } from './extras.js';
 import { clamp } from './utils.js';
 
+// 🪧 черга банерів: мінімальний показ (нижче цього новий низькопріоритетний чекає в черзі)
+// і максимальна довжина черги (переповнення викидає найстаріший низькопріоритетний).
+const BANNER_MIN_SHOW = 1.6;
+const BANNER_QUEUE_MAX = 3;
+
 export class HUD {
   constructor(game) {
     this.game = game;
@@ -61,6 +66,10 @@ export class HUD {
     this._v3 = new THREE.Vector3();
     this.ctx = this.el.minimap.getContext('2d');
     this.bannerT = 0;
+    // 🪧 пріоритетна черга банерів (v299): поточний + черга; критичні (prio≥1) перебивають
+    this._bnCur = null;      // { title, sub, dur, prio }
+    this._bnElapsed = 0;     // скільки поточний уже показується
+    this._bnQueue = [];
     this.hitT = 0;
     this.vignetteT = 0;
     this.lastHealth = 100;
@@ -81,9 +90,10 @@ export class HUD {
       this.banner(t('✅ МІСІЮ ВИКОНАНО!'), t('{title} · +{r} монет 💰', { title: m.title, r: m.reward }));
       this._bump(this.el.missionPanel);
     });
-    bus.on('hordeWarning', () => this.banner(t('⚠️ УВАГА!'), t('Наближається орда зомбі!')));
-    bus.on('eliteWaveWarning', () => this.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4));
-    bus.on('hordeStart', () => this.banner(t('🧟 ОРДА!'), t('Відбий напад!')));
+    // ⚠️ телеграфи хвилі/орди — пріоритетні: перебивають звичайні банери одразу
+    bus.on('hordeWarning', () => this.banner(t('⚠️ УВАГА!'), t('Наближається орда зомбі!'), 3.2, { prio: 1 }));
+    bus.on('eliteWaveWarning', () => this.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4, { prio: 1 }));
+    bus.on('hordeStart', () => this.banner(t('🧟 ОРДА!'), t('Відбий напад!'), 3.2, { prio: 1 }));
     bus.on('hordeEnd', () => this.banner(t('🎉 Орду відбито!'), t('+60 монет 💰')));
     bus.on('bossUnlocked', () => this.banner(t('👑 АРЕНА ВІДКРИТА!'), t('Іди до фіолетового маркера і переможи БОСА!')));
     bus.on('bossStart', () => {
@@ -111,6 +121,10 @@ export class HUD {
     bus.on('robotMet', () => this.hintOnce('robot',
       t('🤖 ЗОМБІ-РОБОТ!'),
       t('Великий і міцний, має щит. Збий щит, тримай дистанцію — коли гине, він ВИБУХАЄ! 💥')));
+    // 👹 перший елітний зомбі (v299) — теплий разовий банер
+    bus.on('eliteMet', () => this.hintOnce('elite1',
+      t('👹 Це елітний зомбі!'),
+      t('У нього своя хитрість — придивись!')));
   }
 
   // 🎓 Разова підказка-знайомство: ВЕЛИКИЙ банер РІВНО ОДИН раз назавжди (прапорець у save.hints).
@@ -124,12 +138,72 @@ export class HUD {
     this.banner(title, sub, 4.5);
   }
 
-  banner(title, sub = '', dur = 3.2) {
-    this.el.bannerTitle.textContent = title;
-    this.el.bannerSub.textContent = sub;
+  // 🪧 Банер із пріоритетною чергою (v299). Сигнатура сумісна: усі наявні виклики
+  // banner(title, sub, dur) працюють як prio 0. opts.prio≥1 (телеграфи хвилі/бурі/орди)
+  // перебиває поточний ОДРАЗУ, а витіснений повертається в чергу. Без prio: якщо банер
+  // уже показується — новий стає в чергу (макс 3; переповнення викидає найстаріший
+  // низькопріоритетний). Мінімальний показ поточного — BANNER_MIN_SHOW.
+  banner(title, sub = '', dur = 3.2, opts = {}) {
+    const prio = (opts && opts.prio) | 0;
+    const item = { title, sub, dur, prio };
+    if (!this._bnCur) { this._showBanner(item); return; }
+    if (prio >= 1 && prio > (this._bnCur.prio | 0)) {
+      this._bnQueue.unshift(this._bnCur); // витіснений — назад у чергу (у голову)
+      this._trimBannerQueue();
+      this._showBanner(item);
+      return;
+    }
+    this._bnQueue.push(item);
+    this._trimBannerQueue();
+  }
+
+  _showBanner(item) {
+    this._bnCur = item;
+    this._bnElapsed = 0;
+    this.bannerT = item.dur; // сумісність (діагностика/старий код)
+    this.el.bannerTitle.textContent = item.title;
+    this.el.bannerSub.textContent = item.sub;
     this.el.banner.classList.add('show');
     document.body.classList.add('banner-active');
-    this.bannerT = dur;
+  }
+
+  _trimBannerQueue() {
+    while (this._bnQueue.length > BANNER_QUEUE_MAX) {
+      let idx = this._bnQueue.findIndex((b) => (b.prio | 0) < 1); // найстаріший низькопріоритетний
+      if (idx < 0) idx = 0; // усі пріоритетні — викидаємо найстаріший
+      this._bnQueue.splice(idx, 1);
+    }
+  }
+
+  // проганяє поточний банер у часі; коли він «відпрацював» (повний dur АБО мінімум і є
+  // черга) — показує наступний або ховає банер. Викликається з update(dt).
+  _updateBanner(dt) {
+    if (!this._bnCur) return;
+    this._bnElapsed += dt;
+    this.bannerT = Math.max(0, this._bnCur.dur - this._bnElapsed);
+    const minDone = this._bnElapsed >= BANNER_MIN_SHOW;
+    const durDone = this._bnElapsed >= this._bnCur.dur;
+    if (durDone || (minDone && this._bnQueue.length > 0)) {
+      if (this._bnQueue.length > 0) {
+        this._showBanner(this._bnQueue.shift());
+      } else {
+        this._bnCur = null;
+        this._bnElapsed = 0;
+        this.bannerT = 0;
+        this.el.banner.classList.remove('show');
+        document.body.classList.remove('banner-active');
+      }
+    }
+  }
+
+  // 🧹 очистити чергу банерів (виклик з endLevel/зміни стану гри)
+  clearBanners() {
+    this._bnQueue = [];
+    this._bnCur = null;
+    this._bnElapsed = 0;
+    this.bannerT = 0;
+    if (this.el && this.el.banner) this.el.banner.classList.remove('show');
+    if (document.body) document.body.classList.remove('banner-active');
   }
 
   toast(text, dur = 4) {
@@ -362,6 +436,8 @@ export class HUD {
     // ⭐ R3 вторинна ціль забігу (⭐2) — компактний чип під місіями (лише соло-кампанія)
     const so = level.secondaryObjective;
     if (so) {
+      // 🎓 перший чип вторинної цілі — разове знайомство
+      this.hintOnce('secondary1', t('⭐ ДОДАТКОВА ЦІЛЬ!'), t('Виконай ціль забігу — отримаєш зірку! ⭐'));
       html += `<div class="mission secondary ${so.done ? 'done' : ''}">`
         + `<span class="mi">${so.done ? '✅' : '⭐'}</span> ${so.label()} `
         + `<span class="sec-prog">${Math.min(so.target, so.progress)}/${so.target}</span></div>`;
@@ -387,14 +463,8 @@ export class HUD {
       if (this.el.tbInteract) this.el.tbInteract.classList.remove('avail');
     }
 
-    // банер
-    if (this.bannerT > 0) {
-      this.bannerT -= dt;
-      if (this.bannerT <= 0) {
-        this.el.banner.classList.remove('show');
-        document.body.classList.remove('banner-active');
-      }
-    }
+    // банер (пріоритетна черга)
+    this._updateBanner(dt);
 
     // віньєтка
     if (this.vignetteT > 0) {

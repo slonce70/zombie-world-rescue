@@ -39,6 +39,7 @@
     </div>
     <div class="globe-bottom">
       <button id="gift-chip" type="button" aria-label="Подарунок дня — забрати">🎁 Подарунок дня!</button>
+      <button id="camp-quest-chip" type="button" aria-label="Квест табору — забрати нагороду">📌 Квест табору</button>
       <div id="globe-compass" class="player-compass"></div>
       <div class="globe-play-row">
         <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
@@ -338,6 +339,23 @@
       <div id="gift-week" class="gift-week"></div>
       <div id="gift-grid" class="gift-grid"></div>
       <button id="btn-gift-claim" class="btn btn-primary">🎁 Забрати</button>
+    </div>
+  </div>
+
+  <!-- 🏕️ Тижневий квест табору: опис, прогрес, кнопка «Забрати 🥚» -->
+  <div id="overlay-campquest" class="overlay">
+    <div class="overlay-card panel-card">
+      <div class="panel-header">
+        <h2>🏕️ КВЕСТ ТАБОРУ</h2>
+        <button class="btn-x panel-close" data-close="overlay-campquest">✕</button>
+      </div>
+      <p class="panel-sub">Виконуй квест тижня у будь-якому режимі — і забирай яйце петса в таборі! Квест не згорає 😊</p>
+      <div id="campquest-title" class="campquest-title"></div>
+      <p id="campquest-desc" class="campquest-desc"></p>
+      <div class="campquest-bar"><div id="campquest-fill" class="campquest-fill"></div></div>
+      <div id="campquest-prog" class="campquest-prog">0/0</div>
+      <button id="btn-campquest-claim" class="btn btn-primary">Забрати 🥚</button>
+      <p id="campquest-claimed" class="campquest-claimed">✅ Нагороду вже забрано. Новий квест — наступного тижня!</p>
     </div>
   </div>
 
