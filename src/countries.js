@@ -8,6 +8,7 @@ import spainMap from './maps/spain.js';
 import portugalMap from './maps/portugal.js';
 import italyMap from './maps/italy.js';
 import turkeyMap from './maps/turkey.js';
+import swedenMap from './maps/sweden.js';
 import egyptMap from './maps/egypt.js';
 import japanMap from './maps/japan.js';
 import chinaMap from './maps/china.js';
@@ -385,7 +386,7 @@ export const COUNTRIES = {
     lat: 60.1, lon: 18.6,
     victoryTitle: t('🇸🇪 ШВЕЦІЮ ЗВІЛЬНЕНО!'),
     biome: 'winterDusk',
-    map: polandMap,
+    map: swedenMap,
     difficulty: { hp: 2.1, dmg: 1.42, counts: 1.52 },
     coinReward: 700,
     extraZombie: 'snowman',
