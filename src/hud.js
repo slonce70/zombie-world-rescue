@@ -355,6 +355,13 @@ export class HUD {
     for (const m of list) {
       html += `<div class="mission ${m.done ? 'done' : ''}"><span class="mi">${m.done ? '✅' : m.icon}</span> ${m.title}</div>`;
     }
+    // ⭐ R3 вторинна ціль забігу (⭐2) — компактний чип під місіями (лише соло-кампанія)
+    const so = level.secondaryObjective;
+    if (so) {
+      html += `<div class="mission secondary ${so.done ? 'done' : ''}">`
+        + `<span class="mi">${so.done ? '✅' : '⭐'}</span> ${so.label()} `
+        + `<span class="sec-prog">${Math.min(so.target, so.progress)}/${so.target}</span></div>`;
+    }
     if (this.el.missions.innerHTML !== html) this.el.missions.innerHTML = html;
 
     // підказка взаємодії

@@ -31,6 +31,7 @@ const SHELL = [
   './src/countries.js',
   './src/chapter.js',
   './src/titles.js',
+  './src/stars.js',
   './src/touch.js',
   './src/progress.js',
   './src/extras.js',
