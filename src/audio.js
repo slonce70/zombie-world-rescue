@@ -325,6 +325,20 @@ export class AudioMan {
     }
   }
 
+  // 🌪️ телеграф піщаної бурі — вітер наростає (єгипетський хазард)
+  sandstormWarn() {
+    const t = this.t;
+    this._noise(t, 3.6, 0.16, 'bandpass', 220, 1.2, 1500); // фільтр повзе вгору = вітер дужчає
+    this._osc('sawtooth', 120, t, 3.4, 0.05, 320);          // низький гул, що піднімається
+  }
+
+  // 🌬️ буря вщухає — вітер спадає
+  sandstormSettle() {
+    const t = this.t;
+    this._noise(t, 1.8, 0.14, 'lowpass', 1400, 1, 240);     // фільтр повзе вниз = стихає
+    this._osc('sawtooth', 300, t, 1.4, 0.045, 90);
+  }
+
   // 🛴 дзвоник самоката
   bell() {
     const t = this.t;

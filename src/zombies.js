@@ -1096,8 +1096,10 @@ export class Zombies {
       const st = z.stats;
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
-      // 🌙 вночі зомбі помічають здалеку
-      const nightAggro = 1 + (level.nightK || 0) * 0.5;
+      // 🌙 вночі зомбі помічають здалеку; 🌪️ у піщану бурю — ближче (чесно: і зомбі,
+      // і гравець бачать гірше — можна прокрастися або перевести дух)
+      const nightAggro = (1 + (level.nightK || 0) * 0.5)
+        * (level.sandstorm && level.sandstorm.active ? 0.5 : 1);
       // золотий зомбі: побачив гравця — тікає; зникає за 12с, якщо не встигли вбити
       if (z.golden && z.state !== 'dead') {
         if (z.goldenTtl !== undefined) {

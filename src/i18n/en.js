@@ -13,6 +13,8 @@ export const EN = {
 "Хедшот робить подвійну шкоду. Цілься в голову!": "Headshots deal double damage. Aim for the head!",
 "Дробовик — король ближнього бою. Клавіша 3!": "The shotgun is king of close combat. Key 3!",
 "На льоду ковзько — гальмуй заздалегідь! ⛸": "Ice is slippery — brake early! ⛸",
+"🌪️ Піщана буря наближається!": "🌪️ A sandstorm is coming!",
+"Буря вщухла": "The storm has passed",
 "Комбо-серії вбивств дають бонусні монети 🔥": "Kill combos give bonus coins 🔥",
 "Шукай аеродропи 🪂 — там навіть БАЗУКА буває!": "Watch for airdrops 🪂 — sometimes even a BAZOOKA!",
 "Клавіша V — подивись на свого героя збоку!": "Key V — see your hero from the outside!",
