@@ -393,6 +393,15 @@ export class AudioMan {
     this._osc('triangle', 784, t + 0.08, 0.12, 0.25);
   }
 
+  // ✅ Проміжний чекпойнт (1 з N точок активовано): два бадьорі ноти, БЕЗ голосу.
+  // Легкий «дзинь» — щоб «квест виконано» звучало ЛИШЕ на фінальній точці (mission()).
+  checkpoint() {
+    if (!this.ctx) return;
+    const t = this.t;
+    this._osc('triangle', midi(72), t, 0.1, 0.22);
+    this._osc('triangle', midi(79), t + 0.09, 0.14, 0.22);
+  }
+
   mission() {
     this.voiceOnce('mission', 20);
     const t = this.t;
