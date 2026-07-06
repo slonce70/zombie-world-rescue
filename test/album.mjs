@@ -25,14 +25,15 @@ await page.click('#btn-album');
 await page.waitForSelector('#overlay-album.show', { timeout: 8000 });
 check(true, 'альбом відкривається кнопкою 📖');
 
+// R5: інші вкладки теж наповнені картками — асерти друзів скоупимо на вкладку Друзі
 let st = await page.evaluate(() => ({
-  cards: document.querySelectorAll('#album-content .album-card').length,
-  locked: document.querySelectorAll('#album-content .album-card.locked').length,
-  silhouettes: document.querySelectorAll('#album-content .album-portrait.silhouette').length,
-  hints: document.querySelectorAll('#album-content .album-hint').length,
-  counter: document.querySelector('#album-content .album-counter')?.textContent || '',
+  cards: document.querySelectorAll('#album-content .album-pane[data-tab="friends"] .album-card').length,
+  locked: document.querySelectorAll('#album-content .album-pane[data-tab="friends"] .album-card.locked').length,
+  silhouettes: document.querySelectorAll('#album-content .album-pane[data-tab="friends"] .album-portrait.silhouette').length,
+  hints: document.querySelectorAll('#album-content .album-pane[data-tab="friends"] .album-hint').length,
+  counter: document.querySelector('#album-content .album-pane[data-tab="friends"] .album-counter')?.textContent || '',
   tabs: [...document.querySelectorAll('#album-content .album-tab')].map((b) => b.getAttribute('data-tab')),
-  q: document.querySelector('#album-content .album-card.locked .album-name')?.textContent || '',
+  q: document.querySelector('#album-content .album-pane[data-tab="friends"] .album-card.locked .album-name')?.textContent || '',
 }));
 check(st.cards === 12, '12 карток друзів (по країні кампанії)', String(st.cards));
 check(st.locked === 12 && st.silhouettes === 12, 'нерятовані — тёмний силует', JSON.stringify(st));
@@ -40,10 +41,14 @@ check(st.hints === 12 && st.q === '???', 'нерятовані — «???» + ч�
 check(/0\/12/.test(st.counter), 'лічильник 🤝 0/12', st.counter);
 check(st.tabs.length === 4 && st.tabs.join(',') === 'friends,skins,pets,elites', '4 вкладки: Друзі + скіни/петси/еліти', JSON.stringify(st.tabs));
 
-// вкладка-заглушка показує «Скоро!»
+// R5: вкладки скінів/петсів/еліт наповнені (не заглушки). Петси показують реальні картки + рядок яєць.
 await page.click('#album-content .album-tab[data-tab="pets"]');
-const soon = await page.evaluate(() => document.querySelector('#album-content .album-pane[data-tab="pets"] .album-soon-text')?.textContent || '');
-check(/Скоро|Soon|Скоро/i.test(soon), 'вкладка Петси — заглушка «Скоро!»', soon);
+const petsPane = await page.evaluate(() => ({
+  cards: document.querySelectorAll('#album-content .album-pane[data-tab="pets"] .album-card').length,
+  eggRow: !!document.querySelector('#album-content .album-pane[data-tab="pets"] .album-egg-row'),
+  noSoon: !document.querySelector('#album-content .album-pane[data-tab="pets"] .album-soon'),
+}));
+check(petsPane.cards > 0 && petsPane.eggRow && petsPane.noSoon, 'вкладка Петси наповнена (картки + рядок яєць, без «Скоро!»)', JSON.stringify(petsPane));
 
 // рятуємо друга → картка країни відкривається, лічильник росте
 st = await page.evaluate(() => {
@@ -56,8 +61,8 @@ st = await page.evaluate(() => {
     name: card ? card.querySelector('.album-name')?.textContent : '',
     role: card ? !!card.querySelector('.album-role') : false,
     flag: card ? !!card.querySelector('.album-flag') : false,
-    counter: document.querySelector('#album-content .album-counter')?.textContent || '',
-    locked: document.querySelectorAll('#album-content .album-card.locked').length,
+    counter: document.querySelector('#album-content .album-pane[data-tab="friends"] .album-counter')?.textContent || '',
+    locked: document.querySelectorAll('#album-content .album-pane[data-tab="friends"] .album-card.locked').length,
   };
 });
 check(st.revealed && st.name && st.name !== '???', 'після порятунку картка UKR відкрита з імʼям', JSON.stringify(st));
