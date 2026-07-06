@@ -1382,6 +1382,9 @@ body.touch-mode #touch-coach.show { display: block; }
      мобайл головний пристрій дитини, подарунок не сміє зникати; лише стискаємо */
   #gift-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #weekly-goal { padding: 5px 12px; min-width: 0; font-size: 12px; }
+  /* ⭐ лічильник зірок (v289) подовжив рядок прогресу — на вузькому портреті
+     стискаємо в один рядок, інакше блок росте і піднімає ГРАТИ над beacon-зоною */
+  #globe-progress { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
 }
 
 /* короткий ландшафт (телефон боком): тісно по висоті — підтискаємо все */
