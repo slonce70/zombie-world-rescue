@@ -48,10 +48,13 @@ const ranged = await page.evaluate(async () => {
 check(ranged.stats.hp === ranged.stats.expectedHp, 'чарівник: HP масштабовано складністю країни', `${ranged.stats.hp} vs ${ranged.stats.expectedHp}`);
 check(ranged.stats.dmg === 15, 'чарівник: дальня шкода 15', ranged.stats.dmg);
 check(ranged.stats.sh === 100, 'чарівник: щит 100', ranged.stats.sh);
-// проганяємо ~6 секунд симуляції — снаряди мають долетіти й поранити
-await page.waitForTimeout(6500 * SLOW);
+// чекаємо реального влучання: фіксований sleep флейкав на повільних CI-ранерах,
+// коли цикл кидка чарівника не встигав за відведені секунди
+const rangedHit = await page
+  .waitForFunction((hp0) => window.__game.level.player.health < hp0, ranged.hp0, { timeout: 30000 * SLOW })
+  .then(() => true).catch(() => false);
 const afterRanged = await page.evaluate(() => window.__game.level.player.health);
-check(afterRanged < ranged.hp0, `чарівник поранив гравця здалека (${ranged.hp0} → ${afterRanged})`);
+check(rangedHit && afterRanged < ranged.hp0, `чарівник поранив гравця здалека (${ranged.hp0} → ${afterRanged})`);
 
 // ---------- (а2) Призов: тримає ≤5 живих, поповнює слот після смерті ----------
 console.log('▸ (а) Призов прислужників (≤5 живих)');
