@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 shots/
 .DS_Store
 index-alt.html.bak
@@ -6,4 +6,3 @@ index-alt.html.bak
 worker/.dev.vars
 graphify-out/
 .superpowers/
-node_modules/
