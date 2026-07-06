@@ -66,11 +66,11 @@
 - [x] test/coop-stars.mjs + реєстрація в test:coop-release
 
 ## R4 — v299 «Табір кличе»
-- [ ] Тижневий квест табору (дошка в hqbase, week-key, прогрес соло+кооп, нагорода 🥚+🍖×2, БЕЗ FOMO); save `weeklyCamp` + cloudsave-guard
-- [ ] Черга банерів hud.banner (пріоритети, мін. показ, без зміни API)
-- [ ] hintOnce: перший еліт / чип цілі / клітка / альбом
-- [ ] i18n-гейт test/i18n-parity.mjs + виправити наявні пропуски
-- [ ] test/weekly-camp.mjs, test/banner-queue.mjs + реєстрація в release.mjs
+- [x] Тижневий квест табору (дошка в hqbase, week-key, прогрес соло+кооп, нагорода 🥚+🍖×2, БЕЗ FOMO); save `weeklyCamp` + cloudsave-guard (PR #63; рятунок 12 людей замість 25 — збалансовано під 2-3 сесії)
+- [x] Черга банерів hud.banner (пріоритети, мін. показ 1.6с, черга ≤3, без зміни API; endLevel чистить чергу)
+- [x] hintOnce: перший еліт (по першому дамагу) / чип цілі / клітка / альбом
+- [x] i18n-гейт test/i18n-parity.mjs (t() + статичні тексти index.html) + виправлено 423 пропуски en/ru
+- [x] test/weekly-camp.mjs, test/banner-queue.mjs + реєстрація в release.mjs
 
 ## R5 — фінал
 - [ ] Повний test:release + кооп-ланцюжок зелені
