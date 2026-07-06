@@ -145,6 +145,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'stars', 'starClaims', 'mercyDeaths',
       // 🤝 R4 «Врятовані друзі»
       'friends', 'friendThanks',
+      // 🥚 R5 «Колекція та яйця»
+      'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -154,6 +156,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
+      'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -198,6 +201,12 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     // 🤝 врятований друг — теж прогрес (зміна пристрою не має його обнуляти)
     out.friends = saveHasProgress({ ...fresh, friends: { UKR: true } }) === true;
     out.falseFriendNotProgress = saveHasProgress({ ...fresh, friends: { UKR: false } }) === false;
+    // 🥚 R5: яйця/корм/рівні петсів — теж прогрес (зміна пристрою не має їх обнуляти)
+    out.eggs = saveHasProgress({ ...fresh, eggs: 2 }) === true;
+    out.petFood = saveHasProgress({ ...fresh, petFood: 5 }) === true;
+    out.petLevels = saveHasProgress({ ...fresh, petLevels: { dog: 3 } }) === true;
+    out.eggClaims = saveHasProgress({ ...fresh, eggClaims: [6] }) === true;
+    out.zeroEggsNotProgress = saveHasProgress({ ...fresh, eggs: 0, petFood: 0, petLevels: { dog: 1 } }) === false;
     return out;
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
@@ -220,6 +229,11 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('⭐ 0 зірок ≠ прогрес', res.zeroStarsNotProgress);
   check('🤝 врятований друг → прогрес=true', res.friends);
   check('🤝 friends:false ≠ прогрес', res.falseFriendNotProgress);
+  check('🥚 яйця → прогрес=true', res.eggs);
+  check('🍖 корм петса → прогрес=true', res.petFood);
+  check('🐾 рівень петса → прогрес=true', res.petLevels);
+  check('🥚 видані пороги-яйця → прогрес=true', res.eggClaims);
+  check('🥚 порожні яйця/корм/Рів.1 ≠ прогрес', res.zeroEggsNotProgress);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);
