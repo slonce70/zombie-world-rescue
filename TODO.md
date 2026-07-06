@@ -56,9 +56,9 @@
 - [x] test/coop-elite.mjs (+mid-join посеред хвилі) + реєстрація в test:coop-release
 
 ## R2 — v297 «Сила разом» (PROTO 12)
-- [ ] Супер-пікап host-authoritative: `spx`/`spg`, nid-цикл spawn→grant→despawn, captureState для mid-join
-- [ ] Сила активується локально в того, хто взяв; магніт-буря в хостовому pickup-циклі per-pid; банер іншим
-- [ ] test/coop-super.mjs + реєстрація в release.mjs
+- [x] Супер-пікап host-authoritative: `spx`/`spg`, nid-цикл spawn→grant→despawn, captureState (`state.spu`) для mid-join (PR #61)
+- [x] Сила активується локально в того, хто взяв; магніт-буря в хостовому pickup-циклі per-pid; банер іншим
+- [x] test/coop-super.mjs + реєстрація в test:coop-release
 
 ## R3 — v298 «Зірки разом» (PROTO 13)
 - [ ] Вторинна ціль: хост ролить від сіда кімнати, чип у всіх, командний прогрес (`soc`)
