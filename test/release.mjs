@@ -7,6 +7,7 @@ const { close: closeServer } = await ensureWebServer({ quiet: false });
 
 const suite = [
   ['node', ['test/version-sync.mjs']],
+  ['node', ['test/i18n-parity.mjs']],
   ['node', ['test/runbuild.mjs']],
   ['node', ['test/sw-cache.mjs']],
   ['node', ['test/pwa-offline.mjs']],
@@ -14,6 +15,8 @@ const suite = [
   ['node', ['test/loop-edges.mjs']],
   ['node', ['test/daily-gift.mjs']],
   ['node', ['test/weekly-goal.mjs']],
+  ['node', ['test/weekly-camp.mjs']],
+  ['node', ['test/banner-queue.mjs']],
   ['node', ['test/prestige-donate.mjs']],
   ['node', ['test/title-progress.mjs']],
   ['node', ['test/bestiary-goals.mjs']],

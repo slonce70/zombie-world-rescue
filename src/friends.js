@@ -328,6 +328,8 @@ export class HiddenRescue {
       this.prompt = { text: t('Тримай {k} — визволь друга', { k: interactKey() }), hold: true, progress: 0 };
       if (allowControl && input && input.down('KeyE')) this.state = 'freeing';
     } else if (dist <= NEAR_PROMPT && guardsAlive) {
+      // 🎓 перша клітка друга в полі зору — разова підказка
+      if (this.game.hud) this.game.hud.hintOnce('cage1', t('🗝️ ДРУГ У КЛІТЦІ!'), t('Там друг у клітці! Здолай сторожів і звільни! 🗝️'));
       this.prompt = { text: t('🔒 Спершу здолай сторожів клітки!'), hold: false };
     } else {
       this.prompt = null;

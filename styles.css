@@ -60,6 +60,22 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 }
 #gift-chip.show { display: inline-flex; }
 @keyframes gift-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+/* 🏕️ чіп-нагадування квесту табору — видно лише коли квест виконано й не забрано */
+#camp-quest-chip {
+  display: none; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 10px 22px; border-radius: 16px; cursor: pointer;
+  background: linear-gradient(135deg, #4cc158, #2f9c46); border: 2px solid #a8e8ac;
+  color: #04240b; font-weight: 900; font-size: 16px;
+  box-shadow: 0 6px 18px rgba(60,180,80,.45); animation: gift-pulse 1.6s ease-in-out infinite;
+}
+#camp-quest-chip.show { display: inline-flex; }
+/* 🏕️ панель квесту табору */
+.campquest-title { font-size: 20px; font-weight: 900; margin: 6px 0; text-align: center; }
+.campquest-desc { opacity: .85; text-align: center; margin: 0 0 12px; }
+.campquest-bar { height: 16px; border-radius: 10px; background: rgba(0,0,0,.35); overflow: hidden; margin: 4px 0; }
+.campquest-fill { height: 100%; width: 0; border-radius: 10px; background: linear-gradient(90deg, #4cc158, #8fe06f); transition: width .3s ease; }
+.campquest-prog { text-align: center; font-weight: 900; margin: 6px 0 12px; }
+.campquest-claimed { display: none; text-align: center; opacity: .85; font-weight: 700; }
 /* 🗓️ ціль тижня — тонка плашка з баром під прогресом країн */
 #weekly-goal {
   background: var(--ui-bg); border: 2px solid var(--ui-border); border-radius: 12px;
@@ -1381,6 +1397,7 @@ body.touch-mode #touch-coach.show { display: block; }
   /* 🎁 подарунок і 🗓️ ціль тижня лишаються видимими навіть у портреті —
      мобайл головний пристрій дитини, подарунок не сміє зникати; лише стискаємо */
   #gift-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
+  #camp-quest-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #weekly-goal { padding: 5px 12px; min-width: 0; font-size: 12px; }
   /* ⭐ лічильник зірок (v289) подовжив рядок прогресу — на вузькому портреті
      стискаємо в один рядок, інакше блок росте і піднімає ГРАТИ над beacon-зоною */
@@ -1395,6 +1412,7 @@ body.touch-mode #touch-coach.show { display: block; }
   .globe-hint { display: none; }
   #globe-compass { display: none; }
   #gift-chip.show { display: none; }
+  #camp-quest-chip.show { display: none; }
   #weekly-goal { display: none; }
   #globe-progress { font-size: 14px; padding: 6px 14px; }
   .globe-play { font-size: 14px; padding: 9px 18px; }

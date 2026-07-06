@@ -147,6 +147,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'friends', 'friendThanks',
       // 🥚 R5 «Колекція та яйця»
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
+      // 🏕️ R4 (v299) «Табір кличе»
+      'weeklyCamp',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -157,6 +159,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
+      'weeklyCamp',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;

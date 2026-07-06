@@ -700,6 +700,7 @@ export class Zombies {
   _damage(z, amt, dir, headshot, opts) {
     if (z.state === 'dead') return;
     if (z.type === 'robot') this.level.bus.emit('robotMet'); // 🎓 перша зустріч з роботом → разовий банер
+    if (z.elite) this.level.bus.emit('eliteMet'); // 🎓 перший елітний зомбі → разова підказка
     const fire = !!(opts && opts.fire);
     if (z.worldBossShield) amt *= 0.25;
     if (z.worldBossCoreClosed) amt *= 0.35;

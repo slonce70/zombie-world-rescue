@@ -10,6 +10,7 @@ import { BESTIARY_TYPE_IDS } from './zombies.js';
 import {
   rescuedFriendIds, friendFor, campTier, friendThanksUnlocked, friendThanksPending, FRIEND_THANKS_COINS,
 } from './friends.js';
+import { weeklyCampState } from './weeklycamp.js';
 
 // маленький rng для makeCivilian (потрібні .pick/.f) — детермінізм тут не критичний
 function campRng() {
@@ -30,6 +31,8 @@ export class LivingHQ {
     this.hints = [];
     this.friends = [];       // 🤝 живий табір: врятовані друзі-ріги
     this.campProps = 0;
+    this.campBoardObjs = []; // 🏕️ дошка тижневого квесту (клікабельні меші)
+    this.campQuestBoard = 0;
     this.damageTotal = 0;
     this.worldBossTrophies = 0;
     this.megaQuestRows = 0;
@@ -97,6 +100,7 @@ export class LivingHQ {
     this._addTrainingTargets();
     this._addDamageDummies();
     this._addLivingCamp();
+    this._addCampQuestBoard();
     this._refreshHints();
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
@@ -401,6 +405,46 @@ export class LivingHQ {
     this.scene.add(pole, flag);
   }
 
+  // 🏕️ Дошка тижневого квесту табору: зʼявляється за ≥1 врятованого друга. Дешевий меш
+  // (стовпчик + дощечка + прогрес-смужка), БЕЗ нових динамічних світел. Тап (як по другові)
+  // відкриває панель квесту. Emissive-маркер, коли є нагорода на клейм.
+  _addCampQuestBoard() {
+    this.campBoardObjs = [];
+    this.campQuestBoard = 0;
+    if (rescuedFriendIds(this.game.save).length === 0) return; // ≥1 друг
+    const st = weeklyCampState(this.game.save, this.game._weekIndex());
+    const x = -1.7, z = 4.5, W = 1.7;
+    const post = this._addBox(x, 0.7, z, 0.16, 1.4, 0.16, 0x8a5a32, { isCampQuestBoard: true });
+    const plank = this._addBox(x, 1.55, z, W, 0.92, 0.12, 0x2f5a8a, { isCampQuestBoard: true });
+    const bg = this._addBox(x, 1.4, z + 0.07, W - 0.3, 0.14, 0.06, 0x0b1422, { isCampQuestBoard: true });
+    const ratio = st.goal ? Math.max(0.04, Math.min(1, st.p / st.goal)) : 0.04;
+    const fw = (W - 0.3) * ratio;
+    const fill = this._addBox(x - (W - 0.3) / 2 + fw / 2, 1.4, z + 0.1, fw, 0.14, 0.08, st.done ? 0x6fe06f : 0xf5c542, { isCampQuestBoard: true });
+    this.campBoardObjs.push(post, plank, bg, fill);
+    // 🥚 emissive-маркер над дошкою, коли нагороду можна забрати (як вогник багаття — без світла)
+    if (st.claimable) {
+      const mark = new THREE.Mesh(
+        new THREE.SphereGeometry(0.17, 10, 8),
+        new THREE.MeshLambertMaterial({ color: 0x6fe06f, emissive: 0x39c04f, emissiveIntensity: 0.9 })
+      );
+      mark.position.set(x, 2.2, z);
+      mark.userData.isCampQuestBoard = true;
+      this.scene.add(mark);
+      this.campBoardObjs.push(mark);
+    }
+    this.campQuestBoard = 1;
+  }
+
+  // тест-хук: тап по дошці квесту (відкриває панель квесту через головну гру)
+  tapCampQuestBoard() {
+    if (this.campQuestBoard) this._openCampQuest();
+  }
+
+  _openCampQuest() {
+    this.game.exitHQBase();      // як інші кнопки табору: спершу на глобус, тоді оверлей
+    this.game._openCampQuest();
+  }
+
   // тап по другові: репліка табору + (за ≥3 друзів) «щоденне дякую» +20💰 раз на день
   tapFirstFriend() {
     const fr = (this.friends || [])[0];
@@ -446,12 +490,13 @@ export class LivingHQ {
     this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._pointer, this.camera);
     const friendGroups = (this.friends || []).map((fr) => fr.rig.group);
-    const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || []), ...friendGroups], true)[0];
+    const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || []), ...(this.campBoardObjs || []), ...friendGroups], true)[0];
     if (!hit) return;
     let obj = hit.object;
-    while (obj && !obj.userData?.isHqTarget && !obj.userData?.hqHint && !obj.userData?.isHqFriend) obj = obj.parent;
+    while (obj && !obj.userData?.isHqTarget && !obj.userData?.hqHint && !obj.userData?.isHqFriend && !obj.userData?.isCampQuestBoard) obj = obj.parent;
     if (!obj) return;
-    if (obj.userData.isHqFriend) this._tapFriend(obj.userData.friendId);
+    if (obj.userData.isCampQuestBoard) this._openCampQuest();
+    else if (obj.userData.isHqFriend) this._tapFriend(obj.userData.friendId);
     else if (obj.userData.isHqTarget) this._hitTarget(obj);
     else this._showHint(obj);
   }
@@ -539,6 +584,8 @@ export class LivingHQ {
     this.hints = [];
     this.friends = [];
     this.campProps = 0;
+    this.campBoardObjs = [];
+    this.campQuestBoard = 0;
     this.countryTrophies = 0;
     this.beastTrophies = 0;
     this.worldBossTrophies = 0;
@@ -577,6 +624,7 @@ export class LivingHQ {
       dummyCount: (this.dummies || []).length,
       friendRigs: (this.friends || []).length,
       campProps: this.campProps || 0,
+      campQuestBoard: this.campQuestBoard || 0,
       hasHero: !!this.hero,
     };
   }

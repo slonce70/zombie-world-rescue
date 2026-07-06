@@ -58,6 +58,9 @@ import {
   petLevel, canFeed, feedCost, feedPet, activePetMagnet, PET_MAX_LEVEL,
   ELITE_CHEST_EGG_CHANCE, GOLDEN_CHEST_EGG_CHANCE,
 } from './eggs.js';
+import {
+  ensureWeeklyCamp, bumpWeeklyCamp, weeklyCampState, weeklyCampReminder, claimWeeklyCamp,
+} from './weeklycamp.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
@@ -88,7 +91,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 298;
+const APP_VERSION = 299;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -631,6 +634,8 @@ class Game {
     if (giftChip) giftChip.addEventListener('click', () => { this.audio.click(); this._openGiftModal(); });
     const giftClaim = document.getElementById('btn-gift-claim');
     if (giftClaim) giftClaim.addEventListener('click', () => this._claimGift());
+    const campClaim = document.getElementById('btn-campquest-claim');
+    if (campClaim) campClaim.addEventListener('click', () => this._claimCampQuest());
     document.getElementById('btn-wardrobe').addEventListener('click', () => {
       this.renderWardrobe();
       this._showOverlay('overlay-wardrobe');
@@ -647,7 +652,12 @@ class Game {
       this.audio.click();
       this.renderAlbum();
       this._showOverlay('overlay-album');
+      // 🎓 разове знайомство з Альбомом (раз назавжди)
+      this.hud.hintOnce('album1', t('📖 ТВОЯ КОЛЕКЦІЯ!'), t('Тут живе твоя колекція. Сірі картки підкажуть, де шукати! 😊'));
     });
+    // 🏕️ чіп квесту табору на глобусі відкриває панель квесту
+    const campChip = document.getElementById('camp-quest-chip');
+    if (campChip) campChip.addEventListener('click', () => { this.audio.click(); this._openCampQuest(); });
     document.getElementById('btn-hqbase').addEventListener('click', () => this.enterHQBase());
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
@@ -811,6 +821,9 @@ class Game {
       // 🥚 R5 «Колекція та яйця»: лічильник яєць, видані пороги-яйця (зірки/друзі),
       // корм (з дублікатів) і рівні петсів ({ petId: 1..3 })
       eggs: 0, eggClaims: [], friendEggClaims: [], petFood: 0, petLevels: {},
+      // 🏕️🥚 R4 (v299) «Табір кличе»: тижневий квест табору. { wk: номер тижня, q: id квесту,
+      // p: прогрес, claimed }. Детермінований від _weekIndex(); БЕЗ FOMO (не згорає).
+      weeklyCamp: null,
     };
   }
 
@@ -965,6 +978,8 @@ class Game {
         else out.gift = Object.assign({ last: '', streak: 0, week: 1 }, out.gift);
         if (!out.weeklyGoal || typeof out.weeklyGoal !== 'object' || Array.isArray(out.weeklyGoal)) out.weeklyGoal = { week: -1, n: 0, claimed: false };
         else out.weeklyGoal = this._sanitizeWeeklyGoal(Object.assign({ week: -1, n: 0, claimed: false }, out.weeklyGoal));
+        // 🏕️ тижневий квест табору — старий сейв без поля дістає чистий старт (ретро-безпека)
+        if (out.weeklyCamp !== null && (typeof out.weeklyCamp !== 'object' || Array.isArray(out.weeklyCamp))) out.weeklyCamp = null;
         out.strongZombies = !!out.strongZombies;
         out.toughZombies = !!out.toughZombies;
         // 🎭 кооп-роль: лише з білого списку (зіпсоване/чуже → null, без ролі)
@@ -1371,6 +1386,8 @@ class Game {
       // 🎁 чіп подарунка дня — видно лише коли подарунок готовий
       const giftChip = document.getElementById('gift-chip');
       if (giftChip) giftChip.classList.toggle('show', this.gift.pending());
+      // 🏕️ чіп-нагадування квесту табору — коли виконано й не забрано
+      this._refreshCampChip();
       // 🗓️ ціль тижня — оновлюємо текст/бар
       this._refreshWeeklyGoalUI();
       if (this._newVersion) this._onNewVersion(this._newVersion);
@@ -3181,6 +3198,9 @@ class Game {
     });
     // 🤝 R5: кожен 3-й врятований друг дарує яйце петса — теплий тост від друга
     level.bus.on('friendRescued', (cid) => this._onFriendRescued(cid));
+    // 🏕️ тижневий квест «Врятуй N людей»: хлів рятунку = 3 людини (medic/granny/kid).
+    // Гачок кіл-кредитований господарем (у гостя _complete не бігає) — рахуємо локально.
+    level.bus.on('missionDone', (m) => { if (m && m.type === 'rescue') this._bumpCamp('rescue', 3); });
     // ⭐ зірковий досвід і щоденні завдання
     level.bus.on('zombieKilled', (z) => {
       if (level.playground) return;
@@ -3197,6 +3217,9 @@ class Game {
       // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
       // лічильник елітів рахує окремий уникредитований гачок нижче (еліт, убитий будь-ким).
       if (z.elite && !level.net) this._bumpSecondary(level, 'elite');
+      // 🏕️ тижневий квест табору «Здолай N елітних» — тікає з ЛОКАЛЬНИХ елітних кілів
+      // гравця (цей гачок уже кіл-кредитований: у коопі-хості чужі кіли відсіяно вище)
+      if (z.elite) this._bumpCamp('elite');
       this._bumpWeeklyGoal();
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
@@ -3474,6 +3497,7 @@ class Game {
 
   // 🤝 R5: друга врятовано → кожен 3-й дарує яйце (ретро-безпечно через friendEggClaims).
   _onFriendRescued(cid) {
+    this._bumpCamp('rescue', 1); // 🏕️ звільнений друг — теж «врятована людина» для квесту табору
     const granted = claimFriendEggs(this.save);
     if (granted > 0) {
       const f = friendFor(cid);
@@ -3481,6 +3505,25 @@ class Game {
       this.hud.toast(t('🥚 {who} дарує тобі яйце петса! Відкрий у Альбомі → 🐾 Петси', { who }), 5);
       this.saveGame();
     }
+  }
+
+  // 🏕️ тік тижневого квесту табору від ЛОКАЛЬНОЇ події гравця (соло І кооп). Коли квест
+  // САМЕ виконано — теплий банер + чип-нагадування на глобусі + сейв. Проміжний прогрес
+  // не пише сейв на кожній події (як _bumpWeeklyGoal) — його підхопить наступний saveGame.
+  _bumpCamp(metric, amount = 1) {
+    const done = bumpWeeklyCamp(this.save, this._weekIndex(), metric, amount);
+    if (done) {
+      this.hud.banner(t('🏕️ КВЕСТ ТАБОРУ ВИКОНАНО!'), t('Забери 🥚 у таборі бази!'), 4.5);
+      this._refreshCampChip();
+      this.saveGame();
+    }
+    return done;
+  }
+
+  // 🏕️ показ/сховок чипа-нагадування «📌 Квест табору» на глобусі (виконано й не забрано)
+  _refreshCampChip() {
+    const chip = document.getElementById('camp-quest-chip');
+    if (chip) chip.classList.toggle('show', weeklyCampReminder(this.save, this._weekIndex()));
   }
 
   // 🥚 відкрити одне яйце з Альбому → церемонія скрині: новий петс АБО дублікат → корм ×2
@@ -3856,6 +3899,7 @@ class Game {
   }
 
   endLevel() {
+    if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
     if (this.level && this.level.net && this.coop) {
@@ -4148,6 +4192,36 @@ class Game {
     this._openGiftModal();       // перемалювати грід (день зсунувся, кнопка сховається)
     const giftChip = document.getElementById('gift-chip');
     if (giftChip) giftChip.classList.remove('show');
+  }
+
+  // 🏕️ панель тижневого квесту табору: опис, прогрес X/N, кнопка «Забрати 🥚» коли виконано.
+  // Викликається з чипа на глобусі АБО з дошки квесту в таборі бази (hqbase).
+  _openCampQuest() {
+    const st = weeklyCampState(this.save, this._weekIndex());
+    const def = st.def;
+    const titleEl = document.getElementById('campquest-title');
+    const descEl = document.getElementById('campquest-desc');
+    const progEl = document.getElementById('campquest-prog');
+    const fillEl = document.getElementById('campquest-fill');
+    const claimBtn = document.getElementById('btn-campquest-claim');
+    const doneEl = document.getElementById('campquest-claimed');
+    if (titleEl) titleEl.textContent = def ? `${def.emoji} ${def.title()}` : t('Квест табору');
+    if (descEl) descEl.textContent = def ? def.desc() : '';
+    if (progEl) progEl.textContent = `${st.p}/${st.goal}`;
+    if (fillEl) fillEl.style.width = `${st.goal ? Math.round((st.p / st.goal) * 100) : 0}%`;
+    if (claimBtn) claimBtn.style.display = st.claimable ? '' : 'none';
+    if (doneEl) doneEl.style.display = (st.done && st.claimed) ? '' : 'none';
+    this._showOverlay('overlay-campquest');
+  }
+
+  // 🏕️ забрати нагороду квесту табору: +1🥚 +🍖×2 через церемонію скрині (мета-екран — можна).
+  _claimCampQuest() {
+    const r = claimWeeklyCamp(this.save, this._weekIndex());
+    if (!r) { this.audio.denied(); return; }
+    this.saveGame();
+    this._hideOverlay('overlay-campquest');
+    this.chestCeremony({ title: t('🏕️ НАГОРОДА ТАБОРУ!'), items: [{ icon: '🥚', n: r.eggs }, { icon: '🍖', n: r.food }] });
+    this._refreshCampChip();
   }
 
   // 🗓️ оновити текст і бар цілі тижня на глобусі
@@ -5174,6 +5248,10 @@ class Game {
     const starInfo = this.level.secondaryObjective ? this._awardStars(country.id, s) : null;
     this.progress.addXp(XP_VALUES.country);
     if (!wasLiberated) this.quests.onEvent('country');
+    // 🏕️ тижневий квест «Переможи у N країнах»: рахуємо БУДЬ-ЯКУ кампанійну перемогу
+    // (соло/кооп), у т.ч. повторну — щоб ветеран із усіма звільненими країнами міг виконати.
+    // Гейт — наявність secondaryObjective (виставляється рівно для кампанійного забігу).
+    if (this.level.secondaryObjective) this._bumpCamp('victory');
     this.saveGame();
     // 🎁 тости за розблоковані пороги зірок (після saveGame — стан уже узгоджений)
     if (starInfo) for (const th of starInfo.claimed) this.hud.toast(t('🎉 {l}', { l: th.label() }), 5);

@@ -44,6 +44,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'friends', 'friendThanks',
   // 🥚 R5 «Колекція та яйця»: яйця, видані пороги (зірки/друзі), корм і рівні петсів
   'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
+  // 🏕️ R4 (v299) «Табір кличе»: тижневий квест табору (тиждень/квест/прогрес/забрано)
+  'weeklyCamp',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -99,6 +101,7 @@ export function saveHasProgress(s) {
     || (Array.isArray(s.friendEggClaims) && s.friendEggClaims.length > 0) // видані пороги-яйця (друзі)
     || (s.petFood | 0) > 0                                  // 🍖 корм для росту петсів
     || (s.petLevels && typeof s.petLevels === 'object' && Object.values(s.petLevels).some((v) => (v | 0) > 1)) // рівні петсів
+    || (s.weeklyCamp && typeof s.weeklyCamp === 'object' && ((s.weeklyCamp.p | 0) > 0 || !!s.weeklyCamp.claimed)) // 🏕️ прогрес/нагорода тижневого квесту табору
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 
