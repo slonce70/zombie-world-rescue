@@ -90,7 +90,7 @@ export class Sandstorm {
     this.phase = 'warn';
     this.timer = WARN_T;
     const g = this.level.game;
-    if (g && g.hud) g.hud.banner(t('🌪️ Піщана буря наближається!'), '', WARN_T + 0.5);
+    if (g && g.hud) g.hud.banner(t('🌪️ Піщана буря наближається!'), '', WARN_T + 0.5, { prio: 1 }); // v300: телеграф небезпеки не чекає в черзі
     if (this.level.audio && this.level.audio.sandstormWarn) this.level.audio.sandstormWarn();
   }
 
