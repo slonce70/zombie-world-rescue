@@ -950,6 +950,39 @@ export function makeBurnFx() {
   return g;
 }
 
+// 👹 Аура еліта (v287): пласке світне кільце під ногами. Геометрія спільна (кеш),
+// матеріал per-instance (свій колір) — все одно дешево, бо еліти обмежені кількістю.
+let eliteAuraGeo = null;
+export function makeEliteAura(colorHex = 0xffd23f) {
+  if (!eliteAuraGeo) eliteAuraGeo = new THREE.RingGeometry(0.5, 0.72, 22);
+  const m = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
+  const ring = new THREE.Mesh(eliteAuraGeo, m);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.06;
+  return ring;
+}
+
+// 🔖 Іконка-спрайт над головою (емодзі). Текстури кешуються за символом — без зайвих канвасів.
+const iconTexCache = new Map();
+function iconTexture(emoji) {
+  if (iconTexCache.has(emoji)) return iconTexCache.get(emoji);
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.font = '46px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, 32, 36);
+  const tex = new THREE.CanvasTexture(c);
+  iconTexCache.set(emoji, tex);
+  return tex;
+}
+export function makeIconSprite(emoji) {
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(emoji), transparent: true, depthTest: false, depthWrite: false }));
+  spr.scale.set(0.55, 0.55, 1);
+  return spr;
+}
+
 function buildZombie(type, rng) {
   if (type === 'snowman') return buildSnowman(rng);
   if (type === 'mummy') {
@@ -1595,6 +1628,54 @@ function buildZombie(type, rng) {
       eyeWhite: 0xfff0a0, eyeL: 0.1, eyeR: 0.1, pupilColor: 0xc62828, brow: 0.2,
     }));
     rig.ztype = 'imp';
+    addZombieWear(rig);
+    return rig;
+  } else if (type === 'splitter') {
+    // 🪓 розділювач: кремезний зеленошкірий здоровань із важким тесаком і шрамом-швом посередині
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.3, belly: 1.6, armsForward: 1.1, headR: 0.24,
+      skin: 0x7bbf5a, shirt: 0x3f6e3a, pants: 0x2e3a2a,
+      eyeL: 0.06, eyeR: 0.08, brow: 0.55, bellySkin: true,
+    }));
+    // тесак у правій руці (руків'я + широке лезо)
+    const handleM = toonMat(0x5a3b22);
+    const bladeM = toonMat(0xcfd6de, 0x9aa6b2, 0.3);
+    const handle = box(0.06, 0.42, 0.06, handleM);
+    handle.position.set(0, -0.66, -0.12);
+    const blade = box(0.34, 0.3, 0.05, bladeM);
+    blade.position.set(0, -0.9, -0.12);
+    rig.parts.armR.add(handle, blade);
+    // «шов» по тулубу — натяк, що зомбі розколеться
+    const seamM = toonMat(0x2e4a24);
+    const seam = box(0.05, 0.5, 0.34, seamM);
+    seam.position.set(0, 0.1, 0);
+    rig.parts.torso.add(seam);
+    rig.ztype = 'splitter';
+    addZombieWear(rig);
+    return rig;
+  } else if (type === 'exploder') {
+    // 💥 підривник: худий, прудкий, з роздутим світним «зарядом» на пузі (миготить перед вибухом)
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 0.98, belly: 0.9, armsForward: 1.5, lean: -0.34,
+      skin: 0xd08a4a, shirt: 0x6a3320, pants: 0x33241a,
+      eyeWhite: 0xffd0a0, eyeL: 0.09, eyeR: 0.09, pupilColor: 0xc62828, brow: 0.35,
+      mouth: 'open', teeth: true,
+    }));
+    // мідні «дужки» навколо заряду — печуться разом з тілом (не анімуються)
+    const ringM = toonMat(0x8a5a2a);
+    const cage = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.04, 6, 12), ringM);
+    cage.position.set(0, 0.02, -0.2);
+    rig.parts.torso.add(cage);
+    // світний заряд-бомба на пузі — ОКРЕМИЙ меш ПІСЛЯ запікання (як нагрудник броньовика),
+    // щоб zombies.js міг знайти його за іменем і миготіти перед вибухом.
+    rig._postBake = (r) => {
+      const coreM = toonMat(0xff5a2a, 0xff2a00, 0.9);
+      const core = sphere(0.24, coreM, 12, 10);
+      core.name = 'bombCore';
+      core.position.set(0, 0.02, -0.24);
+      r.parts.torso.add(core);
+    };
+    rig.ztype = 'exploder';
     addZombieWear(rig);
     return rig;
   } else { // walker

@@ -1,6 +1,6 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
-import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, updateRig, setAnim, toonMat, disposeRigSkeleton } from './characters.js';
+import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, makeEliteAura, makeIconSprite, updateRig, setAnim, toonMat, disposeRigSkeleton } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
 import { t } from './i18n.js';
@@ -70,7 +70,26 @@ const TYPE_STATS = {
   // 🧛 вампір: швидкий НІЧНИЙ хижак. Зʼявляється лише вночі (nightK>0.5), у будь-якій країні.
   // 150 hp, прудкий у погоні; БЕЗ ranged, БЕЗ щита, без lifesteal (lifesteal — окрема майбутня опція).
   vampire: { hp: 150, speed: 1.7, chaseSpeed: 4.0, aggro: 30, dmg: 14, attackR: 1.9, coins: 24, pitch: 1.15 },
+  // 🪓 розділювач (v287): кремезний, повільний; по СМЕРТІ розпадається на 2 міні-зомбі
+  // (швидкі, слабкі, ~60% зросту). Міні рахуються у вбивства/квести як звичайні (тип 'runner').
+  splitter: { hp: 210, speed: 1.35, chaseSpeed: 2.8, aggro: 26, dmg: 15, attackR: 2.1, coins: 22, pitch: 0.66, splits: true },
+  // 💥 підривник (v287): біжить до гравця ШВИДШЕ за всіх; у радіусі ~4м — телеграф 1.2с
+  // (миготіння + червоне коло на землі), потім вибух (25 гравцю в радіусі, добиває сусідніх зомбі).
+  // Постріл до детонації підриває на місці. Мультяшний бабах — без крові.
+  exploder: { hp: 55, speed: 2.6, chaseSpeed: 5.4, aggro: 34, dmg: 5, attackR: 2.0, coins: 18, pitch: 1.35, exploder: true },
   boss: { hp: 1300, speed: 2.0, chaseSpeed: 3.9, aggro: 999, dmg: 26, attackR: 3.6, coins: 0, pitch: 0.4 },
+};
+// 💥 підривник: радіус вибуху і шкода гравцю; телеграф — час до детонації в межах радіуса
+const EXPLODER_RADIUS = 4.5;
+const EXPLODER_DMG = 25;
+const EXPLODER_TELEGRAPH = 1.2;
+// 👹 еліт-декор (v287): іконка над головою + колір аури під ногами, за типом
+const ELITE_INFO = {
+  shield: { icon: '🛡️', color: 0x8fb7ff },
+  splitter: { icon: '🪓', color: 0x7be07b },
+  exploder: { icon: '💥', color: 0xff6a4a },
+  golden: { icon: '👑', color: 0xffd23f },
+  default: { icon: '👑', color: 0xffd23f },
 };
 const WEEKLY_ELITE_SOURCE_TYPES = new Set(['walker', 'runner', 'headphones', 'boxer', 'mummy', 'imp']);
 
@@ -186,7 +205,7 @@ export class Zombies {
     // та стилізовані boss-виклики, щоб не складати сценарні ефекти двічі.
     const weeklyCanTouch = !!(wm && finalType !== 'boss' && !opts.horde && !opts.mirror && !opts.style && !opts.frost);
     if (weeklyCanTouch) {
-      const weeklyEliteOk = !opts.guard && !opts.zone && !opts.golden && !opts.sleeping && !opts.noCoopScale
+      const weeklyEliteOk = !opts.guard && !opts.zone && !opts.golden && !opts.sleeping && !opts.noCoopScale && !opts.mini
         && WEEKLY_ELITE_SOURCE_TYPES.has(finalType);
       if (weeklyEliteOk && wm.eliteChance > 0 && this.rng.chance(wm.eliteChance)) {
         const eliteTypes = Array.isArray(wm.eliteTypes) && wm.eliteTypes.length ? wm.eliteTypes : ['tank', 'shield'];
@@ -310,6 +329,23 @@ export class Zombies {
     z_.damage = (amt, dir, headshot, opts) => this._damage(z_, amt, dir, headshot, opts);
     if (opts.golden) this._makeGolden(z_);
     if (opts.elite) this._makeElite(z_);
+    // 💥 підривник: телеграф-таймер (0 = ще не почав), маркер детонації, посилання на світний «заряд»
+    if (finalType === 'exploder') {
+      z_.explodeT = 0;
+      z_.exploded = false;
+      z_.rig.body.traverse((o) => { if (o.name === 'bombCore') z_.bombCore = o; });
+    }
+    // 🪓 міні-зомбі розділювача: ~60% зросту, слабкий, мало монет (тіло вже клоноване як 'runner')
+    if (opts.mini) {
+      z_.mini = true;
+      z_.rig.group.scale.multiplyScalar(0.6);
+      z_.rig.radius *= 0.6;
+      z_.rig.height *= 0.6;
+      z_.stats.coins = 4;
+      this.setConfiguredHp(z_, 18, opts);
+    }
+    // 👑 золотий: зникає за 12с, якщо не встигли вбити (спавн-таймер лову)
+    if (opts.golden) z_.goldenTtl = 12;
     if (opts.sleeping) {
       z_.sleeping = true;
       setAnim(rig, 'idle');
@@ -339,7 +375,8 @@ export class Zombies {
     });
   }
 
-  // 👹 еліт: золота корона-обідок і більший зріст
+  // 👹 еліт: золота корона-обідок, більший зріст + (v287) кольорова аура під ногами
+  // й іконка-емодзі над головою. Аура/іконка — спільна геометрія + кешовані текстури (дешево).
   _makeElite(z_) {
     z_.elite = true;
     const crown = new THREE.Mesh(
@@ -350,6 +387,14 @@ export class Zombies {
     crown.position.y = 0.38;
     z_.rig.parts.head.add(crown);
     z_.rig.group.scale.multiplyScalar(1.18);
+    const info = ELITE_INFO[z_.type] || ELITE_INFO.default;
+    const aura = makeEliteAura(info.color);
+    z_.rig.group.add(aura);
+    z_.eliteAura = aura;
+    const icon = makeIconSprite(info.icon);
+    icon.position.set(0, z_.rig.height + 0.55, 0);
+    z_.rig.group.add(icon);
+    z_.eliteIcon = icon;
   }
 
   populate() {
@@ -687,10 +732,53 @@ export class Zombies {
         && Math.hypot(o.x - z.x, o.z - z.z) < 13) this._aggro(o);
     }
     if (z.hp <= 0) {
+      // 💥 підривник: постріл до детонації підриває його НА МІСЦІ (безпечно, якщо гравець далеко)
+      if (z.type === 'exploder' && !z.exploded) { this._explode(z, dir); return; }
       // 🪬 шаман воскресає один раз — перша «смерть» його не вбиває
       if (z.type === 'shaman' && !z.revivedOnce) { this._reviveShaman(z); return; }
       this._kill(z, dir);
     }
+  }
+
+  // 💥 Вибух підривника (v287): мультяшний бабах — шкода гравцю в радіусі, добиває сусідніх зомбі.
+  // Викликається або при детонації телеграфу (update), або коли підривника застрелили (_damage).
+  // Kid-safe: яскравий спалах, без крові. Host/solo рахує шкоду; гостю реплікуємо ВІЗУАЛ через 'bm'.
+  _explode(z, dir) {
+    if (z.exploded) return;
+    z.exploded = true;
+    const level = this.level;
+    const R = EXPLODER_RADIUS;
+    const boomPos = new THREE.Vector3(z.x, z.y + 0.9, z.z);
+    // мультяшний спалах: помаранчево-жовтий бурст + кільце ударної хвилі (без металевого диму робота)
+    level.effects.burst(boomPos, 0xffcf3a, 22, { speed: 7, up: 6, life: 0.8, size: 1.9 });
+    level.effects.burst(boomPos, 0xff7a2a, 16, { speed: 6, up: 5, life: 0.7, size: 1.6 });
+    level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xff6a2a, R + 0.5);
+    level.audio.explosion();
+    if (!level.net || level.net.authority) {
+      const pls = level.players
+        || [{ pid: 1, pos: level.player.pos, get health() { return level.player.health; } }];
+      for (const pl of pls) {
+        if (pl.health <= 0) continue;
+        if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, EXPLODER_DMG, z.x, z.z);
+      }
+      // 🎯 винагорода за кайтинг: вибух добиває інших зомбі поряд (не рекурсивно — direct hp)
+      for (const o of this.list) {
+        if (o === z || o.state === 'dead' || o.gone) continue;
+        if (Math.hypot(o.x - z.x, o.z - z.z) > R) continue;
+        if (o.type === 'exploder' && !o.exploded) { this._explode(o, null); continue; } // ланцюг
+        const before = o.hp;
+        o.hp -= 120;
+        if (before > 0) this.level.bus.emit('zombieDamaged', Math.min(before, 120), o);
+        if (o.hp <= 0) {
+          if (o.type === 'shaman' && !o.revivedOnce) this._reviveShaman(o);
+          else this._kill(o, null);
+        }
+      }
+      // реплікація ВІЗУАЛУ гостям наявним каналом 'bm' (client.netExplosion)
+      level.netEv('bm', Math.round(boomPos.x * 10) / 10, Math.round(boomPos.y * 10) / 10,
+        Math.round(boomPos.z * 10) / 10, R, 0, 0);
+    }
+    this._kill(z, dir); // сам підривник гине (лут/лічильники — штатно)
   }
 
   _aggro(z) {
@@ -776,15 +864,33 @@ export class Zombies {
       }
     }
     if (z.horde) this.hordeRemaining--;
-    if (z.golden) {
-      // 🏆 джекпот!
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
+    // 🪓 розділювач: по смерті розпадається на 2 міні-зомбі (швидкі, слабкі; рахуються як звичайні).
+    // Не для самих міні; у коопі — лише authority (реплікація через onZombieSpawn у spawn()).
+    if (z.type === 'splitter' && !z.mini && (!level.net || level.net.authority)) {
+      level.effects.burst(new THREE.Vector3(z.x, z.y + 1.0, z.z), 0x7be07b, 12, { speed: 4, up: 3, life: 0.5, size: 1.1 });
+      for (let i = 0; i < 2; i++) {
+        const a = (i ? 1 : -1) * 0.9 + this.rng.range(-0.3, 0.3);
+        const mx = z.x + Math.cos(a) * 1.0, mz = z.z + Math.sin(a) * 1.0;
+        const mn = this.spawn('runner', mx, mz, { mini: true });
+        mn.aggroed = true;
+        mn.state = 'chase';
+        mn.anchor = { x: mx, z: mz, r: 12 };
       }
+    }
+    if (z.golden) {
       level.audio.goldenJingle(false);
-      level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
-      level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
+      // 👑 v287: у СОЛО золотий дарує скриню-церемонію (гарантована). Кооп лишаємо як було —
+      // фонтан монет + тост (церемонія — соло-фіча, кооп не чіпаємо).
+      if (!level.net) {
+        level.bus.emit('goldenChest', { x: z.x, z: z.z, y: z.y });
+      } else {
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          level.effects.spawnCoin(z.x + Math.cos(a) * this.rng.range(0.5, 2.5), z.z + Math.sin(a) * this.rng.range(0.5, 2.5), 12);
+        }
+        level.bus.emit('toast', t('🏆 ЗОЛОТИЙ ЗОМБІ! ДЖЕКПОТ +144 монети!'));
+        level.netEv('toast', t('🏆 ЗОЛОТОГО ЗОМБІ ВПІЙМАНО! Монети сиплються — розбирайте!'));
+      }
     }
     if (z.type === 'boss') {
       this.boss = null;
@@ -925,8 +1031,24 @@ export class Zombies {
 
       // 🌙 вночі зомбі помічають здалеку
       const nightAggro = 1 + (level.nightK || 0) * 0.5;
-      // золотий зомбі: побачив гравця — тікає
+      // золотий зомбі: побачив гравця — тікає; зникає за 12с, якщо не встигли вбити
       if (z.golden && z.state !== 'dead') {
+        if (z.goldenTtl !== undefined) {
+          z.goldenTtl -= dt;
+          if (z.goldenTtl <= 0) {
+            z.gone = true;
+            removeAny = true;
+            this.scene.remove(rig.group);
+            disposeRigSkeleton(rig);
+            this.byNidMap.delete(z.nid);
+            level.netEv('zg', z.nid);
+            if (!this._goldenGoneHint) {
+              this._goldenGoneHint = true;
+              level.bus.emit('toast', t('💨 Золотий зомбі втік! Наступного разу дожени швидше!'));
+            }
+            continue;
+          }
+        }
         if (playerAlive && distP < 26) {
           z.state = 'flee';
           if (!z._goldenVoice) {
@@ -1062,6 +1184,11 @@ export class Zombies {
       // --- 🐂 торо (charger, не-бос): телеграф → ривок рогами здаля ---
       if (z.charger && z.type !== 'boss' && z.state !== 'dead' && z.aggroed) {
         this._updateChargerAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt);
+      }
+
+      // --- 💥 підривник: телеграф у радіусі → вибух. Детонація прибирає зомбі — далі не оновлюємо. ---
+      if (z.type === 'exploder' && z.state !== 'dead') {
+        if (this._updateExploderAI(z, dt, distP, playerAlive)) continue;
       }
 
       // --- бос: чардж і призов ---
@@ -1302,6 +1429,40 @@ export class Zombies {
     }
   }
 
+  // 💥 Підривник (v287): у радіусі ~4м — телеграф 1.2с (миготіння заряду + пульс червоного кола),
+  // потім вибух. Повертає true, якщо детонував цього кадру (зомбі вже прибрано/мертвий).
+  _updateExploderAI(z, dt, distP, playerAlive) {
+    const level = this.level;
+    if (z.explodeT > 0) {
+      z.explodeT -= dt;
+      // блимання заряду — частішає до вибуху (per-instance bombCore, transform-only)
+      if (z.bombCore) {
+        const blink = 0.6 + 0.7 * Math.abs(Math.sin((EXPLODER_TELEGRAPH - z.explodeT) * 18));
+        z.bombCore.scale.setScalar(blink);
+      }
+      // пульс червоного кола радіуса вибуху на землі
+      z._decalT = (z._decalT || 0) - dt;
+      if (z._decalT <= 0) {
+        z._decalT = 0.4;
+        level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xff3a2a, EXPLODER_RADIUS);
+      }
+      if (z.explodeT <= 0) { this._explode(z, null); return true; }
+      return false;
+    }
+    // почав телеграф, коли добіг близько до живого гравця
+    if (z.aggroed && playerAlive && distP <= 4) {
+      z.explodeT = EXPLODER_TELEGRAPH;
+      z._decalT = 0;
+      level.audio.chargeWarn();
+      level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xff3a2a, EXPLODER_RADIUS);
+      if (!this._exploderHint) {
+        this._exploderHint = true;
+        level.bus.emit('toast', t('💥 Підривник! Відбіжи або підстрель здалеку — рвоне у колі!'));
+      }
+    }
+    return false;
+  }
+
   // 👑 Бос: пороги призову (75/50/25%), чардж-ривок, лють (<35% HP) і ліш до арени.
   _updateBossAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt) {
     const level = this.level;
@@ -1409,7 +1570,7 @@ export class Zombies {
       spd = st.speed;
       if (Math.hypot(z.wx - z.x, z.wz - z.z) < 1) spd = 0;
     }
-    if (z.charging > 0 || z.telegraph > 0) spd = 0;
+    if (z.charging > 0 || z.telegraph > 0 || z.explodeT > 0) spd = 0;
     if (z.slowT > 0) {
       spd *= z.slowMul || 0.5;
       z.slowT = Math.max(0, z.slowT - dt);
