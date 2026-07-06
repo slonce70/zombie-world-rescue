@@ -51,7 +51,7 @@ import { RescueHQ } from './ui/hq.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
-import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
+import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
 import {
   claimStarEggs, claimFriendEggs, claimBacklogEggs, openEgg, eggOddsText,
@@ -88,7 +88,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 297;
+const APP_VERSION = 298;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2927,6 +2927,15 @@ class Game {
         // 🕊️ невидиме милосердя: після 2+ смертей поспіль у ЦІЙ країні — тихі послаблення (БЕЗ UI).
         const md = this.save.mercyDeaths;
         level.mercy = (md && md.cid === countryId && md.n >= 2) ? { hpMult: 0.9, medkitMult: 1.5, eliteMinus: 1 } : null;
+      } else if (coop && !isPlayground && !isInfected && CAMPAIGN_ORDER.includes(countryId)) {
+        // ⭐ R3 «Зірки разом» (v298): у КООП-кампанії вторинна ціль КОМАНДНА. Дефініцію
+        // ({id,target}) ролить ХОСТ від сіда кімнати у coop.startLevel і кладе у spec (`so`),
+        // тож обидві сторони будують ТУ САМУ ціль (чип видно всім). Прогрес рахує лише хост
+        // (див. _bumpSecondary/уникредитований лічильник елітів), виконання шле подією `soc`.
+        // 🕊️ Милосердя (mercy) лишається СОЛО-only: у коопі тебе піднімає друг — це і є
+        // милосердя. Тож level.mercy тут НЕ виставляємо (і mercyDeaths у коопі не тікаємо).
+        const soDef = coop.spec && coop.spec.so;
+        if (soDef && soDef.id) level.secondaryObjective = pickSecondaryObjective(country, 0, soDef.id);
       }
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
@@ -3185,7 +3194,9 @@ class Game {
         lp.health += lp.lifeSteal;
       }
       this.save.stats.killed++;
-      if (z.elite) this._bumpSecondary(level, 'elite'); // ⭐2 «Убий N елітних зомбі»
+      // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
+      // лічильник елітів рахує окремий уникредитований гачок нижче (еліт, убитий будь-ким).
+      if (z.elite && !level.net) this._bumpSecondary(level, 'elite');
       this._bumpWeeklyGoal();
       const bk = z.golden ? 'golden' : z.type;
       this.save.bestiary[bk] = (this.save.bestiary[bk] || 0) + 1;
@@ -3204,6 +3215,13 @@ class Game {
         if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('boss');
         this.save.stats.bosses++;
       }
+    });
+    // ⭐ R3 «Зірки разом» (v298): КОМАНДНИЙ прогрес цілі «Убий N елітних» рахує ХОСТ
+    // НЕЗАЛЕЖНО від кіл-кредиту — еліт, убитий будь-ким (у т.ч. гостем), помирає у хостовій
+    // симуляції. Кредитований гачок вище лишається СОЛО-only, тож подвійного тіку нема.
+    level.bus.on('zombieKilled', (z) => {
+      if (!level.net || !level.net.authority) return; // соло/гість тут не рахують
+      if (z.elite) this._bumpSecondary(level, 'elite');
     });
     level.bus.on('zombieDamaged', (n, z) => {
       if (level.playground) return;
@@ -3494,16 +3512,35 @@ class Game {
     this.renderAlbum();
   }
 
+  // ⭐ R3 «Зірки разом» (v298): детермінований рол КОМАНДНОЇ вторинної цілі кооп-кампанії.
+  // Викликає coop.startLevel ПЕРЕД розсилкою spec, щоб `so` доїхав обом сторонам однаково.
+  // Пул звужено (COOP_SECONDARY_IDS) до цілей, які ХОСТ бачить авторитетно для всієї команди
+  // (див. коментар у stars.js). Тест форсить тип через _forceSecondary. Повертає {id,target} або null.
+  _rollCoopSecondary(countryId, seed) {
+    const country = COUNTRIES[countryId];
+    if (!country || !CAMPAIGN_ORDER.includes(countryId)) return null;
+    const pool = COOP_SECONDARY_IDS;
+    const forced = this._forceSecondary && pool.includes(this._forceSecondary) ? this._forceSecondary : null;
+    const id = forced || pool[(((seed | 0) % pool.length) + pool.length) % pool.length];
+    const so = pickSecondaryObjective(country, 0, id);
+    return { id: so.id, target: so.target };
+  }
+
   // ⭐ R3: тік вторинної цілі забігу (⭐2). Викликається з відповідних подій.
-  // Соло-only через level.secondaryObjective (виставляється лише у соло-кампанії).
+  // Соло: level.secondaryObjective виставляється лише у соло-кампанії — тікає локально.
+  // Кооп: прогрес КОМАНДНИЙ і авторитетний у ХОСТА. Гість-дзеркало НЕ тікає локально —
+  // він отримує progress у снапшоті (snap.so) і виконання подією `soc`. На виконанні хост
+  // шле `soc` → тік+дзвіночок+тост у всіх (як соло).
   _bumpSecondary(level, ev, n = 1) {
     const so = level && level.secondaryObjective;
     if (!so || so.done || so.ev !== ev) return;
+    if (level.net && !level.net.authority) return; // гість не рахує сам — прогрес йде від хоста
     so.progress = Math.min(so.target, so.progress + n);
     if (so.progress >= so.target) {
       so.done = true;
       this.audio.questDone();       // 🔔 дзвіночок «ціль виконана»
       this.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
+      if (level.net && level.net.authority) level.netEv('soc'); // сповіщаємо команду
     }
   }
 
@@ -3886,11 +3923,14 @@ class Game {
   }
 
   _onPlayerDied() {
+    // ⭐3 (v298 «Зірки разом»): stats.deaths — це ОСОБИСТІ падіння цього клієнта за забіг.
+    // У коопі кожен рахує СВОЇ (хост — свій player, гість — свій), і ⭐3 отримує лише той,
+    // у кого 0 падінь. Тебе піднімає друг — це і є «милосердя» коопу (mercy нижче — соло-only).
     this.level.stats.deaths++;
     // 🕊️ R3 невидиме милосердя: смерті ПОСПІЛЬ на одній країні кампанії (solo). БЕЗ жодного UI.
     // Наступний забіг цієї країни при n≥2 дістане тихі послаблення (див. створення рівня).
-    // secondaryObjective виставляється РІВНО для соло-забігу країни кампанії (не інфекція/кооп/
-    // спецрежими) — тож це точний гейт «зірково-милосердний забіг», а не просто campaign countryId.
+    // secondaryObjective виставляється для соло- І кооп-забігу кампанії, тож гейт milości —
+    // саме `!this.level.net`: у коопі mercyDeaths НЕ тікаємо (милосердя = друг тебе підіймає).
     if (this.level.secondaryObjective && !this.level.net) {
       const cid = this.level.countryId;
       const md = this.save.mercyDeaths;
@@ -5124,12 +5164,14 @@ class Game {
       }
     }
     if (infectedFirstWin) this._grantInfectedWin(country.id, s);
-    // ⭐ R3 «Зірки та милосердя»: нараховуємо зірки за перемогу (solo-only, лише країни кампанії).
-    // Кооп/інфекція/LAB/LOST зірок НЕ дають. level.secondaryObjective виставляється РІВНО для
-    // зіркового забігу (соло, кампанія, story/dynamic, !isInfected) — гейтимо на ньому (як у v289
-    // при нарахуванні mercyDeaths), інакше заражений забіг главы 2 хибно давав би зірки, пороги
-    // 12/24/36, яйця-мілстоуни й скидав би mercyDeaths. Пороги-нагороди — всередині _awardStars.
-    const starInfo = (this.level.secondaryObjective && !this.level.net) ? this._awardStars(country.id, s) : null;
+    // ⭐ R3 «Зірки та милосердя» / v298 «Зірки разом»: нараховуємо зірки за перемогу.
+    // level.secondaryObjective виставляється РІВНО для зіркового забігу — соло-кампанія АБО
+    // кооп-кампанія (story/dynamic, !isInfected, не спецрежими) — тож сама його наявність і є
+    // гейтом (заражений забіг глави 2, LAB/LOST, шторм/арена/кімнатні режими його не мають).
+    // Кооп: КОЖЕН гравець (хост — свій victory-шлях, гість — netVictory→_showVictory) нараховує
+    // зірки у ВЛАСНИЙ сейв локально: ⭐1 перемога; ⭐2 командна ціль (so.done прийшов через `soc`);
+    // ⭐3 ОСОБИСТО без падінь (stats.deaths — кожен рахує свої). _awardStars однаковий для соло й коопу.
+    const starInfo = this.level.secondaryObjective ? this._awardStars(country.id, s) : null;
     this.progress.addXp(XP_VALUES.country);
     if (!wasLiberated) this.quests.onEvent('country');
     this.saveGame();
@@ -5627,6 +5669,16 @@ class Game {
       secondaryState: () => {
         const so = g.level && g.level.secondaryObjective;
         return so ? { id: so.id, ev: so.ev, target: so.target, progress: so.progress, done: so.done, label: so.label() } : null;
+      },
+      // ⭐ v298 «Зірки разом»: форс виконання КОМАНДНОЇ цілі на ХОСТІ (як соло-тести форсять
+      // secondaryObjective.done). Хост доганяє прогрес до target через _bumpSecondary → шле `soc`.
+      // На гості (mirror) — no-op: прогрес авторитетний у хоста.
+      forceSecondaryDone: () => {
+        const level = g.level;
+        const so = level && level.secondaryObjective;
+        if (!so || (level.net && !level.net.authority)) return false;
+        g._bumpSecondary(level, so.ev, so.target);
+        return so.done;
       },
       starState: () => ({
         stars: { ...(g.save.stars || {}) },

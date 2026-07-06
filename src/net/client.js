@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { PF, weaponToIdx, idxToWeapon } from './protocol.js';
 import { PING_PHRASES } from './coop.js';
+import { pickSecondaryObjective } from '../stars.js';
 import { t } from '../i18n.js';
 
 const SEND_HZ = 15;
@@ -182,6 +183,14 @@ export class GuestNet {
     }
     level.zombies.applySnapshot(s.z);
     if (s.m && level.missions.applyNet) level.missions.applyNet(s.m);
+    // ⭐ v298 «Зірки разом»: КОМАНДНИЙ прогрес цілі — чип гостя тікає наживо. Виконання
+    // окремо підтверджує подія `soc` (тік+дзвіночок), але якщо її пропустили — done тут
+    // безпечно виводиться з progress≥target, щоб ⭐2 зарахувалась на перемозі.
+    if (s.so != null && level.secondaryObjective) {
+      const so = level.secondaryObjective;
+      so.progress = Math.min(so.target, s.so | 0);
+      if (so.progress >= so.target) so.done = true;
+    }
     if (s.ball && level.effects.ball) {
       const bp = level.effects.ball.mesh.position;
       bp.x += (s.ball[0] - bp.x) * 0.4;
@@ -306,6 +315,18 @@ export class GuestNet {
         break;
       }
       case 'vict': game.netVictory(); break;
+      // ⭐ v298 «Зірки разом»: хост підтвердив виконання КОМАНДНОЇ вторинної цілі →
+      // тік+дзвіночок+тост у гостя (як соло). Робить ⭐2 досяжною на перемозі.
+      case 'soc': {
+        const so = level.secondaryObjective;
+        if (so && !so.done) {
+          so.done = true;
+          so.progress = so.target;
+          level.audio.questDone();
+          game.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
+        }
+        break;
+      }
       case 'stormend': game._endStormRun(); break;
       // 🎲 кооп-драфт: хост роздав набір карток — відкриваємо оверлей лише СВОЄМУ pid
       case 'dro': if (a[0] === me && game.draft) game.draft.openNet(a[1]); break;
@@ -402,6 +423,20 @@ export class GuestNet {
       this.game.makeGuestMegabox(w.megabox);
     }
     if (st.missions && level.missions.applyNetFull) level.missions.applyNetFull(st.missions);
+    // ⭐ v298 «Зірки разом»: mid-join/реконект відновлює чип КОМАНДНОЇ цілі + прогрес/виконаність.
+    // Зазвичай secondaryObjective уже побудовано зі spec (`so`) при вході; якщо ні — реконструюємо
+    // з дефініції у стані (id/target) детерміновано через pickSecondaryObjective.
+    if (st.so) {
+      let so = level.secondaryObjective;
+      if (!so && level.country) {
+        so = pickSecondaryObjective(level.country, 0, st.so[0]);
+        level.secondaryObjective = so;
+      }
+      if (so) {
+        so.progress = Math.min(so.target, st.so[2] | 0);
+        so.done = !!st.so[3];
+      }
+    }
     // 🌟 v297: непідібраний супер-пікап (mid-join/реконект) → дзеркало. Активні сили — короткочасні,
     // у стані НЕ синкаються: гравець, що приєднався посеред сили, її просто не побачить (за задумом).
     if (st.spu) this.game._spawnSuperMirror(st.spu[0], st.spu[1], st.spu[2]);

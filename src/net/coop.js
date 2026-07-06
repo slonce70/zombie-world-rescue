@@ -234,7 +234,12 @@ export class CoopSession {
     // ті самі гейти, що соло: playground/?test-без-weekmod → null). Гість НЕ рахує
     // локально — інакше розсинхрон опівночі/часових поясів.
     const mut = game._hostWeeklyMutatorId();
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut };
+    // ⭐ v298 «Зірки разом»: КОМАНДНУ вторинну ціль ролить ХОСТ від сіда кімнати ТУТ (перед
+    // розсилкою spec), щоб `so` доїхав обом сторонам однаково — лише у чистій кооп-кампанії
+    // (не шторм/арена/нокаут/оборона/радіація/турель/світовий бос). Той самий сід-патерн, що соло.
+    const isPlainCampaign = !storm && !arena && !knockout && !defense && !radiation && !turretwar && !wb;
+    const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3) : null;
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();

@@ -9,7 +9,7 @@
     "test:quick-release": "node test/quick-release.mjs",
     "test:release": "node test/release.mjs && npm run test:coop-release",
     "test:coop": "node test/coop.mjs",
-    "test:coop-release": "node test/relay-reconnect.mjs && node test/coop-reconnect-guard.mjs && SLOW=4 node test/coop3.mjs && SLOW=2 node test/coop-elite.mjs && SLOW=2 node test/coop-super.mjs && SLOW=2 node test/coop-draft.mjs && SLOW=2 node test/coop-friendly-defense.mjs && SLOW=2 node test/coop-weekly.mjs && SLOW=2 node test/coop-radiation.mjs && SLOW=2 node test/coop-turretwar.mjs && SLOW=2 node test/coop-bonus.mjs && SLOW=2 node test/coop-worldboss.mjs && SLOW=4 node test/coop-roles.mjs"
+    "test:coop-release": "node test/relay-reconnect.mjs && node test/coop-reconnect-guard.mjs && SLOW=4 node test/coop3.mjs && SLOW=2 node test/coop-elite.mjs && SLOW=2 node test/coop-super.mjs && SLOW=2 node test/coop-stars.mjs && SLOW=2 node test/coop-draft.mjs && SLOW=2 node test/coop-friendly-defense.mjs && SLOW=2 node test/coop-weekly.mjs && SLOW=2 node test/coop-radiation.mjs && SLOW=2 node test/coop-turretwar.mjs && SLOW=2 node test/coop-bonus.mjs && SLOW=2 node test/coop-worldboss.mjs && SLOW=4 node test/coop-roles.mjs"
   },
   "license": "ISC",
   "type": "commonjs",
