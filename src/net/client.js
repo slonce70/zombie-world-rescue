@@ -314,6 +314,16 @@ export class GuestNet {
       // 🗼 кооп-турельна війна: фінал вирішив хост
       case 'twend': game._endTurretWarRun(!!a[0], a[1] || 'turret'); break;
       case 'arenaend': game._endArenaRun(); break;
+      // 👹 v296 «Еліти разом»: телеграф елітної хвилі — той самий банер+стінгер, що в соло.
+      // Не емітимо eliteWaveWarning (він у соло-грі тягне _trySuperPickup — R2, ще не в коопі).
+      case 'ew':
+        level.audio.eliteWave();
+        game.hud.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4);
+        break;
+      // хвилю зачищено → нагорода кожному локально (гроші/кристали/рол яйця + банер)
+      case 'ewc': game._grantEliteChestCoop(); break;
+      // золоту скриню взято → нагорода кожному локально
+      case 'gch': game._grantGoldenChestCoop(); break;
       case 'hw': level.bus.emit('hordeWarning', 5); break;
       case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;
       case 'he': level.bus.emit('hordeEnd'); break;

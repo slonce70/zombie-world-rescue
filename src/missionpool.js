@@ -590,10 +590,12 @@ export class DynamicMissions {
     const fresh = !this.pendingHorde;
     if (this.pendingHorde) this.pendingHorde.count += count;
     else this.pendingHorde = { t: 5, count };
-    // 👹 елітна хвиля (v287): кожна ~3-тя орда у СОЛО стає елітною — анонс за 3с
+    // 👹 елітна хвиля (v287): кожна ~3-тя орда стає елітною — анонс за 3с
     // (правило Brotato) + стінгер; 2–4 еліти доспавнюються при старті орди.
+    // v296 «Еліти разом»: рішення приймає ХОСТ (authority) — у гостя-дзеркалі
+    // _complete і так не бігає, але гард робимо явним, щоб гість не позначив свою хвилю.
     let eliteWave = false;
-    if (fresh && !level.net) {
+    if (fresh && (!level.net || level.net.authority)) {
       this._soloHordeNum = (this._soloHordeNum || 0) + 1;
       if (this._soloHordeNum % 3 === 0) eliteWave = true;
     }
@@ -602,6 +604,8 @@ export class DynamicMissions {
       this.pendingHorde.t = 3;
       level.audio.eliteWave();
       level.bus.emit('eliteWaveWarning');
+      // кооп: телеграф-банер + стінгер гостям (хост зіграв локально через bus вище)
+      if (level.net) level.netEv('ew');
     } else {
       level.bus.emit('hordeWarning', 5);
       level.netEv('hw'); // кооп: попередження про орду і гостю
