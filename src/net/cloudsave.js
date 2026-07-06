@@ -40,6 +40,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'coopWins', 'coopBonusDay',
   // ⭐ R3 «Зірки та милосердя»: зірки країн, видані пороги-нагороди, лічильник милосердя
   'stars', 'starClaims', 'mercyDeaths',
+  // 🤝 R4 «Врятовані друзі»: врятовані НПС і день останнього «щоденного дякую» табору
+  'friends', 'friendThanks',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -89,6 +91,7 @@ export function saveHasProgress(s) {
     || (s.cloneSkins || []).length > 0 || (!!s.activeCloneSkin && s.activeCloneSkin !== 'ninja')
     || !!(s.gift && (s.gift.streak | 0) > 0)                 // стрик подарунка дня — щоб зміна пристрою не обнуляла його
     || (s.stars && typeof s.stars === 'object' && Object.values(s.stars).some((v) => (v | 0) > 0)) // ⭐ зароблені зірки країн
+    || (s.friends && typeof s.friends === 'object' && Object.values(s.friends).some((v) => !!v)) // 🤝 врятовані друзі
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

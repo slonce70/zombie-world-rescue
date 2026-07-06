@@ -51,6 +51,7 @@ import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
+import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
@@ -81,7 +82,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 289;
+const APP_VERSION = 290;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -634,6 +635,13 @@ class Game {
       this.hq.render();
       this._showOverlay('overlay-hq');
     });
+    // 📖 R4 «Альбом»: колекція друзів (жива) + заглушки скінів/петсів/еліт (наповнення R5)
+    const albumBtn = document.getElementById('btn-album');
+    if (albumBtn) albumBtn.addEventListener('click', () => {
+      this.audio.click();
+      this.renderAlbum();
+      this._showOverlay('overlay-album');
+    });
     document.getElementById('btn-hqbase').addEventListener('click', () => this.enterHQBase());
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
@@ -791,6 +799,9 @@ class Game {
       stars: {}, starClaims: [], mercyDeaths: null,
       // 🎓 разові підказки-знайомства (вежа/самокат/гаджет/робот): { ключ: 1 } = вже показано
       hints: {},
+      // 🤝 R4 «Врятовані друзі»: врятовані НПС ({ cid: true }) і день останнього «щоденного дякую»
+      // з табору (YYYY-MM-DD, формат DailyGift.dayKey — скаляр, НЕ map)
+      friends: {}, friendThanks: '',
     };
   }
 
@@ -1656,6 +1667,56 @@ class Game {
       </div>`;
     }
     document.getElementById('quest-list').innerHTML = html;
+  }
+
+  // 📖 R4 «Альбом»: секція «Друзі» жива (картка на країну), решта — заглушки «Скоро!» (R5)
+  renderAlbum() {
+    const save = this.save;
+    const tabs = [
+      ['friends', t('🤝 Друзі')],
+      ['skins', t('🧢 Скіни')],
+      ['pets', t('🐾 Петси')],
+      ['elites', t('👹 Еліти')],
+    ];
+    if (!this._albumTab || !tabs.some(([id]) => id === this._albumTab)) this._albumTab = 'friends';
+    const rescued = rescuedFriendCount(save);
+    let friendsHtml = `<div class="album-counter">🤝 ${rescued}/${FRIEND_TOTAL}</div><div class="album-grid">`;
+    for (const cid of CAMPAIGN_ORDER) {
+      const f = friendFor(cid);
+      if (!f) continue;
+      const c = COUNTRIES[cid];
+      const flag = c ? c.flag : '';
+      const country = c ? c.name : cid;
+      if (isFriendRescued(save, cid)) {
+        friendsHtml += `<div class="album-card revealed" data-cid="${cid}">
+          <div class="album-portrait">${f.emoji}</div>
+          <div class="album-name">${f.name()}</div>
+          <div class="album-role">${f.role()}</div>
+          <div class="album-flag">${flag} ${country}</div>
+        </div>`;
+      } else {
+        friendsHtml += `<div class="album-card locked" data-cid="${cid}">
+          <div class="album-portrait silhouette">${f.emoji}</div>
+          <div class="album-name">???</div>
+          <div class="album-hint">${t('Схований у {country}', { country })}</div>
+        </div>`;
+      }
+    }
+    friendsHtml += '</div>';
+    const soon = (ico) => `<div class="album-soon"><div class="album-soon-ico">${ico}</div><div class="album-soon-text">${t('Скоро!')}</div></div>`;
+    const pane = (id, body) => `<div class="album-pane" data-tab="${id}" ${this._albumTab === id ? '' : 'hidden'}>${body}</div>`;
+    let html = `<div class="ward-tabs album-tabs">${tabs.map(([id, label]) => `<button class="shop-tab album-tab ${this._albumTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
+    html += pane('friends', friendsHtml) + pane('skins', soon('🧢')) + pane('pets', soon('🐾')) + pane('elites', soon('👹'));
+    const root = document.getElementById('album-content');
+    root.innerHTML = html;
+    root.querySelectorAll('.album-tab').forEach((el) => {
+      el.addEventListener('click', () => {
+        this._albumTab = el.dataset.tab;
+        this.audio.click();
+        root.querySelectorAll('.album-tab').forEach((b) => b.classList.toggle('on', b === el));
+        root.querySelectorAll('.album-pane').forEach((p) => { p.hidden = p.dataset.tab !== this._albumTab; });
+      });
+    });
   }
 
   renderWardrobe() {
@@ -2685,6 +2746,9 @@ class Game {
         isPlayground,
       }) && !this._forceMissionSet;
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
+      // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
+      // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
+      if (useStory) level.rescueCage = new HiddenRescue(level);
       // 🎲 «Прокачка» і в соло-кампанії: картка після кожної місії (кооп — окремий beat)
       if (!coop && !isPlayground) level.runBuild = new RunBuild();
       // 🌟 «момент могутності» (v288): супер-пікап 1×/рівень лише у соло-кампанії
@@ -3418,6 +3482,7 @@ class Game {
       // standalone-ресурси Effects (оригінал tracerMat, гео монет/снарядів/гранат) обхід сцени
       // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
       if (this.level.worldBoss && this.level.worldBoss.dispose) this.level.worldBoss.dispose();
+      if (this.level.rescueCage && this.level.rescueCage.dispose) this.level.rescueCage.dispose();
       if (this.level.effects && this.level.effects.dispose) this.level.effects.dispose();
       // звільняємо ресурси сцени — але НЕ спільні кешовані (matCache/geoCache/gradMap/bakedMat
       // із characters.js): вони живуть на весь сеанс і переюзаються наступними рівнями.
@@ -4938,6 +5003,8 @@ class Game {
         this.level.player.update(simDt, this.input, allowControl);
         this.level.zombies.update(simDt);
         this.level.missions.update(simDt, this.input, allowControl);
+        // 🤝 схований друг у клітці (соло-кампанія): підхід + звільнення 2с + летить у табір
+        if (this.level.rescueCage) this.level.rescueCage.update(simDt, this.input, allowControl);
         // іграшки: самокати, мегабокс, гаджети, песик
         if (!this.level.noGadgets) this.level.vehicles.update(simDt, this.input, allowControl);
         if (this.level.megabox && !this.level.megabox.done) {
