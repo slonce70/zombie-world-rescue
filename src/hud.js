@@ -469,7 +469,9 @@ export class HUD {
     if (onScreen) {
       wp.classList.add('on');
       wp.classList.remove('edge');
-      wp.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%)`;
+      // не даємо чипу залізти на смужку боса вгорі по центру (top 24..~85px):
+      // далекий бос проєктується високо, і «👑 253м» сідав прямо на його HP-бар
+      wp.style.transform = `translate(${Math.round(sx)}px, ${Math.round(Math.max(sy, 128))}px) translate(-50%, -100%)`;
     } else {
       // ціль поза екраном: стрілка на краю, повернута в її бік
       wp.classList.add('edge');
