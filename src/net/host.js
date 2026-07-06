@@ -565,6 +565,10 @@ export class HostNet {
     };
     const state = { t: 'state', zoms, items, world, tm: r1(level.stats.time) };
     if (level.missions && level.missions.netFullState) state.missions = level.missions.netFullState();
+    // 🌟 v297: непідібраний супер-пікап переживає mid-join/реконект (nid+позиція; тип лишається
+    // у хоста — підбір host-authoritative). Активні сили короткочасні, у стан НЕ пишемо.
+    const sp = level.superPickup;
+    if (sp && !sp.done && sp.nid) state.spu = [sp.nid, r1(sp.x), r1(sp.z)];
     return state;
   }
 

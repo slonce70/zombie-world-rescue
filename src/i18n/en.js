@@ -1627,6 +1627,8 @@ export const EN = {
 "🧲 МАГНІТ-БУРЯ": "🧲 MAGNET STORM",
 "Безлім патронів + скорострільність!": "Infinite ammo + fire rate!",
 "Магніт монет + швидкість!": "Coin magnet + speed!",
+"⭐ {n} схопив {p}!": "⭐ {n} grabbed {p}!",
+"Сила разом! 💪": "Power together! 💪",
 "⭐ Ціль забігу виконана: {l}!": "⭐ Run goal complete: {l}!",
 "Ти все одно здобув: 💰{c} · ⚡{x} XP": "You still earned: 💰{c} · ⚡{x} XP",
 "🎉 {l}": "🎉 {l}",
