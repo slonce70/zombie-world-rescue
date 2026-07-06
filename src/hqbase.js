@@ -4,9 +4,17 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
-import { makeHero, HERO_SKINS } from './characters.js';
+import { makeHero, HERO_SKINS, makeCivilian, setAnim, updateRig } from './characters.js';
 import { WORLD_BOSSES } from './worldboss.js';
 import { BESTIARY_TYPE_IDS } from './zombies.js';
+import {
+  rescuedFriendIds, friendFor, campTier, friendThanksUnlocked, friendThanksPending, FRIEND_THANKS_COINS,
+} from './friends.js';
+
+// маленький rng для makeCivilian (потрібні .pick/.f) — детермінізм тут не критичний
+function campRng() {
+  return { f: Math.random, range(a, b) { return a + (b - a) * Math.random(); }, pick(arr) { return arr[Math.floor(Math.random() * arr.length) % arr.length]; } };
+}
 
 export class LivingHQ {
   constructor(game) {
@@ -20,6 +28,8 @@ export class LivingHQ {
     this.targets = [];
     this.dummies = [];
     this.hints = [];
+    this.friends = [];       // 🤝 живий табір: врятовані друзі-ріги
+    this.campProps = 0;
     this.damageTotal = 0;
     this.worldBossTrophies = 0;
     this.megaQuestRows = 0;
@@ -86,6 +96,7 @@ export class LivingHQ {
     this._addHallOfFame();
     this._addTrainingTargets();
     this._addDamageDummies();
+    this._addLivingCamp();
     this._refreshHints();
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
@@ -312,6 +323,109 @@ export class LivingHQ {
     }
   }
 
+  // 🏕️ Живий табір: врятовані друзі ходять/махають; декор росте з їх кількістю.
+  // Дешева спільна геометрія, БЕЗ динамічних світел (emissive-матеріали — можна).
+  _addLivingCamp() {
+    this.friends = [];
+    this.campProps = 0;
+    const ids = rescuedFriendIds(this.game.save);
+    const count = ids.length;
+    if (count === 0) return;
+    const tier = campTier(count);
+    const baseX = -4, baseZ = 3;
+    if (tier.tent) { this._addTent(baseX - 1.4, baseZ + 0.4); this._addCampfire(baseX + 0.2, baseZ); this.campProps += 2; }
+    if (tier.benches) { this._addBenches(baseX + 2, baseZ + 0.6); this.campProps += 1; }
+    if (tier.garland) { this._addGarland(baseX, baseZ - 1.6); this.campProps += 1; }
+    if (tier.allFlag) { this._addAllFlag(baseX + 1.4, baseZ - 1.2); this.campProps += 1; }
+    const rng = campRng();
+    ids.forEach((cid, i) => {
+      const f = friendFor(cid);
+      if (!f) return;
+      const rig = makeCivilian(f.kind || 'kid', rng);
+      const ang = (i / count) * Math.PI * 2;
+      const rr = 1.5 + (i % 3) * 0.55;
+      const x = baseX + Math.cos(ang) * rr;
+      const z = baseZ + Math.sin(ang) * rr;
+      rig.group.position.set(x, 0, z);
+      rig.group.rotation.y = ang + Math.PI;
+      rig.group.userData.isHqFriend = true;
+      rig.group.userData.friendId = cid;
+      setAnim(rig, i % 2 ? 'idle' : 'cheer');
+      this.scene.add(rig.group);
+      this.friends.push({
+        cid, f, rig, home: { x, z },
+        wp: { x: x + (Math.random() - 0.5) * 2.4, z: z + (Math.random() - 0.5) * 2.4 },
+        waveT: Math.random() * 4, moving: true,
+      });
+    });
+  }
+
+  _addTent(x, z) {
+    const tent = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.5, 4), new THREE.MeshLambertMaterial({ color: 0xd8654a }));
+    tent.position.set(x, 0.75, z);
+    tent.rotation.y = Math.PI / 4;
+    this.scene.add(tent);
+  }
+
+  _addCampfire(x, z) {
+    const logs = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.18, 8), new THREE.MeshLambertMaterial({ color: 0x5f3d22 }));
+    logs.position.set(x, 0.09, z);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xff8a3d, emissive: 0xff6a1a, emissiveIntensity: 0.9 }));
+    flame.position.set(x, 0.42, z);
+    flame.userData.campFlame = true;
+    this.scene.add(logs, flame);
+  }
+
+  _addBenches(x, z) {
+    for (const dx of [-0.9, 0.9]) {
+      this._addBox(x + dx, 0.22, z, 0.7, 0.12, 0.28, 0x8a5a32);
+    }
+    this._addBox(x, 0.4, z, 0.5, 0.1, 0.9, 0xb0895a); // столик
+  }
+
+  _addGarland(x, z) {
+    const colors = [0xff5d73, 0xffd23f, 0x4cff7a, 0x44ccff, 0xb086f2];
+    for (let i = 0; i < 5; i++) {
+      const c = colors[i % colors.length];
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.8 }));
+      lamp.position.set(x - 1 + i * 0.5, 1.7 + Math.sin(i) * 0.1, z);
+      this.scene.add(lamp);
+    }
+  }
+
+  _addAllFlag(x, z) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 8), new THREE.MeshLambertMaterial({ color: 0x8a8478 }));
+    pole.position.set(x, 1.1, z);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.04), new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0xffb020, emissiveIntensity: 0.5 }));
+    flag.position.set(x + 0.5, 1.9, z);
+    this.scene.add(pole, flag);
+  }
+
+  // тап по другові: репліка табору + (за ≥3 друзів) «щоденне дякую» +20💰 раз на день
+  tapFirstFriend() {
+    const fr = (this.friends || [])[0];
+    return fr ? this._tapFriend(fr.cid) : '';
+  }
+
+  _tapFriend(cid) {
+    const f = friendFor(cid);
+    if (!f) return '';
+    let msg = f.greeting();
+    const save = this.game.save;
+    if (friendThanksUnlocked(save)) {
+      const key = this.game.gift.dayKey();
+      if (friendThanksPending(save, key)) {
+        save.friendThanks = key;
+        save.coins = (save.coins || 0) + FRIEND_THANKS_COINS;
+        this.game.saveGame();
+        if (this.game.audio && this.game.audio.coin) this.game.audio.coin();
+        msg = t('💰 Щоденне дякую табору: +{n} монет!', { n: FRIEND_THANKS_COINS }) + ' ' + f.greeting();
+      }
+    }
+    if (this.game.hud) this.game.hud.toast(`${f.emoji} ${msg}`);
+    return msg;
+  }
+
   hitFirstTarget() {
     if (this.targets && this.targets[0]) this._hitTarget(this.targets[0]);
   }
@@ -331,12 +445,14 @@ export class LivingHQ {
     this._pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._pointer, this.camera);
-    const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || [])], true)[0];
+    const friendGroups = (this.friends || []).map((fr) => fr.rig.group);
+    const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || []), ...friendGroups], true)[0];
     if (!hit) return;
     let obj = hit.object;
-    while (obj && !obj.userData?.isHqTarget && !obj.userData?.hqHint) obj = obj.parent;
+    while (obj && !obj.userData?.isHqTarget && !obj.userData?.hqHint && !obj.userData?.isHqFriend) obj = obj.parent;
     if (!obj) return;
-    if (obj.userData.isHqTarget) this._hitTarget(obj);
+    if (obj.userData.isHqFriend) this._tapFriend(obj.userData.friendId);
+    else if (obj.userData.isHqTarget) this._hitTarget(obj);
     else this._showHint(obj);
   }
 
@@ -376,6 +492,27 @@ export class LivingHQ {
   update(dt) {
     if (!this.ready) return;
     this.scene.rotation.y += dt * 0.03;
+    // 🤝 живий табір: друзі ходять між точками, часом махають
+    for (const fr of this.friends || []) {
+      const g = fr.rig.group;
+      const dx = fr.wp.x - g.position.x;
+      const dz = fr.wp.z - g.position.z;
+      const d = Math.hypot(dx, dz);
+      fr.waveT -= dt;
+      if (fr.waveT <= 0 && d < 0.3) {
+        // прибув — помахати/порадіти, тоді нова точка
+        setAnim(fr.rig, 'cheer');
+        fr.waveT = 2 + Math.random() * 3;
+        fr.wp = { x: fr.home.x + (Math.random() - 0.5) * 3, z: fr.home.z + (Math.random() - 0.5) * 3 };
+      } else if (d > 0.3) {
+        const sp = 1.1 * dt;
+        g.position.x += (dx / d) * sp;
+        g.position.z += (dz / d) * sp;
+        g.rotation.y = Math.atan2(dx, dz);
+        setAnim(fr.rig, 'walk');
+      }
+      updateRig(fr.rig, dt);
+    }
     for (const target of this.targets || []) {
       if (target.userData.flash > 0) {
         target.userData.flash -= dt;
@@ -400,6 +537,8 @@ export class LivingHQ {
     this.targets = [];
     this.dummies = [];
     this.hints = [];
+    this.friends = [];
+    this.campProps = 0;
     this.countryTrophies = 0;
     this.beastTrophies = 0;
     this.worldBossTrophies = 0;
@@ -436,6 +575,8 @@ export class LivingHQ {
       hallTrophies: this.scene.children.filter((obj) => obj.userData?.kind === 'hall-trophy').length,
       hintDisplays: this.hintDisplays || 0,
       dummyCount: (this.dummies || []).length,
+      friendRigs: (this.friends || []).length,
+      campProps: this.campProps || 0,
       hasHero: !!this.hero,
     };
   }
