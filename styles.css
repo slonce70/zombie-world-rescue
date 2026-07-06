@@ -1519,3 +1519,40 @@ body.touch-mode #touch-coach.show { display: block; }
   from { box-shadow: 0 0 14px rgba(255,204,64,.35); }
   to   { box-shadow: 0 0 30px rgba(255,204,64,.75); }
 }
+
+/* 🎁 Церемонія скрині (v287): shake → burst → предмети по одному з count-up. Тап — пропустити. */
+#chest-ceremony {
+  position: fixed; inset: 0; z-index: 46; display: none;
+  align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(20,14,4,.62), rgba(6,8,12,.82));
+  pointer-events: auto; cursor: pointer; overflow: hidden;
+}
+#chest-ceremony.show { display: flex; }
+.chest-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.chest-icon { font-size: clamp(72px, 16vw, 130px); line-height: 1; filter: drop-shadow(0 8px 22px rgba(0,0,0,.6)); }
+#chest-ceremony.shaking .chest-icon { animation: chest-shake .9s ease-in-out infinite; }
+@keyframes chest-shake {
+  0%,100% { transform: translate(0,0) rotate(0deg); }
+  20% { transform: translate(-5px,1px) rotate(-7deg); }
+  40% { transform: translate(6px,-2px) rotate(8deg); }
+  60% { transform: translate(-6px,2px) rotate(-9deg) scale(1.05); }
+  80% { transform: translate(5px,-1px) rotate(7deg) scale(1.05); }
+}
+#chest-ceremony.burst .chest-icon { animation: chest-pop .5s cubic-bezier(.2,1.6,.4,1) forwards; }
+@keyframes chest-pop { 0% { transform: scale(.7); } 60% { transform: scale(1.35); } 100% { transform: scale(1.1); } }
+.chest-title { font-size: clamp(26px, 5vw, 46px); font-weight: 900; color: #ffd23f;
+  text-shadow: 0 3px 0 rgba(0,0,0,.35), 0 6px 20px rgba(0,0,0,.6); }
+.chest-sub { color: #cfe8ff; font-weight: 800; font-size: clamp(14px, 2.4vw, 20px); text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+.chest-items { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; min-height: 60px; }
+.chest-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,225,120,.22), rgba(255,180,40,.12));
+  border: 2px solid rgba(255,210,90,.55); box-shadow: 0 6px 18px rgba(0,0,0,.4);
+  opacity: 0; transform: translateY(28px) scale(.6);
+}
+.chest-item.in { animation: chest-item-in .5s cubic-bezier(.2,1.5,.4,1) forwards; }
+@keyframes chest-item-in { to { opacity: 1; transform: translateY(0) scale(1); } }
+.chest-item .ci-icon { font-size: clamp(28px, 5vw, 42px); }
+.chest-item .ci-val { font-size: clamp(22px, 4vw, 34px); font-weight: 900; color: #fff; }
+.chest-skip { margin-top: 12px; color: #9fb6cf; font-weight: 700; font-size: 13px; opacity: .8; }
+.chest-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }

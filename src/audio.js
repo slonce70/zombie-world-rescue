@@ -388,6 +388,20 @@ export class AudioMan {
     this._noise(t, 1.0, 0.2, 'lowpass', 300);
   }
 
+  // 👹 Елітна хвиля (v287): тривожний сплеск-стінгер — три висхідні акорди + гонг.
+  eliteWave() {
+    if (!this.ctx) return;
+    const t = this.t;
+    // висхідне тризвуччя (мінор) — «увага, щось сильне йде»
+    [55, 58, 62].forEach((m, i) => {
+      this._osc('sawtooth', midi(m), t + i * 0.14, 0.5, 0.24);
+      this._osc('square', midi(m + 12), t + i * 0.14, 0.3, 0.1);
+    });
+    // гонг-удар наприкінці
+    this._osc('sine', midi(43), t + 0.5, 0.9, 0.35, midi(38));
+    this._noise(t + 0.5, 0.5, 0.18, 'lowpass', 500, 1, 120);
+  }
+
   // countryId (напр. 'UKR') → персональна сценка цього боса, інакше загальна репліка
   bossRoar(countryId) {
     const cid = countryId ? String(countryId).toLowerCase() : '';

@@ -60,6 +60,8 @@ const suite = [
   ['node', ['test/worldboss.mjs']],
   ['node', ['test/chapter2-infected.mjs']],
   ['node', ['test/zombie-boxer.mjs']],
+  ['node', ['test/elite-zombies.mjs']],
+  ['node', ['test/elite-wave.mjs']],
   ['node', ['test/draft.mjs']],
   ['node', ['test/draft-storm.mjs']],
   ['node', ['test/draft-campaign.mjs']],

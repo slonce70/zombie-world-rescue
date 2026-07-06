@@ -80,7 +80,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 286;
+const APP_VERSION = 287;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2844,6 +2844,29 @@ class Game {
       this.progress.addXp(XP_VALUES.horde);
       this.quests.onEvent('horde');
     });
+    // 👹 v287: скриня по зачистці елітної хвилі (solo-only) — церемонія + монети/кристали
+    level.bus.on('eliteWaveCleared', (pos) => {
+      if (level.playground || level.net) return;
+      const reward = 120;
+      level.addCoins(reward);
+      this.save.crystals = (this.save.crystals || 0) + 3;
+      this.progress.addXp(XP_VALUES.horde);
+      if (pos && level.effects) {
+        level.effects.ring(new THREE.Vector3(pos.x, pos.y || 0, pos.z), 0xffd23f, 3.5);
+        level.effects.burst(new THREE.Vector3(pos.x, (pos.y || 0) + 1, pos.z), 0xffd23f, 20, { speed: 5, up: 5, life: 0.9, size: 1.4 });
+      }
+      this.chestCeremony({ title: t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), items: [{ icon: '💰', n: reward }, { icon: '💎', n: 3 }] });
+      this.saveGame();
+    });
+    // 👑 v287: золотий зомбі впольовано (solo) — гарантована золота скриня
+    level.bus.on('goldenChest', (pos) => {
+      if (level.playground || level.net) return;
+      const reward = 144;
+      level.addCoins(reward);
+      this.save.crystals = (this.save.crystals || 0) + 5;
+      this.chestCeremony({ title: t('🏆 ЗОЛОТА СКРИНЯ!'), items: [{ icon: '💰', n: reward }, { icon: '💎', n: 5 }] });
+      this.saveGame();
+    });
     // ⭐ зірковий досвід і щоденні завдання
     level.bus.on('zombieKilled', (z) => {
       if (level.playground) return;
@@ -3078,9 +3101,10 @@ class Game {
   openMegaboxReward(x, z) {
     const save = this.save;
     const level = this.level;
+    const items = []; // 🎁 v287: перелік нагород для церемонії скрині
     if (Math.random() < 0.78) {
       save.crystals = (save.crystals || 0) + 15;
-      this.hud.toast(t('💎 +15 кристалів з Мегабокса!'));
+      items.push({ icon: '💎', n: 15 });
     }
     const unownedSkins = ['frog', 'super'].filter((id) => !save.skins.includes(id));
     const unownedDances = ['jump', 'chicken'].filter((id) => !save.dances.includes(id));
@@ -3096,12 +3120,14 @@ class Game {
         save.skins.push(id);
         title = t('{i} НОВИЙ СКІН!', { i: HERO_SKINS[id].icon });
         sub = t('«{n}» — одягни в Гардеробі 🎒', { n: HERO_SKINS[id].name });
+        items.push({ icon: HERO_SKINS[id].icon, label: HERO_SKINS[id].name });
       } else {
         const id = unownedDances[0];
         save.dances.push(id);
         save.activeDance = id;
         title = t('{i} НОВИЙ ТАНЕЦЬ!', { i: DANCES[id].icon });
         sub = t('«{n}» — натисни N і танцюй!', { n: DANCES[id].name });
+        items.push({ icon: DANCES[id].icon, label: DANCES[id].name });
       }
     } else {
       save.megaPity = (save.megaPity || 0) + 1;
@@ -3117,6 +3143,7 @@ class Game {
         }
         title = t('💰 ФОНТАН МОНЕТ!');
         sub = t('Збирай скоріше! (наступний бокс щасливіший 😉)');
+        items.push({ icon: '💰', label: t('фонтан!') });
       } else if (roll < 0.83) {
         if (level) {
           level.player.grenades += 3;
@@ -3125,14 +3152,111 @@ class Game {
         }
         title = t('🧨 БОЙОВИЙ НАБІР!');
         sub = t('+3 гранати, +2 ракети і гора патронів!');
+        items.push({ icon: '💣', n: 3 }, { icon: '🚀', n: 2 }, { icon: '🔫', n: 120 });
       } else {
         for (const k of ['speed', 'rage', 'bubble', 'magnet']) level.player.buffs[k] = 20;
         title = t('🌈 УСІ ПІДСИЛЕННЯ!');
         sub = t('Швидкість, лють, бульбашка і магніт — на 20 секунд!');
+        items.push({ icon: '⚡', label: '20с' }, { icon: '💪', label: '20с' }, { icon: '🛡', label: '20с' }, { icon: '🧲', label: '20с' });
       }
     }
-    this.hud.banner(title, sub, 4.5);
+    // 🎁 v287: замість миттєвого банера — соковита церемонія скрині (нагороди ті самі)
+    this.chestCeremony({ title, sub, items });
     this.saveGame();
+  }
+
+  // 🎁 Церемонія скрині (v287): reusable DOM/CSS — трясеться → вибух → предмети вилітають
+  // по одному з count-up → авто-закриття. Тап пропускає до підсумку. Не паузить сим (як банер/
+  // мегабокс — просто DOM-оверлей поверх). items: [{icon, n}] (count-up) або [{icon, label}].
+  chestCeremony({ title = t('🎁 СКРИНЯ!'), sub = '', items = [] } = {}) {
+    const root = document.getElementById('chest-ceremony');
+    if (!root) return;
+    // якщо попередня церемонія ще йде — миттєво закриваємо (черга не потрібна дітям)
+    if (this._chestState) this._closeChest();
+    this.audio.megabox(); // барабанний дріб + «тада!» (reuse наявного стінгера)
+    const iconEl = root.querySelector('.chest-icon');
+    const titleEl = root.querySelector('.chest-title');
+    const subEl = root.querySelector('.chest-sub');
+    const itemsEl = root.querySelector('.chest-items');
+    titleEl.textContent = title;
+    subEl.textContent = sub;
+    itemsEl.innerHTML = '';
+    iconEl.textContent = '🎁';
+    root.classList.remove('burst');
+    root.classList.add('show', 'shaking');
+    root.setAttribute('aria-hidden', 'false');
+    const state = { timers: [], busted: false };
+    this._chestState = state;
+    const T = (fn, ms) => { const id = setTimeout(fn, this.testMode ? 0 : ms); state.timers.push(id); return id; };
+    const revealItem = (it) => {
+      const chip = document.createElement('div');
+      chip.className = 'chest-item';
+      const hasN = typeof it.n === 'number';
+      chip.innerHTML = `<span class="ci-icon">${it.icon}</span><span class="ci-val">${hasN ? '0' : (it.label || '')}</span>`;
+      itemsEl.appendChild(chip);
+      requestAnimationFrame(() => chip.classList.add('in'));
+      if (hasN) {
+        const valEl = chip.querySelector('.ci-val');
+        const target = it.n;
+        const stepN = Math.max(1, Math.round(target / 16));
+        let cur = 0;
+        const up = () => {
+          cur = Math.min(target, cur + stepN);
+          valEl.textContent = String(cur);
+          if (cur < target) state.timers.push(setTimeout(up, this.testMode ? 0 : 45));
+        };
+        up();
+      }
+    };
+    const burst = () => {
+      if (state.busted) return;
+      state.busted = true;
+      root.classList.remove('shaking');
+      root.classList.add('burst');
+      iconEl.textContent = '📦';
+      this._spawnChestConfetti(root);
+      const shown = items.length ? items : [{ icon: '🎁', label: '' }];
+      shown.forEach((it, i) => T(() => revealItem(it), i * 420));
+      T(() => this._closeChest(), shown.length * 420 + 2600);
+    };
+    T(burst, 1150); // трясеться ~1.2с, потім вибух
+    // тап будь-де — пропустити: спершу показуємо весь підсумок, потім закриваємо
+    root.onclick = () => {
+      if (!state.busted) {
+        state.timers.forEach(clearTimeout);
+        state.timers = [];
+        burst();
+      } else {
+        this._closeChest();
+      }
+    };
+  }
+
+  _closeChest() {
+    const root = document.getElementById('chest-ceremony');
+    if (this._chestState) { this._chestState.timers.forEach(clearTimeout); this._chestState = null; }
+    if (!root) return;
+    root.classList.remove('show', 'shaking', 'burst');
+    root.setAttribute('aria-hidden', 'true');
+    root.onclick = null;
+    const cf = root.querySelector('.chest-confetti');
+    if (cf) cf.innerHTML = '';
+  }
+
+  _spawnChestConfetti(root) {
+    const cf = root.querySelector('.chest-confetti');
+    if (!cf) return;
+    cf.innerHTML = '';
+    const cols = ['#ffd23f', '#4cff7a', '#44ccff', '#ff5d73', '#b086f2'];
+    for (let i = 0; i < 40; i++) {
+      const d = document.createElement('div');
+      d.className = 'confetti-piece';
+      d.style.left = Math.random() * 100 + '%';
+      d.style.background = cols[i % cols.length];
+      d.style.animationDelay = Math.random() * 0.8 + 's';
+      d.style.animationDuration = 1.8 + Math.random() * 1.6 + 's';
+      cf.appendChild(d);
+    }
   }
 
   // нагорода-зброя за країну: видається і запам'ятовується назавжди.
@@ -3418,11 +3542,11 @@ class Game {
   _claimGift() {
     const r = this.gift.claim();
     if (!r) return;
-    this.audio.levelUp();
-    const parts = [];
-    if (r.coins) parts.push(t('🪙 {n} монет', { n: r.coins }));
-    if (r.crystals) parts.push(t('💎 {n}', { n: r.crystals }));
-    this.hud.banner(t('🎁 ПОДАРУНОК ДНЯ!'), parts.join(' · '), 4.2);
+    // 🎁 v287: церемонія скрині замість миттєвого банера (нагорода та сама)
+    const items = [];
+    if (r.coins) items.push({ icon: '🪙', n: r.coins });
+    if (r.crystals) items.push({ icon: '💎', n: r.crystals });
+    this.chestCeremony({ title: t('🎁 ПОДАРУНОК ДНЯ!'), items });
     this._openGiftModal();       // перемалювати грід (день зсунувся, кнопка сховається)
     const giftChip = document.getElementById('gift-chip');
     if (giftChip) giftChip.classList.remove('show');

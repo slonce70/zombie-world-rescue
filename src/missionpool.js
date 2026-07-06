@@ -585,10 +585,25 @@ export class DynamicMissions {
     level.bus.emit('missionDone', m);
     level.netEv('md', m.slotIndex, m.reward, m.type);
     const count = Math.round(m.horde * ((level.country && level.country.difficulty.counts) || 1));
+    const fresh = !this.pendingHorde;
     if (this.pendingHorde) this.pendingHorde.count += count;
     else this.pendingHorde = { t: 5, count };
-    level.bus.emit('hordeWarning', 5);
-    level.netEv('hw'); // кооп: попередження про орду і гостю
+    // 👹 елітна хвиля (v287): кожна ~3-тя орда у СОЛО стає елітною — анонс за 3с
+    // (правило Brotato) + стінгер; 2–4 еліти доспавнюються при старті орди.
+    let eliteWave = false;
+    if (fresh && !level.net) {
+      this._soloHordeNum = (this._soloHordeNum || 0) + 1;
+      if (this._soloHordeNum % 3 === 0) eliteWave = true;
+    }
+    if (eliteWave) {
+      this.pendingHorde.elite = true;
+      this.pendingHorde.t = 3;
+      level.audio.eliteWave();
+      level.bus.emit('eliteWaveWarning');
+    } else {
+      level.bus.emit('hordeWarning', 5);
+      level.netEv('hw'); // кооп: попередження про орду і гостю
+    }
     this._maybeStartLivingWorld(m);
   }
 
@@ -833,6 +848,7 @@ export class DynamicMissions {
         level.audio.horde();
         level.bus.emit('hordeStart', this.pendingHorde.count);
         level.netEv('hs', this.pendingHorde.count); // кооп: рев і банер старту орди гостю
+        if (this.pendingHorde.elite) level.zombies.spawnEliteWave(); // 👹 доспавн еліт-хвилі
         this.pendingHorde = null;
       }
     }

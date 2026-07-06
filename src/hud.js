@@ -82,6 +82,7 @@ export class HUD {
       this._bump(this.el.missionPanel);
     });
     bus.on('hordeWarning', () => this.banner(t('⚠️ УВАГА!'), t('Наближається орда зомбі!')));
+    bus.on('eliteWaveWarning', () => this.banner(t('⚠️ Елітна хвиля!'), t('Готуйся — йдуть еліти! 👹'), 3.4));
     bus.on('hordeStart', () => this.banner(t('🧟 ОРДА!'), t('Відбий напад!')));
     bus.on('hordeEnd', () => this.banner(t('🎉 Орду відбито!'), t('+60 монет 💰')));
     bus.on('bossUnlocked', () => this.banner(t('👑 АРЕНА ВІДКРИТА!'), t('Іди до фіолетового маркера і переможи БОСА!')));
