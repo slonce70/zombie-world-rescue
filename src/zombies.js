@@ -495,42 +495,39 @@ export class Zombies {
   // ambient=true: v287-подія — спавн 30–60м ВІД ГРАВЦЯ + TTL 25с, щоб «дожени — гарантована скриня!»
   // була чесною обіцянкою (80–150м від центру були недосяжні за 12с).
   spawnGolden(ambient = false) {
-    let x = 0, z = 0;
-    if (ambient) {
-      const p = this.level.player.pos;
-      for (let tries = 0; tries < 20; tries++) {
-        const a = this.rng.next() * Math.PI * 2;
-        const r = this.rng.range(30, 60);
-        x = p.x + Math.cos(a) * r;
-        z = p.z + Math.sin(a) * r;
-        const dB = Math.hypot(x, z);
-        if (dB > this.L.BOUND - 6) { x *= (this.L.BOUND - 8) / dB; z *= (this.L.BOUND - 8) / dB; }
-        let ok = true;
-        for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
-          const s = this.L[key];
-          if (s && Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
-        }
-        if (ok) break;
-      }
-    } else {
-      // десь на околиці, далеко від місій
-      for (let tries = 0; tries < 20; tries++) {
-        const a = this.rng.next() * Math.PI * 2;
-        const r = this.rng.range(80, 150);
-        x = Math.cos(a) * r;
-        z = Math.sin(a) * r;
-        let ok = true;
-        for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
-          const s = this.L[key];
-          if (Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
-        }
-        if (ok) break;
-      }
-    }
+    // v302: два майже однакові цикли пошуку точки злиті в один хелпер (null-guard на
+    // будівлі місій тепер усюди — це safety, не зміна поведінки). Амбієнтний спавнить
+    // навколо гравця в кільці 30–60 з клампом до меж; мапний — навколо центру 80–150.
+    const { x, z } = ambient
+      ? this._goldenSpawnPoint(this.level.player.pos.x, this.level.player.pos.z, 30, 60, true)
+      : this._goldenSpawnPoint(0, 0, 80, 150, false);
     const z_ = this.spawn('walker', x, z, { golden: true, ambientGolden: ambient });
     this.setConfiguredHp(z_, 80);
     z_.anchor = { x, z, r: 30 };
     return z_;
+  }
+
+  // 👑 v302: 20 спроб знайти точку спавну золотого в кільці [rMin,rMax] навколо (cx,cz),
+  // що не накладається на будівлі місій. clampBound — тримати точку в межах карти (амбієнт).
+  _goldenSpawnPoint(cx, cz, rMin, rMax, clampBound) {
+    let x = cx, z = cz;
+    for (let tries = 0; tries < 20; tries++) {
+      const a = this.rng.next() * Math.PI * 2;
+      const r = this.rng.range(rMin, rMax);
+      x = cx + Math.cos(a) * r;
+      z = cz + Math.sin(a) * r;
+      if (clampBound) {
+        const dB = Math.hypot(x, z);
+        if (dB > this.L.BOUND - 6) { x *= (this.L.BOUND - 8) / dB; z *= (this.L.BOUND - 8) / dB; }
+      }
+      let ok = true;
+      for (const key of ['rescue', 'tower', 'warehouse', 'arena']) {
+        const s = this.L[key];
+        if (s && Math.hypot(x - s.x, z - s.z) < s.r + 12) { ok = false; break; }
+      }
+      if (ok) break;
+    }
+    return { x, z };
   }
 
   // 👹 Елітна хвиля (v287, solo-only): 2–4 еліти навколо гравця (золотий виключений —

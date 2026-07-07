@@ -602,15 +602,22 @@ export class DynamicMissions {
     if (eliteWave) {
       this.pendingHorde.elite = true;
       this.pendingHorde.t = 3;
-      level.audio.eliteWave();
-      level.bus.emit('eliteWaveWarning');
       // кооп: телеграф-банер + стінгер гостям (хост зіграв локально через bus вище)
-      if (level.net) level.netEv('ew');
+      this.telegraphEliteWave();
     } else {
       level.bus.emit('hordeWarning', 5);
       level.netEv('hw'); // кооп: попередження про орду і гостю
     }
     this._maybeStartLivingWorld(m);
+  }
+
+  // 👹 v302: телеграф елітної хвилі — стінгер + банер-попередження (bus) + ev гостям.
+  // Спільне для реального шляху (_complete) і тест-хука forceEliteWave (main.js).
+  telegraphEliteWave() {
+    const level = this.level;
+    level.audio.eliteWave();
+    level.bus.emit('eliteWaveWarning');
+    if (level.net) level.netEv('ew'); // телеграф гостям
   }
 
   _maybeStartLivingWorld(m) {

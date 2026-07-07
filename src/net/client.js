@@ -334,8 +334,7 @@ export class GuestNet {
         if (so && !so.done) {
           so.done = true;
           so.progress = so.target;
-          level.audio.questDone();
-          game.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
+          game._secondaryDoneToast(level); // v302: спільний тост+дзвіночок (див. main.js)
         }
         break;
       }
