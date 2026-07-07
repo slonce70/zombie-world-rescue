@@ -46,6 +46,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
   // 🏕️ R4 (v299) «Табір кличе»: тижневий квест табору (тиждень/квест/прогрес/забрано)
   'weeklyCamp',
+  // 🌍 v303 «Світ врятовано»: одноразовий прапорець фіналу кампанії (усі 12 країн вільні)
+  'worldSaved',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -102,6 +104,7 @@ export function saveHasProgress(s) {
     || (s.petFood | 0) > 0                                  // 🍖 корм для росту петсів
     || (s.petLevels && typeof s.petLevels === 'object' && Object.values(s.petLevels).some((v) => (v | 0) > 1)) // рівні петсів
     || (s.weeklyCamp && typeof s.weeklyCamp === 'object' && ((s.weeklyCamp.p | 0) > 0 || !!s.weeklyCamp.claimed)) // 🏕️ прогрес/нагорода тижневого квесту табору
+    || (s.worldSaved | 0) > 0                               // 🌍 фінал кампанії пройдено (усі 12 країн вільні)
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

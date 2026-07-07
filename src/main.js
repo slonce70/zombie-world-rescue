@@ -119,7 +119,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 302;
+const APP_VERSION = 303;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -603,6 +603,15 @@ class Game {
     document.getElementById('btn-victory-globe').addEventListener('click', () => {
       this._hideOverlay('overlay-victory');
       this.endLevel();
+      // 🌍 фінал кампанії: якщо цією перемогою звільнено всі 12 країн — церемонія
+      // «Світ врятовано» показується РІВНО тут, уже на глобусі (не поверх victory-екрана)
+      this._maybeWorldSaved();
+    });
+    document.getElementById('btn-worldsaved-close').addEventListener('click', () => {
+      this.audio.click();
+      this._hideOverlay('overlay-worldsaved');
+      const conf = document.getElementById('worldsaved-confetti');
+      if (conf) conf.innerHTML = '';
     });
     document.getElementById('btn-victory-retry').addEventListener('click', () => {
       const cid = this.level.countryId;
@@ -853,6 +862,9 @@ class Game {
       // 🏕️🥚 R4 (v299) «Табір кличе»: тижневий квест табору. { wk: номер тижня, q: id квесту,
       // p: прогрес, claimed }. Детермінований від _weekIndex(); БЕЗ FOMO (не згорає).
       weeklyCamp: null,
+      // 🌍 v303 «Світ врятовано»: 0/1 — чи вже показано фінал кампанії (усі 12 країн вільні).
+      // Одноразовий гейт церемонії; медаль 'WORLD' і +50💎 видаються рівно раз.
+      worldSaved: 0,
     };
   }
 
@@ -1252,6 +1264,9 @@ class Game {
     // 🎁 catch-up продовженого Зоряного шляху (40→65): пропущені по XP рівні видаються разом
     this.progress.grantBacklog();
     this._showGlobeUI(true);
+    // 🌍 ретро-ветеран: перший вхід на глобус із уже повними 12/12 (гра до v303 нічого не
+    // святкувала) — показуємо фінал одноразово. Ідемпотентно через save.worldSaved.
+    this._maybeWorldSaved();
     // 👋 welcome-back: показуємо прогрес і компас, якщо це не свіжий старт і не автозапуск рівня з URL
     const libN0 = liberatedCount(this.save.liberated);
     if (libN0 > 0 && !this.params.get('country')) {
@@ -1748,12 +1763,13 @@ class Game {
   renderAlbum() {
     const save = this.save;
     const tabs = [
+      ['hero', t('🏅 Герой')],
       ['friends', t('🤝 Друзі')],
       ['skins', t('🧢 Скіни')],
       ['pets', t('🐾 Петси')],
       ['elites', t('👹 Еліти')],
     ];
-    if (!this._albumTab || !tabs.some(([id]) => id === this._albumTab)) this._albumTab = 'friends';
+    if (!this._albumTab || !tabs.some(([id]) => id === this._albumTab)) this._albumTab = 'hero';
     const rescued = rescuedFriendCount(save);
     let friendsHtml = `<div class="album-counter">🤝 ${rescued}/${FRIEND_TOTAL}</div><div class="album-grid">`;
     for (const cid of CAMPAIGN_ORDER) {
@@ -1879,9 +1895,63 @@ class Game {
     }
     elitesHtml += '</div>';
 
+    // 🏅 Герой: профіль пригоди — рівень+XP, зірки, звільнені країни, медалі, рекорди,
+    // лічильники колекцій і активний титул. Усе читається з наявного save (жодних нових ключів тут).
+    const lvl = this.progress.level;
+    const lvlPct = Math.round(this.progress.levelFrac() * 100);
+    const starPct = Math.round((starTotal(save) / CAMPAIGN_STAR_MAX) * 100);
+    const heroLibN = liberatedCount(save.liberated);
+    const libPct = Math.round((heroLibN / CAMPAIGN_ORDER.length) * 100);
+    const bar = (pct) => `<div class="hero-bar"><div class="hero-bar-fill" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
+    const barRow = (label, right, pct) => `<div class="hero-bar-row"><div class="hero-bar-label"><span>${label}</span><span>${right}</span></div>${bar(pct)}</div>`;
+    const statRow = (icon, name, val) => `<div class="stat">${icon ? `<span class="stat-icon">${icon}</span>` : ''}<span class="stat-name">${name}</span><span class="stat-val">${val}</span></div>`;
+    // медалі: здобуті — яскраві; нездобуті — сірий силует із підказкою як здобути (патерн album-card)
+    const medals = save.medals || [];
+    const medalCard = (owned, icon, name, hint) => owned
+      ? `<div class="album-card revealed"><div class="album-portrait">${icon}</div><div class="album-name">${name}</div></div>`
+      : `<div class="album-card locked"><div class="album-portrait silhouette">${icon}</div><div class="album-name">???</div><div class="album-hint">${hint}</div></div>`;
+    const medalsHtml = medalCard(medals.includes(CHAPTER3.id), '🧪', CHAPTER3.medalName, t('Пройди Главу 3 у Лігві Вірусу'))
+      + medalCard(medals.includes('WORLD'), '🌍', t('Рятівник світу'), t('Звільни всі 12 країн світу'));
+    // рекорди: найшвидша країна (мін time), найкраще комбо (макс по records)
+    const records = save.records || {};
+    let fastCid = null; let fastTime = Infinity; let bestCombo = 0;
+    for (const [cid, r] of Object.entries(records)) {
+      if (!r) continue;
+      if (typeof r.time === 'number' && r.time < fastTime) { fastTime = r.time; fastCid = cid; }
+      if ((r.combo | 0) > bestCombo) bestCombo = r.combo | 0;
+    }
+    const fastCountry = fastCid ? COUNTRIES[fastCid] : null;
+    const fastVal = fastCid
+      ? `${(fastCountry && fastCountry.flag) || ''} ${(fastCountry && fastCountry.name) || fastCid} · ${Math.floor(fastTime / 60)}:${String(Math.round(fastTime) % 60).padStart(2, '0')}`
+      : '—';
+    const killed = (save.stats && save.stats.killed) | 0;
+    const bosses = (save.stats && save.stats.bosses) | 0;
+    // активний титул + скільки титулів здобуто
+    const activeTitleName = save.activeTitle && TITLES[save.activeTitle] ? TITLES[save.activeTitle].name() : t('Ще немає');
+    const titlesGot = (save.titles || []).length;
+    const titlesTotal = Object.keys(TITLES).length;
+    const heroHtml = `<div class="hero-pane">
+      ${barRow(`⭐ ${t('Рівень')} ${lvl}`, `${lvlPct}%`, lvlPct)}
+      ${barRow(`⭐ ${t('Зірки кампанії')}`, `${starTotal(save)}/${CAMPAIGN_STAR_MAX}`, starPct)}
+      ${barRow(`🌍 ${t('Країни світу')}`, `${heroLibN}/${CAMPAIGN_ORDER.length}`, libPct)}
+      <div class="hero-sec">${t('🏅 Медалі')}</div>
+      <div class="album-grid">${medalsHtml}</div>
+      <div class="hero-sec">${t('🏆 Рекорди')}</div>
+      ${statRow('⚡', t('Найшвидша країна'), fastVal)}
+      ${statRow('🔥', t('Найкраще комбо'), 'x' + bestCombo)}
+      ${statRow('🧟', t('Усього переможено'), killed)}
+      ${statRow('👑', t('Босів переможено'), bosses)}
+      <div class="hero-sec">${t('🎒 Колекції')}</div>
+      ${statRow('', t('🤝 Друзі'), `${rescued}/${FRIEND_TOTAL}`)}
+      ${statRow('', t('🐾 Петси'), `${ownedPets.length}/${petIds.length}`)}
+      ${statRow('', t('🧢 Скіни'), `${ownedSkins.length}/${skinIds.length}`)}
+      <div class="hero-sec">${t('🏷️ Титул')}</div>
+      ${statRow('🏷️', activeTitleName, t('здобуто {x}/{y}', { x: titlesGot, y: titlesTotal }))}
+    </div>`;
+
     const pane = (id, body) => `<div class="album-pane" data-tab="${id}" ${this._albumTab === id ? '' : 'hidden'}>${body}</div>`;
     let html = `<div class="ward-tabs album-tabs">${tabs.map(([id, label]) => `<button class="shop-tab album-tab ${this._albumTab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</div>`;
-    html += pane('friends', friendsHtml) + pane('skins', skinsHtml) + pane('pets', petsHtml) + pane('elites', elitesHtml);
+    html += pane('hero', heroHtml) + pane('friends', friendsHtml) + pane('skins', skinsHtml) + pane('pets', petsHtml) + pane('elites', elitesHtml);
     const root = document.getElementById('album-content');
     root.innerHTML = html;
     root.querySelectorAll('.album-tab').forEach((el) => {
@@ -5369,6 +5439,57 @@ class Game {
       this.hud.toast(t('⭐ Ще трохи — і титул «{n}»! {c}/{t}', { n: meta.name(), c: cur, t: meta.target }), 5);
       break;
     }
+  }
+
+  // 🌍 v303 «Світ врятовано»: одноразовий тригер фіналу кампанії. Викликається на глобусі —
+  // з кнопки «На глобус» після переможної 12-ї країни І на першому вході ретро-ветерана.
+  // Одноразовість надійна: гейт save.worldSaved ставиться РАЗОМ із нагородою під saveGame(),
+  // тож повторний виклик (реплей, наступний boot, гість коопу) нічого не робить. state==='globe'
+  // не дає церемонії спливти поверх рівня. Повертає true лише коли реально показали.
+  _maybeWorldSaved() {
+    if (this.state !== 'globe') return false;
+    if (this.save.worldSaved) return false;
+    if (!CAMPAIGN_ORDER.every((c) => hasLiberated(this.save.liberated, c))) return false;
+    this.save.worldSaved = 1;
+    this.save.crystals = (this.save.crystals || 0) + 50;
+    if (!Array.isArray(this.save.medals)) this.save.medals = [];
+    if (!this.save.medals.includes('WORLD')) this.save.medals.push('WORLD');
+    this.saveGame();
+    this._showWorldSaved();
+    return true;
+  }
+
+  _showWorldSaved() {
+    const stars = starTotal(this.save);
+    const friends = rescuedFriendCount(this.save);
+    const killed = (this.save.stats && this.save.stats.killed) | 0;
+    const nums = document.getElementById('worldsaved-nums');
+    if (nums) {
+      nums.textContent = t('🌍 {a}/{b} країн · ⭐ {s}/{sm} зірок · 🤝 {f}/{ft} друзів · 🧟 {n} переможено', {
+        a: CAMPAIGN_ORDER.length, b: CAMPAIGN_ORDER.length,
+        s: stars, sm: CAMPAIGN_STAR_MAX,
+        f: friends, ft: FRIEND_TOTAL, n: killed,
+      });
+    }
+    const reward = document.getElementById('worldsaved-reward');
+    if (reward) reward.textContent = t('🎁 Нагорода: 💎 +50 · медаль 🌍 «{m}»', { m: t('Рятівник світу') });
+    // конфетті — той самий DOM-патерн, що на екрані перемоги (працює й на глобусі)
+    const conf = document.getElementById('worldsaved-confetti');
+    if (conf) {
+      conf.innerHTML = '';
+      for (let i = 0; i < 80; i++) {
+        const d = document.createElement('div');
+        d.className = 'confetti-piece';
+        d.style.left = Math.random() * 100 + '%';
+        d.style.background = ['#ffd23f', '#4cff7a', '#44ccff', '#ff5d73', '#b086f2'][i % 5];
+        d.style.animationDelay = Math.random() * 3 + 's';
+        d.style.animationDuration = 2.5 + Math.random() * 2 + 's';
+        conf.appendChild(d);
+      }
+    }
+    this._showOverlay('overlay-worldsaved');
+    // 🔊 святковий голос: лише якщо аудіо вже розбуджене жестом — інакше тихо пропускаємо
+    if (this.audio) { try { this.audio.victory(); } catch (e) { /* звук не критичний */ } }
   }
 
   _grantInfectedWin(countryId, stats) {

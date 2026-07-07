@@ -149,6 +149,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
       // 🏕️ R4 (v299) «Табір кличе»
       'weeklyCamp',
+      // 🌍 v303 «Світ врятовано»
+      'worldSaved',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -159,7 +161,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
-      'weeklyCamp',
+      'weeklyCamp', 'worldSaved',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -209,6 +211,8 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.petFood = saveHasProgress({ ...fresh, petFood: 5 }) === true;
     out.petLevels = saveHasProgress({ ...fresh, petLevels: { dog: 3 } }) === true;
     out.eggClaims = saveHasProgress({ ...fresh, eggClaims: [6] }) === true;
+    // 🌍 v303: фінал кампанії пройдено — теж прогрес (зміна пристрою не має його обнуляти)
+    out.worldSaved = saveHasProgress({ ...fresh, worldSaved: 1 }) === true;
     out.zeroEggsNotProgress = saveHasProgress({ ...fresh, eggs: 0, petFood: 0, petLevels: { dog: 1 } }) === false;
     return out;
   });
@@ -236,6 +240,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('🍖 корм петса → прогрес=true', res.petFood);
   check('🐾 рівень петса → прогрес=true', res.petLevels);
   check('🥚 видані пороги-яйця → прогрес=true', res.eggClaims);
+  check('🌍 світ врятовано → прогрес=true', res.worldSaved);
   check('🥚 порожні яйця/корм/Рів.1 ≠ прогрес', res.zeroEggsNotProgress);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
