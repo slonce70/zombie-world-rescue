@@ -84,10 +84,12 @@ try {
   check('обидва увійшли в рівень', true);
 
   // гість має дочекатися повного стану від хоста (щоб net жив на обох боках)
+  // ширше вікно: на задушеному раннері пінг стає в чергу ЗА бэклогом стану — якщо
+  // прогрів не завершився, доставка тоста вилазить за вікно waitFor нижче
   await guestPage.waitForFunction(() => {
     const s = window.__game.test.coopState();
     return s.aliveZombies > 5;
-  }, null, { timeout: 15000 * SLOW }).catch(() => {});
+  }, null, { timeout: 30000 * SLOW }).catch(() => {});
 
   // ============ 📣 ПІНГИ ============
   // 5. шпигуємо за тостами хоста; гість шле пінг #1 (Допоможи!)
@@ -101,7 +103,7 @@ try {
   const got = await waitFor(async () => {
     const arr = await hostPage.evaluate(() => window.__pings || []);
     return arr.some((m) => /Допоможи|Help|Помоги/.test(m));
-  }, 8000, 'host received ping toast');
+  }, 15000, 'host received ping toast'); // CI: тост доїжджав за ~33с при SLOW=4 — вікно 60с
   check('хост отримав пінг гостя як тост', got,
     JSON.stringify(await hostPage.evaluate(() => window.__pings || [])));
 
@@ -113,7 +115,7 @@ try {
     h.toast = (m) => { window.__pings.push(m); return o(m); };
   });
   await hostPage.evaluate(() => window.__game.coop.session.sendPing(0));
-  const got2 = await waitFor(async () => (await guestPage.evaluate(() => window.__pings || [])).some((m) => /Сюди|Here|Сюда/.test(m)), 8000, 'guest received host ping');
+  const got2 = await waitFor(async () => (await guestPage.evaluate(() => window.__pings || [])).some((m) => /Сюди|Here|Сюда/.test(m)), 15000, 'guest received host ping');
   check('гість отримав пінг хоста як тост', got2,
     JSON.stringify(await guestPage.evaluate(() => window.__pings || [])));
 

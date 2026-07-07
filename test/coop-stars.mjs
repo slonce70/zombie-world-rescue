@@ -107,10 +107,12 @@ try {
   // ---- (б) форс виконання на ХОСТІ → `soc` → тік (done) у гостя ----
   const doneHost = await A.evaluate(() => window.__game.test.forceSecondaryDone());
   check('(б) хост виконав командну ціль', doneHost === true);
+  // ширше вікно: на задушеному раннері `soc` стає в чергу за бэклогом снапшотів гостя —
+  // на CI подія доїжджала за ~50с при SLOW=4 (⭐2 гість зрештою отримував)
   const doneB = await B.waitForFunction(() => {
     const s = window.__game.test.secondaryState();
     return s && s.done ? true : null;
-  }, null, { timeout: 12000 * SLOW }).then(() => true).catch(() => false);
+  }, null, { timeout: 30000 * SLOW }).then(() => true).catch(() => false);
   check('(б) у гостя ціль позначилась виконаною (подія soc)', doneB);
 
   // ---- (в)+(г) перемога: кожен нараховує зірки СОБІ; гість «падав» → без ⭐3 ----

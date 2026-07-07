@@ -155,14 +155,21 @@ await waitFor(async () => {
 check(fled === 'flee', `золотий тікає (стан: ${fled})`);
 const goldenVoiceNear = await page.evaluate(() => window.__game.__goldenVoiceHits || 0);
 check(goldenVoiceNear === 1, `озвучка золотого спрацьовує при наближенні (${goldenVoiceNear})`);
-const coinsBefore = await page.evaluate(() => window.__game.level.effects.coins.length);
+// v287: замість джекпоту монет на землі золотий дарує ЗОЛОТУ СКРИНЮ (церемонія):
+// +144 монети в баланс і +5 кристалів — нараховуються синхронно з goldenChest.
+const chestBefore = await page.evaluate(() => ({
+  coins: window.__game.save.coins, cry: window.__game.save.crystals || 0,
+}));
 await page.evaluate(() => {
   const gz = window.__game.level.zombies.list.find((z) => z.golden);
   if (gz) gz.damage(99999, null, false);
 });
 await page.waitForTimeout(600);
-const coinsAfter = await page.evaluate(() => window.__game.level.effects.coins.length);
-check(coinsAfter >= coinsBefore + 10, `джекпот: +${coinsAfter - coinsBefore} монет на землі`);
+const chestAfter = await page.evaluate(() => ({
+  coins: window.__game.save.coins, cry: window.__game.save.crystals || 0,
+}));
+check(chestAfter.coins >= chestBefore.coins + 144 && chestAfter.cry >= chestBefore.cry + 5,
+  `золота скриня: +${chestAfter.coins - chestBefore.coins} монет, +${chestAfter.cry - chestBefore.cry} кристалів`);
 const goldenVoiceAfterKill = await page.evaluate(() => window.__game.__goldenVoiceHits || 0);
 check(goldenVoiceAfterKill === 1, `після смерті золотого озвучка не повторюється (${goldenVoiceAfterKill})`);
 

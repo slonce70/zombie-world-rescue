@@ -44,9 +44,10 @@ const armBannerSpy = (page) => page.evaluate(() => {
   window.__eliteBanner = null;
   const g = window.__game;
   const orig = g.hud.banner.bind(g.hud);
-  g.hud.banner = (title, sub, dur) => {
-    if (String(title).includes('Елітна хвиля')) window.__eliteBanner = title;
-    return orig(title, sub, dur);
+  // прокидаємо ВСІ аргументи (v300 додав 4-й opts із prio — гасити його не можна)
+  g.hud.banner = (...args) => {
+    if (String(args[0]).includes('Елітна хвиля')) window.__eliteBanner = args[0];
+    return orig(...args);
   };
 });
 
