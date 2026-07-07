@@ -39,7 +39,7 @@ check(st.cards === 12, '12 карток друзів (по країні камп
 check(st.locked === 12 && st.silhouettes === 12, 'нерятовані — тёмний силует', JSON.stringify(st));
 check(st.hints === 12 && st.q === '???', 'нерятовані — «???» + чесна підказка де схований', JSON.stringify(st));
 check(/0\/12/.test(st.counter), 'лічильник 🤝 0/12', st.counter);
-check(st.tabs.length === 4 && st.tabs.join(',') === 'friends,skins,pets,elites', '4 вкладки: Друзі + скіни/петси/еліти', JSON.stringify(st.tabs));
+check(st.tabs.length === 5 && st.tabs.join(',') === 'hero,friends,skins,pets,elites', '5 вкладок: Герой + Друзі + скіни/петси/еліти', JSON.stringify(st.tabs));
 
 // R5: вкладки скінів/петсів/еліт наповнені (не заглушки). Петси показують реальні картки + рядок яєць.
 await page.click('#album-content .album-tab[data-tab="pets"]');

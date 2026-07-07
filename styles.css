@@ -461,6 +461,16 @@ body.in-level #hud { display: block; }
   100% { transform: translateY(105vh) rotate(640deg); }
 }
 
+/* 🌍 Фінал кампанії «Світ врятовано» */
+#worldsaved-confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.worldsaved-card { max-width: 520px; }
+.worldsaved-nums { color: #cfe0f5; font-weight: 800; font-size: 17px; margin: 18px auto 8px; max-width: 430px; line-height: 1.55; }
+.worldsaved-reward { color: var(--accent); font-weight: 900; font-size: 18px; margin: 10px 0; }
+.worldsaved-bridge {
+  background: rgba(76,255,122,.12); border: 2px solid rgba(76,255,122,.4); border-radius: 12px;
+  color: #d6ffe4; font-weight: 800; font-size: 15px; padding: 10px 14px; margin: 14px auto 6px; max-width: 430px;
+}
+
 /* гранати */
 #grenades {
   margin-top: 4px; color: #cfe8ff; font-weight: 800; font-size: 17px;
@@ -882,6 +892,14 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 
 /* 📖 R4 «Альбом»: колекція друзів (жива) + заглушки. Responsive через auto-fill грід. */
 .album-tabs { margin-bottom: 12px; }
+/* 🏅 Альбом → вкладка «Герой»: смужки прогресу + рядки-статистики */
+.hero-bar-row { margin: 8px 0 12px; }
+.hero-bar-label { display: flex; justify-content: space-between; gap: 8px; color: #cfe0f5; font-weight: 900; font-size: 14px; margin-bottom: 5px; }
+.hero-bar { height: 14px; border-radius: 8px; background: rgba(0,0,0,.35); overflow: hidden; }
+.hero-bar-fill { height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--accent), #4cff7a); transition: width .3s; }
+.hero-sec { color: var(--accent); font-weight: 900; font-size: 15px; letter-spacing: .5px; margin: 16px 0 8px; }
+.hero-pane .stat { margin-bottom: 6px; font-size: 15px; }
+.hero-pane .album-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 .album-counter { color: var(--accent); font-weight: 900; font-size: 16px; margin: 2px 0 10px; }
 .album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .album-card {

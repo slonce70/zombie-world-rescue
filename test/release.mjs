@@ -77,6 +77,7 @@ const suite = [
   ['node', ['test/npc-rescue.mjs']],
   ['node', ['test/album.mjs']],
   ['node', ['test/album-fill.mjs']],
+  ['node', ['test/world-saved.mjs']],
   ['node', ['test/pet-eggs.mjs']],
   ['node', ['test/hq-friends.mjs']],
   ['node', ['test/mode-depth.mjs']],
