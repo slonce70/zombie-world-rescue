@@ -34,7 +34,8 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('☰ меню: 12 другорядних кнопок у висувному меню', menu.side === 12, `${menu.side}`);
+  // 13 із v290: додалась кнопка «📖 Альбом»
+  check('☰ меню: 13 другорядних кнопок у висувному меню', menu.side === 13, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');

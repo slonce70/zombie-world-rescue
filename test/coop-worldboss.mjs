@@ -88,6 +88,10 @@ try {
     const b = g.level.zombies.boss;
     return !!(b && b.worldBoss && b.state !== 'dead') && g.level.worldBoss.remaining() === 1;
   }, null, { timeout: 30000 * SLOW });
+  // бар вмикає HUD-кадр ПІСЛЯ появи puppet-а (на софтверному рендері ~10 fps) —
+  // чекаємо його явно, інакше читання класу між кадрами дає флейк
+  await B.waitForFunction(() => document.getElementById('bossbar')?.classList.contains('show'),
+    null, { timeout: 10000 * SLOW }).catch(() => {});
   const guestBoss = await B.evaluate(() => {
     const g = window.__game;
     const b = g.level.zombies.boss;

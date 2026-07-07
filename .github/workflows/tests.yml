@@ -24,7 +24,11 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Release gate (production browser/PWA suite)
-        run: npm run test:release
+        run: node test/release.mjs
+      # тротлінг free-раннера: SLOW-підлога 4 + 1 повтор (реальна регресія впаде двічі,
+      # гейт лишається блокуючим) — рецепт, яким джоб `coop` уже стабільно зелений
+      - name: Coop release chain
+        run: SLOW=4 RETRY=1 node test/coop-release.mjs
 
   smoke:
     runs-on: ubuntu-latest

@@ -569,6 +569,8 @@ export class Zombies {
   _updateEliteWave() {
     const ew = this._eliteWave;
     if (!ew || ew.done) return;
+    // v301: хвилю «зачистив» переможний sweep після боса — без скрині («здача» не рахується)
+    if (this.level.bossDefeated) { ew.done = true; return; }
     const alive = ew.list.filter((z) => z.state !== 'dead' && !z.gone);
     if (alive.length > 0) { ew.lastAlive = alive[alive.length - 1]; return; }
     ew.done = true;
@@ -968,7 +970,10 @@ export class Zombies {
         mn.anchor = { x: mx, z: mz, r: 12 };
       }
     }
-    if (z.golden) {
+    // v301: «здача» після перемоги (переможний sweep у _onBossDied) — НЕ впольований
+    // золотий: без джинглу і без скрині, інакше кожна перемога на карті з золотим дарує
+    // халявну скриню всім (у коопі — через gch), а церемонія лізе поверх салюту.
+    if (z.golden && !level.bossDefeated) {
       level.audio.goldenJingle(false);
       // 👑 v287: у СОЛО золотий дарує скриню-церемонію (гарантована).
       // 👑 v296 «Еліти разом»: у коопі золоту скриню отримує КОЖЕН гравець локально
