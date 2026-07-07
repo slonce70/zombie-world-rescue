@@ -116,14 +116,16 @@ try {
   // ---- (б) гість наводиться на зірку → підбір host-authoritative → сила В ГОСТЯ ----
   await armBannerSpy(A);
   await B.evaluate((s) => window.__game.test.teleport(s.x, s.z), starB);
+  // ширше вікно: підбір — потрійний мережевий круг (позиція гостя → хост-детект → spg →
+  // активація в гостя); на задушеному CI-раннері 12с×SLOW не вистачало (main-ран 2026-07-07)
   const bPower = await B.waitForFunction(
     () => (window.__game.test.superState() ? window.__game.test.superState().type : null),
-    null, { timeout: 12000 * SLOW },
+    null, { timeout: 30000 * SLOW },
   ).then((h) => h.jsonValue()).catch(() => null);
   check('(б) сила активна В ГОСТЯ (magnet)', bPower === 'magnet', `superState=${bPower}`);
   const aPower = await A.evaluate(() => window.__game.test.superState());
   check('(б) у ХОСТА сили нема (superState null)', aPower === null, JSON.stringify(aPower));
-  const aBanner = await A.waitForFunction(() => window.__superBanner, null, { timeout: 8000 * SLOW })
+  const aBanner = await A.waitForFunction(() => window.__superBanner, null, { timeout: 15000 * SLOW })
     .then((h) => h.jsonValue()).catch(() => null);
   check('(б) у ХОСТА банер «схопив»', !!aBanner, aBanner || 'нема');
   const bGone = await B.evaluate(() => !window.__game.level.superPickup);
@@ -142,7 +144,7 @@ try {
   }, starB);
   const bCoins1 = await B.waitForFunction(
     (c0) => (window.__game.save.coins > c0 ? window.__game.save.coins : false),
-    bCoins0, { timeout: 12000 * SLOW },
+    bCoins0, { timeout: 30000 * SLOW },
   ).then((h) => h.jsonValue()).catch(() => bCoins0);
   check('(в) монети магніт-бурі гостя зараховано (хост-лут → pid гостя)', bCoins1 > bCoins0,
     `монети гостя ${bCoins0} → ${bCoins1}`);
