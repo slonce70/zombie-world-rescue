@@ -166,7 +166,7 @@ export class TouchControls {
       btn.setAttribute('aria-label', `${t('Зброя')}: ${t(w.name)}, ${ammoText}`);
       if (id === player.cur) btn.setAttribute('aria-current', 'true');
       btn.innerHTML = `<span class="ww-icon">${w.icon}</span>`
-        + `<span class="ww-name">${w.name}</span>`
+        + `<span class="ww-name">${t(w.name)}</span>`
         + `<span class="ww-ammo">${ammoText}</span>`;
       const pick = (e) => {
         if (e.cancelable) e.preventDefault();

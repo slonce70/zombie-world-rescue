@@ -104,8 +104,44 @@ for (const file of files) {
   }
 }
 
-if (perFile.length === 0) {
-  console.log('  ✅ i18n-parity: усі ключі t() і статичні тексти index.html присутні в en.js і ru.js');
+// v304: додаткова перевірка — «голі» поля name:/title:/cat:/label:/sub: із кириличним
+// рядковим літералом БЕЗ обгортки t(...). Такі поля (напр. cat: 'Ангел' у shop.js,
+// name: 'Посох' у player.js) перекладаються ДИНАМІЧНО через t(змінна) у місці рендеру
+// (список категорій магазину, колесо зброї, картки прокачки в draft.js тощо) —
+// тому ключ мусить бути в обох словниках, навіть якщо сам t() виклик десь-інде.
+// Регекс `field:\s*(['"])` природно НЕ ловить `field: t('…')` (бо після ':' там 't(', не квота) —
+// це і рятує від фолс-позитивів на вже обгорнутих полях.
+const RAW_FIELD_RE = /\b(name|title|cat|label|sub)\s*:\s*(['"])((?:\\.|(?!\2).)*?)\2/g;
+const hasCyr = (s) => /[а-яіїєґ]/i.test(s);
+const rawFieldFiles = walk(root + 'src/', []).filter((f) => !f.includes(root + 'src/i18n/'));
+let missingRawEn = 0;
+let missingRawRu = 0;
+const perFileRaw = [];
+for (const file of rawFieldFiles) {
+  const src = stripComments(readFileSync(file, 'utf8'));
+  const rel = file.slice(root.length);
+  const misEn = [];
+  const misRu = [];
+  src.split('\n').forEach((line, i) => {
+    let m;
+    RAW_FIELD_RE.lastIndex = 0;
+    while ((m = RAW_FIELD_RE.exec(line)) !== null) {
+      const val = m[3].replace(/\\(['"\\])/g, '$1');
+      if (!hasCyr(val)) continue;
+      const loc = `${i + 1}: ${JSON.stringify(val)}`;
+      if (!EN.has(val)) misEn.push(loc);
+      if (!RU.has(val)) misRu.push(loc);
+    }
+  });
+  if (misEn.length || misRu.length) {
+    perFileRaw.push({ rel, misEn: [...new Set(misEn)], misRu: [...new Set(misRu)] });
+    missingRawEn += new Set(misEn).size;
+    missingRawRu += new Set(misRu).size;
+  }
+}
+
+if (perFile.length === 0 && perFileRaw.length === 0) {
+  console.log('  ✅ i18n-parity: усі ключі t(), статичні тексти index.html і «голі» name/title/cat/label/sub присутні в en.js і ru.js');
   process.exit(0);
 }
 
@@ -115,5 +151,10 @@ for (const f of perFile) {
   if (f.misEn.length) for (const k of f.misEn) console.log(`    [en] ${JSON.stringify(k)}`);
   if (f.misRu.length) for (const k of f.misRu) console.log(`    [ru] ${JSON.stringify(k)}`);
 }
-console.log(`\n  Разом: ${missingEn} без en, ${missingRu} без ru`);
+for (const f of perFileRaw) {
+  console.log(`\n— ${f.rel} (голі поля name/title/cat/label/sub без t())`);
+  if (f.misEn.length) for (const k of f.misEn) console.log(`    [en] ${k}`);
+  if (f.misRu.length) for (const k of f.misRu) console.log(`    [ru] ${k}`);
+}
+console.log(`\n  Разом: ${missingEn + missingRawEn} без en, ${missingRu + missingRawRu} без ru`);
 process.exit(1);
