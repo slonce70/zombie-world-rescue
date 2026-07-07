@@ -89,6 +89,56 @@ check(shopBoxesEn.tabs.includes('Boxes') && shopBoxesEn.tabs.includes('Hyperchar
   'en: shop boxes translated', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
 check(!/Бокси|Гіперзаряди|Великий бокс|Скін-бокс|Мегабокс|кристалів|монет/.test(shopBoxesEn.text + shopBoxesEn.tabs.join(' ')),
   'en: shop boxes are not Ukrainian', JSON.stringify({ tabs: shopBoxesEn.tabs, text: shopBoxesEn.text.slice(0, 260) }));
+
+// v304: пройтись по УСІХ вкладках категорій магазину (не лише Бокси) — ані назва категорії,
+// ані назва жодного айтема активної панелі не мають містити кирилицю (Ангел/Демон/Радіація тощо).
+const shopAllCatsEn = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.crystals = 999;
+  g.save.radiationCoins = 999;
+  g.shop.open();
+  const tabs = [...document.querySelectorAll('.shop-tab')];
+  const out = tabs.map((tab) => {
+    tab.click();
+    const cat = tab.textContent.trim();
+    const items = [...document.querySelectorAll('#shop-grid .shop-name')].map((el) => el.textContent.trim());
+    return { cat, items };
+  });
+  g.shop.close();
+  return out;
+});
+const cyr = /[а-яіїєґ]/i;
+const catCyr = shopAllCatsEn.filter((r) => cyr.test(r.cat)).map((r) => r.cat);
+const itemCyr = shopAllCatsEn.flatMap((r) => r.items.filter((n) => cyr.test(n)).map((n) => `${r.cat}: ${n}`));
+check(shopAllCatsEn.length >= 5, 'en: у магазині кілька вкладок категорій', shopAllCatsEn.length);
+check(catCyr.length === 0, 'en: усі вкладки категорій магазину без кирилиці', JSON.stringify(catCyr));
+check(itemCyr.length === 0, 'en: усі назви айтемів у кожній категорії без кирилиці', itemCyr.join(' | '));
+
+// v304: WEAPONS[*].name (колесо зброї touch.js рендерить їх через t()) — ключ мусить бути
+// в ОБОХ словниках. Проста перевірка dict-наявності через import таблиці прямо в браузері.
+const weaponsMissing = await page.evaluate(async () => {
+  const { WEAPONS } = await import('/src/player.js');
+  const { EN } = await import('/src/i18n/en.js');
+  const { RU } = await import('/src/i18n/ru.js');
+  return Object.values(WEAPONS).map((w) => w.name).filter((n) => !(n in EN) || !(n in RU));
+});
+check(weaponsMissing.length === 0, 'en/ru: усі WEAPONS[*].name є в обох словниках', JSON.stringify(weaponsMissing));
+
+// v304: назви режимів Нокауту (t(this.cfg.title) у knockout.js) — реальний старт режиму,
+// перевіряємо, що HUD-заголовок перекладений і без кирилиці.
+await page.evaluate(async () => {
+  const g = window.__game;
+  const { xpForLevel } = await import('/src/progress.js');
+  let xp = 0;
+  for (let lvl = 1; lvl < 20; lvl++) xp += xpForLevel(lvl);
+  g.test.addXp(xp);
+});
+await page.evaluate(() => window.__game.test.startKnockout());
+await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.knockout, null, { timeout: 30000 });
+const knockoutTitlesEn = await page.evaluate(() => window.__game.level.knockout.getHudList().map((m) => m.title));
+check(knockoutTitlesEn.some((s) => /KNOCKOUT/i.test(s)), 'en: назва режиму Нокаут перекладена', knockoutTitlesEn.join(' | '));
+check(!knockoutTitlesEn.some((s) => cyr.test(s)), 'en: HUD Нокауту без кирилиці', knockoutTitlesEn.join(' | '));
+
 await page.goto(`${BASE}/?test&fresh&lang=en`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 30000 });
 await page.evaluate(() => {

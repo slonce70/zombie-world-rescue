@@ -119,7 +119,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 303;
+const APP_VERSION = 304;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3860,7 +3860,7 @@ class Game {
         for (const k of ['speed', 'rage', 'bubble', 'magnet']) level.player.buffs[k] = 20;
         title = t('🌈 УСІ ПІДСИЛЕННЯ!');
         sub = t('Швидкість, лють, бульбашка і магніт — на 20 секунд!');
-        items.push({ icon: '⚡', label: '20с' }, { icon: '💪', label: '20с' }, { icon: '🛡', label: '20с' }, { icon: '🧲', label: '20с' });
+        items.push({ icon: '⚡', label: t('20с') }, { icon: '💪', label: t('20с') }, { icon: '🛡', label: t('20с') }, { icon: '🧲', label: t('20с') });
       }
     }
     // 🎁 v287: замість миттєвого банера — соковита церемонія скрині (нагороди ті самі)

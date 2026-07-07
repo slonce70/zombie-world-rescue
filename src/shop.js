@@ -79,21 +79,21 @@ export const SHOP_ITEMS = [
   { id: 'wizardskin', icon: HERO_SKINS.wizard.icon, name: HERO_SKINS.wizard.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 25, max: 1, cat: t('Скіни'), skin: 'wizard' },
   { id: 'muscleskin', icon: HERO_SKINS.muscle.icon, name: HERO_SKINS.muscle.name, desc: t('Скін героя за кристали'), price: 0, crystalPrice: 20, max: 1, cat: t('Скіни'), skin: 'muscle' },
   { id: 'goldskin', icon: HERO_SKINS.gold.icon, name: HERO_SKINS.gold.name, desc: t('Золотий скін на героя'), price: 2500, max: 1, cat: t('Скіни'), skin: 'gold' },
-  { id: 'angel-action-1', icon: '🪽', name: t('Ангел: Німб'), desc: t('Акція 1/3 для набору Ангела'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 1 },
-  { id: 'angel-action-2', icon: '✨', name: t('Ангел: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 2 },
-  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 відкриває скін, білі kill-іскри і біле відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Ангел', angelStep: 3 },
-  { id: 'demon-action-1', icon: '😈', name: t('Демон: Роги'), desc: t('Акція 1/3 для набору Демона'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 1 },
-  { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 2 },
-  { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 відкриває скін, червоні kill-іскри і червоне відродження'), price: 0, crystalPrice: 20, max: 1, cat: 'Демон', demonStep: 3 },
-  { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: 'Радіація', skin: 'radiation' },
-  { id: 'radiationupgrade', icon: '☢️', name: t('Радіаційні калюжі'), desc: t('Покращення Радіаційного: калюжі бʼють 5 HP/с, а влучання сиплять краплі радіації'), price: 0, crystalPrice: 45, max: 1, cat: 'Радіація', needsSkin: 'radiation' },
-  { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: 'Радіація' },
-  { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', pet: true },
-  { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', cloneSkin: 'radiation' },
-  { id: 'poisonpuddle', icon: GADGETS.poisonpuddle.icon, name: GADGETS.poisonpuddle.name, desc: () => GADGETS.poisonpuddle.desc + t(' · перезарядка {n}с', { n: GADGETS.poisonpuddle.cd }), price: 0, radiationPrice: 300, max: 1, cat: 'Радіація', gadget: true },
-  { id: 'poisonpuddle-hyper', icon: '⚡', name: t('Гіперзаряд: Отруйна калюжа'), desc: t('Калюжа наносить 10 HP/с і сповільнює зомбі'), price: 5000, crystalPrice: 5, max: 1, cat: 'Радіація', hyper: 'poisonpuddle', needsGadget: 'poisonpuddle' },
+  { id: 'angel-action-1', icon: '🪽', name: t('Ангел: Німб'), desc: t('Акція 1/3 для набору Ангела'), price: 0, crystalPrice: 20, max: 1, cat: t('Ангел'), angelStep: 1 },
+  { id: 'angel-action-2', icon: '✨', name: t('Ангел: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: t('Ангел'), angelStep: 2 },
+  { id: 'angel-action-3', icon: HERO_SKINS.angel.icon, name: t('Ангел: Крила'), desc: t('Акція 3/3 відкриває скін, білі kill-іскри і біле відродження'), price: 0, crystalPrice: 20, max: 1, cat: t('Ангел'), angelStep: 3 },
+  { id: 'demon-action-1', icon: '😈', name: t('Демон: Роги'), desc: t('Акція 1/3 для набору Демона'), price: 0, crystalPrice: 20, max: 1, cat: t('Демон'), demonStep: 1 },
+  { id: 'demon-action-2', icon: '🔥', name: t('Демон: Іскри'), desc: t('Акція 2/3 для kill-анімації'), price: 0, crystalPrice: 20, max: 1, cat: t('Демон'), demonStep: 2 },
+  { id: 'demon-action-3', icon: '🦇', name: t('Демон: Плащ'), desc: t('Акція 3/3 відкриває скін, червоні kill-іскри і червоне відродження'), price: 0, crystalPrice: 20, max: 1, cat: t('Демон'), demonStep: 3 },
+  { id: 'radiationskin', icon: HERO_SKINS.radiation.icon, name: HERO_SKINS.radiation.name, desc: t('Маска, калюжа радіації після kill і радіаційне відродження'), price: 0, crystalPrice: 100, max: 1, cat: t('Радіація'), skin: 'radiation' },
+  { id: 'radiationupgrade', icon: '☢️', name: t('Радіаційні калюжі'), desc: t('Покращення Радіаційного: калюжі бʼють 5 HP/с, а влучання сиплять краплі радіації'), price: 0, crystalPrice: 45, max: 1, cat: t('Радіація'), needsSkin: 'radiation' },
+  { id: 'radiationturretpack', icon: '🤖', name: t('Набір радіації'), desc: t('Радіаційна турель: +5 шкоди і зелені кулі'), price: 0, crystalPrice: 50, radiationPrice: 50, max: 1, cat: t('Радіація') },
+  { id: 'radiationlizard', icon: PETS.radiationlizard.icon, name: PETS.radiationlizard.name, desc: PETS.radiationlizard.desc, price: 0, radiationPrice: 150, max: 1, cat: t('Радіація'), pet: true },
+  { id: 'radiationcloneskin', icon: '☢️', name: t('Радіаційні клони'), desc: t('Скін для гаджета Клон'), price: 0, radiationPrice: 150, max: 1, cat: t('Радіація'), cloneSkin: 'radiation' },
+  { id: 'poisonpuddle', icon: GADGETS.poisonpuddle.icon, name: GADGETS.poisonpuddle.name, desc: () => GADGETS.poisonpuddle.desc + t(' · перезарядка {n}с', { n: GADGETS.poisonpuddle.cd }), price: 0, radiationPrice: 300, max: 1, cat: t('Радіація'), gadget: true },
+  { id: 'poisonpuddle-hyper', icon: '⚡', name: t('Гіперзаряд: Отруйна калюжа'), desc: t('Калюжа наносить 10 HP/с і сповільнює зомбі'), price: 5000, crystalPrice: 5, max: 1, cat: t('Радіація'), hyper: 'poisonpuddle', needsGadget: 'poisonpuddle' },
   // ☢️📜 повторюваний стік радіаційних монет: інакше після викупу разових товарів валюта мертва
-  { id: 'radiationcontract', icon: '📜', name: t('Радіаційний контракт'), desc: t('Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.'), price: 0, radiationPrice: 150, max: 1, cat: 'Радіація', contract: true },
+  { id: 'radiationcontract', icon: '📜', name: t('Радіаційний контракт'), desc: t('Здай 150 ☢️ — отримай 25 💎. Раз на тиждень.'), price: 0, radiationPrice: 150, max: 1, cat: t('Радіація'), contract: true },
   // --- спорядження (видно на герої — клавіша V!) ---
   { id: 'vest', icon: '🦺', name: t('Бронежилет'), desc: t('+50 броні щорівня, видно на герої'), price: 200, max: 2, cat: t('Спорядження') },
   { id: 'helmet', icon: '⛑️', name: t('Шолом'), desc: t('-15% будь-якої шкоди'), price: 250, max: 1, cat: t('Спорядження') },
@@ -468,10 +468,10 @@ export class Shop {
         let reward = '';
         if (roll < 0.6) {
           save.coins += 350;
-          reward = '+350 монет';
+          reward = t('+350 монет');
         } else if (roll < 0.8) {
           save.crystals = (save.crystals || 0) + 20;
-          reward = '+20 кристалів';
+          reward = t('+20 кристалів');
         } else if (roll < 0.9) {
           const pool = Object.keys(GADGETS).filter((g) => !save.gadgetsOwned.includes(g));
           const gadget = pool[Math.floor(Math.random() * pool.length)];
@@ -479,21 +479,21 @@ export class Shop {
             save.gadgetsOwned.push(gadget);
             if (!save.activeGadget) save.activeGadget = gadget;
           }
-          reward = gadget ? `${GADGETS[gadget].icon} ${GADGETS[gadget].name}` : 'Гаджет';
+          reward = gadget ? `${GADGETS[gadget].icon} ${GADGETS[gadget].name}` : t('Гаджет');
         } else if (roll < 0.95) {
           if (!save.skins.includes('ghost')) save.skins.push('ghost');
           save.activeSkin = 'ghost';
-          reward = '👻 Скін Привид';
+          reward = t('👻 Скін Привид');
         } else if (roll < 0.98) {
           if (!Array.isArray(save.gadgetHypers)) save.gadgetHypers = [];
           const pool = ['shield', 'heal', 'frostgrenade', 'turret', 'clone', 'soulmagnet', 'stunammo', 'goldapple', 'meteor', 'dash', 'mine', 'dnaswitch'].filter((h) => !save.gadgetHypers.includes(h));
           const hyper = pool[Math.floor(Math.random() * pool.length)];
           if (hyper) save.gadgetHypers.push(hyper);
-          reward = '⚡ Гіперзаряд';
+          reward = t('⚡ Гіперзаряд');
         } else {
           if (!save.skins.includes('samurai')) save.skins.push('samurai');
           save.activeSkin = 'samurai';
-          reward = '🎌 Скін Самурай';
+          reward = t('🎌 Скін Самурай');
         }
         this.showMegaboxReveal(reward);
         break;
