@@ -64,6 +64,34 @@ import {
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 
+// 🎁 v302: єдина таблиця нагород скринь — числа продубльовані у 4 місцях (соло-хендлери
+// eliteWaveCleared/goldenChest + кооп-гранти _grantEliteChestCoop/_grantGoldenChestCoop).
+// Значення рантайму лишаються ті самі, що були захардкоджені.
+const CHEST_REWARDS = {
+  elite: { coins: 120, crystals: 3, eggChance: ELITE_CHEST_EGG_CHANCE },
+  golden: { coins: 144, crystals: 5, eggChance: GOLDEN_CHEST_EGG_CHANCE },
+};
+
+// 🌟 v302: єдина таблиця суперсил — тривалість/лейбли/іконки/кольори були продубльовані
+// у _grantSuperCoop/_activateSuperPower/_superBannerFor. Лейбли — ЛІНИВІ функції (),
+// бо t() залежить від поточної мови (обчислюємо на момент показу, не імпорту).
+const SUPER_POWERS = {
+  shkval: {
+    dur: 12,
+    label: () => t('🔥 ШКВАЛ'),
+    sub: () => t('Безлім патронів + скорострільність!'),
+    flash: 'rgba(255,120,60,0.55)',
+    color: 0xff7a3c,
+  },
+  magnet: {
+    dur: 15,
+    label: () => t('🧲 МАГНІТ-БУРЯ'),
+    sub: () => t('Магніт монет + швидкість!'),
+    flash: 'rgba(102,221,255,0.55)',
+    color: 0x66ddff,
+  },
+};
+
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
 translateHtml(document.body);
 document.documentElement.lang = getLang();
@@ -91,7 +119,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 301;
+const APP_VERSION = 302;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3172,16 +3200,16 @@ class Game {
         }
         return;
       }
-      const reward = 120;
-      level.addCoins(reward);
-      this.save.crystals = (this.save.crystals || 0) + 3;
+      const { coins, crystals, eggChance } = CHEST_REWARDS.elite;
+      level.addCoins(coins);
+      this.save.crystals = (this.save.crystals || 0) + crystals;
       this.progress.addXp(XP_VALUES.horde);
       if (pos && level.effects) {
         level.effects.ring(new THREE.Vector3(pos.x, pos.y || 0, pos.z), 0xffd23f, 3.5);
         level.effects.burst(new THREE.Vector3(pos.x, (pos.y || 0) + 1, pos.z), 0xffd23f, 20, { speed: 5, up: 5, life: 0.9, size: 1.4 });
       }
-      const items = [{ icon: '💰', n: reward }, { icon: '💎', n: 3 }];
-      if (this._rollChestEgg(ELITE_CHEST_EGG_CHANCE)) items.push({ icon: '🥚', label: t('яйце петса!') });
+      const items = [{ icon: '💰', n: coins }, { icon: '💎', n: crystals }];
+      if (this._rollChestEgg(eggChance)) items.push({ icon: '🥚', label: t('яйце петса!') });
       this.chestCeremony({ title: t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), items });
       this.saveGame();
     });
@@ -3198,11 +3226,11 @@ class Game {
         }
         return;
       }
-      const reward = 144;
-      level.addCoins(reward);
-      this.save.crystals = (this.save.crystals || 0) + 5;
-      const items = [{ icon: '💰', n: reward }, { icon: '💎', n: 5 }];
-      if (this._rollChestEgg(GOLDEN_CHEST_EGG_CHANCE)) items.push({ icon: '🥚', label: t('яйце петса!') });
+      const { coins, crystals, eggChance } = CHEST_REWARDS.golden;
+      level.addCoins(coins);
+      this.save.crystals = (this.save.crystals || 0) + crystals;
+      const items = [{ icon: '💰', n: coins }, { icon: '💎', n: crystals }];
+      if (this._rollChestEgg(eggChance)) items.push({ icon: '🥚', label: t('яйце петса!') });
       this.chestCeremony({ title: t('🏆 ЗОЛОТА СКРИНЯ!'), items });
       this.saveGame();
     });
@@ -3242,7 +3270,10 @@ class Game {
       if (killXp) this.progress.addXp(killXp);
       if (!((level.worldBoss || level.radiation) && z.type === 'boss')) this.quests.onEvent('kill', { weapon: level.player.cur });
       if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('kill');
-      if (z.golden) this.quests.onEvent('golden');
+      // v302: «Дожени золотого» не зараховуємо за золотого, добитого переможним sweep
+      // після смерті боса (той самий гейт, що v301 дав скрині в zombies.js) — інакше
+      // будь-яка перемога на карті із золотим дарує квест-тік «на халяву».
+      if (z.golden && !level.bossDefeated) this.quests.onEvent('golden');
       if (z.type === 'boss' && !level.storm && !level.radiation && !level.worldBoss) {
         this.quests.onEvent('boss');
         if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('boss');
@@ -3477,22 +3508,22 @@ class Game {
   // (і хост, і гість по ev `ewc`) нараховує собі локально ті самі числа, що соло,
   // але без блокуючої церемонії (рішення v294): неблокуючий банер зі складом.
   _grantEliteChestCoop() {
-    const reward = 120, crystals = 3;
-    this.level.addCoins(reward);
+    const { coins, crystals, eggChance } = CHEST_REWARDS.elite;
+    this.level.addCoins(coins);
     this.save.crystals = (this.save.crystals || 0) + crystals;
-    const gotEgg = this._rollChestEgg(ELITE_CHEST_EGG_CHANCE); // незалежний рол у кожного
-    this.hud.banner(t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), t('+{c} 💰   +{k} 💎', { c: reward, k: crystals }), 4.5);
+    const gotEgg = this._rollChestEgg(eggChance); // незалежний рол у кожного
+    this.hud.banner(t('🎁 СКРИНЯ ЕЛІТНОЇ ХВИЛІ!'), t('+{c} 💰   +{k} 💎', { c: coins, k: crystals }), 4.5);
     if (gotEgg) this.hud.toast(t('🥚 У скрині було яйце!'), 5);
     this.saveGame();
   }
 
   // 🤝 v296: золота скриня в коопі — той самий локальний, неблокуючий шлях (числа соло: 144🪙+5💎).
   _grantGoldenChestCoop() {
-    const reward = 144, crystals = 5;
-    this.level.addCoins(reward);
+    const { coins, crystals, eggChance } = CHEST_REWARDS.golden;
+    this.level.addCoins(coins);
     this.save.crystals = (this.save.crystals || 0) + crystals;
-    const gotEgg = this._rollChestEgg(GOLDEN_CHEST_EGG_CHANCE);
-    this.hud.banner(t('🏆 ЗОЛОТА СКРИНЯ!'), t('+{c} 💰   +{k} 💎', { c: reward, k: crystals }), 4.5);
+    const gotEgg = this._rollChestEgg(eggChance);
+    this.hud.banner(t('🏆 ЗОЛОТА СКРИНЯ!'), t('+{c} 💰   +{k} 💎', { c: coins, k: crystals }), 4.5);
     if (gotEgg) this.hud.toast(t('🥚 У скрині було яйце!'), 5);
     this.saveGame();
   }
@@ -3591,10 +3622,18 @@ class Game {
     so.progress = Math.min(so.target, so.progress + n);
     if (so.progress >= so.target) {
       so.done = true;
-      this.audio.questDone();       // 🔔 дзвіночок «ціль виконана»
-      this.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
+      this._secondaryDoneToast(level);
       if (level.net && level.net.authority) level.netEv('soc'); // сповіщаємо команду
     }
+  }
+
+  // ⭐ v302: спільний тост+дзвіночок «ціль забігу виконана» — соло/хост тікають у
+  // _bumpSecondary, кооп-гість дублював це в net/client.js по ev `soc`. Текст/звук ті самі.
+  _secondaryDoneToast(level) {
+    const so = level && level.secondaryObjective;
+    if (!so) return;
+    this.audio.questDone();       // 🔔 дзвіночок «ціль виконана»
+    this.hud.toast(t('⭐ Ціль забігу виконана: {l}!', { l: so.label() }));
   }
 
   // 🌟 «момент могутності» (v288): спавн супер-пікапа 1×/рівень.
@@ -3654,10 +3693,9 @@ class Game {
     sp.remove();
     level.superPickup = null;
     level.netEv('spg', nid, pid, power); // гостям: активація у грабера, банер решті
-    const DUR = { shkval: 12, magnet: 15 };
     // силу гостя хост тримає в мапі (магніт-буря в лут-циклі + знання про Шквал гостя).
     // Свою (pid 1) не пишемо — читаємо player.superPower напряму (див. getPickupTargets).
-    if (pid !== 1 && level.superActive) level.superActive.set(pid, { power, t: DUR[power] || 12 });
+    if (pid !== 1 && level.superActive) level.superActive.set(pid, { power, t: SUPER_POWERS[power]?.dur || 12 });
     if (pid === 1) this._activateSuperPower(level, power); // хост схопив сам → локальна активація
     else this._superBannerFor(pid, power);                 // друг схопив → у хоста лише банер
   }
@@ -3667,7 +3705,7 @@ class Game {
     const roster = this.coop && this.coop.session && this.coop.session.roster;
     const r = roster && roster.get(pid);
     const nick = (r && r.nick) || t('Друг');
-    const label = power === 'shkval' ? t('🔥 ШКВАЛ') : t('🧲 МАГНІТ-БУРЯ');
+    const label = (SUPER_POWERS[power] || SUPER_POWERS.magnet).label();
     this.hud.banner(t('⭐ {n} схопив {p}!', { n: nick, p: label }), t('Сила разом! 💪'), 3.2);
     this.audio.superStart(power);
   }
@@ -3676,23 +3714,19 @@ class Game {
   // Соло — через bus 'superPickupGrabbed'; кооп — прямий виклик у грабера (`spg`/хост-підбір).
   // Спрацьовує ЛИШЕ в того, хто взяв: слоу-мо/спалах/чип відліку бачить тільки він.
   _activateSuperPower(level, type) {
-    const DUR = { shkval: 12, magnet: 15 };
-    const dur = DUR[type] || 12;
+    const spec = SUPER_POWERS[type] || SUPER_POWERS.shkval;
+    const dur = spec.dur;
     level.player.superPower = { type, t: dur, dur };
     this._hitstopT = Math.max(this._hitstopT, 0.5); // 0.5с слоу-мо (той самий хук, що хітстоп)
     this.audio.superStart(type);
-    this.hud.powerFlash(type === 'shkval' ? 'rgba(255,120,60,0.55)' : 'rgba(102,221,255,0.55)');
+    this.hud.powerFlash(spec.flash);
     if (level.effects) {
       const p = level.player;
-      const col = type === 'shkval' ? 0xff7a3c : 0x66ddff;
+      const col = spec.color;
       level.effects.ring(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), col, 4);
       level.effects.burst(new THREE.Vector3(p.pos.x, p.pos.y + 1, p.pos.z), col, 24, { speed: 6, up: 6, life: 0.9, size: 1.4 });
     }
-    const name = type === 'shkval' ? t('🔥 ШКВАЛ') : t('🧲 МАГНІТ-БУРЯ');
-    const sub = type === 'shkval'
-      ? t('Безлім патронів + скорострільність!')
-      : t('Магніт монет + швидкість!');
-    this.hud.banner(name, sub, 3.4);
+    this.hud.banner(spec.label(), spec.sub(), 3.4);
     level.superPickup = null;
   }
 
@@ -5796,9 +5830,7 @@ class Game {
       forceEliteWave: () => {
         const level = g.level;
         if (level.net && !level.net.authority) return 0;
-        level.audio.eliteWave();
-        level.bus.emit('eliteWaveWarning'); // хост-банер локально (як реальний шлях)
-        if (level.net) level.netEv('ew');   // телеграф гостям
+        level.missions.telegraphEliteWave(); // банер+стінгер+ev — той самий шлях, що _complete
         return level.zombies.spawnEliteWave().length;
       },
       finishHorde: () => {
