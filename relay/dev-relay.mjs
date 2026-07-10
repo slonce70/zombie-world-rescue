@@ -7,7 +7,8 @@
 // Хост завжди отримує id 1. Кімната живе, поки живий хост (грейс 90с на реконект).
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
-import { cleanNickSrv } from '../worker/nick.mjs';
+import { cleanNickSrv, cleanCountrySrv } from '../worker/nick.mjs';
+import { cleanProfileSrv, safeInt } from '../worker/profile.mjs';
 import { routeBatch } from '../worker/route.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
@@ -84,24 +85,7 @@ function lobbyView(now) {
   };
 }
 
-function safeInt(v, min, max) {
-  v = Math.floor(Number(v) || 0);
-  return Math.max(min, Math.min(max, v));
-}
-
-function cleanProfile(nick, raw = {}, ts) {
-  return {
-    nick,
-    countries: safeInt(raw.countries, 0, 99),
-    coins: safeInt(raw.coins, 0, 999999),
-    crystals: safeInt(raw.crystals, 0, 99999),
-    kills: safeInt(raw.kills, 0, 999999),
-    star: safeInt(raw.star || 1, 1, 65), // стеля Зоряного шляху (v236)
-    prestige: safeInt(raw.prestige, 0, 999),
-    title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
-    ts,
-  };
-}
+// 📇 правила чистки профілю (і safeInt) — спільні з воркером у worker/profile.mjs
 
 function lobbyPing(d) {
   const now = Date.now();
@@ -109,7 +93,7 @@ function lobbyPing(d) {
   if (cid.length < 8) return null;
   const nick = cleanNickSrv(d.nick);
   lobbyPlayers.set(cid, { nick, ts: now });
-  lobbyProfiles.set(cid, cleanProfile(nick, d.profile, now));
+  lobbyProfiles.set(cid, cleanProfileSrv(nick, d.profile, now));
   recordToday(now, cid);
   if (d.day && typeof d.day === 'object') recordDayScore(now, d.day.nick || nick, d.day.score);
   if (d.close) {
@@ -125,7 +109,7 @@ function lobbyPing(d) {
         cid, host: nick,
         mode: ['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss', 'friendly-knockout',
           'friendly-defense', 'friendly-zone-defense', 'weekly-coop'].includes(d.room.mode) ? d.room.mode : 'campaign',
-        country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
+        country: cleanCountrySrv(d.room.country), // видно всьому лобі — латиниця + фільтр лайки
         n: Math.min(4, Math.max(1, d.room.n | 0)),
         state: d.room.state === 'game' ? 'game' : 'lobby',
         build: d.room.build | 0, ts: now,

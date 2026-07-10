@@ -358,7 +358,7 @@ export class CoopUI {
     let rh = '';
     for (const r of rooms) {
       const c = COUNTRIES[r.country];
-      const where = r.mode === 'arena' ? t('Арена') : c ? `${c.flag} ${c.name}` : esc(r.country); // невідома country — лише ескейпнутою
+      const where = r.mode === 'arena' ? t('Арена') : c ? `${c.flag} ${c.name}` : '🌍'; // невідома country — нейтральний глобус (сирий id дітям не показуємо)
       const full = r.n >= 4;
       rh += `<div class="coop-room">
         <span class="cr-mode">${MODE_ICON[r.mode] || '🎯'}</span>

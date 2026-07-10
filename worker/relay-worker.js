@@ -4,7 +4,8 @@
 //
 // Деплой:  cd worker && npx wrangler deploy
 // Адреса потім вписується у src/net/transport.js (DEFAULT_RELAY).
-import { cleanNickSrv } from './nick.mjs';
+import { cleanNickSrv, cleanCountrySrv } from './nick.mjs';
+import { cleanProfileSrv, safeInt } from './profile.mjs';
 import { routeBatch } from './route.mjs';
 
 const MAX_PLAYERS = 4;
@@ -302,10 +303,10 @@ export class Lobby {
   async _recordDayScore(now, nick, score) {
     await this._loadTop3(now);
     const day = this._dayKey(now);
-    // ігноруємо відсутній/сміттєвий скор — інакше _safeInt дав би підлогу 1 і засмітив топ
+    // ігноруємо відсутній/сміттєвий скор — інакше safeInt дав би підлогу 1 і засмітив топ
     if (!Number.isFinite(Number(score)) || Number(score) < 1) return;
     const cleaned = cleanNickSrv(nick);
-    const sc = this._safeInt(score, 1, 200); // штормова хвиля: та сама стеля, що й у Лізі
+    const sc = safeInt(score, 1, 200); // штормова хвиля: та сама стеля, що й у Лізі
     if (!cleaned) return;
     // один запис на нік — КРАЩИЙ: клієнт шле результат після кожного забігу,
     // слабший пізніший забіг не сміє затерти ранковий рекорд
@@ -343,24 +344,9 @@ export class Lobby {
     }
   }
 
-  _safeInt(v, min, max) {
-    v = Math.floor(Number(v) || 0);
-    return Math.max(min, Math.min(max, v));
-  }
+  // safeInt — спільний із dev-relay у worker/profile.mjs
 
-  _cleanProfile(nick, raw = {}, ts) {
-    return {
-      nick,
-      countries: this._safeInt(raw.countries, 0, 99),
-      coins: this._safeInt(raw.coins, 0, 999999),
-      crystals: this._safeInt(raw.crystals, 0, 99999),
-      kills: this._safeInt(raw.kills, 0, 999999),
-      star: this._safeInt(raw.star || 1, 1, 65), // стеля Зоряного шляху (v236)
-      prestige: this._safeInt(raw.prestige, 0, 999),
-      title: String(raw.title || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').slice(0, 24),
-      ts,
-    };
-  }
+  // 📇 правила чистки профілю — спільні з dev-relay у worker/profile.mjs
 
   _view(now) {
     this._prune(now);
@@ -405,7 +391,7 @@ export class Lobby {
         if (cid.length < 8) return this.json({ error: 'bad' }, 400);
         const nick = cleanNickSrv(d.nick);
         this.players.set(cid, { nick, ts: now });
-        this.profiles.set(cid, this._cleanProfile(nick, d.profile, now));
+        this.profiles.set(cid, cleanProfileSrv(nick, d.profile, now));
         this._recordToday(now, cid); // 📅 рахуємо унікального гравця за сьогодні
         // 🏆 денний результат для «топ-3 сьогодні» (клієнт шле свій кращий штормовий за сьогодні)
         if (d.day && typeof d.day === 'object') await this._recordDayScore(now, d.day.nick || nick, d.day.score);
@@ -427,7 +413,7 @@ export class Lobby {
           if (code && (!existing || existing.cid === cid)) {
             this.rooms.set(code, {
               cid, host: cleanNickSrv(d.nick), mode,
-              country: String(d.room.country || 'UKR').toUpperCase().slice(0, 4),
+              country: cleanCountrySrv(d.room.country), // видно всьому лобі — латиниця + фільтр лайки
               n: Math.min(4, Math.max(1, d.room.n | 0)),
               state: d.room.state === 'game' ? 'game' : 'lobby',
               build: d.room.build | 0, ts: now,

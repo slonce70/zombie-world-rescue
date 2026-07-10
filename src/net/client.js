@@ -3,11 +3,19 @@
 import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { PF, weaponToIdx, idxToWeapon } from './protocol.js';
-import { PING_PHRASES } from './coop.js';
+import { PING_PHRASES, cleanNick } from './coop.js';
+import { nickIsBad } from '../../worker/nick.mjs';
 import { pickSecondaryObjective } from '../stars.js';
 import { t } from '../i18n.js';
 
 const SEND_HZ = 15;
+
+// 🧼 вільний текст від хоста для HUD: стеля довжини + фільтр лайки (мат → '',
+// подія тихо дропається). Хост може бути модифікованим клієнтом — не довіряємо.
+function safeHudText(s, max) {
+  const x = String(s == null ? '' : s).slice(0, max);
+  return nickIsBad(x) ? '' : x;
+}
 
 export class GuestNet {
   constructor(session, level, spec) {
@@ -141,7 +149,8 @@ export class GuestNet {
         return true;
       }
       case 'revived': {
-        this.game.applyRevive(d.by || null);
+        // нік рятівника їде ПОЗА ростером — чистимо так само, як ростер (coop.js)
+        this.game.applyRevive(cleanNick(d.by) || null);
         return true;
       }
       default: return false;
@@ -380,8 +389,15 @@ export class GuestNet {
         break;
       }
       case 'pg': { if (a[0] === me) break; this._showPing(a[0], a[1]); break; } // 📣 пінг від хоста/іншого гостя
-      case 'toast': game.hud.toast(a[0]); break;
-      case 'banner': game.hud.banner(a[0], a[1] || '', a[2] || 3.2); break;
+      // 🧼 toast/banner — єдиний канал ВІЛЬНОГО тексту хост→гість: стеля довжини
+      // + фільтр лайки. Легітимні відправники (storm/bossrush/main) шлють t()-рядки.
+      case 'toast': { const m = safeHudText(a[0], 120); if (m) game.hud.toast(m); break; }
+      case 'banner': {
+        const ti = safeHudText(a[0], 60);
+        const sub = safeHudText(a[1] || '', 140);
+        if (ti) game.hud.banner(ti, sub, Math.min(Math.max(Number(a[2]) || 3.2, 0.5), 10));
+        break;
+      }
       case 'sbb': {
         // міні-бос шторму (на майбутнє) / святковий бонус
         level.addCoins(a[0] || 120);
