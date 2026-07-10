@@ -5,7 +5,7 @@ import { makeRoomCode, PROTO_VERSION } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
-import { nickIsBad } from '../../worker/nick.mjs';
+import { nickIsBad, normNick } from '../../worker/nick.mjs';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -44,11 +44,18 @@ export function saveNick(nick) {
   try { localStorage.setItem(NICK_KEY, nick); } catch (e) { /* ignore */ }
 }
 export function cleanNick(raw) {
-  let s = String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
-  if (s.length > 12) s = s.slice(0, 12);
+  const s = normNick(raw); // спільна нормалізація з сервером — правила живуть у worker/nick.mjs
   // 🧼 безпека дітей: груба лайка в ніку (видно над головою/в пінгах) → нейтральний нік
   if (s && nickIsBad(s)) return t('Гравець');
   return s;
+}
+
+// 🛡️ Захист гостя: welcome/roster приходять від ХОСТА, а хост може бути
+// модифікованим клієнтом — чистимо кожен запис так само, як хост чистить
+// hello гостей (_hostHello). Інакше лайка з мережі потрапить дітям на екран.
+function sanitizeRosterEntry(r) {
+  const src = r || {};
+  return { ...src, nick: cleanNick(src.nick) || t('Гравець'), role: sanitizeCoopRole(src.role) };
 }
 
 export class CoopSession {
@@ -275,7 +282,7 @@ export class CoopSession {
       if (d.t === 'welcome') {
         this.myPid = d.pid;
         this.roster.clear();
-        for (const r of d.roster) this.roster.set(r.pid, r);
+        for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); this.roster.set(c.pid, c); }
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
@@ -285,7 +292,7 @@ export class CoopSession {
         this.transport.close();
       } else if (d.t === 'roster') {
         this.roster.clear();
-        for (const r of d.list) this.roster.set(r.pid, r);
+        for (const r of d.list || []) { const c = sanitizeRosterEntry(r); this.roster.set(c.pid, c); }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'cfg') {
         this.countryId = d.countryId;
@@ -328,7 +335,16 @@ export class CoopSession {
     let nick = cleanNick(d.nick) || t('Гравець {n}', { n: from });
     // 🧼 безпека дітей: захист від клієнта, що оминає cleanNick (нік видно іншій дитині)
     if (nickIsBad(nick)) nick = t('Гравець');
-    for (const [pid, r] of this.roster) if (pid !== from && r.nick === nick) nick += ' (2)';
+    // дедуп У МЕЖАХ стелі 12: гість повторно жене ростер через normNick, і суфікс
+    // « (2)» поза бюджетом обрізався б у кашу («Володимир123 (2)» → «Володимир123»)
+    const taken = new Set([...this.roster].filter(([pid]) => pid !== from).map(([, r]) => r.nick));
+    if (taken.has(nick)) {
+      const base = nick;
+      for (let n = 2; taken.has(nick); n++) {
+        const suf = ` (${n})`;
+        nick = base.slice(0, 12 - suf.length).trimEnd() + suf;
+      }
+    }
     this.roster.set(from, { pid: from, nick, role: sanitizeCoopRole(d.role), skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,

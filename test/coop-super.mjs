@@ -107,10 +107,13 @@ try {
   }
   check('(г) третій гравець приєднався', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
+  // 30с×SLOW як у (б): на задушеному CI-раннері з 3 браузерами state.spu доїжджає
+  // mid-joiner'у за 60-80с через бэклог снапшотів (main-ран 2026-07-07 пройшов
+  // за ~80с впритул, ран PR #73 схибив на тих самих 80с)
   const starC = await C.waitForFunction(() => {
     const sp = window.__game.level.superPickup;
     return sp ? { x: Math.round(sp.x * 10) / 10, z: Math.round(sp.z * 10) / 10 } : null;
-  }, null, { timeout: 20000 * SLOW }).then((h) => h.jsonValue()).catch(() => null);
+  }, null, { timeout: 30000 * SLOW }).then((h) => h.jsonValue()).catch(() => null);
   check('(г) mid-joiner бачить непідібрану зірку (state.spu)', !!starC, JSON.stringify(starC));
 
   // ---- (б) гість наводиться на зірку → підбір host-authoritative → сила В ГОСТЯ ----

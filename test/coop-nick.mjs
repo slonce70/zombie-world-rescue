@@ -49,7 +49,55 @@ const r = await page.evaluate(async () => {
   };
 });
 
-console.log('coop-nick:', JSON.stringify(r));
+// 🛡️ v306: гість чистить welcome/roster від хоста (модифікований хост-клієнт
+// не може показати дітям лайку чи сміттєву роль) + титул профілю фільтрується
+// на сервері як нік (worker/profile.mjs → cleanTitleSrv).
+const r2 = await page.evaluate(async () => {
+  const coop = await import('/src/net/coop.js');
+  const prof = await import('/worker/profile.mjs');
+  const nick = await import('/worker/nick.mjs');
+  const s = new coop.CoopSession({});
+  // гість (role=null → гілка else) отримує welcome зі зловмисним ростером
+  s._onMessage(1, { t: 'welcome', pid: 2, roster: [{ pid: 1, nick: 'b1tch', role: 'hax', skin: 'classic' }] });
+  const w = s.roster.get(1) || {};
+  // ...і пізніший roster-бродкаст
+  s._onMessage(1, { t: 'roster', list: [{ pid: 1, nick: 'сука', role: 'guard' }, { pid: 3, nick: 'Оля' }] });
+  const b = s.roster.get(1) || {};
+  const ok = s.roster.get(3) || {};
+  const p = prof.cleanProfileSrv('Влад', { title: 'xyi <b>лол</b>', coins: 1e9 }, 0);
+  const pOk = prof.cleanProfileSrv('Влад', { title: 'Рятівник Світу' }, 0);
+  // HTML-стрип на ЧИСТОМУ титулі (лайка не маскує відсутність стрипу) + стеля 24
+  const pHtml = prof.cleanProfileSrv('Влад', { title: '<b>Герой</b> Дня' }, 0);
+  const pLong = prof.cleanProfileSrv('Влад', { title: 'Дуже довгий титул на тридцять+' }, 0);
+  // 🧩 еквівалентність клієнт/сервер на «брудному» вході — головна мета normNick
+  const messy = '  Player   Seven777  ';
+  const eq = {
+    client: coop.cleanNick(messy),
+    server: nick.cleanNickSrv(messy),
+    norm: nick.normNick(messy),
+  };
+  // 🛡️ welcome/roster без масиву — гість не має падати (гард || [])
+  const s2 = new coop.CoopSession({});
+  let emptyOk = true, emptySize = -1;
+  try {
+    s2._onMessage(1, { t: 'welcome', pid: 9 });
+    s2._onMessage(1, { t: 'roster' });
+    emptySize = s2.roster.size;
+  } catch (e) { emptyOk = false; }
+  // 🔁 інваріант дедупу хоста: суфікс « (2)» у межах стелі 12 має пережити
+  // повторний cleanNick на гості (регресія: «Володимир123 (2)» різалась у кашу)
+  const dedupSurvives = coop.cleanNick('Володими (2)');
+  return {
+    dedupSurvives,
+    welcomeNick: w.nick, welcomeRole: w.role, welcomeSkin: w.skin,
+    rosterNick: b.nick, rosterRoleKept: b.role, rosterOkNick: ok.nick,
+    titleBad: p.title, coinsClamped: p.coins, titleOk: pOk.title,
+    titleHtml: pHtml.title, titleLongLen: pLong.title.length,
+    eq, emptyOk, emptySize,
+  };
+});
+
+console.log('coop-nick:', JSON.stringify(r), JSON.stringify(r2));
 
 check(r.importedClean, 'браузер імпортує cleanNick із src/net/coop.js');
 check(r.importedBad, 'браузер імпортує nickIsBad із worker/nick.mjs (ESM у браузері)');
@@ -65,6 +113,22 @@ check(r.bad_leet === 'Гравець', 'leet-обхід (b1tch) → «Граве
 
 check(r.isBad_bitch === true, 'nickIsBad ловить лайку (хост/UI шлях)', String(r.isBad_bitch));
 check(r.isBad_good === false, 'nickIsBad пропускає нормальний нік', String(r.isBad_good));
+
+check(r2.welcomeNick === 'Гравець', 'гість: лайка у welcome-ростері → «Гравець»', r2.welcomeNick);
+check(r2.welcomeRole === null, 'гість: сміттєва роль з мережі → null', String(r2.welcomeRole));
+check(r2.welcomeSkin === 'classic', 'гість: решта полів ростера не зачеплені', r2.welcomeSkin);
+check(r2.rosterNick === 'Гравець', 'гість: лайка у roster-бродкасті → «Гравець»', r2.rosterNick);
+check(r2.rosterRoleKept === 'guard', 'гість: валідна роль проходить', String(r2.rosterRoleKept));
+check(r2.rosterOkNick === 'Оля', 'гість: нормальний нік у ростері проходить', r2.rosterOkNick);
+check(r2.titleBad === '', 'сервер: лайка у титулі профілю → порожньо', JSON.stringify(r2.titleBad));
+check(r2.titleOk === 'Рятівник Світу', 'сервер: нормальний титул проходить', r2.titleOk);
+check(r2.titleHtml === 'Герой Дня', 'сервер: HTML стрипається з чистого титулу', JSON.stringify(r2.titleHtml));
+check(r2.titleLongLen <= 24, 'сервер: титул обрізається до 24', String(r2.titleLongLen));
+check(r2.coinsClamped === 999999, 'сервер: coins клампиться стелею', String(r2.coinsClamped));
+check(r2.eq.client === r2.eq.server && r2.eq.client === r2.eq.norm && r2.eq.norm.length <= 12,
+  'normNick: клієнт і сервер нормалізують однаково (брудний вхід)', JSON.stringify(r2.eq));
+check(r2.emptyOk && r2.emptySize === 0, 'гість: welcome/roster без масиву не валить клієнт', `ok=${r2.emptyOk} size=${r2.emptySize}`);
+check(r2.dedupSurvives === 'Володими (2)', 'дедуп-суфікс хоста у бюджеті 12 переживає cleanNick гостя', r2.dedupSurvives);
 
 check(errs.length === 0, 'без помилок сторінки', errs.join(' | '));
 
