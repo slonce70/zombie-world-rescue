@@ -102,22 +102,26 @@ try {
   await A.screenshot({ path: 'shots/coop-08-revive-prompt.png' });
   // тримаємо E, поки гість не встане
   await A.evaluate(() => window.__game.test.key('KeyE', true));
-  const t0 = Date.now();
-  let revOk = false;
-  while (Date.now() - t0 < T(12000)) {
-    await sleep(300);
-    const hp = await B.evaluate(() => window.__game.level.player.health);
-    if (hp > 0) { revOk = true; break; }
-  }
+  await B.waitForFunction(() => {
+    const g = window.__game;
+    return g.level.player.health > 0 && g.deathT < 0;
+  }, null, { timeout: T(20000) }).catch(() => {});
   await A.evaluate(() => window.__game.test.key('KeyE', false));
   const afterRev = await B.evaluate(() => ({
     hp: window.__game.level.player.health,
     max: window.__game.level.player.maxHealth,
     deathT: window.__game.deathT,
   }));
-  check('хост підняв гостя (50% HP, без телепорта)', revOk && afterRev.hp === Math.ceil(afterRev.max * 0.5) && afterRev.deathT < 0, JSON.stringify(afterRev));
+  check('хост підняв гостя (50% HP, без телепорта)', afterRev.hp === Math.ceil(afterRev.max * 0.5) && afterRev.deathT < 0, JSON.stringify(afterRev));
 
   // ---- 3. 💀→💚 навпаки: хост падає, гість піднімає ----
+  const hostPos = await A.evaluate(() => ({ x: window.__game.level.player.pos.x, z: window.__game.level.player.pos.z }));
+  await B.evaluate((p) => window.__game.test.teleport(p.x + 2, p.z), hostPos);
+  await B.waitForFunction(() => {
+    const g = window.__game;
+    const host = g.level.net.remotes.get(1);
+    return host && Math.hypot(host.pos.x - g.level.player.pos.x, host.pos.z - g.level.player.pos.z) < 2.8;
+  }, null, { timeout: T(15000) });
   await A.evaluate(() => {
     const p = window.__game.level.player;
     p.respawnProtect = 0;
@@ -131,16 +135,13 @@ try {
     return rp && rp.health <= 0;
   }, null, { timeout: T(8000) });
   await B.evaluate(() => window.__game.test.key('KeyE', true));
-  const t1 = Date.now();
-  let revOk2 = false;
-  while (Date.now() - t1 < T(12000)) {
-    await sleep(300);
-    const hp = await A.evaluate(() => window.__game.level.player.health);
-    if (hp > 0) { revOk2 = true; break; }
-  }
+  await A.waitForFunction(() => {
+    const g = window.__game;
+    return g.level.player.health > 0 && g.deathT < 0;
+  }, null, { timeout: T(20000) }).catch(() => {});
   await B.evaluate(() => window.__game.test.key('KeyE', false));
   const afterRev2 = await A.evaluate(() => ({ hp: window.__game.level.player.health, deathT: window.__game.deathT }));
-  check('гість підняв хоста', revOk2 && afterRev2.hp > 0 && afterRev2.deathT < 0, JSON.stringify(afterRev2));
+  check('гість підняв хоста', afterRev2.hp > 0 && afterRev2.deathT < 0, JSON.stringify(afterRev2));
 
   // ---- 4. без друга поруч — звичайний респавн біля бази ----
   await B.evaluate(() => {

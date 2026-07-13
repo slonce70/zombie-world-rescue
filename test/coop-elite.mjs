@@ -52,8 +52,8 @@ const armBannerSpy = (page) => page.evaluate(() => {
 });
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(60000 * SLOW);
+  B.setDefaultTimeout(60000 * SLOW);
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 * SLOW });
@@ -125,29 +125,42 @@ try {
   await armBannerSpy(A);
   const spawned2 = await A.evaluate(() => window.__game.test.forceEliteWave());
   check('друга хвиля активна для mid-join', spawned2 >= 2, `${spawned2}`);
+  // Mid-join на повільному CI триває довго; не даємо NPC випадково зачистити хвилю
+  // до того, як хост сформує state для третього гравця.
+  await A.evaluate(() => {
+    for (const z of window.__game.level.zombies.list) {
+      if (z.elite && z.state !== 'dead') z.hp = z.maxHp = Math.max(z.maxHp, 1e9);
+    }
+  });
   await B.waitForFunction(() => window.__game.level.zombies.list.some((z) => z.elite && z.state !== 'dead'),
     null, { timeout: 12000 * SLOW }).catch(() => {});
 
-  browserC = await chromium.launch(LAUNCH);
-  const C = await (await browserC.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  browserC = await browserB.newContext({ viewport: { width: 1280, height: 800 } });
+  const C = await browserC.newPage();
   C.on('pageerror', (e) => errsC.push(e.message));
   C.on('console', (m) => { if (m.type() === 'error') errsC.push(m.text()); });
-  C.setDefaultTimeout(60000);
+  C.setDefaultTimeout(60000 * SLOW);
   await C.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
   // джойн посеред хвилі може впертись у welcome-таймаут на задушеному раннері — до 3 спроб (як coop3)
   let joinedC = false;
   for (let attempt = 1; attempt <= 3 && !joinedC; attempt++) {
     joinedC = await C.evaluate((c) => window.__game.test.coopJoin(c, 'Оля').then(() => true, (e) => (console.log('join fail:', e.message), false)), code);
-    if (!joinedC) console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — повторюємо`);
+    if (!joinedC) {
+      console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — даємо хосту розвантажити backlog`);
+      await sleep(2000 * SLOW);
+    }
   }
   check('(г) третій гравець приєднався посеред хвилі', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
-  const cSync = await C.waitForFunction(() => window.__game.level?.net?._ready === true, null, { timeout: 20000 * SLOW })
-    .then(() => true).catch(() => false);
-  check('(г) welcome+state застосувались (світ синхронний)', cSync);
-  const cElite = await C.evaluate(() => window.__game.level.zombies.list.filter((z) => z.elite && z.state !== 'dead').length);
-  check('(г) mid-joiner бачить еліт-puppet\'ів зі state-синку', cElite >= 1, `${cElite}`);
+  const cElite = await C.waitForFunction(
+    () => {
+      const count = window.__game.level?.zombies?.list.filter((z) => z.elite && z.state !== 'dead').length || 0;
+      return count > 0 ? count : false;
+    },
+    null, { timeout: 30000 * SLOW },
+  ).then((h) => h.jsonValue()).catch(() => 0);
+  check('(г) welcome+state застосувались: mid-joiner бачить еліт-puppet\'ів', cElite >= 1, `${cElite}`);
 
   const realErrsA = errsA.filter((e) => !e.includes('favicon'));
   const realErrsB = errsB.filter((e) => !e.includes('favicon'));

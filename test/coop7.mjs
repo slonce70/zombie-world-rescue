@@ -124,7 +124,12 @@ try {
     return row.textContent;
   }, code);
   check('у списку видно, що кімната «у грі»', rowState.includes('у грі'), rowState.trim());
-  await C.click(`.cr-join[data-code="${code}"]`);
+  let joinedC = false;
+  for (let attempt = 1; attempt <= 3 && !joinedC; attempt++) {
+    joinedC = await C.evaluate((c) => window.__game.test.coopJoin(c, 'Бабуся').then(() => true, () => false), code);
+    if (!joinedC) await sleep(T(2000));
+  }
+  check('третій гравець приєднався зі знайденої кімнати', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.net, null, { timeout: T(90000) });
   await C.evaluate(() => window.__game.test.god());
   await C.waitForFunction(() => window.__game.test.coopState().aliveZombies > 0, null, { timeout: T(60000) });

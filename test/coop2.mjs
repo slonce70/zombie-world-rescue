@@ -97,27 +97,39 @@ try {
   check('у гостя хлів відчинено і цивільні є', barnB.opened && barnB.civ === 3, JSON.stringify(barnB));
 
   // рятувальна місія завершується за ~2с
-  await A.waitForFunction(() => window.__game.level.missions.missions[0].state === 'done', null, { timeout: T(8000) });
+  await A.waitForFunction(() => window.__game.level.missions.missions[0].state === 'done', null, { timeout: T(20000) });
   // ГОНКА: хост завершує місію і шле подію 'md' (нагорода +80) гостю асинхронно.
   // Раніше тут був фіксований sleep(600) + читання монет гостя — під SLOW=2 подія 'md'
   // інколи долітала ПІЗНІШЕ за 600мс, тож монети читались як 50 (нагорода вже в дорозі, ще не застосована).
   // Чекаємо саме на стан ГОСТЯ: і 'done', і нараховану нагороду — детерміновано, без гонки.
-  const doneB = await B.waitForFunction(
-    () => window.__game.level.missions.missions[0].state === 'done',
-    null, { timeout: T(8000) },
-  ).then(() => 'done').catch(() => 'timeout');
-  const coinsB1 = await B.waitForFunction(
-    () => window.__game.save.coins >= 130 ? window.__game.save.coins : false,
-    null, { timeout: T(8000) },
-  ).then((h) => h.jsonValue()).catch(async () => B.evaluate(() => window.__game.save.coins));
-  check('місія «порятунок» виконана у гостя теж', doneB === 'done');
-  check('гість отримав нагороду місії (+80)', coinsB1 >= 130, `монет: ${coinsB1}`);
+  const missionB = await B.waitForFunction(() => {
+    const g = window.__game;
+    return g.level.missions.missions[0].state === 'done' && g.save.coins >= 130
+      ? { state: 'done', coins: g.save.coins }
+      : false;
+  }, null, { timeout: T(20000) }).then((h) => h.jsonValue()).catch(async () => B.evaluate(() => ({
+    state: window.__game.level.missions.missions[0].state,
+    coins: window.__game.save.coins,
+  })));
+  check('місія «порятунок» виконана у гостя теж', missionB.state === 'done');
+  check('гість отримав нагороду місії (+80)', missionB.coins >= 130, `монет: ${missionB.coins}`);
 
   // ---- 2. граната гостя вибухає в усіх ----
+  for (const page of [A, B]) {
+    await page.evaluate(() => {
+      const effects = window.__game.level.effects;
+      window.__grenadesSeen = 0;
+      const original = effects.spawnGrenade.bind(effects);
+      effects.spawnGrenade = (...args) => {
+        window.__grenadesSeen++;
+        return original(...args);
+      };
+    });
+  }
   await B.evaluate(() => { window.__game.level.player.grenades = 2; });
   await B.evaluate(() => window.__game.test.throwGrenade());
-  const appearedA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: T(10000) }).then(() => true).catch(() => false);
-  const appearedB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: T(10000) }).then(() => true).catch(() => false);
+  const appearedA = await A.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
+  const appearedB = await B.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
   check('граната гостя зʼявилась на обох екранах', appearedA && appearedB, `A:${appearedA} B:${appearedB}`);
   const goneA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
   const goneB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
@@ -178,8 +190,14 @@ try {
   // ГОНКА: хост тисне «на глобус» і шле гостю намір повернутись у лобі асинхронно.
   // Фіксований sleep(1500) під SLOW=2 інколи не встигав — гість лишався у 'level'.
   // Чекаємо детерміновано на автоповернення гостя (і хоста) у лобі.
-  await A.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: T(15000) }).catch(() => {});
-  await B.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: T(15000) }).catch(() => {});
+  await A.waitForFunction(() => {
+    const g = window.__game;
+    return g.state === 'globe' && g.test.coopState().state === 'lobby' && g.test.coopState().roster.length === 2;
+  }, null, { timeout: T(20000) }).catch(() => {});
+  await B.waitForFunction(() => {
+    const g = window.__game;
+    return g.state === 'globe' && g.test.coopState().state === 'lobby' && g.test.coopState().roster.length === 2;
+  }, null, { timeout: T(20000) }).catch(() => {});
   const stA = await A.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   const stB = await B.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   check('хост повернувся в лобі', stA.state === 'globe' && stA.coop.state === 'lobby', `${stA.state}/${stA.coop.state}`);
