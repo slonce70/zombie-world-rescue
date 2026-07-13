@@ -1,14 +1,16 @@
 import { chromium } from 'playwright';
+import { ensureWebServer } from './_server.mjs';
 
 let fail = 0;
 const check = (ok, msg, extra = '') => { console.log(`${ok ? '✅' : '❌'} ${msg}`, extra); if (!ok) fail++; };
+const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
 try {
-  await page.goto('http://127.0.0.1:8741/?test&fresh&seed=400', { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/?test&fresh&seed=400`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__game?.state === 'globe');
   await page.click('#btn-expedition');
   await page.waitForSelector('#overlay-expedition.show');
@@ -33,6 +35,7 @@ try {
   check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
 } finally {
   await browser.close();
+  closeServer();
 }
 
 if (fail) process.exit(1);

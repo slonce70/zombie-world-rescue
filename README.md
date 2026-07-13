@@ -51,7 +51,7 @@ node test/cloudsave.mjs
 npm run test:release
 ```
 
-Релізні ранери автоматично знаходять `test/*.mjs`. Для локального відтворення CI shard:
+Релізні ранери автоматично знаходять `test/*.mjs`. PR/push блокують focused smoke, e2e та Expedition gates; повна батарея йде щоночі й вручну. Для локального відтворення повного soak shard:
 
 ```bash
 SHARD_INDEX=0 SHARD_TOTAL=4 SLOW=4 node test/release.mjs

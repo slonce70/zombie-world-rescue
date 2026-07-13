@@ -22,7 +22,7 @@ node test/i18n-parity.mjs
 SLOW=2 node test/coop-elite.mjs
 ```
 
-Повне відтворення CI:
+Повна soak-батарея запускається щоночі та вручну через `workflow_dispatch`; вона не блокує швидкий production deploy через відомі довгі мережеві сценарії:
 
 ```bash
 for i in 0 1 2 3; do SHARD_INDEX=$i SHARD_TOTAL=4 SLOW=4 node test/release.mjs || exit 1; done

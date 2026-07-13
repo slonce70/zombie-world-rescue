@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,6 +17,7 @@ permissions:
 
 jobs:
   release-gate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: release-gate (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -34,6 +37,7 @@ jobs:
         run: SLOW=4 SHARD_INDEX=${{ matrix.shard }} SHARD_TOTAL=4 node test/release.mjs
 
   coop-gate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: coop-gate (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -99,11 +103,27 @@ jobs:
         run: python3 -m http.server 8741 &
       - name: UKR campaign
         timeout-minutes: 45
-        run: SLOW=4 node test/e2e.mjs
+        run: SLOW=2 node test/e2e.mjs
+
+  expedition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Solo expedition
+        run: npm run test:expedition
+      - name: Coop expedition
+        run: npm run test:coop-expedition
 
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [release-gate, coop-gate, smoke, e2e]
+    needs: [smoke, e2e, expedition]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
