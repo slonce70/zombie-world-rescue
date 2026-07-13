@@ -7,6 +7,8 @@
     "relay": "node relay/dev-relay.mjs",
     "test": "node test/smoke.mjs",
     "test:quick-release": "node test/quick-release.mjs",
+    "test:expedition": "node --test test/expedition-unit.mjs && node test/expedition-browser.mjs",
+    "test:coop-expedition": "node test/coop-expedition.mjs",
     "test:release": "node test/release.mjs && npm run test:coop-release",
     "test:coop": "node test/coop.mjs",
     "test:coop-release": "node test/coop-release.mjs"

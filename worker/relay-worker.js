@@ -242,7 +242,7 @@ export class Room {
 const LOBBY_TTL = 40_000;
 // повний перелік режимів, які хост реально анонсує (MODE_ICON у src/ui/coopui.js);
 // невідомий режим коерситься в 'campaign' — радіація більше не прикидається кампанією
-const LOBBY_MODES = new Set(['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
+const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
   'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 
 export class Lobby {

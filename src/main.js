@@ -14,6 +14,10 @@ import { HUD } from './hud.js';
 import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
 import { Draft } from './draft.js';
 import { RunBuild } from './runbuild.js';
+import {
+  EXPEDITION_NODE_TYPES, EXPEDITION_STEPS, chooseExpeditionNode, completeExpeditionNode,
+  createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
+} from './expedition.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
@@ -111,7 +115,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 307;
+const APP_VERSION = 400;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -309,6 +313,7 @@ class Game {
       this._showTouchCoach(true);
     });
     document.getElementById('btn-victory-globe').addEventListener('click', () => {
+      if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-victory');
       this._hideOverlay('overlay-victory');
       this.endLevel();
       // 🌍 фінал кампанії: якщо цією перемогою звільнено всі 12 країн — церемонія
@@ -329,6 +334,7 @@ class Game {
       inf ? this.startInfected(cid) : this.startLevel(cid);
     });
     document.getElementById('btn-victory-next').addEventListener('click', () => {
+      if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-victory');
       const nid = nextTarget(this.save.liberated);
       if (!nid) return;
       this._hideOverlay('overlay-victory');
@@ -410,6 +416,13 @@ class Game {
       this.renderSoloMenu();
       this._showOverlay('overlay-solo');
     });
+    document.getElementById('btn-expedition').addEventListener('click', () => this.openExpedition());
+    document.getElementById('btn-expedition-go').addEventListener('click', () => this._expeditionGo());
+    document.getElementById('btn-expedition-abandon').addEventListener('click', () => {
+      this.save.expedition = null;
+      this.saveGame();
+      this._hideOverlay('overlay-expedition');
+    });
     document.getElementById('btn-arena-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-arena-end');
       const mode = this._lastEndMode;
@@ -417,6 +430,7 @@ class Game {
       this._startSoloMode(mode || 'arena', mode === 'worldboss' ? (this._lastWorldBossId || 'radiation') : undefined);
     });
     document.getElementById('btn-arena-globe').addEventListener('click', () => {
+      if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-arena-end');
       this._hideOverlay('overlay-arena-end');
       this.endLevel();
     });
@@ -573,6 +587,8 @@ class Game {
       // 🌍 v303 «Світ врятовано»: 0/1 — чи вже показано фінал кампанії (усі 12 країн вільні).
       // Одноразовий гейт церемонії; медаль 'WORLD' і +50💎 видаються рівно раз.
       worldSaved: 0,
+      // 🧭 v400: активний багаторівневий забіг; чиста компактна структура з expedition.js
+      expedition: null,
     };
   }
 
@@ -675,6 +691,7 @@ class Game {
         if (!out.infected || typeof out.infected !== 'object') out.infected = { cleared: {}, done: false };
         if (!out.infected.cleared || typeof out.infected.cleared !== 'object') out.infected.cleared = {};
         if (!Array.isArray(out.medals)) out.medals = [];
+        out.expedition = sanitizeExpedition(out.expedition);
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
         if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
@@ -2184,6 +2201,137 @@ class Game {
     if (id === 'overlay-wardrobe') this._stopHeroPreview();
   }
 
+  // ---------- 🧭 експедиція ----------
+  _expeditionCountries() {
+    const ids = CAMPAIGN_ORDER.filter((id) => isCountryOpen(this.save.liberated, id) || hasLiberated(this.save.liberated, id));
+    return ids.length ? ids : ['UKR'];
+  }
+
+  openExpedition({ coop = false } = {}) {
+    let run = sanitizeExpedition(this.save.expedition);
+    if (!run || (run.coop && !coop) || (!run.coop && coop)) {
+      run = createExpedition({ countries: this._expeditionCountries(), coop });
+      this.save.expedition = run;
+      this.saveGame();
+    }
+    this.renderExpedition();
+    this._showOverlay('overlay-expedition');
+    this.audio.click();
+  }
+
+  renderExpedition() {
+    const run = sanitizeExpedition(this.save.expedition);
+    if (!run) return;
+    this.save.expedition = run;
+    const summary = document.getElementById('expedition-summary');
+    const route = document.getElementById('expedition-route');
+    const build = document.getElementById('expedition-build');
+    const votes = document.getElementById('expedition-votes');
+    const go = document.getElementById('btn-expedition-go');
+    const abandon = document.getElementById('btn-expedition-abandon');
+    summary.textContent = run.status === 'won'
+      ? t('Експедицію завершено: {n}/{all} перемог.', { n: run.wins, all: EXPEDITION_STEPS })
+      : run.status === 'failed'
+        ? t('Експедиція завершилась після {n} перемог.', { n: run.wins })
+        : t('Етап {n}/{all} · {kind}', { n: run.step + 1, all: EXPEDITION_STEPS, kind: run.coop ? t('разом') : t('соло') });
+    build.textContent = run.build.length
+      ? t('🎲 Збірка: {cards}', { cards: run.build.map((id) => (expeditionCard(id) || {}).icon || '◆').join('') })
+      : t('🎲 Збірка зʼявиться після першого вибору маршруту.');
+    votes.textContent = '';
+    route.innerHTML = '';
+    if (run.status === 'active' && run.current) {
+      const meta = EXPEDITION_NODE_TYPES[run.current.type];
+      route.innerHTML = `<div class="expedition-node sel"><strong>${meta.icon} ${t(meta.name)}</strong><span>${t(meta.desc)}</span></div>`;
+      go.textContent = t('🚀 ПОЧАТИ ЕТАП');
+      go.style.display = '';
+    } else if (run.status === 'choice') {
+      for (const node of run.choices) {
+        const meta = EXPEDITION_NODE_TYPES[node.type];
+        const card = expeditionCard(node.card);
+        const button = document.createElement('button');
+        button.className = 'expedition-node';
+        button.dataset.node = node.id;
+        button.innerHTML = `<strong>${meta.icon} ${t(meta.name)}</strong><span>${t(meta.desc)}${card ? ` · ${card.icon} ${t(card.name)}` : ''}</span>`;
+        button.addEventListener('click', () => {
+          if (run.coop) {
+            this.coop.session.voteExpedition(node.id);
+            route.querySelectorAll('.expedition-node').forEach((el) => el.classList.toggle('sel', el === button));
+          } else {
+            this.save.expedition = chooseExpeditionNode(run, node.id);
+            this.saveGame();
+            this.renderExpedition();
+          }
+        });
+        route.appendChild(button);
+      }
+      go.textContent = run.coop ? t('🗳️ ОБРАТИ ГОЛОСУВАННЯМ') : t('Обери маршрут вище');
+      go.style.display = run.coop && this.coop.session.role === 'host' ? '' : 'none';
+      if (run.coop) votes.textContent = t('Голоси: {n}/{all}. За рівності вирішує голос хоста.', {
+        n: this.coop.session.expeditionVotes.size,
+        all: this.coop.session.roster.size,
+      });
+    } else {
+      const r = run.reward;
+      route.innerHTML = `<div class="expedition-node sel"><strong>${run.status === 'won' ? t('🏆 ЕКСПЕДИЦІЮ ПРОЙДЕНО!') : t('🧭 ЗАБІГ ЗАВЕРШЕНО')}</strong><span>${t('Нагорода')}: 🪙 ${r.coins} · 💎 ${r.crystals}</span></div>`;
+      go.textContent = t('🧭 НОВА ЕКСПЕДИЦІЯ');
+      go.style.display = run.coop && this.coop.session.role !== 'host' ? 'none' : '';
+    }
+    abandon.style.display = ['active', 'choice'].includes(run.status) ? '' : 'none';
+  }
+
+  _expeditionGo() {
+    const run = sanitizeExpedition(this.save.expedition);
+    if (!run) return this.openExpedition();
+    if (run.status === 'active') return this._startExpeditionNode(run);
+    if (run.status === 'choice') {
+      if (run.coop && this.coop.session.role === 'host') return this.coop.session.commitExpeditionVote();
+      return;
+    }
+    this.save.expedition = createExpedition({ countries: this._expeditionCountries(), coop: run.coop });
+    this.saveGame();
+    if (run.coop && this.coop.session.syncExpedition) this.coop.session.syncExpedition(this.save.expedition);
+    this.renderExpedition();
+  }
+
+  _startExpeditionNode(run = this.save.expedition) {
+    const cfg = expeditionLevelConfig(run);
+    if (!cfg) return;
+    this._hideOverlay('overlay-expedition');
+    if (run.coop) return this.coop.session.startExpeditionNode(run);
+    this.startLevel(cfg.countryId, cfg.opts);
+  }
+
+  _finishExpeditionNode(won) {
+    const current = this.level && this.level.expedition;
+    if (!current || this.level._expeditionFinished) return false;
+    this.level._expeditionFinished = true;
+    const run = completeExpeditionNode(current, { won: !!won, build: this.level.runBuild ? this.level.runBuild.ids : [] });
+    if (!run) return false;
+    if ((run.status === 'won' || run.status === 'failed') && !run.reward.claimed) {
+      this.save.coins += run.reward.coins;
+      this.save.crystals = (this.save.crystals || 0) + run.reward.crystals;
+      if (run.status === 'won' && this.level.net) this._grantCoopWin();
+      run.reward.claimed = true;
+    }
+    this.save.expedition = run;
+    this.saveGame();
+    if (run.coop && this.coop.session.syncExpedition) this.coop.session.syncExpedition(run);
+    const retry = document.getElementById('btn-arena-retry');
+    const globe = document.getElementById('btn-arena-globe');
+    if (retry) retry.style.display = 'none';
+    if (globe) globe.textContent = t('🧭 ДО МАРШРУТУ');
+    return true;
+  }
+
+  _leaveExpeditionResult(overlay) {
+    this._hideOverlay(overlay);
+    this.endLevel();
+    setTimeout(() => {
+      this.renderExpedition();
+      this._showOverlay('overlay-expedition');
+    }, 50);
+  }
+
   // ---------- рівень ----------
   async startLevel(countryId, opts = {}) {
     if (this._startingLevel) return;
@@ -2213,6 +2361,12 @@ class Game {
   }
 
   async _buildLevel(countryId, opts = {}) {
+    const arenaGlobe = document.getElementById('btn-arena-globe');
+    if (arenaGlobe) arenaGlobe.textContent = t('🌍 На глобус');
+    const victoryGlobe = document.getElementById('btn-victory-globe');
+    if (victoryGlobe) victoryGlobe.style.display = '';
+    const victoryNext = document.getElementById('btn-victory-next');
+    if (victoryNext) victoryNext.textContent = t('▶️ Далі');
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
     const isStorm = !!opts.storm;
     document.body.classList.toggle('storm-mode', isStorm);
@@ -2264,7 +2418,9 @@ class Game {
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = isWorldBoss
+    document.getElementById('ll-title').textContent = opts.expedition
+      ? t('🧭 ЕКСПЕДИЦІЯ')
+      : isWorldBoss
       ? t('🌋 СВІТОВИЙ БОС')
       : isPvp
       ? (pvpVariant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП'))
@@ -2351,6 +2507,7 @@ class Game {
       weeklyModId: wkModId,
       weeklyMutator,
       weekly: opts.weekly || null,
+      expedition: sanitizeExpedition(opts.expedition || (coop && coop.spec && coop.spec.ex)),
       noGadgets: !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: !!modeRules.noShop,
@@ -2363,7 +2520,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
+    const soloReplay = !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -2500,7 +2657,7 @@ class Game {
         isGuest,
         isCoop: !!coop,
         isPlayground,
-      }) && !this._forceMissionSet;
+      }) && !this._forceMissionSet && !level.expedition;
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
@@ -2517,14 +2674,14 @@ class Game {
       // v297 «Сила разом»: рішення про спавн приймає ХОСТ (гість малює дзеркало по `spx`).
       if ((!coop || coop.role === 'host') && !isPlayground) level.superEligible = true;
       // ⭐ R3 «Зірки та милосердя»: лише СОЛО-забіг країни кампанії (не інфекція/кооп/полігон).
-      if (!coop && !isPlayground && !isInfected && CAMPAIGN_ORDER.includes(countryId)) {
+      if (!coop && !isPlayground && !isInfected && !level.expedition && CAMPAIGN_ORDER.includes(countryId)) {
         // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип)
         const runIdx = (this.save.missionRuns[countryId] || 0);
         level.secondaryObjective = pickSecondaryObjective(country, country.seed + runIdx * 3, this._forceSecondary || null);
         // 🕊️ невидиме милосердя: після 2+ смертей поспіль у ЦІЙ країні — тихі послаблення (БЕЗ UI).
         const md = this.save.mercyDeaths;
         level.mercy = (md && md.cid === countryId && md.n >= 2) ? { hpMult: 0.9, medkitMult: 1.5, eliteMinus: 1 } : null;
-      } else if (coop && !isPlayground && !isInfected && CAMPAIGN_ORDER.includes(countryId)) {
+      } else if (coop && !isPlayground && !isInfected && !level.expedition && CAMPAIGN_ORDER.includes(countryId)) {
         // ⭐ R3 «Зірки разом» (v298): у КООП-кампанії вторинна ціль КОМАНДНА. Дефініцію
         // ({id,target}) ролить ХОСТ від сіда кімнати у coop.startLevel і кладе у spec (`so`),
         // тож обидві сторони будують ТУ САМУ ціль (чип видно всім). Прогрес рахує лише хост
@@ -2534,6 +2691,10 @@ class Game {
         const soDef = coop.spec && coop.spec.so;
         if (soDef && soDef.id) level.secondaryObjective = pickSecondaryObjective(country, 0, soDef.id);
       }
+    }
+    if (level.expedition) {
+      if (!level.runBuild) level.runBuild = new RunBuild();
+      level.runBuild.restore(level.expedition.build, level.player);
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -2991,6 +3152,9 @@ class Game {
     }
 
     this.level = level;
+    if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {
+      level.zombies.spawnEliteWave(4);
+    }
     if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
@@ -3014,7 +3178,7 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : level.storm ? t('⛈️ ШТОРМ') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerTitle = level.expedition ? t('🧭 ЕКСПЕДИЦІЯ · ЕТАП {n}/{all}', { n: level.expedition.step + 1, all: EXPEDITION_STEPS }) : level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : level.storm ? t('⛈️ ШТОРМ') : `${country.flag} ${country.name.toUpperCase()}`;
     const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.radiation ? t('50 HP, дробовик з 10 патронами і один зомбі на 500 HP. Перемога: +50 монет радіації.') : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : level.storm ? t('Виживи у колі, що звужується. Рекорд — у Лігу!') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
@@ -3102,6 +3266,7 @@ class Game {
   unlockWeapon(id) { return unlockWeapon(this, id); }
 
   endLevel() {
+    const leavingExpedition = !!(this.level && this.level.expedition);
     if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
@@ -3114,8 +3279,13 @@ class Game {
       this.level.net = null;
       setTimeout(() => {
         if (sess.state === 'lobby') {
-          this._showOverlay('overlay-lobby');
-          this.coop._renderLobby();
+          if (leavingExpedition) {
+            this.renderExpedition();
+            this._showOverlay('overlay-expedition');
+          } else {
+            this._showOverlay('overlay-lobby');
+            this.coop._renderLobby();
+          }
         }
       }, 50);
     }
@@ -3255,6 +3425,16 @@ class Game {
     }
     if (this.level.worldBoss) {
       this._endWorldBossRun(false);
+      return;
+    }
+    if (this.level.expedition && !this.level.net) {
+      this._finishExpeditionNode(false);
+      this.victoryShown = true;
+      this.audio.defeat();
+      this.input.exitLock();
+      document.querySelector('#overlay-arena-end h1').textContent = t('🧭 ЕКСПЕДИЦІЮ ЗАВЕРШЕНО');
+      document.getElementById('arena-stats').innerHTML = `<div class="stat"><span class="stat-icon">🏁</span><span class="stat-name">${t('Пройдено етапів')}</span><span class="stat-val">${this.save.expedition.wins} / ${EXPEDITION_STEPS}</span></div>`;
+      this._showOverlay('overlay-arena-end');
       return;
     }
     const coop = !!this.level.net;
@@ -3611,7 +3791,7 @@ class Game {
   // Кооп-варіанти (friendly-нокаут) рекорди/віхи не чіпають — це соло-прогрес.
   _soloModeFinish(modeId, won, timeMs = null) {
     const out = { mult: 1, recBadge: '', bestRow: '' };
-    if (this.level && this.level.net) return out;
+    if (this.level && (this.level.net || this.level.expedition)) return out;
     const daily = this.dailyChallengeId() === modeId;
     const weekly = this.weeklyChallengeId() === modeId;
     if (won) {
@@ -3870,7 +4050,7 @@ class Game {
     // 🌐 кооп: фінал вирішує хост і сповіщає гостей (дзеркало stormend)
     if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
     this._grantWeeklyCoop(level, !!won);
-    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
+    if (won && level.net && !level.expedition) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
     level.defense.completed = !!won;
     const res = level.defense.results();
     level.defense.over = true;
@@ -3890,7 +4070,7 @@ class Game {
     const isZone = level.defense.variant === 'zone';
     const defModeId = isZone ? 'zone-defense' : level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
     const fin = this._soloModeFinish(defModeId, !!won, isZone ? null : res.timeMs);
-    if (won) {
+    if (won && !level.expedition) {
       this.progress.addXp(100 * fin.mult);
       level.addCoins(150 * fin.mult);
       this.saveGame();
@@ -3911,6 +4091,7 @@ class Game {
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${fin.bestRow}`;
+    this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
   }
 
@@ -3920,7 +4101,7 @@ class Game {
     // 🌐 кооп: бій веде хост (update гостя дзеркальний) — фінал сповіщаємо подією (патерн dfend)
     if (level.net && level.net.authority) level.netEv('twend', won ? 1 : 0, reason);
     this._grantWeeklyCoop(level, !!won);
-    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в турельній війні
+    if (won && level.net && !level.expedition) this._grantCoopWin(); // 🤝 бонус «разом» і в турельній війні
     level.turretwar.completed = !!won;
     const res = level.turretwar.results();
     level.turretwar.over = true;
@@ -3938,7 +4119,7 @@ class Game {
       retryBtn.textContent = t('🗼 Ще раз!');
     }
     const fin = this._soloModeFinish('turretwar', !!won, res.timeMs);
-    if (won) {
+    if (won && !level.expedition) {
       this.progress.addXp(100 * fin.mult);
       level.addCoins(150 * fin.mult);
       this.saveGame();
@@ -3956,6 +4137,7 @@ class Game {
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${fin.bestRow}`;
+    this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
   }
 
@@ -4072,7 +4254,7 @@ class Game {
     }
     const fin = this._soloModeFinish('portal', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
-    if (won) {
+    if (won && !level.expedition) {
       this.progress.addXp(110 * fin.mult);
       level.addCoins(150 * fin.mult);
       rewardTitle = t('🪙 +{n} монет', { n: 150 * fin.mult });
@@ -4089,6 +4271,7 @@ class Game {
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
+    this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
   }
 
@@ -4220,7 +4403,7 @@ class Game {
     if (!level || !level.radiation || level.radiation.over) return;
     // 🌐 кооп: фінал кожен детектить сам зі стану puppet-боса (патерн нокауту)
     this._grantWeeklyCoop(level, !!won);
-    if (won && level.net) this._grantCoopWin(); // 🤝 бонус «разом» і в радіації
+    if (won && level.net && !level.expedition) this._grantCoopWin(); // 🤝 бонус «разом» і в радіації
     level.radiation.completed = !!won;
     const res = level.radiation.results();
     level.radiation.over = true;
@@ -4239,7 +4422,7 @@ class Game {
     }
     const fin = this._soloModeFinish('radiation', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
-    if (won) {
+    if (won && !level.expedition) {
       // ×2/×3 дня-тижня діють і на монети радіації — інакше ротація для режиму пуста
       const gain = RADIATION_WIN_COINS * fin.mult;
       this.save.radiationCoins = (this.save.radiationCoins || 0) + gain;
@@ -4257,6 +4440,7 @@ class Game {
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
+    this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
   }
 
@@ -4271,7 +4455,7 @@ class Game {
     // Кожен локально пише save.worldBosses[id] нижче — гість отримує clear без окремого
     // соло-анлоку СВІДОМО (прецедент radiationCoins: нагороди коопу нараховуються локально).
     this._grantWeeklyCoop(level, !!won);
-    if (won && level.net) this._grantCoopWin();
+    if (won && level.net && !level.expedition) this._grantCoopWin();
     mode.completed = !!won;
     mode.over = true;
     level.bossDefeated = !!won;
@@ -4289,7 +4473,7 @@ class Game {
     }
 
     let rewardTitle = t('Нагороду вже отримано');
-    const firstClear = won && !(this.save.worldBosses && this.save.worldBosses[mode.id]);
+    const firstClear = won && !level.expedition && !(this.save.worldBosses && this.save.worldBosses[mode.id]);
     const wkBossKey = 'W' + this._weekIndex() + ':boss';
     if (firstClear) {
       this.save.worldBosses = this.save.worldBosses || {};
@@ -4303,7 +4487,7 @@ class Game {
         x: mode.cfg.reward.xp,
       });
       this.saveGame();
-    } else if (won && this.weeklyBossId() === mode.id && !this.save.weekly[wkBossKey]) {
+    } else if (won && !level.expedition && this.weeklyBossId() === mode.id && !this.save.weekly[wkBossKey]) {
       // 🗓️ бос тижня: повторна нагорода — раз на тиждень
       this.save.weekly[wkBossKey] = true;
       this.save.coins += mode.cfg.reward.coins;
@@ -4317,7 +4501,7 @@ class Game {
       this.saveGame();
     }
 
-    if (won) this.quests.onEvent('radiationBoss', { bossId: mode.id });
+    if (won && !level.expedition) this.quests.onEvent('radiationBoss', { bossId: mode.id });
     this._lastEndMode = 'worldboss';
     this._lastWorldBossId = mode.id;
     const res = mode.results();
@@ -4330,6 +4514,7 @@ class Game {
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${won ? rewardTitle : t('Без нагороди')}</span></div>`;
+    this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
   }
 

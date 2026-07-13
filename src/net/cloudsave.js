@@ -56,6 +56,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'weeklyCamp',
   // 🌍 v303 «Світ врятовано»: одноразовий прапорець фіналу кампанії (усі 12 країн вільні)
   'worldSaved',
+  // 🧭 v400: активний маршрут, збірка і незабрана нагорода експедиції
+  'expedition',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -113,6 +115,7 @@ export function saveHasProgress(s) {
     || (s.petLevels && typeof s.petLevels === 'object' && Object.values(s.petLevels).some((v) => (v | 0) > 1)) // рівні петсів
     || (s.weeklyCamp && typeof s.weeklyCamp === 'object' && ((s.weeklyCamp.p | 0) > 0 || !!s.weeklyCamp.claimed)) // 🏕️ прогрес/нагорода тижневого квесту табору
     || (s.worldSaved | 0) > 0                               // 🌍 фінал кампанії пройдено (усі 12 країн вільні)
+    || !!s.expedition                                      // 🧭 активний/завершений маршрут і нагорода
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

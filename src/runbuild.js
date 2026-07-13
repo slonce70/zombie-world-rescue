@@ -83,6 +83,7 @@ export class RunBuild {
   constructor() {
     this.tags = { power: 0, speed: 0, tank: 0 };
     this.picks = [];          // іконки обраних карток — для екрана фіналу
+    this.ids = [];            // серіалізований build для багаторівневої Експедиції
     this.taken = new Set();   // id взятих — не пропонуємо повторно, поки колода не скінчиться
     this._combosFired = {};   // tag → true (комбо не повторюється)
   }
@@ -92,8 +93,10 @@ export class RunBuild {
   // АБО 'cross' для крос-тегового (≥1 картка кожного тега). Інакше null.
   // Однотегове комбо має пріоритет, якщо обидва добилися цим самим піком.
   apply(card, player) {
+    if (!card) return null;
     card.apply(player);
     this.picks.push(card.icon);
+    this.ids.push(card.id);
     this.taken.add(card.id);
     this.tags[card.tag] = (this.tags[card.tag] || 0) + 1;
     let fired = null;
@@ -108,6 +111,14 @@ export class RunBuild {
       if (!fired) fired = 'cross';
     }
     return fired;
+  }
+
+  restore(ids, player) {
+    for (const id of ids || []) {
+      const card = CARD_POOL.find((item) => item.id === id);
+      if (card) this.apply(card, player);
+    }
+    return this;
   }
 
   // 3 РІЗНІ картки: зважений вибір за рідкістю (rng.int(a,b) включно — як у storm.js).

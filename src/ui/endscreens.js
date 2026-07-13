@@ -18,6 +18,26 @@ export function showVictory(game) {
   game.deathT = -1;
   game._hideOverlay('overlay-death');
   const country = game.level.country;
+  if (game.level.expedition) {
+    const s = game.level.stats;
+    if (game.level.net && game.level.net.authority) game.level.netEv('vict');
+    game._finishExpeditionNode(true);
+    game.input.exitLock();
+    document.querySelector('#overlay-victory h1').textContent = t('🧭 ЕТАП ПРОЙДЕНО!');
+    document.querySelector('.victory-sub').textContent = t('Маршрут оновлено. Обери наступний виклик.');
+    document.getElementById('victory-stars').innerHTML = '';
+    const rb = game.level.runBuild;
+    document.getElementById('victory-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${s.kills}</span></div>
+      <div class="stat"><span class="stat-icon">🎲</span><span class="stat-name">${t('Твоя збірка')}</span><span class="stat-val">${rb ? rb.summary() : '—'}</span></div>`;
+    const next = document.getElementById('btn-victory-next');
+    next.style.display = '';
+    next.textContent = t('🧭 ДО МАРШРУТУ');
+    document.getElementById('btn-victory-retry').style.display = 'none';
+    document.getElementById('btn-victory-globe').style.display = 'none';
+    game._showOverlay('overlay-victory');
+    return;
+  }
   const wasLiberated = !!game.save.liberated[country.id];
   game.save.liberated[country.id] = true;
   const infectedFirstWin = game.level.infected && !(game.save.infected && game.save.infected.cleared && game.save.infected.cleared[country.id]);

@@ -7,6 +7,7 @@ import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
 import { DANCES, HERO_FACES, HERO_HATS, HERO_SKINS, PETS, TRACERS } from '../characters.js';
 import { nickIsBad, normNick } from '../../worker/nick.mjs';
+import { chooseExpeditionNode, createExpedition, expeditionLevelConfig, sanitizeExpedition } from '../expedition.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -121,6 +122,7 @@ export class CoopSession {
     this.onCfg = null;         // (countryId)
     this.onEnd = null;         // (reason) — кімната померла
     this.onStarted = null;     // () => {} — рівень стартував (закрити лобі)
+    this.expeditionVotes = new Map();
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);
@@ -267,6 +269,17 @@ export class CoopSession {
   startLevel() {
     if (this.role !== 'host') return;
     const game = this.game;
+    if (this.mode === 'expedition') {
+      let run = sanitizeExpedition(game.save.expedition);
+      if (!run || !run.coop || ['won', 'failed'].includes(run.status)) {
+        run = createExpedition({ countries: game._expeditionCountries(), coop: true });
+        game.save.expedition = run;
+        game.saveGame();
+      }
+      this.syncExpedition(run);
+      if (run.status === 'choice') return game.openExpedition({ coop: true });
+      return this.startExpeditionNode(run);
+    }
     const countryId = this.countryId;
     const runIndex = (game.save.missionRuns && game.save.missionRuns[countryId]) || 0;
     // 🗓️ weekly-кооп: реальний режим тижня обирає ХОСТ і кладе ключ тижня у spec —
@@ -301,6 +314,67 @@ export class CoopSession {
     game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, worldBoss: wb, weekly, mut });
   }
 
+  startExpeditionNode(value) {
+    if (this.role !== 'host') return;
+    const run = sanitizeExpedition(value);
+    const cfg = expeditionLevelConfig(run);
+    if (!cfg) return;
+    const opts = cfg.opts;
+    const spec = {
+      countryId: cfg.countryId, seed: this.game.seed, runIndex: run.step,
+      defense: opts.defense || null, radiation: !!opts.radiation, turretwar: !!opts.turretwar,
+      wb: opts.worldBoss || null, portal: !!opts.portal, ex: run,
+    };
+    this.transport.broadcast({ t: 'start', ...spec }, true);
+    this.state = 'level';
+    if (this.onStarted) this.onStarted();
+    this.game.startLevel(cfg.countryId, {
+      coop: { session: this, role: 'host', spec }, defense: opts.defense || null,
+      radiation: !!opts.radiation, turretwar: !!opts.turretwar, worldBoss: opts.worldBoss || null,
+      portal: !!opts.portal, expedition: run,
+    });
+  }
+
+  syncExpedition(value) {
+    const run = sanitizeExpedition(value);
+    if (!run || this.role !== 'host') return;
+    this.game.save.expedition = run;
+    this.transport.broadcast({ t: 'xprun', run }, true);
+  }
+
+  voteExpedition(nodeId) {
+    const run = sanitizeExpedition(this.game.save.expedition);
+    if (!run || run.status !== 'choice' || !run.choices.some((n) => n.id === nodeId)) return;
+    if (this.role === 'host') {
+      this.expeditionVotes.set(1, nodeId);
+      this._broadcastExpeditionVotes();
+    } else if (this.role === 'guest') {
+      this.transport.send(1, { t: 'xpv', node: nodeId }, true);
+    }
+  }
+
+  _broadcastExpeditionVotes() {
+    this.transport.broadcast({ t: 'xpvotes', votes: [...this.expeditionVotes] }, true);
+    if (this.game.state === 'globe') this.game.renderExpedition();
+  }
+
+  commitExpeditionVote() {
+    if (this.role !== 'host') return;
+    const run = sanitizeExpedition(this.game.save.expedition);
+    if (!run || run.status !== 'choice') return;
+    const counts = new Map(run.choices.map((n) => [n.id, 0]));
+    for (const node of this.expeditionVotes.values()) if (counts.has(node)) counts.set(node, counts.get(node) + 1);
+    const hostVote = this.expeditionVotes.get(1);
+    const chosen = [...counts].sort((a, b) => b[1] - a[1] || (a[0] === hostVote ? -1 : b[0] === hostVote ? 1 : 0))[0][0];
+    const next = chooseExpeditionNode(run, chosen);
+    this.expeditionVotes.clear();
+    this.game.save.expedition = next;
+    this.game.saveGame();
+    this.syncExpedition(next);
+    this.game._hideOverlay('overlay-expedition');
+    this.startExpeditionNode(next);
+  }
+
   // створення мережевого шару рівня (викликає main під час побудови)
   makeNet(level, spec) {
     if (this.net) this.net.dispose();
@@ -326,6 +400,13 @@ export class CoopSession {
       if (d.t === 'hello') this._hostHello(from, d);
       else if (d.t === 'bye') this._dropGuest(from, 'left');
       else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
+      else if (d.t === 'xpv') {
+        const run = sanitizeExpedition(this.game.save.expedition);
+        if (this.state === 'lobby' && this.roster.has(from) && run && run.status === 'choice' && run.choices.some((n) => n.id === d.node)) {
+          this.expeditionVotes.set(from, d.node);
+          this._broadcastExpeditionVotes();
+        }
+      }
     } else {
       if (d.t === 'welcome') {
         const assignedPid = validPid(d.pid);
@@ -335,6 +416,7 @@ export class CoopSession {
         for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); if (c) this.roster.set(c.pid, c); }
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
+        if (d.ex) this.game.save.expedition = sanitizeExpedition(d.ex);
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'reject') {
@@ -357,9 +439,28 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, weekly: d.weekly || null, mut: d.mut || null });
+        if (d.ex) { this.game.save.expedition = sanitizeExpedition(d.ex); this.game.saveGame(); }
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
+      } else if (d.t === 'xprun') {
+        if (from !== 1) return;
+        const run = sanitizeExpedition(d.run);
+        if (run) {
+          this.game.save.expedition = run;
+          this.game.saveGame();
+          if (this.game.state === 'globe') this.game.renderExpedition();
+        }
+      } else if (d.t === 'xpvotes') {
+        if (from !== 1) return;
+        const run = sanitizeExpedition(this.game.save.expedition);
+        const choices = new Set(run && run.status === 'choice' ? run.choices.map((n) => n.id) : []);
+        this.expeditionVotes.clear();
+        for (const pair of Array.isArray(d.votes) ? d.votes : []) {
+          if (!Array.isArray(pair) || !validPid(pair[0]) || !choices.has(pair[1])) continue;
+          this.expeditionVotes.set(pair[0], pair[1]);
+        }
+        if (this.game.state === 'globe') this.game.renderExpedition();
       } else if (d.t === 'end') {
         this._roomOver(d.why || 'closed');
       }
@@ -403,6 +504,7 @@ export class CoopSession {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
       inLevel: this.state === 'level',
+      ex: this.mode === 'expedition' ? sanitizeExpedition(this.game.save.expedition) : null,
     }, true);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();

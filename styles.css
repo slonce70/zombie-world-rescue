@@ -764,6 +764,17 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .globe-play:hover { transform: translateY(-3px) scale(1.03); }
 .globe-play.coop-btn { background: rgba(26, 92, 78, 0.9); border-color: rgba(77, 214, 168, 0.6); color: #eafff6; }
 .globe-play.coop-btn:hover { border-color: #4dd6a8; }
+.globe-play.expedition-btn { background: linear-gradient(135deg, #6f45d4, #2e8bc0); border-color: #a78bfa; color: #fff; }
+.globe-play.expedition-btn:hover { border-color: #d8c9ff; }
+
+.expedition-card { width: min(700px, 95vw); }
+.expedition-route { display: grid; gap: 10px; margin: 14px 0; }
+.expedition-node { width: 100%; min-height: 64px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.055); color: #fff; text-align: left; }
+button.expedition-node { cursor: pointer; }
+button.expedition-node:hover, .expedition-node.sel { border-color: #a78bfa; background: rgba(167,139,250,.16); }
+.expedition-node strong { display: block; font-size: 17px; }
+.expedition-node span { color: #b9d0e8; font-size: 13px; }
+.expedition-build { min-height: 26px; color: #ffd966; font-weight: 800; }
 .globe-act {
   position: relative; font-size: 15px; font-weight: 900; padding: 11px 18px;
   background: rgba(28, 44, 66, 0.85); border: 2px solid var(--ui-border);
