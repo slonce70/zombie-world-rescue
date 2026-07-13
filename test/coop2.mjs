@@ -128,16 +128,13 @@ try {
       };
     });
   }
-  const guestPos = await B.evaluate(() => ({
-    x: window.__game.level.player.pos.x,
-    z: window.__game.level.player.pos.z,
-  }));
-  await A.waitForFunction((p) => {
-    const guest = window.__game.level.net.remotes.get(2);
-    return guest && Math.hypot(guest.pos.x - p.x, guest.pos.z - p.z) < 5;
-  }, guestPos, { timeout: T(20000) });
-  await B.evaluate(() => { window.__game.level.player.grenades = 2; });
-  await B.evaluate(() => window.__game.test.throwGrenade());
+  // teleport — test hook, тому сам не генерує input ticks. Ставимо актуальну позицію
+  // в queue; urgent nade флашить її перед наміром гранати у тій самій WS-пачці.
+  await B.evaluate(() => {
+    window.__game.level.player.grenades = 2;
+    window.__game.level.net._sendP();
+    window.__game.test.throwGrenade();
+  });
   const appearedA = await A.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
   const appearedB = await B.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
   check('граната гостя зʼявилась на обох екранах', appearedA && appearedB, `A:${appearedA} B:${appearedB}`);

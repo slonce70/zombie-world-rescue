@@ -10,6 +10,9 @@ import { WEAPONS } from '../player.js';
 
 const SNAP_HZ = 12;
 const GUEST_STALE_MS = 120000;
+// Third-person camera is 4.4m behind the player; leave one position-packet of
+// movement slack without allowing actions at arbitrary map coordinates.
+const REMOTE_PROJECTILE_ORIGIN_MAX = 8;
 // санітизація вхідної шкоди від гостя: завжди скінченне число в розумних межах
 // (родинний кооп довіряє гостю, але NaN/Infinity/абсурд не мають псувати стан хоста)
 const clampDmg = (v) => Math.max(0, Math.min(2000, Number(v) || 0));
@@ -151,7 +154,7 @@ export class HostNet {
         // F20: дистанц-гейт як у shot/gadget — граната має вилітати з-під самого гостя.
         // Без нього гість міг би кинути гранату в будь-яку точку карти.
         const rpN = this.remotes.get(from);
-        if (rpN && Math.hypot(o[0] - rpN.pos.x, o[2] - rpN.pos.z) > 6) return true;
+        if (rpN && Math.hypot(o[0] - rpN.pos.x, o[2] - rpN.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
         this.spawnNetGrenade(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(v[0], v[1], v[2]), from);
         return true;
       }
@@ -160,7 +163,7 @@ export class HostNet {
         if (!isVec3(o) || !isVec3(dir)) return true;
         // F20: ракета теж стартує з-під гостя — той самий дистанц-гейт.
         const rpR = this.remotes.get(from);
-        if (rpR && Math.hypot(o[0] - rpR.pos.x, o[2] - rpR.pos.z) > 6) return true;
+        if (rpR && Math.hypot(o[0] - rpR.pos.x, o[2] - rpR.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
         this.spawnNetRocket(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(dir[0], dir[1], dir[2]), clampDmg(d.dmg), from);
         return true;
       }
