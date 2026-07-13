@@ -18,11 +18,17 @@ try {
   await Promise.all([A.waitForFunction(() => window.__game?.state === 'globe'), B.waitForFunction(() => window.__game?.state === 'globe')]);
   const code = await A.evaluate(() => window.__game.test.coopCreate('Хост'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Гість'), code);
-  await A.waitForFunction(() => window.__game.coop.session.roster.size === 2);
+  // A host-side roster update can arrive a frame before the guest has applied
+  // its room snapshot. Starting in that gap makes the test race the relay and
+  // can leave the guest waiting forever on slower CI runners.
+  await Promise.all([
+    A.waitForFunction(() => window.__game.coop.session.roster.size === 2),
+    B.waitForFunction(() => window.__game.coop.session.roster.size === 2),
+  ]);
   await A.evaluate(() => { window.__game.test.coopSetMode('expedition'); window.__game.test.coopStartLevel(); });
   await Promise.all([
-    A.waitForFunction(() => window.__game?.level?.expedition?.coop),
-    B.waitForFunction(() => window.__game?.level?.expedition?.coop),
+    A.waitForFunction(() => window.__game?.level?.expedition?.coop, null, { timeout: 45_000 }),
+    B.waitForFunction(() => window.__game?.level?.expedition?.coop, null, { timeout: 45_000 }),
   ]);
   const first = await Promise.all([A, B].map((p) => p.evaluate(() => window.__game.level.expedition.current.id)));
   check(first[0] === first[1], 'обидва гравці стартують той самий вузол', first.join(' / '));

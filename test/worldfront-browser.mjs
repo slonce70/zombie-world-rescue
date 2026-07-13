@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -12,6 +13,11 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
+const screenshotDir = process.env.FRONT_SCREENSHOTS || '';
+if (screenshotDir) mkdirSync(screenshotDir, { recursive: true });
+const screenshot = async (name) => {
+  if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/${name}.png`, fullPage: true });
+};
 
 try {
   await page.goto(`${BASE}/?test&fresh`);
@@ -34,6 +40,9 @@ try {
   await page.evaluate(() => window.__game.openFront());
   check(await page.locator('#overlay-front').getAttribute('aria-hidden') === 'false', 'Front overlay opens accessibly');
   check(await page.locator('.front-operation').count() === 3, 'board renders recommended plus alternatives');
+  check(await page.locator('.front-operation').first().evaluate((node) => node.classList.contains('recommended')), 'recommended operation leads the board');
+  check(await page.locator('#btn-front-go').isVisible(), 'primary action remains visible at 1280x720');
+  await screenshot('front-board-1280x720');
 
   const initial = await page.evaluate(() => {
     const game = window.__game;
@@ -77,6 +86,7 @@ try {
       check(stageState.pressure === stageState.pressureBudget, 'pressure phase executes its deterministic spawn budget');
       check(stageState.rewardDrop, 'reward phase creates a safe supply drop');
       check(stageState.drawDelta <= 10, 'Front stage stays inside the +10 draw-call budget');
+      await screenshot('front-active-1280x720');
     }
     await page.evaluate(() => {
       window.__game._finishFrontStage(true);
@@ -104,6 +114,9 @@ try {
   check(completed.coins === initial.coins + 200 + initial.threat * 50, 'operation coins are canonical');
   check(completed.crystals === initial.crystals + 1 + initial.threat, 'operation crystals are canonical');
   check(completed.claims.filter((id) => id.endsWith(':operation')).length === 1, 'operation reward has one stable claim id');
+  await page.evaluate(() => window.__game.openFront());
+  await screenshot('front-victory-consequence-1280x720');
+  await page.evaluate(() => window.__game.frontui.close());
 
   const retry = await page.evaluate(async () => {
     const game = window.__game;
@@ -134,15 +147,17 @@ try {
   const mobile = await page.locator('.front-card').boundingBox();
   check(mobile && mobile.width <= 390, 'Front board fits a 390px portrait viewport');
   check(await page.locator('#btn-front-go').isVisible(), 'primary touch action remains visible on mobile');
+  await screenshot('front-board-390x844');
 
-  const hq = await page.evaluate(() => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
     const game = window.__game;
     game.frontui.close();
     game.enterHQBase();
-    const props = game.hqbase.frontProjectProps;
-    game.exitHQBase();
-    return props;
   });
+  const hq = await page.evaluate(() => window.__game.hqbase.frontProjectProps);
+  await screenshot('front-hq-1280x720');
+  await page.evaluate(() => window.__game.exitHQBase());
   check(hq >= 4 && hq <= 10, 'HQ renders the Front map/projects inside the +15 draw-call budget', String(hq));
 
   const realErrors = errors.filter((message) => !/Failed to load resource|status of \d{3}|net::|ERR_|favicon/i.test(message));

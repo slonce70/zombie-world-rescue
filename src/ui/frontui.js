@@ -142,7 +142,8 @@ export class FrontUI {
       : t('🛰️ ЖИВИЙ ФРОНТ');
 
     this.el.status.innerHTML = this._statusHtml(vm, activeOperation);
-    this.el.operations.innerHTML = vm.operations.map((op) => this._operationHtml(op, vm)).join('')
+    const orderedOperations = [...vm.operations].sort((a, b) => Number(b.recommended) - Number(a.recommended));
+    this.el.operations.innerHTML = orderedOperations.map((op) => this._operationHtml(op, vm)).join('')
       || `<div class="front-empty">${esc(t('Фронт безпечний. Нові операції вже готуються!'))}</div>`;
     this.el.specialists.innerHTML = vm.specialists.map((item) => this._specialistHtml(item, !!active)).join('');
     this.el.projects.innerHTML = vm.projects.map((item) => this._projectHtml(item, vm)).join('');
