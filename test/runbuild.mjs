@@ -22,6 +22,9 @@ check(['power', 'speed', 'tank'].every((tg) => CARD_POOL.some((c) => c.tag === t
 const off = new RunBuild().offer({ int: () => 0 });
 check(off.length === 3, 'драфт пропонує 3 картки', off.length);
 check(new Set(off.map((c) => c.id)).size === 3, 'усі 3 — різні');
+const supplierOffer = new RunBuild().offer({ int: () => 0 }, 4);
+check(supplierOffer.length === 4, 'Снабженець пропонує 4 картки', supplierOffer.length);
+check(new Set(supplierOffer.map((c) => c.id)).size === 4, 'усі 4 — різні');
 
 // power-картка піднімає шкоду; не пише в жоден save (сигнатура apply(card, player) — без save)
 const p = mkPlayer();

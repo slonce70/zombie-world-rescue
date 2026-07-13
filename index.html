@@ -42,6 +42,10 @@
       <button id="camp-quest-chip" type="button" aria-label="Квест табору — забрати нагороду">📌 Квест табору</button>
       <div id="globe-compass" class="player-compass"></div>
       <div class="globe-play-row">
+        <button id="btn-front" class="btn btn-primary globe-play front-btn" hidden>
+          <span class="front-threat-dot" aria-hidden="true"></span>
+          <span id="front-cta-label">🛰️ ЖИВИЙ ФРОНТ</span>
+        </button>
         <button id="btn-expedition" class="btn globe-play expedition-btn">🧭 ЕКСПЕДИЦІЯ</button>
         <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
         <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
@@ -83,6 +87,56 @@
       <div class="btn-row">
         <button id="btn-expedition-go" class="btn btn-primary big">🚀 ПОЧАТИ</button>
         <button id="btn-expedition-abandon" class="btn">🗑️ Завершити забіг</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🛰️ v500: Єдиний цикл операцій, фахівців і проєктів Бази -->
+  <div id="overlay-front" class="overlay" role="dialog" aria-modal="true" aria-labelledby="front-title" aria-hidden="true">
+    <div class="overlay-card panel-card front-card">
+      <div class="panel-header front-header">
+        <div>
+          <div class="front-kicker">🛰️ ЖИВИЙ СВІТ</div>
+          <h2 id="front-title">ЖИВИЙ ФРОНТ</h2>
+        </div>
+        <button id="btn-front-close" class="btn-x" type="button" aria-label="Закрити">✕</button>
+      </div>
+
+      <div id="front-status" class="front-status" aria-live="polite"></div>
+
+      <section class="front-section" aria-labelledby="front-operations-title">
+        <div class="front-section-head">
+          <h3 id="front-operations-title">Обери операцію</h3>
+          <div class="front-threat-legend" aria-label="Стани країн">
+            <span><i class="front-marker threat"></i>загроза</span>
+            <span><i class="front-marker rebuilding"></i>відбудова</span>
+            <span><i class="front-marker safe"></i>безпечно</span>
+          </div>
+        </div>
+        <div id="front-operations" class="front-operations"></div>
+      </section>
+
+      <div class="front-setup-grid">
+        <section class="front-section" aria-labelledby="front-specialists-title">
+          <div class="front-section-head">
+            <h3 id="front-specialists-title">🧑‍🚒 Фахівець</h3>
+          </div>
+          <div id="front-specialists" class="front-choice-grid"></div>
+        </section>
+
+        <section class="front-section" aria-labelledby="front-projects-title">
+          <div class="front-section-head">
+            <h3 id="front-projects-title">🏗️ Проєкт Бази</h3>
+            <span id="front-project-progress" class="front-progress-label"></span>
+          </div>
+          <div id="front-projects" class="front-choice-grid"></div>
+        </section>
+      </div>
+
+      <div id="front-rewards" class="front-rewards"></div>
+      <div class="front-actions">
+        <button id="btn-front-go" class="btn btn-primary big" type="button">🚀 ПОЧАТИ</button>
+        <button id="btn-front-abandon" class="btn front-abandon" type="button" hidden>🏳️ Залишити операцію</button>
       </div>
     </div>
   </div>
@@ -447,18 +501,22 @@
         <button class="btn-x panel-close" data-close="overlay-menu">✕</button>
       </div>
       <div id="menu-list">
+        <div class="menu-group-title">ПРОГРЕС</div>
         <button id="btn-pass" class="btn globe-act">🎖️ Зоряний шлях <span id="pass-badge" class="act-badge"></span></button>
         <button id="btn-souls" class="btn globe-act">👻 Шлях душ</button>
         <button id="btn-quests" class="btn globe-act">📅 Завдання <span id="quest-badge" class="act-badge"></span></button>
+        <button id="btn-progress" class="btn globe-act">💾 Прогрес</button>
+        <div class="menu-group-title">КОЛЕКЦІЯ</div>
         <button id="btn-wardrobe" class="btn globe-act">🎒 Гардероб</button>
         <button id="btn-album" class="btn globe-act">📖 Альбом</button>
         <button id="btn-hq" class="btn globe-act">🏠 База</button>
         <button id="btn-league" class="btn globe-act league-btn">🏆 Ліга</button>
+        <div class="menu-group-title">НАЛАШТУВАННЯ</div>
         <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
         <button id="btn-kid" class="btn globe-act">🐣 Малюк: викл</button>
         <button id="btn-strong-zombies" class="btn globe-act">🧟 Сильні зомбі: викл</button>
         <button id="btn-tough-zombies" class="btn globe-act">💪 Живучі зомбі: викл</button>
-        <button id="btn-progress" class="btn globe-act">💾 Прогрес</button>
+        <button id="btn-front-metrics" class="btn globe-act">📊 Анонімна статистика: вимк</button>
         <button id="btn-lang" class="btn globe-act">🌐 Українська</button>
       </div>
     </div>
@@ -609,6 +667,7 @@
       <div class="lobby-section">Країна</div>
       <div id="lobby-countries"></div>
       <p id="lobby-hint" class="panel-sub"></p>
+      <button id="btn-lobby-front" class="btn btn-front coop-wide" hidden>🛰️ ЖИВИЙ ФРОНТ</button>
       <button id="btn-lobby-start" class="btn btn-primary big coop-wide">🚀 СТАРТ!</button>
     </div>
   </div>

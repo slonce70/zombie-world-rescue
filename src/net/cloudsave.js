@@ -58,6 +58,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'worldSaved',
   // 🧭 v400: активний маршрут, збірка і незабрана нагорода експедиції
   'expedition',
+  // 🛰️ v500: дошка Живого фронту, активна операція, проєкти та id вже виданих нагород
+  'front', 'frontCoopClaims',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -116,6 +118,8 @@ export function saveHasProgress(s) {
     || (s.weeklyCamp && typeof s.weeklyCamp === 'object' && ((s.weeklyCamp.p | 0) > 0 || !!s.weeklyCamp.claimed)) // 🏕️ прогрес/нагорода тижневого квесту табору
     || (s.worldSaved | 0) > 0                               // 🌍 фінал кампанії пройдено (усі 12 країн вільні)
     || !!s.expedition                                      // 🧭 активний/завершений маршрут і нагорода
+    || !!s.front                                           // 🛰️ операції, проєкти Бази та незабраний прогрес Front
+    || (Array.isArray(s.frontCoopClaims) && s.frontCoopClaims.length > 0) // 🤝 канонічні нагороди Front, отримані гостем
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 

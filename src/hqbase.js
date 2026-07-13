@@ -39,6 +39,7 @@ export class LivingHQ {
     this.skinDisplays = 0;
     this.hallPlaques = 0;
     this.hintDisplays = 0;
+    this.frontProjectProps = 0;
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
     this._onPointerDown = (e) => this._pickTarget(e);
@@ -101,6 +102,7 @@ export class LivingHQ {
     this._addDamageDummies();
     this._addLivingCamp();
     this._addCampQuestBoard();
+    this._addFrontProjects();
     this._refreshHints();
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
@@ -114,7 +116,34 @@ export class LivingHQ {
     if (data.kind === 'skin-display' || data.kind === 'skin-stand') return t('👕 Колекція скінів: можна вибрати стиль у Гардеробі.');
     if (data.kind === 'hall-trophy') return t('🏆 Зал слави рахує твої найкращі подвиги.');
     if (data.kind === 'beast') return t('📖 Бестіарій: тут живуть відкриті записи про зомбі.');
+    if (data.kind === 'front-map') return t('🛰️ Карта показує активні операції Живого фронту.');
+    if (data.kind === 'front-project') return t('🏗️ Проєкт Бази: рівень {n}/3.', { n: data.level || 0 });
     return '';
+  }
+
+  _addFrontProjects() {
+    this.frontProjectProps = 0;
+    const front = this.game.save.front;
+    if (!front) return;
+    this._addBox(0, 1.25, 4.65, 3.6, 2.2, 0.16, 0x17365d, { kind: 'front-map' });
+    this.frontProjectProps++;
+    const defs = [
+      ['medbay', -3.6, 0xe96378],
+      ['workshop', 0, 0xf0ae38],
+      ['radio', 3.6, 0x4ea7df],
+    ];
+    for (const [id, x, color] of defs) {
+      const level = Math.max(0, Math.min(3, (front.projects && front.projects[id]) | 0));
+      this._addBox(x, 0.35, 3.1, 1.4, 0.7, 1.4, color, { kind: 'front-project', id, level });
+      this.frontProjectProps++;
+      for (let tier = 0; tier < level; tier++) {
+        const height = 0.45 + tier * 0.25;
+        this._addBox(x - 0.38 + tier * 0.38, 0.7 + height / 2, 3.1, 0.26, height, 0.26, 0xe9f4ff, {
+          kind: 'front-project', id, level,
+        });
+        this.frontProjectProps++;
+      }
+    }
   }
 
   _refreshHints() {

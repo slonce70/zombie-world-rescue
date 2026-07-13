@@ -8,6 +8,7 @@ npm ci
 npx playwright install chromium
 node test/version-sync.mjs
 node test/sw-cache.mjs
+npm run test:front
 ```
 
 Номер має збігатися у `version.json`, `src/main.js` (`APP_VERSION`) і `sw.js` (`CACHE`). `PROTO_VERSION` змінюється лише при зміні wire format.
@@ -37,7 +38,7 @@ SLOW=4 node test/e2e.mjs
 ```bash
 sha=$(git rev-parse --short HEAD)
 cd worker
-npx wrangler deploy --tag v400 --message "v400 $sha"
+npx wrangler deploy --tag v500 --message "v500 $sha"
 ```
 
 Worker має бути backward-compatible з попереднім клієнтом. При production-регресії виконати `npx wrangler rollback <previous-version-id>`.
@@ -51,7 +52,7 @@ gh api repos/slonce70/zombie-world-rescue/pages -X PUT -f build_type=workflow
 gh api repos/slonce70/zombie-world-rescue/pages --jq .build_type
 ```
 
-Після merge push у `main` запускає blocking release/coop/smoke/e2e jobs. `deploy-pages` стартує лише після їхнього успіху.
+Після merge push у `main` запускає blocking `smoke`, `expedition` і `front`; `deploy-pages` стартує лише після їхнього успіху. Повні `release-gate`, `coop-gate` та `e2e` лишаються nightly/manual і мають бути зеленими перед ручним release/tag.
 
 ## 5. Production acceptance
 
@@ -67,9 +68,9 @@ cd worker && npx wrangler deployments list
 Тільки після live-перевірки:
 
 ```bash
-git tag v400
-git push origin v400
-gh release create v400 --target main --title "v400 — Експедиція" --notes-file CHANGELOG.md --latest
+git tag v500
+git push origin v500
+gh release create v500 --target main --title "v500 — Живий фронт" --notes-file CHANGELOG.md --latest
 ```
 
 Для аварійного виправлення Pages не зменшувати версію cache: зробити revert, підняти номер і випустити наступний patch через ті самі гейти.

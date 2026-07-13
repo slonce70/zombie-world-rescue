@@ -24,7 +24,7 @@ export const SOLO_MODE_GROUPS = [
   { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
   // «ВИКЛИКИ», не «ВИПРОБУВАННЯ»: довше слово не влазить у 2 ряди табів на 375px
   { id: 'trials', title: () => t('ВИКЛИКИ'), ids: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-  { id: 'souls', title: () => t('ДУШІ'), ids: ['soul-collector'] },
+  { id: 'special', title: () => t('ОСОБЛИВІ'), ids: ['expedition', 'soul-collector'] },
 ];
 
 // 💀 базовий режим → його «перегружений» варіант (кнопка на картці)
@@ -126,6 +126,14 @@ export const MODE_START_OPTS = {
 };
 
 export const SOLO_MODES = [
+  {
+    id: 'expedition', icon: '🧭', name: () => t('ЕКСПЕДИЦІЯ'),
+    locked: ({ libN }) => libN < 1,
+    desc: ({ libN }) => libN < 1
+      ? t('Відкриється після першої звільненої країни')
+      : t('Особлива багаторівнева операція з власним маршрутом і збіркою.'),
+    start: (game) => game.openExpedition(),
+  },
   {
     id: 'campaign', icon: '🎯', name: () => t('КАМПАНІЯ'), picker: 'campaign',
     locked: () => false,

@@ -8,6 +8,7 @@
     "test": "node test/smoke.mjs",
     "test:quick-release": "node test/quick-release.mjs",
     "test:expedition": "node --test test/expedition-unit.mjs && node test/expedition-browser.mjs",
+    "test:front": "node --test test/worldfront-unit.mjs test/worldevents.mjs test/front-worker-metrics.mjs && node test/worldfront-browser.mjs && node test/coop-worldfront.mjs",
     "test:coop-expedition": "node test/coop-expedition.mjs",
     "test:release": "node test/release.mjs && npm run test:coop-release",
     "test:coop": "node test/coop.mjs",

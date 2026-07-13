@@ -413,6 +413,7 @@ export class GuestNet {
 
   _applyState(st) {
     const level = this.level;
+    if (st.frun && this.session.applyFrontSnapshot) this.session.applyFrontSnapshot(st.frun);
     // повна пересинхронізація (вхід/реконект): дозволяємо наступному снапшоту з будь-яким seq
     this._lastSnapSeq = null;
     // скидаємо прапорець завершення рану, щоб реконект-гість сходився до фінального екрана

@@ -18,6 +18,10 @@ import {
   EXPEDITION_NODE_TYPES, EXPEDITION_STEPS, chooseExpeditionNode, completeExpeditionNode,
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
 } from './expedition.js';
+import {
+  applyFrontEvent, createFront, frontStageConfig, frontViewModel, sanitizeFront,
+} from './worldfront.js';
+import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
 import { Bus, RNG } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
@@ -52,6 +56,7 @@ import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
+import { FrontUI } from './ui/frontui.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
@@ -67,6 +72,7 @@ import {
 } from './weeklycamp.js';
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
+import { frontMetricsEnabled, sendFrontMetric, sendFrontReturns, setFrontMetricsEnabled } from './net/frontmetrics.js';
 
 // v305: розпил main.js — таблиці режимів, нагороди, альбом, енд-скріни й тест-хуки
 // переїхали у власні модулі; тут лишились тонкі делегати (тіла з this→game).
@@ -115,7 +121,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 400;
+const APP_VERSION = 500;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -132,6 +138,17 @@ const BIOME_EXPOSURE = {
   desert: 0.96,
   sakura: 1.05,
 };
+const FRONT_MISSION_PRESETS = Object.freeze({
+  'rescue-group': ['rescue', 'escort', 'collect'],
+  'destroy-nests': ['nests', 'clear', 'hunt'],
+  'repair-generator': ['repair', 'defense', 'clear'],
+  'activate-beacons': ['lights', 'hunt', 'collect'],
+  'elite-squad': ['hunt', 'defense', 'clear'],
+  'commander-pursuer': ['hunt', 'defense', 'clear'],
+  'commander-queen': ['hunt', 'nests', 'clear'],
+  'commander-ram': ['hunt', 'repair', 'defense'],
+  'commander-stalker': ['hunt', 'lights', 'clear'],
+});
 // Підказки будуються при показі (а не при завантаженні): keyHint потребує
 // живого input.touchMode, щоб на телефоні згадувати екранні кнопки, а не клавіші.
 function buildTips() {
@@ -228,6 +245,7 @@ class Game {
     this.coop = new CoopUI(this);
     this.league = new LeagueUI(this);
     this.saveui = new SaveUI(this);
+    this.frontui = new FrontUI(this);
     this.hq = new RescueHQ(this);
     this.hqbase = new LivingHQ(this);
     this.chapter = new Chapter(this);
@@ -313,6 +331,7 @@ class Game {
       this._showTouchCoach(true);
     });
     document.getElementById('btn-victory-globe').addEventListener('click', () => {
+      if (this.level && this.level.operation) return this._leaveFrontResult('overlay-victory');
       if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-victory');
       this._hideOverlay('overlay-victory');
       this.endLevel();
@@ -334,6 +353,7 @@ class Game {
       inf ? this.startInfected(cid) : this.startLevel(cid);
     });
     document.getElementById('btn-victory-next').addEventListener('click', () => {
+      if (this.level && this.level.operation) return this._leaveFrontResult('overlay-victory');
       if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-victory');
       const nid = nextTarget(this.save.liberated);
       if (!nid) return;
@@ -430,6 +450,7 @@ class Game {
       this._startSoloMode(mode || 'arena', mode === 'worldboss' ? (this._lastWorldBossId || 'radiation') : undefined);
     });
     document.getElementById('btn-arena-globe').addEventListener('click', () => {
+      if (this.level && this.level.operation) return this._leaveFrontResult('overlay-arena-end');
       if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-arena-end');
       this._hideOverlay('overlay-arena-end');
       this.endLevel();
@@ -504,6 +525,18 @@ class Game {
       });
     }
     this._applyToughZombies({ silent: true });
+    const metricsBtn = document.getElementById('btn-front-metrics');
+    const renderMetrics = () => {
+      if (metricsBtn) metricsBtn.textContent = frontMetricsEnabled(this)
+        ? t('📊 Анонімна статистика: увімк')
+        : t('📊 Анонімна статистика: вимк');
+    };
+    if (metricsBtn) metricsBtn.addEventListener('click', () => {
+      setFrontMetricsEnabled(!frontMetricsEnabled(this));
+      renderMetrics();
+      this.audio.click();
+    });
+    renderMetrics();
 
     window.addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
@@ -589,6 +622,11 @@ class Game {
       worldSaved: 0,
       // 🧭 v400: активний багаторівневий забіг; чиста компактна структура з expedition.js
       expedition: null,
+      // 🛰️ v500: детермінована дошка операцій; renderer/runtime-об'єкти сюди не потрапляють
+      front: null,
+      // Кооп-нагороди гостя мають окремий ledger: host snapshot ніколи не
+      // підміняє особисті board/projects/restored.
+      frontCoopClaims: [],
     };
   }
 
@@ -692,6 +730,9 @@ class Game {
         if (!out.infected.cleared || typeof out.infected.cleared !== 'object') out.infected.cleared = {};
         if (!Array.isArray(out.medals)) out.medals = [];
         out.expedition = sanitizeExpedition(out.expedition);
+        out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
+        out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
+          .filter((id) => typeof id === 'string' && /^front:[A-Za-z0-9_:-]{1,90}$/.test(id)))].slice(-128);
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
         if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
@@ -988,6 +1029,8 @@ class Game {
     this.progress._checkWeaponUnlocks();
     // 🎁 catch-up продовженого Зоряного шляху (40→65): пропущені по XP рівні видаються разом
     this.progress.grantBacklog();
+    this._ensureFront();
+    sendFrontReturns(this);
     this._showGlobeUI(true);
     // 🌍 ретро-ветеран: перший вхід на глобус із уже повними 12/12 (гра до v303 нічого не
     // святкувала) — показуємо фінал одноразово. Ідемпотентно через save.worldSaved.
@@ -1160,6 +1203,7 @@ class Game {
       // 🗓️ ціль тижня — оновлюємо текст/бар
       this._refreshWeeklyGoalUI();
       if (this._newVersion) this._onNewVersion(this._newVersion);
+      if (this.frontui) this.frontui.render(this.getFrontViewModel());
     }
     if (this.coop) this.coop.updateRoomChip();
   }
@@ -1167,6 +1211,7 @@ class Game {
   // ---------- 🏠 Живий Штаб ----------
   enterHQBase() {
     this.audio.click();
+    if (this.save.front) this._applyFrontTransition({ type: 'INIT', baseVisited: true });
     this._hideOverlay('overlay-hq');
     this._hideOverlay('overlay-menu');
     this._showGlobeUI(false);
@@ -2201,6 +2246,377 @@ class Game {
     if (id === 'overlay-wardrobe') this._stopHeroPreview();
   }
 
+  // ---------- 🛰️ Живий фронт ----------
+  _frontContext() {
+    return {
+      seed: this.seed,
+      liberated: this.save.liberated || {},
+      rescuedFriends: this.save.friends || {},
+    };
+  }
+
+  _frontToast(effect) {
+    const messages = {
+      'front.projectSelected': '🏗️ Проєкт Бази обрано',
+      'front.operationStarted': '🛰️ Операція почалася. Прогрес між етапами зберігається.',
+      'front.stageComplete': '✅ Етап завершено. Обери підсилення і продовжуй!',
+      'front.stageFailed': '💚 Загрозу не посилено — повтори етап, коли будеш готовий.',
+      'front.operationAbandoned': '🏳️ Операцію відкладено без штрафу.',
+      'front.operationComplete': '🌟 Операцію завершено!',
+      'front.rewardClaimed': '🏗️ Країна відбудовується, а проєкт Бази просунувся.',
+      'front.cycleComplete': '🥚 Покоління фронту завершено!',
+      'front.generationAdvanced': '🛰️ Нові операції вже на карті.',
+    };
+    return messages[effect.key] || effect.key;
+  }
+
+  _applyFrontTransition(event) {
+    const previousSecondStarts = (this.save.front && this.save.front.stats && this.save.front.stats.secondStarts) || 0;
+    const result = applyFrontEvent(this.save.front, { ...this._frontContext(), ...event });
+    if (!result || result.front === undefined) return result;
+    this.save.front = result.front;
+    let shouldSave = false;
+    for (const effect of result.effects || []) {
+      if (effect.type === 'grant') {
+        this.save.coins += Math.max(0, effect.coins | 0);
+        this.save.crystals = (this.save.crystals || 0) + Math.max(0, effect.crystals | 0);
+        this.save.eggs = (this.save.eggs || 0) + Math.max(0, effect.eggs | 0);
+      } else if (effect.type === 'toast' && this.hud) {
+        this.hud.toast(t(this._frontToast(effect)));
+      } else if (effect.type === 'save') {
+        shouldSave = true;
+      }
+    }
+    if (shouldSave) this.saveGame();
+    if (shouldSave) {
+      const metric = event.type === 'START_OPERATION' ? 'front_start'
+        : event.type === 'CLAIM_OPERATION' ? 'front_complete'
+        : event.type === 'INIT' && event.opened ? 'front_open'
+        : event.type === 'INIT' && event.baseVisited ? 'front_base_visit' : null;
+      if (metric) sendFrontMetric(this, metric);
+      if (event.type === 'START_OPERATION' && result.front.stats.secondStarts > previousSecondStarts) {
+        sendFrontMetric(this, 'front_second_start');
+      }
+    }
+    const session = this.coop && this.coop.session;
+    if (session && session.role === 'host' && session.syncFront) session.syncFront(this.save.front, result.effects || []);
+    if (this.frontui) this.frontui.render(this.getFrontViewModel());
+    return result;
+  }
+
+  applyFrontNetworkRewards(grantEffects = []) {
+    const previousClaims = new Set(this.save.frontCoopClaims || []);
+    let granted = false;
+    for (const effect of grantEffects) {
+      if (!effect || effect.type !== 'grant' || previousClaims.has(effect.rewardId)
+          || !/^front:[A-Za-z0-9_:-]{1,90}$/.test(effect.rewardId || '')) continue;
+      this.save.coins += Math.max(0, effect.coins | 0);
+      this.save.crystals = (this.save.crystals || 0) + Math.max(0, effect.crystals | 0);
+      this.save.eggs = (this.save.eggs || 0) + Math.max(0, effect.eggs | 0);
+      previousClaims.add(effect.rewardId);
+      granted = true;
+    }
+    if (!granted) return false;
+    this.save.frontCoopClaims = [...previousClaims].slice(-128);
+    this.saveGame();
+    return true;
+  }
+
+  _ensureFront() {
+    if (liberatedCount(this.save.liberated) < 1) return null;
+    if (!this.save.front) {
+      this.save.front = createFront(this._frontContext());
+      if (this.save.front) this.saveGame();
+    }
+    // Mid-stage snapshots deliberately restart the current stage after reload.
+    if (this.save.front && this.save.front.active && this.save.front.active.status === 'active' && !this.level) {
+      this._applyFrontTransition({ type: 'FAIL_STAGE' });
+    }
+    return this.save.front;
+  }
+
+  getFrontViewModel() {
+    const front = this.save.front ? sanitizeFront(this.save.front, this._frontContext()) : null;
+    return front ? frontViewModel(front, this.save) : null;
+  }
+
+  openFront() {
+    const front = this._ensureFront();
+    if (!front) {
+      this.hud.toast(t('🔒 Звільни Україну, щоб відкрити Живий фронт.'));
+      return false;
+    }
+    if (!front.active && front.board.every((operation) => operation.status === 'claimed')) {
+      this._applyFrontTransition({ type: 'ADVANCE_GENERATION' });
+    }
+    this._applyFrontTransition({ type: 'INIT', opened: true, day: new Date().toISOString().slice(0, 10) });
+    this.frontui.open(this.getFrontViewModel());
+    return true;
+  }
+
+  selectFrontSpecialist(id) {
+    return id;
+  }
+
+  selectFrontProject(projectId) {
+    this._applyFrontTransition({ type: 'SELECT_PROJECT', projectId });
+  }
+
+  startFrontOperation(operationId, specialist = 'dispatcher') {
+    if (!this._ensureFront()) return false;
+    let front = this.save.front;
+    if (!front.active) {
+      this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
+      front = this.save.front;
+    }
+    if (!front || !front.active || front.active.status !== 'ready') return false;
+    const config = frontStageConfig(front);
+    if (!config) return false;
+    this._applyFrontTransition({ type: 'START_STAGE' });
+    this.frontui.close();
+    const session = this.coop && this.coop.session;
+    if (session && session.role === 'host' && session.state === 'lobby' && session.startFrontStage) {
+      return session.startFrontStage(config.countryId, config.modeOpts, config.operation);
+    }
+    return this.startLevel(config.countryId, {
+      ...config.modeOpts,
+      operation: config.operation,
+      missionPreset: config.missionPreset,
+      encounterPlan: config.encounterPlan,
+    });
+  }
+
+  abandonFrontOperation() {
+    if (!this.save.front || !this.save.front.active) return false;
+    this._applyFrontTransition({ type: 'ABANDON_OPERATION' });
+    return true;
+  }
+
+  _finishFrontStage(won) {
+    const level = this.level;
+    if (!level || !level.operation || level._frontFinished) return false;
+    level._frontFinished = true;
+    if (level.net && !level.net.authority) return true;
+    const picked = level.runBuild ? level.runBuild.ids.slice(level._frontBuildStart || 0) : [];
+    this._applyFrontTransition({ type: won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked });
+    if (won && this.save.front && this.save.front.active && this.save.front.active.status === 'completed') {
+      this._applyFrontTransition({ type: 'CLAIM_OPERATION' });
+    }
+    const retry = document.getElementById('btn-arena-retry');
+    const globe = document.getElementById('btn-arena-globe');
+    if (retry) retry.style.display = 'none';
+    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
+    return true;
+  }
+
+  _initFrontRuntime(level, front) {
+    if (!level.operation || !front) return;
+    const teamSize = level.net && this.coop && this.coop.session ? Math.max(1, this.coop.session.roster.size) : 1;
+    const plan = encounterPlan({
+      seed: front.seed + front.generation,
+      template: level.operation.template,
+      stage: level.operation.stage,
+      threat: level.operation.threat,
+      teamSize,
+    });
+    level.frontDirector = { plan, phaseIndex: -1, remaining: 0 };
+    if (level.defense && level.defense.towerMaxHp > 0) {
+      level.defense.towerMaxHp = Math.round(level.defense.towerMaxHp * level.operationEffects.alliedObjectHealthMultiplier);
+      level.defense.towerHp = level.defense.towerMaxHp;
+    }
+    this._addFrontOutpost(level, front.restored[level.countryId] || 0);
+    this._addFrontSupport(level);
+    level.bus.on('zombieKilled', (zombie) => {
+      if (!zombie || !zombie.frontCommander || this.victoryShown || level._frontFinished) return;
+      level.bossDefeated = true;
+      level.frontCommanderDefeated = true;
+      level.frontObjectiveComplete = true;
+      if (this._frontCanComplete(level)) {
+        this.audio.victory();
+        setTimeout(() => { if (this.level === level) this._showVictory(); }, 650);
+      }
+    });
+    this._enterFrontPhase(level, 0);
+  }
+
+  _addFrontOutpost(level, restoredLevel) {
+    const tier = Math.max(0, Math.min(3, restoredLevel | 0));
+    if (!tier) return;
+    const village = level.world.layout.village || level.world.layout.SPAWN;
+    const x = village.x + Math.min(8, (village.r || 20) * 0.25);
+    const z = village.z + Math.min(8, (village.r || 20) * 0.25);
+    const y = level.world.groundH(x, z);
+    const group = new THREE.Group();
+    group.name = 'front-rescue-outpost';
+    const wood = new THREE.MeshStandardMaterial({ color: 0xc58b52, roughness: 0.9 });
+    const safe = new THREE.MeshStandardMaterial({ color: 0x55d779, roughness: 0.8 });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.8, 1.8), wood);
+    base.position.y = 0.4;
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.7, 0.08), safe);
+    flag.position.set(-1.25, 1.35, 0);
+    group.add(base, flag);
+    if (tier >= 2) {
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.35, 1.7, 4), safe);
+      tent.rotation.y = Math.PI / 4;
+      tent.position.set(0.3, 1.45, 0);
+      group.add(tent);
+    }
+    if (tier >= 3) base.scale.set(1.35, 1.1, 1.35);
+    group.position.set(x, y, z);
+    level.scene.add(group);
+    level.frontOutpostDrawCalls = group.children.length;
+  }
+
+  _addFrontSupport(level) {
+    const fx = level.operationEffects;
+    if (!fx || !fx.support) return;
+    const spawn = level.world.layout.SPAWN || { x: 0, z: 0 };
+    const x = spawn.x + 3;
+    const z = spawn.z + 1;
+    const y = level.world.groundH(x, z);
+    if (fx.support === 'medkit') {
+      level.effects.spawnPickup(x, z, 'medkit', 9999, y + 0.3);
+      return;
+    }
+    const group = new THREE.Group();
+    group.name = `front-support-${fx.support}`;
+    const color = fx.support === 'fortified-barrier' ? 0x5d86a8 : fx.support === 'signal-flare' ? 0xffc642 : 0x6cbf67;
+    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(fx.support === 'fortified-barrier' ? 3 : 1.8, 1, 1), material);
+    body.position.y = 0.5;
+    group.add(body);
+    if (fx.support === 'signal-flare') {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8), material);
+      mast.position.y = 1.7;
+      group.add(mast);
+    }
+    group.position.set(x, y, z);
+    level.scene.add(group);
+  }
+
+  _enterFrontPhase(level, index) {
+    const director = level.frontDirector;
+    const phase = director && director.plan.phases[index];
+    if (!phase) return;
+    director.phaseIndex = index;
+    director.remaining = phase.duration;
+    const labels = {
+      quiet: ['🧭 ОЗИРНИСЬ', 'Виконуй задачу — тиск почнеться не одразу.'],
+      pressure: ['⚠️ ТИСК', 'Орда наближається!'],
+      spike: ['👑 КОМАНДИР', 'Атаку телеграфовано — тримай дистанцію.'],
+      reward: ['🎁 ПЕРЕПОЧИНОК', 'Збери припаси та заверши задачу.'],
+    };
+    const copy = labels[phase.id];
+    if (copy) this.hud.banner(t(copy[0]), t(copy[1]), 2.8);
+    const authority = !level.net || level.net.authority;
+    if (!authority) return;
+    if (phase.id === 'pressure' && !level.defense && !level.portal) {
+      const a = level.world.layout.arena || level.world.layout.village;
+      const types = ['walker', 'runner', 'boxer'];
+      // Campaign stages already contain a populated horde. Reuse it before
+      // allocating new meshes so Front stays inside its +10 draw-call budget.
+      const existing = level.zombies.list.filter((zombie) =>
+        !zombie.dead && !zombie.gone && !zombie.frontCommander);
+      for (let i = 0; i < phase.spawnBudget; i++) {
+        const reused = existing[i];
+        if (reused) {
+          reused.frontEncounter = true;
+          reused.horde = true;
+          reused.aggroed = true;
+          reused.state = 'chase';
+          continue;
+        }
+        const angle = ((director.plan.seed + i * 7) % 360) * Math.PI / 180;
+        const radius = 18 + (i % 4) * 2;
+        const zombie = level.zombies.spawn(types[(director.plan.seed + i) % types.length],
+          a.x + Math.cos(angle) * radius, a.z + Math.sin(angle) * radius, {
+            horde: true,
+            anchor: { x: a.x, z: a.z, r: 38 },
+          });
+        zombie.frontEncounter = true;
+      }
+      return;
+    }
+    if (phase.id === 'reward') {
+      const p = level.player.pos;
+      level.effects.spawnPickup(p.x + 1.2, p.z, 'medkit', 90);
+      level.effects.spawnPickup(p.x - 1.2, p.z, 'ammo', 90);
+      level.frontRewardDrop = true;
+      if (level.frontPendingResult) {
+        const pending = level.frontPendingResult;
+        level.frontPendingResult = null;
+        this._showFrontModeResult(level, true, pending.icon, pending.objective, pending.detail);
+      } else if (level.frontObjectiveComplete && this._frontCanComplete(level)) {
+        this._showVictory();
+      }
+      return;
+    }
+    if (phase.id !== 'spike') return;
+    if (level.operation.stage === 2) {
+      const a = level.world.layout.arena || level.world.layout.village;
+      const commander = director.plan.commander;
+      const zombie = level.zombies.spawn(commander.zombieType, a.x, a.z, {
+        elite: true,
+        horde: true,
+        anchor: { x: a.x, z: a.z, r: 32 },
+      });
+      zombie.frontCommander = commander.id;
+      zombie.maxHp = Math.round(zombie.maxHp * (1.7 + level.operation.threat * 0.25));
+      zombie.hp = zombie.maxHp;
+    } else if (!level.defense && !level.portal) {
+      level.zombies.spawnEliteWave(Math.max(1, Math.min(3, level.operation.threat)));
+    }
+  }
+
+  _updateFrontDirector(level, dt) {
+    const director = level.frontDirector;
+    if (!director || director.phaseIndex >= director.plan.phases.length - 1) return;
+    director.remaining -= dt;
+    if (director.remaining <= 0) this._enterFrontPhase(level, director.phaseIndex + 1);
+  }
+
+  _frontCanComplete(level) {
+    if (!level || !level.operation || !level.frontDirector) return true;
+    if (level.net && !level.net.authority && level.frontRemoteComplete) return true;
+    const phase = level.frontDirector.plan.phases[level.frontDirector.phaseIndex];
+    if (!phase || phase.id !== 'reward') return false;
+    return level.operation.stage !== 2 || !!level.frontCommanderDefeated;
+  }
+
+  _showFrontModeResult(level, won, icon, objective, detail) {
+    if (won && !this._frontCanComplete(level)) {
+      level.frontObjectiveComplete = true;
+      level.frontPendingResult = { icon, objective, detail };
+      return false;
+    }
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    this._finishFrontStage(!!won);
+    const retry = document.getElementById('btn-arena-retry');
+    if (retry) retry.style.display = 'none';
+    const globe = document.getElementById('btn-arena-globe');
+    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
+    document.getElementById('arena-league-place').textContent = '';
+    document.querySelector('#overlay-arena-end h1').textContent = won ? t('✅ ЕТАП ПРОЙДЕНО!') : t('💚 СПРОБУЙ ЩЕ РАЗ');
+    document.getElementById('arena-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">${icon}</span><span class="stat-name">${t(objective)}</span><span class="stat-val">${detail}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
+      <div class="stat best"><span class="stat-icon">💾</span><span class="stat-name">${t('Прогрес')}</span><span class="stat-val">${won ? t('збережено') : t('без штрафу')}</span></div>`;
+    this._showOverlay('overlay-arena-end');
+  }
+
+  _leaveFrontResult(overlay) {
+    this._hideOverlay(overlay);
+    this.endLevel();
+    setTimeout(() => this.openFront(), 50);
+  }
+
   // ---------- 🧭 експедиція ----------
   _expeditionCountries() {
     const ids = CAMPAIGN_ORDER.filter((id) => isCountryOpen(this.save.liberated, id) || hasLiberated(this.save.liberated, id));
@@ -2368,6 +2784,19 @@ class Game {
     const victoryNext = document.getElementById('btn-victory-next');
     if (victoryNext) victoryNext.textContent = t('▶️ Далі');
     const country = COUNTRIES[countryId] || COUNTRIES.UKR;
+    const coopFront = opts.operation && opts.coop && opts.coop.role === 'guest'
+      ? opts.coop.session.frontRun : null;
+    const savedFront = opts.operation
+      ? sanitizeFront(coopFront || this.save.front, coopFront ? {} : this._frontContext())
+      : null;
+    const savedOperation = savedFront && savedFront.board.find((item) => item.id === opts.operation.operationId);
+    const derivedFrontStage = savedFront && opts.operation ? frontStageConfig(savedFront) : null;
+    const operation = opts.operation && savedOperation ? {
+      ...opts.operation,
+      template: savedOperation.template,
+      threat: savedOperation.threat,
+      missionPreset: opts.missionPreset || (derivedFrontStage && derivedFrontStage.missionPreset) || null,
+    } : null;
     const isStorm = !!opts.storm;
     document.body.classList.toggle('storm-mode', isStorm);
     const isKnockout = !!opts.knockout;
@@ -2418,7 +2847,9 @@ class Game {
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
-    document.getElementById('ll-title').textContent = opts.expedition
+    document.getElementById('ll-title').textContent = operation
+      ? t('🛰️ ЖИВИЙ ФРОНТ · ЕТАП {n}/3', { n: operation.stage + 1 })
+      : opts.expedition
       ? t('🧭 ЕКСПЕДИЦІЯ')
       : isWorldBoss
       ? t('🌋 СВІТОВИЙ БОС')
@@ -2508,6 +2939,8 @@ class Game {
       weeklyMutator,
       weekly: opts.weekly || null,
       expedition: sanitizeExpedition(opts.expedition || (coop && coop.spec && coop.spec.ex)),
+      operation,
+      encounterPlan: operation ? (opts.encounterPlan || null) : null,
       noGadgets: !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
       noShop: !!modeRules.noShop,
@@ -2520,7 +2953,7 @@ class Game {
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
     const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
+    const soloReplay = !operation && !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
@@ -2596,6 +3029,11 @@ class Game {
       // 🔋 паливні зброї (v46): на старті рівня — повний балон у кожної наявної
       for (const w of loadout) level.player.refillFuel(w);
     }
+    if (operation) {
+      level.operationEffects = specialistEffects(operation.specialist, savedFront.projects);
+      const baseHeal = level.player.heal.bind(level.player);
+      level.player.heal = (amount) => baseHeal(amount * level.operationEffects.healingMultiplier);
+    }
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isKnockout) {
@@ -2657,8 +3095,9 @@ class Game {
         isGuest,
         isCoop: !!coop,
         isPlayground,
-      }) && !this._forceMissionSet && !level.expedition;
-      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level);
+      }) && !this._forceMissionSet && !level.expedition && !operation;
+      const frontMissions = operation && FRONT_MISSION_PRESETS[operation.missionPreset];
+      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, frontMissions || null);
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
       if (useStory) level.rescueCage = new HiddenRescue(level);
@@ -2674,14 +3113,14 @@ class Game {
       // v297 «Сила разом»: рішення про спавн приймає ХОСТ (гість малює дзеркало по `spx`).
       if ((!coop || coop.role === 'host') && !isPlayground) level.superEligible = true;
       // ⭐ R3 «Зірки та милосердя»: лише СОЛО-забіг країни кампанії (не інфекція/кооп/полігон).
-      if (!coop && !isPlayground && !isInfected && !level.expedition && CAMPAIGN_ORDER.includes(countryId)) {
+      if (!coop && !isPlayground && !isInfected && !level.expedition && !operation && CAMPAIGN_ORDER.includes(countryId)) {
         // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип)
         const runIdx = (this.save.missionRuns[countryId] || 0);
         level.secondaryObjective = pickSecondaryObjective(country, country.seed + runIdx * 3, this._forceSecondary || null);
         // 🕊️ невидиме милосердя: після 2+ смертей поспіль у ЦІЙ країні — тихі послаблення (БЕЗ UI).
         const md = this.save.mercyDeaths;
         level.mercy = (md && md.cid === countryId && md.n >= 2) ? { hpMult: 0.9, medkitMult: 1.5, eliteMinus: 1 } : null;
-      } else if (coop && !isPlayground && !isInfected && !level.expedition && CAMPAIGN_ORDER.includes(countryId)) {
+      } else if (coop && !isPlayground && !isInfected && !level.expedition && !operation && CAMPAIGN_ORDER.includes(countryId)) {
         // ⭐ R3 «Зірки разом» (v298): у КООП-кампанії вторинна ціль КОМАНДНА. Дефініцію
         // ({id,target}) ролить ХОСТ від сіда кімнати у coop.startLevel і кладе у spec (`so`),
         // тож обидві сторони будують ТУ САМУ ціль (чип видно всім). Прогрес рахує лише хост
@@ -2695,6 +3134,11 @@ class Game {
     if (level.expedition) {
       if (!level.runBuild) level.runBuild = new RunBuild();
       level.runBuild.restore(level.expedition.build, level.player);
+    }
+    if (operation) {
+      if (!level.runBuild) level.runBuild = new RunBuild();
+      level.runBuild.restore(operation.build, level.player);
+      level._frontBuildStart = level.runBuild.ids.length;
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
@@ -3152,6 +3596,7 @@ class Game {
     }
 
     this.level = level;
+    if (level.operation) this._initFrontRuntime(level, savedFront);
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {
       level.zombies.spawnEliteWave(4);
     }
@@ -3206,6 +3651,11 @@ class Game {
   // 🤝 гість: перемога (подія від хоста)
   netVictory() {
     if (!this.level || this.victoryShown) return;
+    if (this.level.operation && this.level.net && !this.level.net.authority) {
+      // `vict` already passed GuestNet's trusted-host boundary. A guest's local
+      // Director clock (and non-serialized commander flag) must not veto it.
+      this.level.frontRemoteComplete = true;
+    }
     this.audio.victory();
     this.audio.setMode(null);
     this.level.bossDefeated = true;
@@ -3267,6 +3717,7 @@ class Game {
 
   endLevel() {
     const leavingExpedition = !!(this.level && this.level.expedition);
+    const leavingFront = !!(this.level && this.level.operation);
     if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
@@ -3279,7 +3730,12 @@ class Game {
       this.level.net = null;
       setTimeout(() => {
         if (sess.state === 'lobby') {
-          if (leavingExpedition) {
+          if (leavingFront && sess.role === 'host') {
+            this.openFront();
+          } else if (leavingFront) {
+            this._showOverlay('overlay-lobby');
+            this.coop._renderLobby();
+          } else if (leavingExpedition) {
             this.renderExpedition();
             this._showOverlay('overlay-expedition');
           } else {
@@ -3425,6 +3881,10 @@ class Game {
     }
     if (this.level.worldBoss) {
       this._endWorldBossRun(false);
+      return;
+    }
+    if (this.level.operation) {
+      this._showFrontModeResult(this.level, false, '🛰️', 'Поточний етап', t('можна повторити'));
       return;
     }
     if (this.level.expedition && !this.level.net) {
@@ -4047,13 +4507,20 @@ class Game {
   _endDefenseRun(won = true) {
     const level = this.level;
     if (!level || !level.defense || level.defense.over) return;
+    const res = level.defense.results();
+    level.defense.completed = !!won;
+    level.defense.over = true;
+    if (level.operation) {
+      const detail = level.defense.zone
+        ? `${Math.max(0, res.timeLeft)} ${t('с')}`
+        : `${res.towerHp} / ${level.defense.towerMaxHp} HP`;
+      this._showFrontModeResult(level, won, level.defense.zone ? '⭕' : '🗼', level.defense.zone ? 'Евакуаційна зона' : 'Генератор', detail);
+      return;
+    }
     // 🌐 кооп: фінал вирішує хост і сповіщає гостей (дзеркало stormend)
     if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
     this._grantWeeklyCoop(level, !!won);
     if (won && level.net && !level.expedition) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
-    level.defense.completed = !!won;
-    const res = level.defense.results();
-    level.defense.over = true;
     level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
@@ -4239,6 +4706,10 @@ class Game {
     const res = level.portal.results();
     level.portal.completed = !!won;
     level.portal.over = true;
+    if (level.operation) {
+      this._showFrontModeResult(level, won, '🌀', 'Портали закрито', `${res.closed} / 3`);
+      return;
+    }
     level.bossDefeated = !!won;
     this.victoryShown = true;
     this.deathT = -1;
@@ -4679,6 +5150,7 @@ class Game {
           && !(isCoop && (this.paused || this.shop.isOpen));
         this.level.player.update(simDt, this.input, allowControl);
         this.level.zombies.update(simDt);
+        if (this.level.operation) this._updateFrontDirector(this.level, simDt);
         this.level.missions.update(simDt, this.input, allowControl);
         // 🤝 схований друг у клітці (соло-кампанія): підхід + звільнення 2с + летить у табір
         if (this.level.rescueCage) this.level.rescueCage.update(simDt, this.input, allowControl);

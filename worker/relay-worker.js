@@ -7,6 +7,7 @@
 import { cleanNickSrv, cleanCountrySrv } from './nick.mjs';
 import { cleanProfileSrv, safeInt } from './profile.mjs';
 import { routeBatch } from './route.mjs';
+import { sanitizeFrontMetric } from './frontmetrics.mjs';
 
 const MAX_PLAYERS = 4;
 const MAX_WS_BYTES = 65536;   // ліміт одного ws-повідомлення (звичайна пачка — сотні байт)
@@ -25,6 +26,7 @@ const SAVE_CORS = {
   ...CORS,
   'Access-Control-Allow-Origin': 'https://slonce70.github.io',
 };
+const FRONT_METRICS_CORS = SAVE_CORS;
 
 export default {
   async fetch(request, env) {
@@ -49,6 +51,14 @@ export default {
       const id = env.SAVE.idFromName('save');
       return env.SAVE.get(id).fetch(request);
     }
+    // 🛰️ Opt-in Front metrics: only aggregate counters, no cid/nick/free text/time/location.
+    if (url.pathname.startsWith('/front-metrics/')) {
+      const origin = request.headers.get('Origin');
+      if (origin !== FRONT_METRICS_CORS['Access-Control-Allow-Origin']) return new Response('forbidden origin', { status: 403 });
+      if (request.method === 'OPTIONS') return new Response(null, { headers: FRONT_METRICS_CORS });
+      const id = env.METRICS.idFromName('front-metrics');
+      return env.METRICS.get(id).fetch(request);
+    }
     if (url.pathname !== '/ws') return new Response('zr-relay ok', { status: 200 });
     const code = (url.searchParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     if (!code) return new Response('bad room', { status: 400 });
@@ -56,6 +66,52 @@ export default {
     return env.ROOM.get(id).fetch(request);
   },
 };
+
+export class FrontMetrics {
+  constructor(state) {
+    this.state = state;
+    this.sql = state.storage.sql;
+    this._rate = new Map();
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS counters (
+      event TEXT NOT NULL, version INTEGER NOT NULL, cohort TEXT NOT NULL,
+      platform TEXT NOT NULL, lang TEXT NOT NULL, n INTEGER NOT NULL,
+      PRIMARY KEY (event, version, cohort, platform, lang)
+    )`);
+  }
+
+  _allowed(ip) {
+    const now = Date.now();
+    let row = this._rate.get(ip);
+    if (!row || now - row.t0 > 60_000) row = { n: 0, t0: now };
+    row.n++;
+    this._rate.set(ip, row);
+    if (this._rate.size > 2000) this._rate.clear();
+    return row.n <= 20;
+  }
+
+  json(value, status = 200) {
+    return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json', ...FRONT_METRICS_CORS } });
+  }
+
+  async fetch(request) {
+    if (request.method !== 'POST') return this.json({ error: 'method' }, 405);
+    const length = parseInt(request.headers.get('content-length') || '0', 10);
+    if (length > 512) return this.json({ error: 'big' }, 413);
+    const ip = request.headers.get('CF-Connecting-IP') || 'x';
+    if (!this._allowed(ip)) return this.json({ error: 'rate' }, 429);
+    const text = await request.text();
+    if (text.length > 512) return this.json({ error: 'big' }, 413);
+    let metric;
+    try { metric = sanitizeFrontMetric(JSON.parse(text)); } catch (e) { metric = null; }
+    if (!metric) return this.json({ error: 'bad' }, 400);
+    this.sql.exec(
+      `INSERT INTO counters (event, version, cohort, platform, lang, n) VALUES (?, ?, ?, ?, ?, 1)
+       ON CONFLICT (event, version, cohort, platform, lang) DO UPDATE SET n = n + 1`,
+      metric.event, metric.version, metric.cohort, metric.platform, metric.lang
+    );
+    return this.json({ ok: true });
+  }
+}
 
 export class Room {
   constructor(state) {

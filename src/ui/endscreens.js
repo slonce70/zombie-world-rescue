@@ -13,11 +13,40 @@ import { hasLiberated } from '../net/cloudsave.js';
 export function showVictory(game) {
   if (!game.level || game.victoryShown) return;
   if (game.level.playground) return;
+  if (game.level.operation && !game._frontCanComplete(game.level)) {
+    game.level.frontObjectiveComplete = true;
+    return;
+  }
   game.victoryShown = true;
   // якщо гравця встигли вдарити в момент перемоги — скасовуємо смерть
   game.deathT = -1;
   game._hideOverlay('overlay-death');
   const country = game.level.country;
+  if (game.level.operation) {
+    const s = game.level.stats;
+    const finalStage = game.level.operation.stage === 2;
+    if (game.level.net && game.level.net.authority) game.level.netEv('vict');
+    game._finishFrontStage(true);
+    game.input.exitLock();
+    document.querySelector('#overlay-victory h1').textContent = finalStage
+      ? t('🌟 ОПЕРАЦІЮ ЗАВЕРШЕНО!')
+      : t('✅ ЕТАП ПРОЙДЕНО!');
+    document.querySelector('.victory-sub').textContent = finalStage
+      ? t('Країна відбудовується, а проєкт Бази просунувся.')
+      : t('Прогрес збережено. Наступний етап уже готовий.');
+    document.getElementById('victory-stars').innerHTML = '';
+    const rb = game.level.runBuild;
+    document.getElementById('victory-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${s.kills}</span></div>
+      <div class="stat"><span class="stat-icon">🎲</span><span class="stat-name">${t('Твоя збірка')}</span><span class="stat-val">${rb ? rb.summary() : '—'}</span></div>`;
+    const next = document.getElementById('btn-victory-next');
+    next.style.display = '';
+    next.textContent = t('🛰️ ДО ФРОНТУ');
+    document.getElementById('btn-victory-retry').style.display = 'none';
+    document.getElementById('btn-victory-globe').style.display = 'none';
+    game._showOverlay('overlay-victory');
+    return;
+  }
   if (game.level.expedition) {
     const s = game.level.stats;
     if (game.level.net && game.level.net.authority) game.level.netEv('vict');

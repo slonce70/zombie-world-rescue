@@ -8,6 +8,10 @@ import { t } from '../i18n.js';
 import { DANCES, HERO_FACES, HERO_HATS, HERO_SKINS, PETS, TRACERS } from '../characters.js';
 import { nickIsBad, normNick } from '../../worker/nick.mjs';
 import { chooseExpeditionNode, createExpedition, expeditionLevelConfig, sanitizeExpedition } from '../expedition.js';
+import {
+  canonicalFrontRewards, expandFrontSpec, FRONT_GUEST_FORBIDDEN, frontSpecFromState,
+  sanitizeFrontSnapshot, sanitizeFrontSpec,
+} from './frontsync.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -123,6 +127,7 @@ export class CoopSession {
     this.onEnd = null;         // (reason) — кімната померла
     this.onStarted = null;     // () => {} — рівень стартував (закрити лобі)
     this.expeditionVotes = new Map();
+    this.frontRun = null;      // canonical host snapshot for the current Front room
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);
@@ -226,6 +231,7 @@ export class CoopSession {
     this.room = null;
     this.state = 'idle';
     this.roster.clear();
+    this.frontRun = null;
     if (this.net) { this.net.dispose(); this.net = null; }
   }
 
@@ -335,6 +341,66 @@ export class CoopSession {
     });
   }
 
+  // World Front start is host-only. `opts` uses the existing startLevel options;
+  // the only new protocol field is compact `fr`.
+  startFrontStage(countryId, opts = {}, operation = null) {
+    if (this.role !== 'host') return false;
+    const run = this.frontSnapshot();
+    const fr = frontSpecFromState(run, operation);
+    if (!run || !fr) return false;
+    const spec = {
+      countryId, seed: this.game.seed, runIndex: fr.g,
+      defense: opts.defense || null,
+      radiation: !!opts.radiation,
+      turretwar: !!opts.turretwar,
+      wb: opts.worldBoss || null,
+      portal: !!opts.portal,
+      fr,
+    };
+    this.syncFront(run);
+    this.transport.broadcast({ t: 'start', ...spec }, true);
+    this.state = 'level';
+    this.mode = 'front';
+    this.countryId = countryId;
+    if (this.onStarted) this.onStarted();
+    this.game.startLevel(countryId, {
+      coop: { session: this, role: 'host', spec },
+      defense: spec.defense, radiation: spec.radiation, turretwar: spec.turretwar,
+      worldBoss: spec.wb, portal: spec.portal,
+      operation: expandFrontSpec(fr),
+    });
+    return true;
+  }
+
+  frontSnapshot() {
+    return sanitizeFrontSnapshot(this.frontRun || (this.game.save && this.game.save.front));
+  }
+
+  // Called after the host has applied applyFrontEvent(). Reward amounts never
+  // travel: guests replay the canonical transition from previous → next.
+  syncFront(value, effects = []) {
+    if (this.role !== 'host') return null;
+    const run = sanitizeFrontSnapshot(value);
+    if (!run) return null;
+    this.frontRun = run;
+    const msg = { t: 'frun', run };
+    this.transport.broadcast(msg, true);
+    return run;
+  }
+
+  applyFrontSnapshot(value) {
+    const run = sanitizeFrontSnapshot(value);
+    if (!run) return null;
+    const rewards = canonicalFrontRewards(this.frontRun, run);
+    this.frontRun = run;
+    // Host state is session-only. Never replace the guest's personal board,
+    // projects or restored countries with another player's snapshot.
+    if (rewards.length && typeof this.game.applyFrontNetworkRewards === 'function') {
+      this.game.applyFrontNetworkRewards(rewards);
+    }
+    return run;
+  }
+
   syncExpedition(value) {
     const run = sanitizeExpedition(value);
     if (!run || this.role !== 'host') return;
@@ -393,6 +459,9 @@ export class CoopSession {
   // ---------- повідомлення ----------
   _onMessage(from, d) {
     if (!d || !d.t) return;
+    // Result, reward and snapshot messages are host-only. Consume forged guest
+    // variants before the active level net can see them.
+    if (this.role === 'host' && from !== 1 && FRONT_GUEST_FORBIDDEN.has(d.t)) return;
     // повідомлення рівня — у net
     if (this.net && this.net.onMessage(from, d)) return;
 
@@ -417,6 +486,7 @@ export class CoopSession {
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
         if (d.ex) this.game.save.expedition = sanitizeExpedition(d.ex);
+        if (d.frun) this.applyFrontSnapshot(d.frun);
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'reject') {
@@ -437,10 +507,12 @@ export class CoopSession {
         if (this.state === 'level' && this.game?.state === 'level' && this.net) {
           return;
         }
+        const fr = d.fr == null ? null : sanitizeFrontSpec(d.fr);
+        if (d.fr != null && !fr) return; // malformed Front start is fail-closed
         this.state = 'level';
         if (this.onStarted) this.onStarted();
         if (d.ex) { this.game.save.expedition = sanitizeExpedition(d.ex); this.game.saveGame(); }
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: d }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, weekly: d.weekly || null, mut: d.mut || null });
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'xprun') {
@@ -451,6 +523,9 @@ export class CoopSession {
           this.game.saveGame();
           if (this.game.state === 'globe') this.game.renderExpedition();
         }
+      } else if (d.t === 'frun') {
+        if (from !== 1) return;
+        this.applyFrontSnapshot(d.run);
       } else if (d.t === 'xpvotes') {
         if (from !== 1) return;
         const run = sanitizeExpedition(this.game.save.expedition);
@@ -505,6 +580,7 @@ export class CoopSession {
       roster: this._rosterList(),
       inLevel: this.state === 'level',
       ex: this.mode === 'expedition' ? sanitizeExpedition(this.game.save.expedition) : null,
+      frun: this.mode === 'front' ? this.frontSnapshot() : null,
     }, true);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();

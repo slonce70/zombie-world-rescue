@@ -570,6 +570,8 @@ export class HostNet {
       megabox: level.megabox ? { x: r1(level.megabox.x), z: r1(level.megabox.z), opened: level.megabox.opened ? 1 : 0 } : 0,
     };
     const state = { t: 'state', zoms, items, world, tm: r1(level.stats.time) };
+    const frun = this.spec && this.spec.fr && this.session.frontSnapshot && this.session.frontSnapshot();
+    if (frun) state.frun = frun;
     if (level.missions && level.missions.netFullState) state.missions = level.missions.netFullState();
     // ⭐ v298 «Зірки разом»: mid-join/реконект відновлює чип цілі й КОМАНДНИЙ прогрес+виконаність.
     // (Дефініцію гість також дістає зі spec при вході, але тут несемо id/target для повноти й безпеки.)
