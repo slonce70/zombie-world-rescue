@@ -42,6 +42,7 @@
       <button id="camp-quest-chip" type="button" aria-label="Квест табору — забрати нагороду">📌 Квест табору</button>
       <div id="globe-compass" class="player-compass"></div>
       <div class="globe-play-row">
+        <button id="btn-expedition" class="btn globe-play expedition-btn">🧭 ЕКСПЕДИЦІЯ</button>
         <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
         <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
@@ -65,6 +66,24 @@
       </div>
       <div id="solo-modes" class="solo-modes"></div>
       <div id="solo-countries" class="solo-countries"></div>
+    </div>
+  </div>
+
+  <!-- 🧭 v400: короткий п'ятирівневий забіг поверх наявних режимів -->
+  <div id="overlay-expedition" class="overlay">
+    <div class="overlay-card panel-card expedition-card">
+      <div class="panel-header">
+        <h2>🧭 ЕКСПЕДИЦІЯ</h2>
+        <button class="btn-x panel-close" data-close="overlay-expedition">✕</button>
+      </div>
+      <p id="expedition-summary" class="panel-sub"></p>
+      <div id="expedition-route" class="expedition-route"></div>
+      <div id="expedition-build" class="expedition-build"></div>
+      <p id="expedition-votes" class="panel-sub"></p>
+      <div class="btn-row">
+        <button id="btn-expedition-go" class="btn btn-primary big">🚀 ПОЧАТИ</button>
+        <button id="btn-expedition-abandon" class="btn">🗑️ Завершити забіг</button>
+      </div>
     </div>
   </div>
 

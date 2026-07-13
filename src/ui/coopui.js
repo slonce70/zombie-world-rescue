@@ -19,6 +19,7 @@ const MODE_ICON = {
   campaign: '🎯', storm: '⛈️', arena: '👑', 'friendly-knockout': '🤝',
   'friendly-defense': '🛡️', 'friendly-zone-defense': '⭕', 'weekly-coop': '🗓️',
   radiation: '☢️', turretwar: '🗼', worldboss: '🌋',
+  expedition: '🧭',
 };
 
 export class CoopUI {
@@ -541,6 +542,7 @@ export class CoopUI {
     const wkCoopMode = this.game.weeklyCoopModeId ? this.game.weeklyCoopModeId() : null;
     for (const [mid, label] of [
       ['campaign', t('🎯 Кампанія')],
+      ['expedition', t('🧭 Експедиція')],
       ['storm', t('⛈️ Шторм')],
       ['friendly-knockout', t('🤝 Дружній нокаут')],
       ['friendly-defense', t('🛡️ Дружня оборона')],
@@ -586,7 +588,7 @@ export class CoopUI {
     // weekly-coop показує пікер лише коли режим тижня — Шторм)
     const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout'
       || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
-      || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss'
+      || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss' || s.mode === 'expedition'
       || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
     document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
     this.el.countries.style.display = hideCountries ? 'none' : '';

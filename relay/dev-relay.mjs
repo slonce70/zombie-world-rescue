@@ -107,7 +107,7 @@ function lobbyPing(d) {
     if (code && (!existing || existing.cid === cid)) {
       lobbyRooms.set(code, {
         cid, host: nick,
-        mode: ['campaign', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss', 'friendly-knockout',
+        mode: ['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss', 'friendly-knockout',
           'friendly-defense', 'friendly-zone-defense', 'weekly-coop'].includes(d.room.mode) ? d.room.mode : 'campaign',
         country: cleanCountrySrv(d.room.country), // видно всьому лобі — латиниця + фільтр лайки
         n: Math.min(4, Math.max(1, d.room.n | 0)),
