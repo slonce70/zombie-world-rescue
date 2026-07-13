@@ -6,7 +6,6 @@ import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 let fail = 0;
 const check = (c, m) => { console.log((c ? '✅' : '❌') + ' ' + m); if (!c) fail++; };
 
@@ -51,15 +50,13 @@ const before = await page.evaluate(() => {
   const mine = g.level.zombies.list.slice(base);
   mine.forEach((z) => { z._probe = true; z._sx = z.x; z._sz = z.z; });
   const avg0 = mine.reduce((s, z) => s + Math.hypot(z.x - px, z.z - pz), 0) / mine.length;
-  return { count: mine.length, avg0, simT: g.level.stats.time };
+  return { count: mine.length, avg0 };
 });
-// Міряємо сім секунд СИМУЛЯЦІЇ, а не wall clock: на CPU-задушеному CI сім реальних
-// секунд можуть містити менше секунди game ticks і створити хибне «завмирання» всіх зомбі.
-await page.waitForFunction(
-  (t0) => window.__game.level.stats.time >= t0 + 7,
-  before.simT,
-  { timeout: 30000 * SLOW },
-);
+// Сім секунд СИМУЛЯЦІЇ напряму: draft/магазин можуть законно заморозити загальний
+// game clock, але не повинні робити цей тест руху випадковим або залежним від CPU CI.
+await page.evaluate(() => {
+  for (let i = 0; i < 140; i++) window.__game.level.zombies.update(0.05);
+});
 const after = await page.evaluate(() => {
   const g = window.__game;
   const pl = g.level.player;
