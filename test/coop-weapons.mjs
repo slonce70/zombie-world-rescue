@@ -144,6 +144,26 @@ try {
   });
   check(!shotgun.damaged, 'host rejects shotgun hit beyond 75 units', JSON.stringify(shotgun));
 
+  console.log('▸ Host validation: third-person projectile origins allow lag, not map-wide spoofing');
+  const projectileOrigins = await page.evaluate(async () => {
+    const { HostNet } = await import('/src/net/host.js');
+    const { Vector3 } = await import('/vendor/three.module.js');
+    const host = Object.create(HostNet.prototype);
+    host.level = {};
+    host.remotes = new Map([[2, { pos: new Vector3(0, 0, 0) }]]);
+    const accepted = [];
+    host.spawnNetGrenade = (pos) => accepted.push(['nade', pos.x]);
+    host.spawnNetRocket = (pos) => accepted.push(['rocket', pos.x]);
+    host._handleMessage(2, { t: 'nade', o: [7.5, 1, 0], v: [1, 1, 0] });
+    host._handleMessage(2, { t: 'rocket', o: [7.5, 1, 0], d: [1, 0, 0], dmg: 20 });
+    host._handleMessage(2, { t: 'nade', o: [30, 1, 0], v: [1, 1, 0] });
+    host._handleMessage(2, { t: 'rocket', o: [30, 1, 0], d: [1, 0, 0], dmg: 20 });
+    return accepted;
+  });
+  check(projectileOrigins.length === 2
+    && projectileOrigins[0][0] === 'nade' && projectileOrigins[1][0] === 'rocket',
+    'host accepts camera+lag margin and rejects distant grenade/rocket origins', JSON.stringify(projectileOrigins));
+
   console.log('▸ Guest pet pickup: mirror items stay host-authoritative');
   const petPickup = await page.evaluate(() => {
     const g = window.__game;

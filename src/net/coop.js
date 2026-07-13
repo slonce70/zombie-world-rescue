@@ -5,6 +5,7 @@ import { makeRoomCode, PROTO_VERSION } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
+import { DANCES, HERO_FACES, HERO_HATS, HERO_SKINS, PETS, TRACERS } from '../characters.js';
 import { nickIsBad, normNick } from '../../worker/nick.mjs';
 
 const NICK_KEY = 'zr-nick';
@@ -53,9 +54,55 @@ export function cleanNick(raw) {
 // 🛡️ Захист гостя: welcome/roster приходять від ХОСТА, а хост може бути
 // модифікованим клієнтом — чистимо кожен запис так само, як хост чистить
 // hello гостей (_hostHello). Інакше лайка з мережі потрапить дітям на екран.
-function sanitizeRosterEntry(r) {
-  const src = r || {};
-  return { ...src, nick: cleanNick(src.nick) || t('Гравець'), role: sanitizeCoopRole(src.role) };
+const DEFAULT_HERO = {
+  shirt: 0x2f80c3, pants: 0x474f63, skin: 0xffc9a3, shoes: 0x303642, hatColor: 0x2f80c3,
+  hat: 'cap', face: 'smile',
+};
+
+function validPid(pid) {
+  return Number.isInteger(pid) && pid >= 1 && pid <= 4 ? pid : 0;
+}
+
+function own(source, key) {
+  return Object.hasOwn(source, key) ? source[key] : undefined;
+}
+
+function rosterId(registry, value, fallback) {
+  return typeof value === 'string' && Object.hasOwn(registry, value) ? value : fallback;
+}
+
+function heroColor(value, fallback) {
+  return Number.isInteger(value) ? value & 0xffffff : fallback;
+}
+
+function sanitizeHero(raw) {
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    shirt: heroColor(own(src, 'shirt'), DEFAULT_HERO.shirt),
+    pants: heroColor(own(src, 'pants'), DEFAULT_HERO.pants),
+    skin: heroColor(own(src, 'skin'), DEFAULT_HERO.skin),
+    shoes: heroColor(own(src, 'shoes'), DEFAULT_HERO.shoes),
+    hatColor: heroColor(own(src, 'hatColor'), DEFAULT_HERO.hatColor),
+    hat: rosterId(HERO_HATS, own(src, 'hat'), DEFAULT_HERO.hat),
+    face: rosterId(HERO_FACES, own(src, 'face'), DEFAULT_HERO.face),
+  };
+}
+
+export function sanitizeRosterEntry(raw, forcedPid = undefined) {
+  const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const pid = validPid(forcedPid === undefined ? own(src, 'pid') : forcedPid);
+  if (!pid) return null;
+  const skin = rosterId(HERO_SKINS, own(src, 'skin'), 'classic');
+  return {
+    pid,
+    nick: cleanNick(own(src, 'nick')) || t('Гравець'),
+    role: sanitizeCoopRole(own(src, 'role')),
+    skin,
+    hero: skin === 'custom' ? sanitizeHero(own(src, 'hero')) : null,
+    tracer: rosterId(TRACERS, own(src, 'tracer'), 'classic'),
+    dance: rosterId(DANCES, own(src, 'dance'), 'shuffle'),
+    pet: rosterId(PETS, own(src, 'pet'), null),
+  };
 }
 
 export class CoopSession {
@@ -82,7 +129,8 @@ export class CoopSession {
 
   myInfo() {
     const save = this.game.save;
-    return {
+    return sanitizeRosterEntry({
+      pid: this.myPid,
       nick: this.nick,
       // 🎭 кооп-роль (див. COOP_ROLES): їде в hello/roster, щоб друзі бачили «💉 медик»
       role: sanitizeCoopRole(save.coopRole),
@@ -93,7 +141,7 @@ export class CoopSession {
       tracer: save.activeTracer || 'classic',
       dance: save.activeDance || 'shuffle',
       pet: save.activePet || null, // 🐾 id активного улюбленця — друзі бачать його поряд
-    };
+    });
   }
 
   // ---------- створення / приєднання ----------
@@ -280,9 +328,11 @@ export class CoopSession {
       else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
     } else {
       if (d.t === 'welcome') {
-        this.myPid = d.pid;
+        const assignedPid = validPid(d.pid);
+        if (!assignedPid) return;
+        this.myPid = assignedPid;
         this.roster.clear();
-        for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); this.roster.set(c.pid, c); }
+        for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); if (c) this.roster.set(c.pid, c); }
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
@@ -292,7 +342,7 @@ export class CoopSession {
         this.transport.close();
       } else if (d.t === 'roster') {
         this.roster.clear();
-        for (const r of d.list || []) { const c = sanitizeRosterEntry(r); this.roster.set(c.pid, c); }
+        for (const r of d.list || []) { const c = sanitizeRosterEntry(r); if (c) this.roster.set(c.pid, c); }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'cfg') {
         this.countryId = d.countryId;
@@ -345,7 +395,10 @@ export class CoopSession {
         nick = base.slice(0, 12 - suf.length).trimEnd() + suf;
       }
     }
-    this.roster.set(from, { pid: from, nick, role: sanitizeCoopRole(d.role), skin: d.skin, hero: d.hero || null, tracer: d.tracer, dance: d.dance, pet: d.pet || null });
+    const entry = sanitizeRosterEntry(d, from);
+    if (!entry) { this.transport.send(from, { t: 'reject', why: 'invalid' }, true); return; }
+    entry.nick = nick;
+    this.roster.set(from, entry);
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
@@ -372,7 +425,8 @@ export class CoopSession {
   _rosterList() {
     const out = [];
     for (const [pid, r] of this.roster) {
-      out.push({ pid, nick: r.nick || this.nick, role: sanitizeCoopRole(r.role), skin: r.skin, hero: r.hero || null, tracer: r.tracer, dance: r.dance, pet: r.pet || null });
+      const clean = sanitizeRosterEntry(r, pid);
+      if (clean) out.push(clean);
     }
     return out;
   }

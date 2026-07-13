@@ -44,8 +44,8 @@ A.on('console', (m) => { if (m.type() === 'error') errsA.push(m.text()); });
 B.on('console', (m) => { if (m.type() === 'error') errsB.push(m.text()); });
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(60000 * SLOW);
+  B.setDefaultTimeout(60000 * SLOW);
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 * SLOW });
@@ -84,17 +84,20 @@ try {
   check('(а) чип цілі видно в HUD гостя', !!chipB, chipB || 'нема');
 
   // ---- (д) mid-join: третій гравець бачить чип цілі зі state-синку ----
-  browserC = await chromium.launch(LAUNCH);
-  const C = await (await browserC.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  browserC = await browserB.newContext({ viewport: { width: 1280, height: 800 } });
+  const C = await browserC.newPage();
   C.on('pageerror', (e) => errsC.push(e.message));
   C.on('console', (m) => { if (m.type() === 'error') errsC.push(m.text()); });
-  C.setDefaultTimeout(60000);
+  C.setDefaultTimeout(60000 * SLOW);
   await C.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
   let joinedC = false;
   for (let attempt = 1; attempt <= 3 && !joinedC; attempt++) {
     joinedC = await C.evaluate((c) => window.__game.test.coopJoin(c, 'Оля').then(() => true, (e) => (console.log('join fail:', e.message), false)), code);
-    if (!joinedC) console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — повторюємо`);
+    if (!joinedC) {
+      console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — даємо хосту розвантажити backlog`);
+      await sleep(2000 * SLOW);
+    }
   }
   check('(д) третій гравець приєднався', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
@@ -103,6 +106,9 @@ try {
     return s && s.id ? s : null;
   }, null, { timeout: 20000 * SLOW }).then((h) => h.jsonValue()).catch(() => null);
   check('(д) mid-joiner бачить той самий чип цілі', !!(soC && soC.id === soA.id), JSON.stringify(soC));
+  await browserC.close();
+  browserC = null;
+  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 2, null, { timeout: 15000 * SLOW });
 
   // ---- (б) форс виконання на ХОСТІ → `soc` → тік (done) у гостя ----
   const doneHost = await A.evaluate(() => window.__game.test.forceSecondaryDone());
@@ -128,7 +134,7 @@ try {
     g.victoryShown = false;
     g._showVictory(); // хост-перемога: нараховує СОБІ + шле `vict` гостю (→ netVictory→_showVictory)
   });
-  await B.waitForFunction(() => window.__game.victoryShown === true, null, { timeout: 15000 * SLOW });
+  await B.waitForFunction(() => window.__game.victoryShown === true, null, { timeout: 30000 * SLOW });
   await sleep(300 * SLOW);
   const starsA = await A.evaluate((c) => window.__game.test.starState().stars[c] || 0, cid);
   const starsB = await B.evaluate((c) => window.__game.test.starState().stars[c] || 0, cid);

@@ -52,7 +52,11 @@ const before = await page.evaluate(() => {
   const avg0 = mine.reduce((s, z) => s + Math.hypot(z.x - px, z.z - pz), 0) / mine.length;
   return { count: mine.length, avg0 };
 });
-await page.waitForTimeout(7000);
+// Сім секунд СИМУЛЯЦІЇ напряму: draft/магазин можуть законно заморозити загальний
+// game clock, але не повинні робити цей тест руху випадковим або залежним від CPU CI.
+await page.evaluate(() => {
+  for (let i = 0; i < 140; i++) window.__game.level.zombies.update(0.05);
+});
 const after = await page.evaluate(() => {
   const g = window.__game;
   const pl = g.level.player;

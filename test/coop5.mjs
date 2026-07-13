@@ -15,6 +15,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const T = (ms) => Math.round(ms * SLOW);
 
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
@@ -38,12 +40,12 @@ A.on('console', (m) => { if (m.type() === 'error') errsA.push(m.text()); });
 B.on('console', (m) => { if (m.type() === 'error') errsB.push(m.text()); });
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(T(60000));
+  B.setDefaultTimeout(T(60000));
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
-  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
+  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(30000) });
   // хост уже звільнив Україну
   await A.evaluate(() => {
     window.__game.save.liberated = { UKR: true };
@@ -64,14 +66,14 @@ try {
 
   // 2. старт: обидва у штормі
   await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: 40000 });
-  await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: 40000 });
+  await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
+  await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
   check('обидва у Штормі', true);
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
 
   // 3. масштаб хвилі: 2 гравці → (5+3)×1.6 = 13
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 5, null, { timeout: 20000 });
+  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 5, null, { timeout: T(20000) });
   const waveSize = await A.evaluate(() => window.__game.level.zombies.list.filter((z) => z.state !== 'dead' && z._stormWave).length);
   check('хвиля масштабована на 2 гравців (≈13)', waveSize >= 12 && waveSize <= 14, `зомбі у хвилі: ${waveSize}`);
 
@@ -86,7 +88,11 @@ try {
   // 5. гість падає → лежить і чекає (без авто-респавна)
   const hostPos = await A.evaluate(() => ({ x: window.__game.level.player.pos.x, z: window.__game.level.player.pos.z }));
   await B.evaluate((p) => window.__game.test.teleport(p.x + 2, p.z), hostPos);
-  await sleep(600);
+  await A.waitForFunction(() => {
+    const g = window.__game;
+    const guest = g.level.net.remotes.get(2);
+    return guest && Math.hypot(guest.pos.x - g.level.player.pos.x, guest.pos.z - g.level.player.pos.z) < 2.8;
+  }, null, { timeout: T(15000) });
   await B.evaluate(() => {
     const p = window.__game.level.player;
     p.respawnProtect = 0;
@@ -95,12 +101,16 @@ try {
   await sleep(600);
   const downB = await B.evaluate(() => ({ hp: window.__game.level.player.health, deathT: window.__game.deathT, over: window.__game.level.storm.over }));
   check('гість лежить (deathT великий, забіг триває)', downB.hp <= 0 && downB.deathT > 900 && !downB.over, JSON.stringify(downB));
+  await A.waitForFunction(() => {
+    const guest = window.__game.level.net.remotes.get(2);
+    return guest && guest.health <= 0;
+  }, null, { timeout: T(15000) });
 
   // 6. хост піднімає — гра триває
   await A.evaluate(() => window.__game.test.key('KeyE', true));
   const t0 = Date.now();
   let revived = false;
-  while (Date.now() - t0 < 15000) {
+  while (Date.now() - t0 < T(15000)) {
     await sleep(300);
     const hp = await B.evaluate(() => window.__game.level.player.health);
     if (hp > 0) { revived = true; break; }
@@ -119,8 +129,8 @@ try {
     p.respawnProtect = 0;
     p.takeDamage(9999, p.pos.x + 1, p.pos.z);
   });
-  await A.waitForFunction(() => window.__game.level && window.__game.level.storm.over, null, { timeout: 15000 });
-  await B.waitForFunction(() => window.__game.level && window.__game.level.storm.over, null, { timeout: 15000 });
+  await A.waitForFunction(() => window.__game.level && window.__game.level.storm.over, null, { timeout: T(15000) });
+  await B.waitForFunction(() => window.__game.level && window.__game.level.storm.over, null, { timeout: T(15000) });
   const endA = await A.evaluate(() => ({
     overlay: document.getElementById('overlay-storm-end').classList.contains('show'),
     retryHidden: document.getElementById('btn-storm-retry').style.display === 'none',

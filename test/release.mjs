@@ -1,125 +1,65 @@
+// Повний non-coop релізний гейт. Список не дублюємо: кожен новий test/*.mjs
+// автоматично стає блокуючим, якщо він не helper/runner або окремий smoke/e2e тест.
+import { readdirSync } from 'fs';
 import { spawn } from 'child_process';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { ensureWebServer } from './_server.mjs';
 
-const BETWEEN_TESTS_MS = Number(process.env.RELEASE_BETWEEN_TESTS_MS || 500);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { close: closeServer } = await ensureWebServer({ quiet: false });
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const BETWEEN_TESTS_MS = Number(process.env.RELEASE_BETWEEN_TESTS_MS || 250);
+const SHARD_TOTAL = Number(process.env.SHARD_TOTAL || 1);
+const SHARD_INDEX = Number(process.env.SHARD_INDEX || 0);
+const DEDICATED = new Set([
+  'cloudsave.mjs', 'e2e.mjs', 'i18n.mjs', 'save-migration.mjs', 'smoke.mjs',
+  'version-check.mjs', 'version-sync.mjs',
+]);
+const RUNNERS = new Set(['quick-release.mjs', 'release.mjs']);
 
-const suite = [
-  ['node', ['test/version-sync.mjs']],
-  ['node', ['test/i18n-parity.mjs']],
-  ['node', ['test/runbuild.mjs']],
-  ['node', ['test/sw-cache.mjs']],
-  ['node', ['test/pwa-offline.mjs']],
-  ['node', ['test/smoke.mjs']],
-  ['node', ['test/loop-edges.mjs']],
-  ['node', ['test/daily-gift.mjs']],
-  ['node', ['test/weekly-goal.mjs']],
-  ['node', ['test/weekly-camp.mjs']],
-  ['node', ['test/banner-queue.mjs']],
-  ['node', ['test/prestige-donate.mjs']],
-  ['node', ['test/title-progress.mjs']],
-  ['node', ['test/bestiary-goals.mjs']],
-  ['node', ['test/weekly-mutators.mjs']],
-  ['node', ['test/draft-modes.mjs']],
-  ['node', ['test/team-league.mjs']],
-  ['node', ['test/lobby-dayscore-queue.mjs']],
-  ['node', ['test/story-campaign2.mjs']],
-  ['node', ['test/story-campaign2-browser.mjs']],
-  ['node', ['test/story-delegate-match.mjs']],
-  ['node', ['test/sweden-map.mjs']],
-  ['node', ['test/sandstorm.mjs']],
-  ['node', ['test/shop-boxes.mjs']],
-  ['node', ['test/skin-box.mjs']],
-  ['node', ['test/shop-sections.mjs']],
-  ['node', ['test/crystals.mjs']],
-  ['node', ['test/shop-packs.mjs']],
-  ['node', ['test/gadget-dash.mjs']],
-  ['node', ['test/gadget-soulmagnet.mjs']],
-  ['node', ['test/gadget-clone.mjs']],
-  ['node', ['test/knockout.mjs']],
-  ['node', ['test/friendly-knockout.mjs']],
-  ['node', ['test/zone-defense.mjs']],
-  ['node', ['test/defense.mjs']],
-  ['node', ['test/overloaded-defense.mjs']],
-  ['node', ['test/overloaded-pvp.mjs']],
-  ['node', ['test/cloudsave.mjs'], { SLOW: process.env.RELEASE_CLOUDSAVE_SLOW || process.env.SLOW || '2' }],
-  ['node', ['test/save-migration.mjs']],
-  ['node', ['test/flows.mjs'], { SLOW: process.env.RELEASE_FLOWS_SLOW || process.env.SLOW || '4' }],
-  ['node', ['test/i18n.mjs']],
-  ['node', ['test/update-mobile.mjs']],
-  ['node', ['test/mobile-perf.mjs']],
-  ['node', ['test/visual-polish.mjs']],
-  ['node', ['test/ux-polish.mjs']],
-  ['node', ['test/living-hq.mjs']],
-  ['node', ['test/mega-season.mjs']],
-  ['node', ['test/titles.mjs']],
-  ['node', ['test/wardrobe-tabs.mjs']],
-  ['node', ['test/weapon-unlock.mjs']],
-  ['node', ['test/bank.mjs']],
-  ['node', ['test/portal.mjs']],
-  ['node', ['test/maze.mjs']],
-  ['node', ['test/humans-vs-zombies.mjs']],
-  ['node', ['test/overloaded-humans.mjs']],
-  ['node', ['test/pvp.mjs']],
-  ['node', ['test/soul-collector.mjs']],
-  ['node', ['test/worldboss.mjs']],
-  ['node', ['test/chapter2-infected.mjs']],
-  ['node', ['test/zombie-boxer.mjs']],
-  ['node', ['test/elite-zombies.mjs']],
-  ['node', ['test/elite-wave.mjs']],
-  ['node', ['test/draft.mjs']],
-  ['node', ['test/draft-storm.mjs']],
-  ['node', ['test/draft-campaign.mjs']],
-  ['node', ['test/super-pickup.mjs']],
-  ['node', ['test/stars.mjs']],
-  ['node', ['test/mercy.mjs']],
-  ['node', ['test/npc-rescue.mjs']],
-  ['node', ['test/album.mjs']],
-  ['node', ['test/album-fill.mjs']],
-  ['node', ['test/world-saved.mjs']],
-  ['node', ['test/pet-eggs.mjs']],
-  ['node', ['test/hq-friends.mjs']],
-  ['node', ['test/mode-depth.mjs']],
-  ['node', ['test/weekly.mjs']],
-  ['node', ['test/modifiers.mjs']],
-  ['node', ['test/chapter3.mjs']],
-  ['node', ['test/turretwar.mjs']],
-  ['node', ['test/bazooka-damage.mjs']],
-  ['node', ['test/lobby-profiles.mjs']],
-  ['node', ['test/coop-privacy.mjs']],
-  ['node', ['test/pass-prestige.mjs']],
-  ['node', ['test/livingworld.mjs']],
-  ['node', ['test/mega-quest.mjs']],
-  ['node', ['test/angel-skin.mjs']],
-  ['node', ['test/demon-skin.mjs']],
-  ['node', ['test/radiation-mode.mjs']],
-  ['node', ['test/mega-radiation-quest.mjs']],
-  ['node', ['test/radiation-skin.mjs']],
-  ['node', ['test/radiation-skin-upgrade.mjs']],
-  ['node', ['test/radiation-turret-pack.mjs']],
-  ['node', ['test/radiation-pet.mjs']],
-  ['node', ['test/radiation-contract.mjs']],
-];
+if (!Number.isInteger(SHARD_TOTAL) || SHARD_TOTAL < 1
+  || !Number.isInteger(SHARD_INDEX) || SHARD_INDEX < 0 || SHARD_INDEX >= SHARD_TOTAL) {
+  console.error(`Invalid shard: SHARD_INDEX=${SHARD_INDEX}, SHARD_TOTAL=${SHARD_TOTAL}`);
+  process.exit(2);
+}
 
-function run(cmd, args, env = {}) {
+const all = readdirSync(TEST_DIR)
+  .filter((file) => file.endsWith('.mjs'))
+  .filter((file) => !file.startsWith('_'))
+  .filter((file) => !file.startsWith('coop'))
+  .filter((file) => file !== 'relay-reconnect.mjs')
+  .filter((file) => !DEDICATED.has(file) && !RUNNERS.has(file))
+  .sort();
+const suite = all.filter((_, index) => index % SHARD_TOTAL === SHARD_INDEX);
+
+console.log(`Release shard ${SHARD_INDEX + 1}/${SHARD_TOTAL}: ${suite.length}/${all.length} tests`);
+for (const file of suite) console.log(`  - ${file}`);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+function run(file) {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { stdio: 'inherit', env: { ...process.env, ...env } });
+    const child = spawn(process.execPath, [join(TEST_DIR, file)], {
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
     child.on('error', () => resolve(1));
     child.on('exit', (code) => resolve(code ?? 1));
   });
 }
 
-let code = 0;
+const { close: closeServer } = await ensureWebServer({ quiet: false });
+const failed = [];
 try {
-  for (const [cmd, args, env] of suite) {
-    console.log(`\n$ ${cmd} ${args.join(' ')}`);
-    code = await run(cmd, args, env);
-    if (code) break;
+  for (const file of suite) {
+    console.log(`\n═══ ${file} ═══`);
+    if (await run(file)) failed.push(file);
     if (BETWEEN_TESTS_MS > 0) await sleep(BETWEEN_TESTS_MS);
   }
 } finally {
   closeServer();
 }
 
-process.exit(code);
+if (failed.length) {
+  console.error(`\nRelease shard failed: ${failed.join(', ')}`);
+  process.exit(1);
+}
+console.log(`\nRelease shard ${SHARD_INDEX + 1}/${SHARD_TOTAL} passed`);

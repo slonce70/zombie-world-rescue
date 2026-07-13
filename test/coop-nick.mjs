@@ -87,6 +87,24 @@ const r2 = await page.evaluate(async () => {
   // 🔁 інваріант дедупу хоста: суфікс « (2)» у межах стелі 12 має пережити
   // повторний cleanNick на гості (регресія: «Володимир123 (2)» різалась у кашу)
   const dedupSurvives = coop.cleanNick('Володими (2)');
+  const malicious = coop.sanitizeRosterEntry({
+    pid: 3, nick: 'Оля', role: 'root', skin: 'toString', tracer: 'constructor',
+    dance: '__proto__', pet: 'toString', hero: { shirt: 'red', hat: '__proto__' },
+    admin: true,
+  });
+  const custom = coop.sanitizeRosterEntry({
+    pid: 4, nick: 'Макс', skin: 'custom', hero: {
+      shirt: 0x1234567, pants: -1, skin: 0xabcdef, shoes: null,
+      hatColor: 0x111111, hat: 'constructor', face: 'cool', extra: true,
+    },
+  });
+  const inherited = Object.create({ pid: 2, skin: 'custom', pet: 'dog' });
+  inherited.nick = 'Іра';
+  const inheritedEntry = coop.sanitizeRosterEntry(inherited);
+  const invalidPid = coop.sanitizeRosterEntry({ pid: 9, nick: 'Зайвий' });
+  const chars = await import('/src/characters.js');
+  const protoRig = chars.makeHero('__proto__');
+  const stringRig = chars.makeHero('toString');
   return {
     dedupSurvives,
     welcomeNick: w.nick, welcomeRole: w.role, welcomeSkin: w.skin,
@@ -94,6 +112,13 @@ const r2 = await page.evaluate(async () => {
     titleBad: p.title, coinsClamped: p.coins, titleOk: pOk.title,
     titleHtml: pHtml.title, titleLongLen: pLong.title.length,
     eq, emptyOk, emptySize,
+    malicious,
+    maliciousKeys: Object.keys(malicious || {}).sort(),
+    custom,
+    inheritedEntry,
+    invalidPid,
+    protoSkin: protoRig.heroSkin,
+    stringSkin: stringRig.heroSkin,
   };
 });
 
@@ -129,6 +154,18 @@ check(r2.eq.client === r2.eq.server && r2.eq.client === r2.eq.norm && r2.eq.norm
   'normNick: клієнт і сервер нормалізують однаково (брудний вхід)', JSON.stringify(r2.eq));
 check(r2.emptyOk && r2.emptySize === 0, 'гість: welcome/roster без масиву не валить клієнт', `ok=${r2.emptyOk} size=${r2.emptySize}`);
 check(r2.dedupSurvives === 'Володими (2)', 'дедуп-суфікс хоста у бюджеті 12 переживає cleanNick гостя', r2.dedupSurvives);
+check(r2.malicious && r2.malicious.skin === 'classic' && r2.malicious.tracer === 'classic'
+  && r2.malicious.dance === 'shuffle' && r2.malicious.pet === null && r2.malicious.hero === null,
+  'недовірені prototype-ключі косметики → безпечні defaults', JSON.stringify(r2.malicious));
+check(JSON.stringify(r2.maliciousKeys) === JSON.stringify(['dance', 'hero', 'nick', 'pet', 'pid', 'role', 'skin', 'tracer']),
+  'ростер відкидає невідомі поля', JSON.stringify(r2.maliciousKeys));
+check(r2.custom && r2.custom.hero.shirt === 0x234567 && r2.custom.hero.pants === 0xffffff
+  && r2.custom.hero.shoes === 0x303642 && r2.custom.hero.hat === 'cap' && r2.custom.hero.face === 'cool',
+  'custom hero клампить кольори й whitelist-ить частини', JSON.stringify(r2.custom));
+check(r2.inheritedEntry === null && r2.invalidPid === null,
+  'успадковані поля та pid поза 1..4 відкидаються', JSON.stringify({ inherited: r2.inheritedEntry, invalid: r2.invalidPid }));
+check(r2.protoSkin === 'classic' && r2.stringSkin === 'classic',
+  'makeHero не викликає успадковані prototype builders', JSON.stringify({ proto: r2.protoSkin, string: r2.stringSkin }));
 
 check(errs.length === 0, 'без помилок сторінки', errs.join(' | '));
 
