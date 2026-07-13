@@ -125,9 +125,18 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   await U.goto(`${BASE}/?test&fresh`);
   await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
   const res = await U.evaluate(async () => {
-    const { saveHasProgress, DEFAULT_HERO, NEW_SAVE_COINS, SAVE_PROGRESS_KEYS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
+    const { saveHasProgress, cloudSaveEnabled, DEFAULT_HERO, NEW_SAVE_COINS, SAVE_PROGRESS_KEYS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
     const fresh = window.__game._newSave();
     const out = {};
+    out.cloudPolicy = {
+      production: cloudSaveEnabled({ origin: 'https://slonce70.github.io' }),
+      productionTest: cloudSaveEnabled({ origin: 'https://slonce70.github.io', testMode: true }),
+      productionTestForced: cloudSaveEnabled({ origin: 'https://slonce70.github.io', testMode: true, cloudParam: true }),
+      localhost: cloudSaveEnabled({ origin: 'http://localhost:8741' }),
+      localhostCloud: cloudSaveEnabled({ origin: 'http://localhost:8741', testMode: true, cloudParam: true }),
+      loopbackCloud: cloudSaveEnabled({ origin: 'http://127.0.0.1:8741', cloudParam: true }),
+      foreignCloud: cloudSaveEnabled({ origin: 'https://example.com', cloudParam: true }),
+    };
     const knownProgressKeys = new Set(SAVE_PROGRESS_KEYS);
     const guardedTopLevelKeys = new Set([
       'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
@@ -218,6 +227,12 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
     res.progressManifestMissingKeys ? res.progressManifestMissingKeys.join(',') : '');
+  check('cloud policy: production гра синхронізується, production ?test ніколи не торкається SaveVault',
+    res.cloudPolicy.production && !res.cloudPolicy.productionTest && !res.cloudPolicy.productionTestForced,
+    JSON.stringify(res.cloudPolicy));
+  check('cloud policy: dev-cloud лише явно на localhost/loopback',
+    !res.cloudPolicy.localhost && res.cloudPolicy.localhostCloud && res.cloudPolicy.loopbackCloud && !res.cloudPolicy.foreignCloud,
+    JSON.stringify(res.cloudPolicy));
   check('drift guard: manifest містить поточні категорії прогресу', res.progressManifestHasCurrentCategories);
   check('свіжий сейв ≠ прогрес (false)', res.freshIsEmpty);
   check('liberated:false ≠ прогрес', res.falseLiberatedIsEmpty);

@@ -41,7 +41,7 @@ export class RemotePlayer {
     const hero = h ? {
       shirt: (h.shirt | 0) & 0xffffff, pants: (h.pants | 0) & 0xffffff, skin: (h.skin | 0) & 0xffffff,
       shoes: (h.shoes | 0) & 0xffffff, hatColor: (h.hatColor | 0) & 0xffffff,
-      hat: HERO_HATS[h.hat] ? h.hat : 'cap', face: HERO_FACES[h.face] ? h.face : 'smile',
+      hat: Object.hasOwn(HERO_HATS, h.hat) ? h.hat : 'cap', face: Object.hasOwn(HERO_FACES, h.face) ? h.face : 'smile',
     } : null;
     this.rig = makeHero(this.skin, hero);
     level.scene.add(this.rig.group);
@@ -107,7 +107,7 @@ export class RemotePlayer {
     // 🐾 улюбленець власника видно всім (косметика, біжить за хазяїном локально)
     this.pet = null; this.petMove = 'quad'; this.petId = null;
     const petId = info.pet || (info.dog ? 'dog' : null); // info.dog — сумісність зі старим полем
-    if (petId && PETS[petId]) {
+    if (petId && Object.hasOwn(PETS, petId)) {
       this.petId = petId;
       this.petMove = PETS[petId].move;
       this.pet = PETS[petId].make();

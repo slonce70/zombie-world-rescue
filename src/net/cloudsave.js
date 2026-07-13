@@ -11,6 +11,14 @@ export const SAVE_KEY = 'zr-save-v1';
 export const SAVE_CONFLICT_KEY = 'zr-save-conflict-v1';
 const SHIPPED_ORIGIN = 'https://slonce70.github.io';
 
+export function cloudSaveEnabled({ origin = '', testMode = false, cloudParam = false } = {}) {
+  if (origin === SHIPPED_ORIGIN) return !testMode;
+  let hostname = '';
+  try { hostname = new URL(origin).hostname; } catch (e) { /* disabled for unknown origins */ }
+  const local = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  return local && cloudParam;
+}
+
 // 🎨 Дефолтний герой і стартові монети — ЄДИНЕ ДЖЕРЕЛО для _newSave (main.js) і
 // для saveHasProgress. Якщо порівнювати «чи кастомний герой» з інлайн-числами в
 // двох місцях, вони розійдуться при будь-якій зміні палітри. Тримаємо тут, бо саме
@@ -111,8 +119,12 @@ export function saveHasProgress(s) {
 export class CloudSave {
   constructor(game) {
     this.game = game;
-    // тести/localhost не мають спамити продакшн-хмару; ?cloud вмикає її явно (з dev-relay)
-    this.enabled = game.params.has('cloud') || (typeof location !== 'undefined' && location.origin === SHIPPED_ORIGIN);
+    // Production-тести ніколи не торкаються реального SaveVault; localhost вмикає dev-cloud лише через ?cloud.
+    this.enabled = cloudSaveEnabled({
+      origin: typeof location !== 'undefined' ? location.origin : '',
+      testMode: !!game.testMode,
+      cloudParam: game.params.has('cloud'),
+    });
     this.lastOkTs = 0;   // коли востаннє успішно синхронізувались
     this.lastFailTs = 0;
     this.lastFailStatus = 0;

@@ -3307,11 +3307,12 @@ export function makeHero(skinId = 'classic', heroColors = null) {
       return rig;
     },
   };
-  const rig = (builders[skinId] || builders.classic)();
-  rig.heroSkin = builders[skinId] ? skinId : 'classic';
+  const safeSkinId = Object.hasOwn(builders, skinId) ? skinId : 'classic';
+  const rig = builders[safeSkinId]();
+  rig.heroSkin = safeSkinId;
   // спільне для всіх скінів: рюкзачок (крім скінів зі своїм предметом на спині)
-  if (skinId !== 'astro' && skinId !== 'custom' && skinId !== 'angel' && skinId !== 'demon' && skinId !== 'radiation') {
-    const packM = toonMat(skinId === 'ninja' ? 0x394150 : 0x55a04b);
+  if (safeSkinId !== 'astro' && safeSkinId !== 'custom' && safeSkinId !== 'angel' && safeSkinId !== 'demon' && safeSkinId !== 'radiation') {
+    const packM = toonMat(safeSkinId === 'ninja' ? 0x394150 : 0x55a04b);
     const pack = box(0.34, 0.4, 0.16, packM);
     pack.position.set(0, 0.34, 0.3);
     rig.parts.torso.add(pack);

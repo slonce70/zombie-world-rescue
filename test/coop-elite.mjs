@@ -143,7 +143,7 @@ try {
   }
   check('(г) третій гравець приєднався посеред хвилі', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
-  const cSync = await C.waitForFunction(() => window.__game.test.coopState().aliveZombies > 5, null, { timeout: 20000 * SLOW })
+  const cSync = await C.waitForFunction(() => window.__game.level?.net?._ready === true, null, { timeout: 20000 * SLOW })
     .then(() => true).catch(() => false);
   check('(г) welcome+state застосувались (світ синхронний)', cSync);
   const cElite = await C.evaluate(() => window.__game.level.zombies.list.filter((z) => z.elite && z.state !== 'dead').length);
