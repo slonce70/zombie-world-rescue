@@ -16,6 +16,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const T = (ms) => Math.round(ms * SLOW);
 
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
@@ -42,11 +44,11 @@ A.on('console', (m) => { if (m.type() === 'error') errsA.push(m.text()); });
 B.on('console', (m) => { if (m.type() === 'error') errsB.push(m.text()); });
 
 try {
-  for (const P of [A, B]) P.setDefaultTimeout(90000);
+  for (const P of [A, B]) P.setDefaultTimeout(T(90000));
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   for (const P of [A, B]) {
-    await P.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 60000 });
+    await P.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(60000) });
   }
 
   // хост звільнив лише Україну — у лобі має відкритись ВЕСЬ світ
@@ -71,18 +73,19 @@ try {
   // 2. старт удвох: зомбі ×2 з ПЕРШОГО спавна
   await A.evaluate(() => window.__game.test.coopSetCountry('UKR'));
   await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.net, null, { timeout: 90000 });
-  await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.net, null, { timeout: 90000 });
+  await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.net, null, { timeout: T(90000) });
+  await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.net, null, { timeout: T(90000) });
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
   // чекаємо, поки гість надішле першу позицію (хост побачить його у level.players)
-  await A.waitForFunction(() => window.__game.test.coopState().remotes.length === 1, null, { timeout: 20000 });
+  await A.waitForFunction(() => window.__game.test.coopState().remotes.length === 1, null, { timeout: T(20000) });
 
   const mul2 = await A.evaluate(() => window.__game.level.zombies.coopMul());
   check('двоє у грі → множник ×2', mul2 === 2, `×${mul2}`);
   const walker2 = await A.evaluate(() => {
-    const z = window.__game.level.zombies.list.find((zz) => zz.type === 'walker' && !zz.elite && !zz.golden && zz.state !== 'dead');
-    return z ? { mhp: z.maxHp, base: z.stats.hp } : null;
+    const zm = window.__game.level.zombies;
+    const z = zm.list.find((zz) => zz.type === 'walker' && !zz.elite && !zz.golden && zz.state !== 'dead');
+    return z ? { mhp: z.maxHp, base: zm.baseHpFor(z.type) } : null;
   });
   check('початковий зомбі має ×2 HP', walker2 && walker2.mhp === walker2.base * 2, JSON.stringify(walker2));
   const boss2 = await A.evaluate(() => {
@@ -106,25 +109,25 @@ try {
   check('чип кімнати видно гостю', chipB.includes(code) && chipB.includes('2/4'), chipB);
 
   // 4. ТРЕТІЙ гравець заходить у гру, що ВЖЕ ЙДЕ, зі списку кімнат
-  browserC = await chromium.launch(LAUNCH);
-  C = await (await browserC.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  browserC = await browserB.newContext({ viewport: { width: 1280, height: 800 } });
+  C = await browserC.newPage();
   C.on('pageerror', (e) => errsC.push(e.message));
   C.on('console', (m) => { if (m.type() === 'error') errsC.push(m.text()); });
-  C.setDefaultTimeout(90000);
+  C.setDefaultTimeout(T(90000));
   await C.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
-  await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 60000 });
+  await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(60000) });
   await C.evaluate(() => localStorage.setItem('zr-nick', 'Бабуся'));
   await C.click('#btn-coop');
-  await C.waitForSelector(`.cr-join[data-code="${code}"]`, { timeout: 25000 });
+  await C.waitForSelector(`.cr-join[data-code="${code}"]`, { timeout: T(25000) });
   const rowState = await C.evaluate((cd) => {
     const row = document.querySelector(`.cr-join[data-code="${cd}"]`).closest('.coop-room');
     return row.textContent;
   }, code);
   check('у списку видно, що кімната «у грі»', rowState.includes('у грі'), rowState.trim());
   await C.click(`.cr-join[data-code="${code}"]`);
-  await C.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.net, null, { timeout: 90000 });
+  await C.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.net, null, { timeout: T(90000) });
   await C.evaluate(() => window.__game.test.god());
-  await C.waitForFunction(() => window.__game.test.coopState().aliveZombies > 0, null, { timeout: 60000 });
+  await C.waitForFunction(() => window.__game.test.coopState().aliveZombies > 0, null, { timeout: T(60000) });
   check('третій гравець у бою посеред гри (mid-join зі списку)', true);
 
   // 5. тепер команда з 3 → нові зомбі ×3, чип 3/4
@@ -134,7 +137,7 @@ try {
   const fresh3 = await A.evaluate(() => {
     const L = window.__game.level;
     const z = L.zombies.spawn('walker', L.player.pos.x + 25, L.player.pos.z + 25, {});
-    const out = { mhp: z.maxHp, base: z.stats.hp };
+    const out = { mhp: z.maxHp, base: L.zombies.baseHpFor(z.type) };
     z.gone = true;
     return out;
   });
