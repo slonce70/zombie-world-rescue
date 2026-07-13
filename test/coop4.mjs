@@ -14,6 +14,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const T = (ms) => Math.round(ms * SLOW);
 
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
@@ -37,28 +39,28 @@ A.on('console', (m) => { if (m.type() === 'error') errsA.push(m.text()); });
 B.on('console', (m) => { if (m.type() === 'error') errsB.push(m.text()); });
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(T(60000));
+  B.setDefaultTimeout(T(60000));
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
-  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
+  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(30000) });
   // у хоста є песик — ще ДО створення кімнати (v63: улюбленці через save.pets/activePet)
   await A.evaluate(() => { const g = window.__game; if (!g.save.pets.includes('dog')) g.save.pets.push('dog'); g.save.activePet = 'dog'; g.saveGame(); });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
   await sleep(400);
   await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: 20000 });
+  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: T(20000) });
   check('рівень готовий', true, `код ${code}`);
 
   // ---- 1. 🐶 гість бачить песика хоста ----
   await B.waitForFunction(() => {
     const rp = window.__game.level.net.remotes.get(1);
     return rp && rp.pet && rp.pet.group.visible;
-  }, null, { timeout: 12000 }).catch(() => {});
+  }, null, { timeout: T(12000) }).catch(() => {});
   const dogB = await B.evaluate(() => {
     const rp = window.__game.level.net.remotes.get(1);
     return rp && rp.pet ? rp.pet.group.visible : false;
@@ -69,7 +71,11 @@ try {
   // ставимо їх поруч
   const hp0 = await A.evaluate(() => ({ x: window.__game.level.player.pos.x, z: window.__game.level.player.pos.z }));
   await B.evaluate((p) => window.__game.test.teleport(p.x + 2, p.z), hp0);
-  await sleep(700);
+  await A.waitForFunction(() => {
+    const g = window.__game;
+    const guest = g.level.net.remotes.get(2);
+    return guest && Math.hypot(guest.pos.x - g.level.player.pos.x, guest.pos.z - g.level.player.pos.z) < 2.8;
+  }, null, { timeout: T(15000) });
   await B.evaluate(() => {
     const p = window.__game.level.player;
     p.respawnProtect = 0;
@@ -85,7 +91,7 @@ try {
   await A.waitForFunction(() => {
     const rp = window.__game.level.net.remotes.get(2);
     return rp && rp.health <= 0;
-  }, null, { timeout: 8000 });
+  }, null, { timeout: T(8000) });
   // хост біля тіла тримає E
   await sleep(300);
   const promptA = await A.evaluate(() => {
@@ -98,7 +104,7 @@ try {
   await A.evaluate(() => window.__game.test.key('KeyE', true));
   const t0 = Date.now();
   let revOk = false;
-  while (Date.now() - t0 < 12000) {
+  while (Date.now() - t0 < T(12000)) {
     await sleep(300);
     const hp = await B.evaluate(() => window.__game.level.player.health);
     if (hp > 0) { revOk = true; break; }
@@ -123,11 +129,11 @@ try {
   await B.waitForFunction(() => {
     const rp = window.__game.level.net.remotes.get(1);
     return rp && rp.health <= 0;
-  }, null, { timeout: 8000 });
+  }, null, { timeout: T(8000) });
   await B.evaluate(() => window.__game.test.key('KeyE', true));
   const t1 = Date.now();
   let revOk2 = false;
-  while (Date.now() - t1 < 12000) {
+  while (Date.now() - t1 < T(12000)) {
     await sleep(300);
     const hp = await A.evaluate(() => window.__game.level.player.health);
     if (hp > 0) { revOk2 = true; break; }
@@ -144,7 +150,7 @@ try {
     p.takeDamage(9999, p.pos.x + 1, p.pos.z);
     window.__game.deathT = 1.5; // не чекаємо всі 20с у тесті
   });
-  await B.waitForFunction(() => window.__game.level.player.health > 0, null, { timeout: 15000 });
+  await B.waitForFunction(() => window.__game.level.player.health > 0, null, { timeout: T(15000) });
   const spawned = await B.evaluate(() => {
     const p = window.__game.level.player;
     const S = window.__game.level.world.layout.SPAWN;

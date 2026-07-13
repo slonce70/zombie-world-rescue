@@ -15,6 +15,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const T = (ms) => Math.round(ms * SLOW);
 
 const relay = spawn('node', ['relay/dev-relay.mjs'], {
   env: { ...process.env, PORT: String(RELAY_PORT) },
@@ -45,19 +47,19 @@ const pressE = async (page) => {
 };
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(T(60000));
+  B.setDefaultTimeout(T(60000));
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
-  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 });
-  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 });
+  await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(20000) });
+  await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(20000) });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
   await sleep(400);
   await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: 15000 });
+  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: T(15000) });
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
   check('кімната і рівень готові', true, `код ${code}`);
@@ -95,18 +97,18 @@ try {
   check('у гостя хлів відчинено і цивільні є', barnB.opened && barnB.civ === 3, JSON.stringify(barnB));
 
   // рятувальна місія завершується за ~2с
-  await A.waitForFunction(() => window.__game.level.missions.missions[0].state === 'done', null, { timeout: 8000 });
+  await A.waitForFunction(() => window.__game.level.missions.missions[0].state === 'done', null, { timeout: T(8000) });
   // ГОНКА: хост завершує місію і шле подію 'md' (нагорода +80) гостю асинхронно.
   // Раніше тут був фіксований sleep(600) + читання монет гостя — під SLOW=2 подія 'md'
   // інколи долітала ПІЗНІШЕ за 600мс, тож монети читались як 50 (нагорода вже в дорозі, ще не застосована).
   // Чекаємо саме на стан ГОСТЯ: і 'done', і нараховану нагороду — детерміновано, без гонки.
   const doneB = await B.waitForFunction(
     () => window.__game.level.missions.missions[0].state === 'done',
-    null, { timeout: 8000 },
+    null, { timeout: T(8000) },
   ).then(() => 'done').catch(() => 'timeout');
   const coinsB1 = await B.waitForFunction(
     () => window.__game.save.coins >= 130 ? window.__game.save.coins : false,
-    null, { timeout: 8000 },
+    null, { timeout: T(8000) },
   ).then((h) => h.jsonValue()).catch(async () => B.evaluate(() => window.__game.save.coins));
   check('місія «порятунок» виконана у гостя теж', doneB === 'done');
   check('гість отримав нагороду місії (+80)', coinsB1 >= 130, `монет: ${coinsB1}`);
@@ -114,11 +116,11 @@ try {
   // ---- 2. граната гостя вибухає в усіх ----
   await B.evaluate(() => { window.__game.level.player.grenades = 2; });
   await B.evaluate(() => window.__game.test.throwGrenade());
-  const appearedA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: 10000 }).then(() => true).catch(() => false);
-  const appearedB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: 10000 }).then(() => true).catch(() => false);
+  const appearedA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: T(10000) }).then(() => true).catch(() => false);
+  const appearedB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 1, null, { timeout: T(10000) }).then(() => true).catch(() => false);
   check('граната гостя зʼявилась на обох екранах', appearedA && appearedB, `A:${appearedA} B:${appearedB}`);
-  const goneA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: 20000 }).then(() => true).catch(() => false);
-  const goneB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: 20000 }).then(() => true).catch(() => false);
+  const goneA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
+  const goneB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
   check('вибух прибрав гранату всюди', goneA && goneB, `A:${goneA} B:${goneB}`);
 
   // ---- 3. мегабокс відкриває хост — анімація і в гостя ----
@@ -129,9 +131,9 @@ try {
   await A.evaluate((m) => window.__game.test.teleport(m.x + 1.5, m.z), mb);
   await sleep(500);
   await pressE(A);
-  await A.waitForFunction(() => window.__game.level.megabox.opened, null, { timeout: 8000 }).catch(() => {});
+  await A.waitForFunction(() => window.__game.level.megabox.opened, null, { timeout: T(8000) }).catch(() => {});
   const mbA = await A.evaluate(() => window.__game.level.megabox.opened);
-  const mbB = await B.waitForFunction(() => window.__game.level.megabox && window.__game.level.megabox.opened, null, { timeout: 10000 }).then(() => true).catch(() => false);
+  const mbB = await B.waitForFunction(() => window.__game.level.megabox && window.__game.level.megabox.opened, null, { timeout: T(10000) }).then(() => true).catch(() => false);
   check('мегабокс відкрито у хоста', mbA === true);
   check('мегабокс відкрито у гостя (подія)', mbB === true);
 
@@ -149,22 +151,22 @@ try {
     if (unlocked) break;
     await sleep(1200);
   }
-  await A.waitForFunction(() => window.__game.level.missions.bossUnlocked, null, { timeout: 8000 });
+  await A.waitForFunction(() => window.__game.level.missions.bossUnlocked, null, { timeout: T(8000) });
   const arena = await A.evaluate(() => {
     const a = window.__game.level.world.layout.arena;
     return { x: a.x, z: a.z };
   });
   await A.evaluate((a) => window.__game.test.teleport(a.x, a.z), arena);
-  await A.waitForFunction(() => window.__game.level.missions.bossStarted, null, { timeout: 8000 });
-  await B.waitForFunction(() => !!window.__game.level.zombies.boss, null, { timeout: 12000 }).catch(() => {});
+  await A.waitForFunction(() => window.__game.level.missions.bossStarted, null, { timeout: T(8000) });
+  await B.waitForFunction(() => !!window.__game.level.zombies.boss, null, { timeout: T(12000) }).catch(() => {});
   const bossB = await B.evaluate(() => {
     const b = window.__game.level.zombies.boss;
     return b ? { hp: b.hp, type: b.type } : null;
   });
   check('бос зʼявився у гостя', !!bossB, JSON.stringify(bossB));
   await A.evaluate(() => window.__game.test.damageBoss(99999));
-  await A.waitForFunction(() => window.__game.victoryShown, null, { timeout: 15000 });
-  await B.waitForFunction(() => window.__game.victoryShown, null, { timeout: 15000 });
+  await A.waitForFunction(() => window.__game.victoryShown, null, { timeout: T(15000) });
+  await B.waitForFunction(() => window.__game.victoryShown, null, { timeout: T(15000) });
   const libA = await A.evaluate(() => !!window.__game.save.liberated.UKR);
   const libB = await B.evaluate(() => !!window.__game.save.liberated.UKR);
   check('перемога на обох екранах', true);
@@ -176,8 +178,8 @@ try {
   // ГОНКА: хост тисне «на глобус» і шле гостю намір повернутись у лобі асинхронно.
   // Фіксований sleep(1500) під SLOW=2 інколи не встигав — гість лишався у 'level'.
   // Чекаємо детерміновано на автоповернення гостя (і хоста) у лобі.
-  await A.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: 15000 }).catch(() => {});
-  await B.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: 15000 }).catch(() => {});
+  await A.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: T(15000) }).catch(() => {});
+  await B.waitForFunction(() => window.__game.state === 'globe' && window.__game.test.coopState().state === 'lobby', null, { timeout: T(15000) }).catch(() => {});
   const stA = await A.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   const stB = await B.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
   check('хост повернувся в лобі', stA.state === 'globe' && stA.coop.state === 'lobby', `${stA.state}/${stA.coop.state}`);
@@ -187,14 +189,14 @@ try {
 
   // ---- 6. другий рівень з того ж лобі ----
   await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 });
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: 15000 });
+  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
+  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: T(15000) });
   check('другий рівень з того ж лобі працює', true);
 
   // ---- 7. гість зникає — хост живе далі ----
   await browserB.close();
-  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 1, null, { timeout: 15000 }).catch(() => {});
+  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 1, null, { timeout: T(15000) }).catch(() => {});
   const afterDrop = await A.evaluate(() => ({
     roster: window.__game.test.coopState().roster.length,
     remotes: window.__game.test.coopState().remotes.length,

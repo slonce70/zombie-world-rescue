@@ -54,8 +54,8 @@ const armBannerSpy = (page) => page.evaluate(() => {
 });
 
 try {
-  A.setDefaultTimeout(60000);
-  B.setDefaultTimeout(60000);
+  A.setDefaultTimeout(60000 * SLOW);
+  B.setDefaultTimeout(60000 * SLOW);
   await A.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await B.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 20000 * SLOW });
@@ -93,17 +93,22 @@ try {
   check('(а) у гостя зірка — дзеркало (grab вимкнено)', !!(starB && starB.mirror));
 
   // ---- (г) третій гравець приєднується, ПОКИ зірка непідібрана → бачить її зі state ----
-  browserC = await chromium.launch(LAUNCH);
-  const C = await (await browserC.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  // Третя ізольована сесія не потребує третього Chromium-процесу: окремого context достатньо,
+  // а на CI це не душить host-tab настільки, що welcome не встигає за свої 30 секунд.
+  browserC = await browserB.newContext({ viewport: { width: 1280, height: 800 } });
+  const C = await browserC.newPage();
   C.on('pageerror', (e) => errsC.push(e.message));
   C.on('console', (m) => { if (m.type() === 'error') errsC.push(m.text()); });
-  C.setDefaultTimeout(60000);
+  C.setDefaultTimeout(60000 * SLOW);
   await C.goto(`${BASE}/?test&fresh&relay=ws://localhost:${RELAY_PORT}`);
   await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
   let joinedC = false;
   for (let attempt = 1; attempt <= 3 && !joinedC; attempt++) {
     joinedC = await C.evaluate((c) => window.__game.test.coopJoin(c, 'Оля').then(() => true, (e) => (console.log('join fail:', e.message), false)), code);
-    if (!joinedC) console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — повторюємо`);
+    if (!joinedC) {
+      console.log(`↻ джойн C не пройшов (спроба ${attempt}/3) — даємо хосту розвантажити backlog`);
+      await sleep(2000 * SLOW);
+    }
   }
   check('(г) третій гравець приєднався', joinedC);
   await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
@@ -115,10 +120,19 @@ try {
     return sp ? { x: Math.round(sp.x * 10) / 10, z: Math.round(sp.z * 10) / 10 } : null;
   }, null, { timeout: 30000 * SLOW }).then((h) => h.jsonValue()).catch(() => null);
   check('(г) mid-joiner бачить непідібрану зірку (state.spu)', !!starC, JSON.stringify(starC));
+  // Mid-join уже доведено; закриваємо третій context перед timing-sensitive pickup.
+  await browserC.close();
+  browserC = null;
+  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 2, null, { timeout: 15000 * SLOW });
 
   // ---- (б) гість наводиться на зірку → підбір host-authoritative → сила В ГОСТЯ ----
   await armBannerSpy(A);
   await B.evaluate((s) => window.__game.test.teleport(s.x, s.z), starB);
+  const hostGranted = await A.waitForFunction(
+    () => window.__game.level.superActive && window.__game.level.superActive.has(2),
+    null, { timeout: 30000 * SLOW },
+  ).then(() => true).catch(() => false);
+  check('(б) хост зафіксував підбір гостем', hostGranted);
   // ширше вікно: підбір — потрійний мережевий круг (позиція гостя → хост-детект → spg →
   // активація в гостя); на задушеному CI-раннері 12с×SLOW не вистачало (main-ран 2026-07-07)
   const bPower = await B.waitForFunction(
