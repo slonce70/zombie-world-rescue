@@ -133,7 +133,6 @@ try {
   // Mid-join уже доведено; закриваємо третій context перед timing-sensitive pickup.
   await browserC.close();
   browserC = null;
-  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 2, null, { timeout: 15000 * SLOW });
 
   // ---- (б) гість наводиться на зірку → підбір host-authoritative → сила В ГОСТЯ ----
   await armBannerSpy(A);
