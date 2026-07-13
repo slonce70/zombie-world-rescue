@@ -6,6 +6,7 @@ import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 let fail = 0;
 const check = (c, m) => { console.log((c ? '✅' : '❌') + ' ' + m); if (!c) fail++; };
 
@@ -50,9 +51,15 @@ const before = await page.evaluate(() => {
   const mine = g.level.zombies.list.slice(base);
   mine.forEach((z) => { z._probe = true; z._sx = z.x; z._sz = z.z; });
   const avg0 = mine.reduce((s, z) => s + Math.hypot(z.x - px, z.z - pz), 0) / mine.length;
-  return { count: mine.length, avg0 };
+  return { count: mine.length, avg0, simT: g.level.stats.time };
 });
-await page.waitForTimeout(7000);
+// Міряємо сім секунд СИМУЛЯЦІЇ, а не wall clock: на CPU-задушеному CI сім реальних
+// секунд можуть містити менше секунди game ticks і створити хибне «завмирання» всіх зомбі.
+await page.waitForFunction(
+  (t0) => window.__game.level.stats.time >= t0 + 7,
+  before.simT,
+  { timeout: 30000 * SLOW },
+);
 const after = await page.evaluate(() => {
   const g = window.__game;
   const pl = g.level.player;

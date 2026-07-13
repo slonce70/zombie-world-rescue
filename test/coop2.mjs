@@ -82,15 +82,18 @@ try {
     if (ok) break;
     await sleep(800);
   }
-  await sleep(600);
   const barnA = await A.evaluate(() => ({
     opened: window.__game.level.missions.missions[0].opened,
     civ: window.__game.level.missions.civilians.length,
   }));
-  const barnB = await B.evaluate(() => ({
+  const barnB = await B.waitForFunction(() => {
+    const g = window.__game;
+    const state = { opened: !!g.level.world.barnOpened, civ: g.level.missions.civilians.length };
+    return state.opened && state.civ === 3 ? state : false;
+  }, null, { timeout: T(20000) }).then((h) => h.jsonValue()).catch(async () => B.evaluate(() => ({
     opened: !!window.__game.level.world.barnOpened,
     civ: window.__game.level.missions.civilians.length,
-  }));
+  })));
   check('хост відчинив хлів за наміром гостя', barnA.opened === true);
   check('у хоста зʼявились цивільні', barnA.civ === 3, `${barnA.civ}`);
   check('у гостя хлів відчинено і цивільні є', barnB.opened && barnB.civ === 3, JSON.stringify(barnB));
@@ -125,6 +128,14 @@ try {
       };
     });
   }
+  const guestPos = await B.evaluate(() => ({
+    x: window.__game.level.player.pos.x,
+    z: window.__game.level.player.pos.z,
+  }));
+  await A.waitForFunction((p) => {
+    const guest = window.__game.level.net.remotes.get(2);
+    return guest && Math.hypot(guest.pos.x - p.x, guest.pos.z - p.z) < 5;
+  }, guestPos, { timeout: T(20000) });
   await B.evaluate(() => { window.__game.level.player.grenades = 2; });
   await B.evaluate(() => window.__game.test.throwGrenade());
   const appearedA = await A.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
