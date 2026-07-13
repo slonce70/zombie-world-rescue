@@ -1,126 +1,95 @@
-# CI для Pages-релізу: push у main одразу деплоїться.
-# Швидкий гейт `smoke` має червоніти миттєво; кооп і UKR e2e — окремі джоби
-# (повільніші на безкоштовному раннері з софтверним рендером), тож не тримають швидкий гейт.
 name: tests
+
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   release-gate:
+    name: release-gate (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Release gate (production browser/PWA suite)
-        run: node test/release.mjs
+      - name: Full release shard
+        run: SLOW=4 SHARD_INDEX=${{ matrix.shard }} SHARD_TOTAL=4 node test/release.mjs
 
-  # 🤝 кооп-ланцюжок релізного гейта — ОКРЕМИЙ блокуючий джоб (паралельно з release-gate):
-  # разом вони не вміщались у 120хв джоба (release.mjs ~68хв + ланцюжок SLOW=4 ~55хв).
-  # Тротлінг free-раннера: SLOW-підлога 4 + 1 повтор (реальна регресія впаде двічі,
-  # гейт лишається блокуючим) — рецепт, яким джоб `coop` уже стабільно зелений.
   coop-gate:
+    name: coop-gate (${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 110
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Coop release chain
-        run: SLOW=4 RETRY=1 node test/coop-release.mjs
+      - name: Full coop shard
+        run: SLOW=4 RETRY=1 SHARD_INDEX=${{ matrix.shard }} SHARD_TOTAL=4 node test/coop-release.mjs
 
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Version sync (version.json ↔ APP_VERSION ↔ PROTO_VERSION)
-        run: node test/version-sync.mjs
-      - name: Relay reconnect edge (full room + same pid resume)
-        # мережевий тест: на free-runner буває разовий таймаут-флейк → 1 повтор (реальна
-        # регресія впаде двічі, тож гейт лишається блокуючим)
-        run: SLOW=4 node test/relay-reconnect.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/relay-reconnect.mjs)
       - run: npx playwright install --with-deps chromium
+      - name: Version sync
+        run: node test/version-sync.mjs
+      - name: Relay reconnect edge
+        run: SLOW=4 node test/relay-reconnect.mjs || (echo "retry relay-reconnect" && SLOW=4 node test/relay-reconnect.mjs)
       - name: Start static server
         run: python3 -m http.server 8741 &
-      - name: Smoke (рендер, постріл, fps)
+      - name: Smoke
         run: node test/smoke.mjs
-      - name: Version check (авто-оновлення клієнта)
+      - name: Version check
         run: node test/version-check.mjs
-      - name: Cloud save (хмарний сейв, фільтр ніків, краш-екран)
-        # мережевий тест (relay-спавн + SaveVault): на free-runner буває разовий таймаут-флейк
-        # → 1 повтор (реальна регресія впаде двічі, гейт лишається блокуючим)
-        run: SLOW=4 node test/cloudsave.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/cloudsave.mjs)
-      - name: i18n (українська/English/русский)
+      - name: Cloud save and policy
+        run: SLOW=4 node test/cloudsave.mjs || (echo "retry cloudsave" && SLOW=4 node test/cloudsave.mjs)
+      - name: i18n
         run: node test/i18n.mjs
-      - name: Coop damage (шкода зомбі НЕ множиться на гравців)
+      - name: Coop damage
         run: node test/coop-damage.mjs
-      - name: Coop nick (фільтр лайки в коопних ніках — безпека дітей)
+      - name: Coop roster trust boundary
         run: node test/coop-nick.mjs
-      - name: "Save migration (захист сейва дитини — БЛОКУЮЧИЙ: пошкоджений сейв = втрачений прогрес)"
+      - name: Save migration
         run: node test/save-migration.mjs
 
-  # 🤝 кооп — найскладніша й найрегресійніша підсистема. Окремий джоб (паралельно зі smoke).
-  # NON-BLOCKING (continue-on-error): на безкоштовному раннері headless-вкладку гостя так
-  # сильно тротлить, що один крок тесту триває хвилини — і хост встигає прибрати гостя як
-  # "stale" (>120с тиші), хоча вся синхронізація/бій проходять. Тож кооп тут — ВИДИМИЙ СИГНАЛ
-  # (червоніє в Actions при регресії), але не валить весь ран хибним флейком. Локально (швидко)
-  # і на потужнішому раннері проходить стабільно; жорсткі гейти — smoke + e2e.
-  coop:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    continue-on-error: true
-    # Тести тепер шанують SLOW (×4 таймаутів/вікон) — таймаут-флейк здебільшого знято.
-    # Лишаються 1 авто-повтор (мережева недетермінованість гостя) + continue-on-error як
-    # фінальний backstop: реальна регресія впаде двічі, тож сигнал лишається чесним.
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Start static server
-        run: python3 -m http.server 8741 &
-      - name: Coop base (кімната/лобі/синхронізація/кіл-кредити)
-        timeout-minutes: 25
-        run: SLOW=4 node test/coop.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop.mjs)
-      - name: Coop reconnect (mid-join + resume)
-        timeout-minutes: 20
-        run: SLOW=4 node test/coop3.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop3.mjs)
-      - name: Coop lobby/batching
-        timeout-minutes: 15
-        run: SLOW=4 node test/coop6.mjs || (echo "↻ мережевий флейк — повтор" && SLOW=4 node test/coop6.mjs)
-
-  # повний e2e — окремим джобом: на безкоштовному раннері з софтверним рендером
-  # він іде у рази довше, ніж локально (~4 хв), тому не тримає швидкий гейт
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -128,41 +97,28 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8741 &
-      - name: E2E кампанія UKR (SLOW=4 — софтверний рендер ранера)
+      - name: UKR campaign
         timeout-minutes: 45
         run: SLOW=4 node test/e2e.mjs
 
-  # 🧪 розширена батарея: update*/campaign/maps/replay/terrain — НЕ блокує деплой
-  # (як coop), але червоніє в Actions при регресії квестів/Шторму/гаджетів/карт.
-  extended:
+  deploy-pages:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [release-gate, coop-gate, smoke, e2e]
     runs-on: ubuntu-latest
-    timeout-minutes: 130
-    continue-on-error: true
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Start static server
-        run: python3 -m http.server 8741 &
-      # Глоб замість хардкод-списку: НОВИЙ тест автоматично потрапляє в батарею.
-      # Раніше тест, забутий у списку, тихо не запускався НІДЕ (реальна гниль: новий
-      # контент країн/босів/гаджетів був без гейта). Пропускаємо лише те, що вже бігає
-      # в smoke/coop/e2e-джобах, і ручні скриншот-хелпери (_relay/_shot/_touch*).
-      # Падіння одного тесту НЕ ховає решту — збираємо всі провали й червонимо в кінці
-      # (джоб non-blocking: видимий сигнал у Actions, але не валить деплой хибним флейком).
-      - name: Extended battery (glob — без ручного списку)
-        run: |
-          SKIP="version-sync relay-reconnect smoke version-check cloudsave i18n coop-damage coop-nick e2e save-migration _relay _shot _touch-shot _touch-stress"
-          fails=""
-          for f in test/*.mjs; do
-            t=$(basename "$f" .mjs)
-            case " $SKIP " in *" $t "*) continue;; esac
-            case "$t" in coop*) continue;; esac
-            echo "=== $t ==="
-            # тести тепер шанують SLOW; 1 повтор проти разового флейку (реальна регресія впаде двічі)
-            SLOW=4 node "$f" || (echo "↻ повтор $t" && SLOW=4 node "$f") || fails="$fails $t"
-          done
-          if [ -n "$fails" ]; then echo "❌ ПРОВАЛИЛИСЯ:$fails"; exit 1; fi
-          echo "✅ усі розширені тести пройшли"
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

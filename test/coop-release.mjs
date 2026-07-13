@@ -1,54 +1,64 @@
-// 🤝 Раннер кооп-релізного ланцюжка (той самий список, що був у package.json).
-// Нащо окремий скрипт: на безкоштовному CI-раннері з софтверним рендером гостьову
-// вкладку так тротлить, що чесний тест падає разовим таймаутом. Джоб `coop` у CI вже
-// довів рецепт: SLOW=4 + один повтор (реальна регресія впаде двічі). Цей раннер дає
-// той самий рецепт релізному гейту через env, НЕ міняючи локальний запуск:
-//   SLOW  — ПІДЛОГА множника таймаутів (локальний базовий SLOW тесту не занижується);
-//   RETRY — скільки повторів після провалу (локально 0: падіння видно одразу).
+// Повний блокуючий кооп-гейт. Усі coop*.mjs автоматично входять до батареї;
+// coop-damage/nick лишаються у швидкому smoke job, relay-reconnect входить сюди.
+import { readdirSync } from 'fs';
 import { spawnSync } from 'child_process';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-// Базові SLOW — ті, що були в test:coop-release до виносу в раннер.
-const CHAIN = [
-  { file: 'relay-reconnect.mjs', slow: 1 },
-  { file: 'coop-reconnect-guard.mjs', slow: 1 },
-  { file: 'coop3.mjs', slow: 4 },
-  { file: 'coop-elite.mjs', slow: 2 },
-  { file: 'coop-super.mjs', slow: 2 },
-  { file: 'coop-stars.mjs', slow: 2 },
-  { file: 'coop-draft.mjs', slow: 2 },
-  { file: 'coop-friendly-defense.mjs', slow: 2 },
-  { file: 'coop-weekly.mjs', slow: 2 },
-  { file: 'coop-radiation.mjs', slow: 2 },
-  { file: 'coop-turretwar.mjs', slow: 2 },
-  { file: 'coop-bonus.mjs', slow: 2 },
-  { file: 'coop-worldboss.mjs', slow: 2 },
-  { file: 'coop-roles.mjs', slow: 4 },
-];
-
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const SHARD_TOTAL = Number(process.env.SHARD_TOTAL || 1);
+const SHARD_INDEX = Number(process.env.SHARD_INDEX || 0);
 const slowFloor = Math.max(0, parseFloat(process.env.SLOW || '0') || 0);
 const retries = Math.max(0, parseInt(process.env.RETRY || '0', 10) || 0);
-// НЕ .pathname: кирилиця у шляху (…/Владос/…) стає percent-encoded і модуль не знаходиться
-const testUrl = (f) => fileURLToPath(new URL(`./${f}`, import.meta.url));
+const DEDICATED = new Set(['coop-damage.mjs', 'coop-nick.mjs', 'coop-release.mjs']);
+const BASE_SLOW = {
+  'coop3.mjs': 4,
+  'coop-roles.mjs': 4,
+  'coop-elite.mjs': 2,
+  'coop-super.mjs': 2,
+  'coop-stars.mjs': 2,
+  'coop-draft.mjs': 2,
+  'coop-friendly-defense.mjs': 2,
+  'coop-weekly.mjs': 2,
+  'coop-radiation.mjs': 2,
+  'coop-turretwar.mjs': 2,
+  'coop-bonus.mjs': 2,
+  'coop-worldboss.mjs': 2,
+};
+
+if (!Number.isInteger(SHARD_TOTAL) || SHARD_TOTAL < 1
+  || !Number.isInteger(SHARD_INDEX) || SHARD_INDEX < 0 || SHARD_INDEX >= SHARD_TOTAL) {
+  console.error(`Invalid shard: SHARD_INDEX=${SHARD_INDEX}, SHARD_TOTAL=${SHARD_TOTAL}`);
+  process.exit(2);
+}
+
+const all = readdirSync(TEST_DIR)
+  .filter((file) => (file.startsWith('coop') && file.endsWith('.mjs')) || file === 'relay-reconnect.mjs')
+  .filter((file) => !DEDICATED.has(file))
+  .sort();
+const suite = all.filter((_, index) => index % SHARD_TOTAL === SHARD_INDEX);
+
+console.log(`Coop shard ${SHARD_INDEX + 1}/${SHARD_TOTAL}: ${suite.length}/${all.length} tests`);
+for (const file of suite) console.log(`  - ${file}`);
 
 const failed = [];
-for (const { file, slow } of CHAIN) {
-  const effSlow = Math.max(slow, slowFloor);
+for (const file of suite) {
+  const effSlow = Math.max(BASE_SLOW[file] || 1, slowFloor);
   let ok = false;
   for (let attempt = 0; attempt <= retries && !ok; attempt++) {
-    if (attempt > 0) console.log(`\n↻ повтор ${file} (спроба ${attempt + 1}/${retries + 1}) — разовий флейк раннера`);
+    if (attempt > 0) console.log(`\nRetry ${file} (${attempt + 1}/${retries + 1})`);
     console.log(`\n═══ ${file} (SLOW=${effSlow}) ═══`);
-    const r = spawnSync(process.execPath, [testUrl(file)], {
+    const result = spawnSync(process.execPath, [join(TEST_DIR, file)], {
       stdio: 'inherit',
       env: { ...process.env, SLOW: String(effSlow) },
     });
-    ok = r.status === 0;
+    ok = result.status === 0;
   }
   if (!ok) failed.push(file);
 }
 
 if (failed.length) {
-  console.error(`\n💥 КООП-ГЕЙТ ПРОВАЛЕНО: ${failed.join(', ')}`);
+  console.error(`\nCoop shard failed: ${failed.join(', ')}`);
   process.exit(1);
 }
-console.log('\n🎉 КООП-ГЕЙТ ПРОЙДЕНО ПОВНІСТЮ');
+console.log(`\nCoop shard ${SHARD_INDEX + 1}/${SHARD_TOTAL} passed`);
