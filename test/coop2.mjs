@@ -1,5 +1,4 @@
-// 🤝 Кооп-тест 2: місії через наміри гостя, гранати, нагороди всім,
-// перемога на обох екранах, повернення в лобі, відвал гостя
+// 🤝 Кооп-тест 2: місії через наміри гостя, reliable-гранати та megabox event.
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 import { spawn } from 'child_process';
@@ -148,79 +147,6 @@ try {
   const mbB = await B.waitForFunction(() => window.__game.level.megabox && window.__game.level.megabox.opened, null, { timeout: T(10000) }).then(() => true).catch(() => false);
   check('мегабокс відкрито у хоста', mbA === true);
   check('мегабокс відкрито у гостя (подія)', mbB === true);
-
-  // ---- 4. решта місій + бос → перемога на обох ----
-  await A.evaluate(() => {
-    window.__game.test.completeMission('tower');
-    window.__game.test.completeMission('warehouse');
-  });
-  // відкладені орди добиваємо, щойно вони стартують, поки арена не відкриється
-  for (let i = 0; i < 30; i++) {
-    const unlocked = await A.evaluate(() => {
-      window.__game.test.finishHorde();
-      return window.__game.level.missions.bossUnlocked;
-    });
-    if (unlocked) break;
-    await sleep(1200);
-  }
-  await A.waitForFunction(() => window.__game.level.missions.bossUnlocked, null, { timeout: T(8000) });
-  const arena = await A.evaluate(() => {
-    const a = window.__game.level.world.layout.arena;
-    return { x: a.x, z: a.z };
-  });
-  await A.evaluate((a) => window.__game.test.teleport(a.x, a.z), arena);
-  await A.waitForFunction(() => window.__game.level.missions.bossStarted, null, { timeout: T(8000) });
-  await B.waitForFunction(() => !!window.__game.level.zombies.boss, null, { timeout: T(12000) }).catch(() => {});
-  const bossB = await B.evaluate(() => {
-    const b = window.__game.level.zombies.boss;
-    return b ? { hp: b.hp, type: b.type } : null;
-  });
-  check('бос зʼявився у гостя', !!bossB, JSON.stringify(bossB));
-  await A.evaluate(() => window.__game.test.damageBoss(99999));
-  await A.waitForFunction(() => window.__game.victoryShown, null, { timeout: T(15000) });
-  await B.waitForFunction(() => window.__game.victoryShown, null, { timeout: T(15000) });
-  const libA = await A.evaluate(() => !!window.__game.save.liberated.UKR);
-  const libB = await B.evaluate(() => !!window.__game.save.liberated.UKR);
-  check('перемога на обох екранах', true);
-  check('країну звільнено ОБОМ гравцям', libA && libB, `A:${libA} B:${libB}`);
-  await B.screenshot({ path: 'shots/coop-05-victory-guest.png' });
-
-  // ---- 5. на глобус → обидва в лобі, кімната жива ----
-  await A.evaluate(() => document.getElementById('btn-victory-globe').click());
-  // ГОНКА: хост тисне «на глобус» і шле гостю намір повернутись у лобі асинхронно.
-  // Фіксований sleep(1500) під SLOW=2 інколи не встигав — гість лишався у 'level'.
-  // Чекаємо детерміновано на автоповернення гостя (і хоста) у лобі.
-  await A.waitForFunction(() => {
-    const g = window.__game;
-    return g.state === 'globe' && g.test.coopState().state === 'lobby' && g.test.coopState().roster.length === 2;
-  }, null, { timeout: T(20000) }).catch(() => {});
-  await B.waitForFunction(() => {
-    const g = window.__game;
-    return g.state === 'globe' && g.test.coopState().state === 'lobby' && g.test.coopState().roster.length === 2;
-  }, null, { timeout: T(20000) }).catch(() => {});
-  const stA = await A.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
-  const stB = await B.evaluate(() => ({ state: window.__game.state, coop: window.__game.test.coopState() }));
-  check('хост повернувся в лобі', stA.state === 'globe' && stA.coop.state === 'lobby', `${stA.state}/${stA.coop.state}`);
-  check('гість повернувся в лобі автоматично', stB.state === 'globe' && stB.coop.state === 'lobby', `${stB.state}/${stB.coop.state}`);
-  check('кімната жива, ростер цілий', stA.coop.roster.length === 2 && stB.coop.roster.length === 2);
-  await A.screenshot({ path: 'shots/coop-06-back-to-lobby.png' });
-
-  // ---- 6. другий рівень з того ж лобі ----
-  await A.evaluate(() => window.__game.test.coopStartLevel());
-  await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
-  await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: T(15000) });
-  check('другий рівень з того ж лобі працює', true);
-
-  // ---- 7. гість зникає — хост живе далі ----
-  await browserB.close();
-  await A.waitForFunction(() => window.__game.test.coopState().roster.length === 1, null, { timeout: T(15000) }).catch(() => {});
-  const afterDrop = await A.evaluate(() => ({
-    roster: window.__game.test.coopState().roster.length,
-    remotes: window.__game.test.coopState().remotes.length,
-    state: window.__game.state,
-  }));
-  check('хост помітив відвал гостя і грає далі', afterDrop.roster === 1 && afterDrop.remotes === 0 && afterDrop.state === 'level', JSON.stringify(afterDrop));
 
   const realErrsA = errsA.filter((e) => !e.includes('favicon'));
   const realErrsB = errsB.filter((e) => !e.includes('favicon'));

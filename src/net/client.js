@@ -56,7 +56,11 @@ export class GuestNet {
   }
 
   sendNade(pos, vel) {
-    this.send({ t: 'nade', o: [pos.x, pos.y, pos.z].map((v) => Math.round(v * 100) / 100), v: [vel.x, vel.y, vel.z].map((v) => Math.round(v * 100) / 100) });
+    this.session.transport.send(1, {
+      t: 'nade',
+      o: [pos.x, pos.y, pos.z].map((v) => Math.round(v * 100) / 100),
+      v: [vel.x, vel.y, vel.z].map((v) => Math.round(v * 100) / 100),
+    }, true);
   }
 
   sendRocket(origin, dir, dmg) {
