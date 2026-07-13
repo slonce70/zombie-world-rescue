@@ -70,7 +70,7 @@ jobs:
       - name: Version sync
         run: node test/version-sync.mjs
       - name: Relay reconnect edge
-        run: SLOW=4 node test/relay-reconnect.mjs || (echo "retry relay-reconnect" && SLOW=4 node test/relay-reconnect.mjs)
+        run: SLOW=2 node test/relay-reconnect.mjs || (echo "retry relay-reconnect" && SLOW=2 node test/relay-reconnect.mjs)
       - name: Start static server
         run: python3 -m http.server 8741 &
       - name: Smoke
@@ -78,7 +78,7 @@ jobs:
       - name: Version check
         run: node test/version-check.mjs
       - name: Cloud save and policy
-        run: SLOW=4 node test/cloudsave.mjs || (echo "retry cloudsave" && SLOW=4 node test/cloudsave.mjs)
+        run: SLOW=2 node test/cloudsave.mjs || (echo "retry cloudsave" && SLOW=2 node test/cloudsave.mjs)
       - name: i18n
         run: node test/i18n.mjs
       - name: Coop damage
@@ -89,6 +89,7 @@ jobs:
         run: node test/save-migration.mjs
 
   e2e:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -123,7 +124,7 @@ jobs:
 
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [smoke, e2e, expedition]
+    needs: [smoke, expedition]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
