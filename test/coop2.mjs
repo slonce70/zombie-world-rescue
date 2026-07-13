@@ -117,30 +117,64 @@ try {
   check('гість отримав нагороду місії (+80)', missionB.coins >= 130, `монет: ${missionB.coins}`);
 
   // ---- 2. граната гостя вибухає в усіх ----
-  for (const page of [A, B]) {
-    await page.evaluate(() => {
-      const effects = window.__game.level.effects;
-      window.__grenadesSeen = 0;
-      const original = effects.spawnGrenade.bind(effects);
-      effects.spawnGrenade = (...args) => {
-        window.__grenadesSeen++;
-        return original(...args);
-      };
-    });
-  }
+  await A.evaluate(() => {
+    const net = window.__game.level.net;
+    const effects = window.__game.level.effects;
+    window.__guestNadeGid = null;
+    window.__guestNadeExplodedGid = null;
+    const spawn = net.spawnNetGrenade.bind(net);
+    net.spawnNetGrenade = (pos, vel, pid) => {
+      const gid = net._nextId;
+      const result = spawn(pos, vel, pid);
+      if (pid === 2) window.__guestNadeGid = gid;
+      return result;
+    };
+    const explode = effects._explodeGrenade.bind(effects);
+    effects._explodeGrenade = (nade) => {
+      if (nade.pid === 2) window.__guestNadeExplodedGid = nade.gid;
+      return explode(nade);
+    };
+  });
+  await B.evaluate(() => {
+    const effects = window.__game.level.effects;
+    window.__guestNadeGid = null;
+    window.__guestNadeExplodedGid = null;
+    const spawn = effects.spawnNetGrenade.bind(effects);
+    effects.spawnNetGrenade = (gid, ...args) => {
+      window.__guestNadeGid = gid;
+      return spawn(gid, ...args);
+    };
+    const explode = effects.netExplosion.bind(effects);
+    effects.netExplosion = (x, y, z, radius, gid, barrels) => {
+      window.__guestNadeExplodedGid = gid;
+      return explode(x, y, z, radius, gid, barrels);
+    };
+  });
   // teleport — test hook, тому сам не генерує input ticks. Ставимо актуальну позицію
   // в queue; urgent nade флашить її перед наміром гранати у тій самій WS-пачці.
-  await B.evaluate(() => {
+  const thrown = await B.evaluate(() => {
     window.__game.level.player.grenades = 2;
+    window.__game.level.player.grenadeCd = 0;
     window.__game.level.net._sendP();
-    window.__game.test.throwGrenade();
+    return window.__game.test.throwGrenade();
   });
-  const appearedA = await A.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
-  const appearedB = await B.waitForFunction(() => window.__grenadesSeen > 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
-  check('граната гостя зʼявилась на обох екранах', appearedA && appearedB, `A:${appearedA} B:${appearedB}`);
-  const goneA = await A.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
-  const goneB = await B.waitForFunction(() => window.__game.level.effects.grenadesLive.length === 0, null, { timeout: T(20000) }).then(() => true).catch(() => false);
-  check('вибух прибрав гранату всюди', goneA && goneB, `A:${goneA} B:${goneB}`);
+  check('гість справді кинув гранату', thrown === true);
+  const gidA = await A.waitForFunction(() => window.__guestNadeGid, null, { timeout: T(20000) })
+    .then((h) => h.jsonValue()).catch(() => null);
+  const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA, { timeout: T(20000) })
+    .then(() => gidA).catch(() => null);
+  check('конкретна граната гостя зʼявилась на обох екранах', !!gidA && gidB === gidA, `A:${gidA} B:${gidB}`);
+  // Не чекаємо дві секунди game-time на CPU-задушеному runner: прискорюємо fuse
+  // саме цієї гранати, а мережний bm/explosion шлях лишається production-кодом.
+  await A.evaluate((gid) => {
+    const nade = window.__game.level.effects.grenadesLive.find((g) => g.gid === gid);
+    if (nade) nade.fuse = 0.05;
+  }, gidA);
+  const explodedA = await A.waitForFunction((gid) => window.__guestNadeExplodedGid === gid, gidA, { timeout: T(20000) })
+    .then(() => true).catch(() => false);
+  const explodedB = await B.waitForFunction((gid) => window.__guestNadeExplodedGid === gid, gidA, { timeout: T(20000) })
+    .then(() => true).catch(() => false);
+  check('вибух конкретного gid дійшов на обидві сторони', explodedA && explodedB, `A:${explodedA} B:${explodedB}`);
 
   // ---- 3. мегабокс відкриває хост — анімація і в гостя ----
   const mb = await A.evaluate(() => {
