@@ -56,6 +56,7 @@ export class CoopUI {
       roles: $('lobby-roles'),
       countries: $('lobby-countries'),
       modes: $('lobby-modes'),
+      front: $('btn-lobby-front'),
       start: $('btn-lobby-start'),
       leave: $('btn-lobby-leave'),
       invite: $('btn-coop-invite'),
@@ -114,6 +115,11 @@ export class CoopUI {
         game.audio.click();
         this.session.startLevel();
       }
+    });
+    this.el.front.addEventListener('click', () => {
+      if (this.session.role !== 'host') return;
+      game.audio.click();
+      game.openFront();
     });
     this.el.leave.addEventListener('click', () => {
       game.audio.click();
@@ -616,6 +622,8 @@ export class CoopUI {
     }
 
     this.el.start.style.display = isHost ? '' : 'none';
+    const front = this.game.getFrontViewModel ? this.game.getFrontViewModel() : null;
+    this.el.front.hidden = !(isHost && front && front.unlocked);
     this.el.start.disabled = false;
     const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : s.mode === 'friendly-knockout' ? t('🤝 ДРУЖНІЙ НОКАУТ') : t('кампанію');
     this.el.hint.textContent = isHost

@@ -122,9 +122,23 @@ jobs:
       - name: Coop expedition
         run: npm run test:coop-expedition
 
+  front:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: World Front domain, browser, mobile, metrics and co-op
+        run: npm run test:front
+
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [smoke, expedition]
+    needs: [smoke, expedition, front]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

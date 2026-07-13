@@ -160,7 +160,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'weeklyCamp',
       // 🌍 v303 «Світ врятовано»
       'worldSaved',
-      'expedition',
+      'expedition', 'front', 'frontCoopClaims',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -171,7 +171,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
-      'weeklyCamp', 'worldSaved', 'expedition',
+      'weeklyCamp', 'worldSaved', 'expedition', 'front', 'frontCoopClaims',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;

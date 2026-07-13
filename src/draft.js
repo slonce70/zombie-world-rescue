@@ -15,7 +15,8 @@ export class Draft {
     const level = this.game.level;
     if (!level || !level.runBuild || this.isOpen) return;
     this.isOpen = true;                       // → головний цикл blocked: сим завмирає
-    this.offered = level.runBuild.offer(level.zombies.rng);
+    const count = level.operationEffects && level.operationEffects.cardOfferCount;
+    this.offered = level.runBuild.offer(level.zombies.rng, count);
     this.el.classList.add('show');
     this.game.input.exitLock();
     this._render();

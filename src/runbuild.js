@@ -121,16 +121,17 @@ export class RunBuild {
     return this;
   }
 
-  // 3 РІЗНІ картки: зважений вибір за рідкістю (rng.int(a,b) включно — як у storm.js).
+  // 3–4 РІЗНІ картки: четверта доступна лише через видимий бонус Снабженця у Front.
   // Взяті картки не повторюються; коли колода майже пуста — «перетасовується» заново.
-  offer(rng) {
+  offer(rng, count = 3) {
+    const offerCount = Math.max(3, Math.min(4, Math.floor(Number(count) || 3)));
     let pool = CARD_POOL.filter((c) => !this.taken.has(c.id));
-    if (pool.length < 3) {
+    if (pool.length < offerCount) {
       this.taken.clear();
       pool = CARD_POOL.slice();
     }
     const out = [];
-    while (out.length < 3 && pool.length) {
+    while (out.length < offerCount && pool.length) {
       let total = 0;
       for (const c of pool) total += RARITY_WEIGHT[c.rarity] || RARITY_WEIGHT.common;
       let roll = rng.int(0, total - 1);
