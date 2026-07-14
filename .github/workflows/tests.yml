@@ -75,6 +75,8 @@ jobs:
         run: python3 -m http.server 8741 &
       - name: Smoke
         run: node test/smoke.mjs
+      - name: Campaign progression
+        run: node test/campaign.mjs
       - name: Version check
         run: node test/version-check.mjs
       - name: Cloud save and policy
@@ -104,7 +106,7 @@ jobs:
         run: python3 -m http.server 8741 &
       - name: UKR campaign
         timeout-minutes: 45
-        run: SLOW=2 node test/e2e.mjs
+        run: SLOW=4 node test/e2e.mjs
 
   expedition:
     runs-on: ubuntu-latest

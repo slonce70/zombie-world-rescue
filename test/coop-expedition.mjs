@@ -4,10 +4,12 @@ import { spawnRelay } from './_relay.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const relay = await spawnRelay(8790);
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const url = `${BASE}/?test&fresh&relay=ws://localhost:8790`;
 const launch = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] };
 const browsers = [await chromium.launch(launch), await chromium.launch(launch)];
 const [A, B] = await Promise.all(browsers.map(async (b) => (await b.newContext()).newPage()));
+for (const page of [A, B]) page.setDefaultTimeout(60_000 * SLOW);
 const errors = [];
 for (const p of [A, B]) p.on('pageerror', (e) => errors.push(e.message));
 let fail = 0;
