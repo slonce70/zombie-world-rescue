@@ -111,17 +111,17 @@ try {
     }
   }
   check('(г) третій гравець приєднався', joinedC);
-  await C.waitForFunction(() => window.__game.state === 'level', null, { timeout: 30000 * SLOW });
+  await C.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.net, null, { timeout: 30000 * SLOW });
   // Запитуємо свіжий state уже після повної побудови level у mid-joiner-а. На дуже повільному
   // раннері перший state може бути застосований ще під час входу; повторний lvlready — штатний
   // шлях пересинхронізації GuestNet і перевіряє той самий captureState/applyState контракт.
-  const hostStateHasStar = await A.evaluate((pid) => {
+  const hostStateHasStar = await A.evaluate(() => {
     const g = window.__game;
     const state = g.level.net.captureState();
-    g.coop.session.transport.send(pid, state, true);
     return !!state.spu;
-  }, 3);
+  });
   check('(г) свіжий state хоста містить непідібрану зірку', hostStateHasStar);
+  await C.evaluate(() => window.__game.coop.session.transport.send(1, { t: 'lvlready' }, true));
   // 30с×SLOW як у (б): на задушеному CI-раннері з 3 браузерами state.spu доїжджає
   // mid-joiner'у за 60-80с через бэклог снапшотів (main-ран 2026-07-07 пройшов
   // за ~80с впритул, ран PR #73 схибив на тих самих 80с)

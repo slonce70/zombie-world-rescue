@@ -129,10 +129,10 @@ try {
       if (pid === 2) window.__guestNadeGid = gid;
       return result;
     };
-    const explode = effects._explodeGrenade.bind(effects);
-    effects._explodeGrenade = (nade) => {
-      if (nade.pid === 2) window.__guestNadeExplodedGid = nade.gid;
-      return explode(nade);
+    const explode = effects._explodeAt.bind(effects);
+    effects._explodeAt = (pos, radius, damage, meta) => {
+      if (meta && meta.gid) window.__guestNadeExplodedGid = meta.gid;
+      return explode(pos, radius, damage, meta);
     };
   });
   await B.evaluate(() => {

@@ -23,6 +23,36 @@ try {
   await page.goto(`${BASE}/?test&fresh`);
   await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30_000 });
 
+  const metrics = await page.evaluate(async () => {
+    const game = window.__game;
+    const mod = await import('/src/net/frontmetrics.js');
+    const originalFetch = window.fetch;
+    const originalParams = game.params;
+    const originalSaveGame = game.saveGame;
+    game.save.front = game.save.front || { stats: { firstSeenDay: '2020-01-01', sent: [] } };
+    game.save.front.stats = { firstSeenDay: '2020-01-01', sent: [] };
+    game.saveGame = () => {};
+    localStorage.removeItem(mod.FRONT_METRICS_KEY);
+    game.params = new URLSearchParams('metrics=0');
+    const zeroDisabled = !mod.frontMetricsEnabled(game);
+    await mod.sendFrontReturns(game);
+    const disabledUnsent = game.save.front.stats.sent.length === 0;
+    game.params = new URLSearchParams('metrics=1');
+    window.fetch = async () => ({ ok: false });
+    await mod.sendFrontReturns(game);
+    const failedUnsent = game.save.front.stats.sent.length === 0;
+    window.fetch = async () => ({ ok: true });
+    await mod.sendFrontReturns(game);
+    const successSent = game.save.front.stats.sent.includes('return_d1')
+      && game.save.front.stats.sent.includes('return_d7');
+    window.fetch = originalFetch;
+    game.params = originalParams;
+    game.saveGame = originalSaveGame;
+    game.save.front = null;
+    return { zeroDisabled, disabledUnsent, failedUnsent, successSent };
+  });
+  check(Object.values(metrics).every(Boolean), 'Front return metrics require explicit opt-in and record only successful sends', JSON.stringify(metrics));
+
   const board = await page.evaluate(() => {
     const game = window.__game;
     game.save.liberated = { UKR: true, POL: true, DEU: true };

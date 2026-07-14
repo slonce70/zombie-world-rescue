@@ -10,7 +10,7 @@ export const FRONT_METRIC_EVENTS = new Set([
 ]);
 
 export function frontMetricsEnabled(game) {
-  if (game && game.params && game.params.has('metrics')) return true;
+  if (game && game.params && game.params.get('metrics') === '1') return true;
   try { return localStorage.getItem(FRONT_METRICS_KEY) === '1'; } catch (e) { return false; }
 }
 
@@ -30,7 +30,7 @@ export function frontMetricPayload(game, event) {
   const firstSeen = game && game.save && game.save.front && game.save.front.stats && game.save.front.stats.firstSeenDay;
   const cohort = /^\d{4}-\d{2}-\d{2}$/.test(firstSeen || '') ? firstSeen : new Date().toISOString().slice(0, 10);
   const lang = ['uk', 'en', 'ru'].includes(getLang()) ? getLang() : 'uk';
-  return { version: Number(window.__APP_VERSION) || 500, event, cohort, platform: platformClass(), lang };
+  return { version: Number(window.__APP_VERSION) || 501, event, cohort, platform: platformClass(), lang };
 }
 
 export async function sendFrontMetric(game, event) {
@@ -49,14 +49,14 @@ export async function sendFrontMetric(game, event) {
   }
 }
 
-export function sendFrontReturns(game) {
+export async function sendFrontReturns(game) {
   const front = game && game.save && game.save.front;
-  if (!front || !front.stats || !front.stats.firstSeenDay) return;
+  if (!frontMetricsEnabled(game) || !front || !front.stats || !front.stats.firstSeenDay) return;
   const days = Math.floor((Date.now() - Date.parse(`${front.stats.firstSeenDay}T00:00:00Z`)) / 86400000);
   for (const [event, threshold] of [['return_d1', 1], ['return_d7', 7]]) {
     if (days < threshold || front.stats.sent.includes(event)) continue;
+    if (!await sendFrontMetric(game, event)) continue;
     front.stats.sent.push(event);
     game.saveGame();
-    sendFrontMetric(game, event);
   }
 }

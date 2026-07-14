@@ -34,8 +34,7 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  // 13 із v290: додалась кнопка «📖 Альбом»
-  check('☰ меню: 13 другорядних кнопок у висувному меню', menu.side === 13, `${menu.side}`);
+  check('☰ меню: 14 другорядних кнопок у висувному меню', menu.side === 14, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');
@@ -73,15 +72,15 @@ try {
       })),
     };
   });
-  check('17 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
-    fresh.modes === 17 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('18 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
+    fresh.modes === 18 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked
       && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
     JSON.stringify(fresh));
   check('режими згруповані у вкладки як Гардероб',
     JSON.stringify(fresh.tabs) === JSON.stringify([
-      'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИКЛИКИ', 'ДУШІ',
+      'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИКЛИКИ', 'ОСОБЛИВІ',
     ])
       && fresh.activeTab === 'КАМПАНІЯ'
       && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
@@ -92,7 +91,7 @@ try {
         { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
         { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
         { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-        { title: 'ДУШІ', modes: ['soul-collector'] },
+        { title: 'ОСОБЛИВІ', modes: ['expedition', 'soul-collector'] },
       ]),
     JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
   await page.click('.solo-tab:has-text("ВИКЛИКИ")');
@@ -115,7 +114,7 @@ try {
       { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
       { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
       { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-      { title: 'ДУШІ', modes: ['soul-collector'] },
+      { title: 'ОСОБЛИВІ', modes: ['expedition', 'soul-collector'] },
     ]),
     JSON.stringify(fresh.sections));
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
