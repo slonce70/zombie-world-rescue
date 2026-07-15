@@ -30,6 +30,11 @@ const TYPE_STATS = {
     hp: 55, speed: 1.5, chaseSpeed: 3.0, aggro: 32, dmg: 8, attackR: 1.7, coins: 14, pitch: 1.25,
     ranged: { min: 7, max: 30, hold: 13, cd: 2.6, projSpeed: 30, dmg: 10, size: 0.11, color: 0xffe08a },
   },
+  archer: {
+    hp: 120, speed: 0, chaseSpeed: 0, aggro: 45, dmg: 7, attackR: 1.8, coins: 20, pitch: 0.9,
+    ranged: { min: 5, max: 45, hold: 45, cd: 2.8, projSpeed: 24, dmg: 7, size: 0.1, color: 0xd8b06a },
+    helmetHp: 125,
+  },
   // 🦾 броньовик: залізний нагрудник 600 міцності, повільний; голова вразлива!
   ironclad: { hp: 60, speed: 0.85, chaseSpeed: 1.7, aggro: 22, dmg: 5, attackR: 2.1, coins: 35, pitch: 0.5, chestHp: 600 },
   // 🧙 зомбі-чарівник: кастер. Б'є посохом-орбом здалека (15), прикликає зомбі (≤5 живих),
@@ -224,6 +229,7 @@ export class Zombies {
       }
     }
     const castleKnight = finalType === 'gladiator' && opts.castleKnight === true;
+    const castleArcher = finalType === 'archer' && opts.castleArcher === true;
     if (castleKnight) Object.assign(stats, { hp: 150, chestHp: 500, helmetHp: 250 });
     const rig = finalType === 'boss' ? makeBoss(bossStyle) : makeZombie(finalType, vrng, castleKnight ? 'castleKnight' : '');
     const y = opts.zone === 'castle-dungeon' ? this.world.dungeonGroundH(x, z) : this.world.groundH(x, z);
@@ -236,7 +242,7 @@ export class Zombies {
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = finalType === 'boss' ? 1 : this.diff.hp * coopScale;
-    const maxHp = castleKnight ? 150 : finalType === 'stone' ? 500 : this.hpWithSettings(stats.hp * hpScale, opts);
+    const maxHp = castleKnight ? 150 : castleArcher ? 120 : finalType === 'stone' ? 500 : this.hpWithSettings(stats.hp * hpScale, opts);
     stats.hp = maxHp;
     const z_ = {
       nid, rig, type: finalType, stats,
@@ -248,6 +254,7 @@ export class Zombies {
       zone: opts.zone || null,
       horde: !!opts.horde,
       castleKnight,
+      castleArcher,
       aggroed: !!opts.horde,
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,

@@ -177,12 +177,15 @@ try {
     const castle = g.level.missions.delegate.get('castle');
     const knights = castle.guards.filter((z) => z.castleKnight);
     const regular = castle.guards.filter((z) => !z.castleKnight);
+    const archers = castle.archers;
     return {
       phase: castle.phase,
       total: castle.guards.length,
       regular: regular.length,
       knights: knights.length,
       knightStats: knights.map((z) => [z.hp, z.maxHp, z.chestHp, z.chestMax, z.helmetHp, z.helmetMax]),
+      archerStats: archers.map((z) => [z.type, z.hp, z.maxHp, z.ranged?.dmg, z.helmetHp, z.helmetMax, z.y]),
+      towerHeights: g.level.world.castleTowerSpawns.map((spot) => spot.y),
       gateDestroyed: g.level.world.castleGate.destroyed,
       gatePhysicsGone: !g.level.world.colliders.includes(g.level.world.castleGate.collider)
         && !g.level.world.occluders.includes(g.level.world.castleGate.occluder),
@@ -190,6 +193,7 @@ try {
   });
   assert(state.phase === 'fight' && state.total === 30 && state.regular === 25 && state.knights === 5, 'після вибуху зʼявляються рівно 25 зомбі і 5 лицарів', JSON.stringify(state));
   assert(state.knightStats.every((s) => s.join(',') === '150,150,500,500,250,250'), 'кожен лицар має точні HP і міцність броні', JSON.stringify(state.knightStats));
+  assert(state.archerStats.length === 4 && state.archerStats.every((s, i) => s.slice(0, 6).join(',') === 'archer,120,120,7,125,125' && s[6] === state.towerHeights[i]), 'на кожній башті стоїть лучник: 120 HP, 7 шкоди, шолом 125', JSON.stringify(state.archerStats));
   assert(state.gateDestroyed && state.gatePhysicsGone, 'вибух прибирає ворота, collider і невидиму перешкоду для куль');
   await page.waitForTimeout(450);
   await page.screenshot({ path: 'test-results/poland-castle-fight.png' });
@@ -210,6 +214,10 @@ try {
       zombie.chestHp = 0;
       zombie.helmetHp = 0;
       if (zombie.state !== 'dead') zombie.damage(99999, null, false);
+    }
+    for (const archer of castle.archers) {
+      archer.helmetHp = 0;
+      if (archer.state !== 'dead') archer.damage(99999, null, false);
     }
     g.level.missions.update(0.016, g.input, true);
     const dungeon = g.level.world.castleDungeon;

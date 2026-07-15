@@ -3159,6 +3159,7 @@ export class World {
     const ironM = toonMat(0x303846);
     const woodM = toonMat(0x5f3d28);
     // кутові вежі
+    this.castleTowerSpawns = [];
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       const tx = x + Math.cos(a) * r;
@@ -3169,6 +3170,8 @@ export class World {
       tower.position.set(tx, ty + h / 2, tz);
       tower.castShadow = true;
       this.staticGroup.add(tower);
+      this.castleTowerSpawns.push({ x: tx, z: tz, y: ty + h });
+      this.floors.push({ x: tx, z: tz, ry: 0, w: 5.4, d: 5.4, top: ty + h });
       for (let b = 0; b < 8; b++) {
         const ba = (b / 8) * Math.PI * 2;
         const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.8), stoneM);

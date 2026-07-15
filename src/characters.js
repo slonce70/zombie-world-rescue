@@ -1158,6 +1158,34 @@ function buildZombie(type, rng, variant = '') {
     const grip = box(0.06, 0.16, 0.08, toonMat(0x33271c));
     grip.position.set(0, -0.66, -0.02);
     rig.parts.armR.add(barrel, grip);
+  } else if (type === 'archer') {
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.0, belly: 0.85, armsForward: 0.9, lean: -0.08,
+      shirt: 0x6b4b2a, pants: 0x3e4a36, eyeL: 0.07, eyeR: 0.07, brow: 0.45,
+    }));
+    const bowM = toonMat(0x8a5a32);
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.035, 6, 18, Math.PI), bowM);
+    bow.rotation.set(0, Math.PI / 2, Math.PI / 2);
+    bow.position.set(0, -0.55, -0.12);
+    const string = box(0.02, 0.62, 0.02, toonMat(0xe5d7bd));
+    string.position.set(0, -0.55, -0.12);
+    rig.parts.armL.add(bow, string);
+    const arrow = box(0.035, 0.035, 0.72, toonMat(0x6b4328));
+    arrow.position.set(0, -0.58, -0.3);
+    rig.parts.armR.add(arrow);
+    rig._postBake = (r) => {
+      const helmet = new THREE.Group();
+      helmet.name = 'helmetArmor';
+      const metal = toonMat(0x737b86);
+      const cap = sphere(0.28, metal, 14, 10);
+      cap.position.y = 0.23;
+      cap.scale.set(1.05, 0.7, 1.05);
+      const rim = cylinder(0.3, 0.31, 0.055, metal, 14);
+      rim.position.y = 0.17;
+      helmet.add(cap, rim);
+      bakeGroupMeshes(helmet, { castShadow: true });
+      r.parts.head.add(helmet);
+    };
   } else if (type === 'ironclad') {
     // 🦾 броньовик: кремезний, повільний, у залізному нагруднику (чіпляється після запікання)
     rig = makeHumanoid(Object.assign(common, {
