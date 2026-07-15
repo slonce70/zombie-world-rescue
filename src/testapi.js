@@ -19,6 +19,7 @@ export function buildTestApi(game) {
       country: g.level ? g.level.countryId : null,
       grenades: g.level ? g.level.player.grenades : 0,
       combo: g.level ? g.level.combo.n : 0,
+      momentum: g.level ? { tier: g.level.combo.tier || 0, time: g.level.combo.t || 0 } : null,
       liberated: liberatedIds(g.save.liberated),
       player: g.level ? {
         x: g.level.player.pos.x, y: g.level.player.pos.y, z: g.level.player.pos.z,

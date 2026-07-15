@@ -4,6 +4,7 @@ import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, 
 
 import { clamp, damp, dampAngle } from './utils.js';
 import { t } from './i18n.js';
+import { momentumStats } from './combatmomentum.js';
 
 export const WEAPONS = {
   pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, infinite: true },
@@ -463,7 +464,8 @@ export class Player {
       const buffSpeed = this.buffs.speed > 0 ? 1.45 : 1;
       // 🧲 «Магніт-буря»: +20% швидкості поки сила активна
       const superSpeed = (this.superPower && this.superPower.type === 'magnet') ? 1.2 : 1;
-      const speed = 5.6 * this.speedMult * buffSpeed * superSpeed * (sprint ? 1.55 : 1);
+      const momentum = momentumStats(this.level.combo);
+      const speed = 5.6 * this.speedMult * buffSpeed * superSpeed * momentum.speed * (sprint ? 1.55 : 1);
       let tx = 0, tz = 0;
       if (moving) {
         const len = Math.max(1, Math.hypot(mx, mz));
@@ -555,7 +557,7 @@ export class Player {
   _updateWeaponFiring(dt, input, allowControl) {
     // --- перезарядка ---
     if (this.reloading > 0) {
-      this.reloading -= dt;
+      this.reloading -= dt * momentumStats(this.level.combo).reload;
       if (this.reloading <= 0) {
         const w = this.weapon;
         if (w.continuous) {
@@ -743,10 +745,10 @@ export class Player {
     const infAmmo = gadgetInf || shkval;
     if (!infAmmo) a.mag--;
     // «Шквал»: скорострільність ×1.8 (композиться з гаджет-прискоренням 0.45)
-    this.shootCd = (60 / w.rpm) * (gadgetInf ? 0.45 : 1) / (shkval ? 1.8 : 1);
+    this.shootCd = (60 / w.rpm) * (gadgetInf ? 0.45 : 1) / ((shkval ? 1.8 : 1) * momentumStats(level.combo).fire);
     this.gunKick = 1;
     level.stats.shotsFired++;
-    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
+    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1) * momentumStats(level.combo).damage;
 
     const arms = this.firstPerson ? this.fpArms[this.cur] : this.tpGuns[this.cur];
     arms.muzzle.getWorldPosition(this._muzzlePos);
@@ -936,7 +938,7 @@ export class Player {
     const ro = origin.clone().addScaledVector(dir, 0.7);
     if (level.mirror) level.net.sendRocket(ro, dir, Math.round(w.dmg * dmgMult));
     else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(w.dmg * dmgMult));
-    else level.effects.spawnRocket(ro, dir, w.dmg);
+    else level.effects.spawnRocket(ro, dir, w.dmg * dmgMult, null, 1, true);
     level.audio.rocket();
     this.camShake = Math.max(this.camShake, 0.5);
     this._applyRecoil(w);
@@ -960,7 +962,7 @@ export class Player {
     if (!shkval) this.fuel[this.cur] = Math.max(0, fuel - dt);
     this.gunKick = Math.min(0.5, this.gunKick + dt * 2); // легке тремтіння ствола
     const level = this.level;
-    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1);
+    const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1) * momentumStats(level.combo).damage;
     const dmgThisFrame = w.dps * dmgMult * dt;
 
     // точка вильоту (як у _shoot)
