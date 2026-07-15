@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
@@ -14,6 +14,9 @@ const assert = (value, message, details = '') => {
   if (!value) throw new Error(`${message}${details ? `: ${details}` : ''}`);
   console.log(`  ✅ ${message}`);
 };
+
+const worldSource = await readFile(new URL('../src/world.js', import.meta.url), 'utf8');
+assert(worldSource.includes('const N = 48;') && worldSource.includes('block.rotation.y = -ang - Math.PI / 2;'), 'секції муру стоять вздовж стіни без щілин');
 
 try {
   await page.goto(`${base}/?test&fresh`);
