@@ -192,7 +192,9 @@ export class StoryMissions {
         const target = mission && this.delegate._castleTarget(mission);
         if (target) mk.push({ x: target.x, z: target.z, color: '#ff9e63', icon: mission.phase === 'rescue' ? '🆘' : '🏰' });
       } else {
-        for (const site of this._objectiveTargets(active)) {
+        const mission = this._delegateMissionForObjective(active);
+        const targets = mission && mission.points ? mission.points.filter((point) => !point.done) : this._objectiveTargets(active);
+        for (const site of targets) {
           mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
         }
       }

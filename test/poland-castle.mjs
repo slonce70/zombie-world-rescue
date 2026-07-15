@@ -34,6 +34,8 @@ try {
   let state = await page.evaluate(() => {
     const g = window.__game;
     const story = g.level.missions;
+    const bonfire = story.delegate.get('bonfire');
+    const bonfireMarkers = story.getMarkers().filter((marker) => marker.icon === '🔥');
     const castle = story.delegate.get('castle');
     const map = g.level.country.map;
     const castleSite = map.storySites.castleRuin;
@@ -42,6 +44,8 @@ try {
     const gate = g.level.world.castleGate;
     g.test.completeStoryObjective('pol-castle');
     return {
+      bonfireMarkersMatch: bonfire.points.every((point) => bonfireMarkers.some((marker) => Math.hypot(point.x - marker.x, point.z - marker.z) < 0.1)),
+      bonfireMarkerCount: bonfireMarkers.length,
       radius: castle.site.r,
       siteDistance: Math.hypot(castleSite.x - arenaSite.x, castleSite.z - arenaSite.z),
       requiredDistance: castleSite.r + arenaSite.r + 10,
@@ -58,6 +62,8 @@ try {
       crateBeamDistance: Math.hypot(castle.explosive.x - castle.beam.group.position.x, castle.explosive.z - castle.beam.group.position.z),
     };
   });
+  assert(state.bonfireMarkerCount === 3 && state.bonfireMarkersMatch, 'мінімапа показує три справжні вогнища, а не старі точки біля площі', JSON.stringify(state));
+  await page.screenshot({ path: 'test-results/poland-bonfire-markers.png' });
   assert(state.radius >= 34, 'замок справді великий', JSON.stringify(state));
   assert(state.siteDistance > state.requiredDistance, 'замок є окремою будівлею далеко від арени', JSON.stringify(state));
   assert(state.phase === 'find' && state.castleState === 'locked' && state.storyState === 'locked', 'замкнена сюжетна ціль не виконується завчасно', JSON.stringify(state));
