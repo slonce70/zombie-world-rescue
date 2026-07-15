@@ -261,6 +261,7 @@ export class DynamicMissions {
       m.rescueProgress = 0;
       m.guards = [];
       m.dungeonWizards = [];
+      m.dungeonStones = [];
       m.explosive = this._makeCastleExplosive(m);
       m.plantPoint = this._castlePlantPoint(m);
       if (m.beam && m.beam.group) {
@@ -1471,6 +1472,7 @@ export class DynamicMissions {
     if (m.phase === 'dungeon') {
       if (this.mirror && m.dungeonTarget) return m.dungeonTarget;
       return m.dungeonWizards.find((z) => z.state !== 'dead' && !z.gone)
+        || m.dungeonStones.find((z) => z.state !== 'dead' && !z.gone)
         || this.level.world.castleDungeon || m.site;
     }
     if (m.phase === 'rescue') return this.level.world.castleDungeon || m.site;
@@ -1553,33 +1555,34 @@ export class DynamicMissions {
       m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: 25 - regularLeft, k: 5 - knightLeft });
       if (regularLeft === 0 && knightLeft === 0) {
         m.phase = 'dungeon';
-        m.title = t('Зайди у підземелля і переможи 5 зомбі-чаклунів');
+        m.title = t('Зайди у підземелля і переможи 5 чаклунів та 11 камʼяних зомбі');
         const dungeon = level.world.castleDungeon || m.site;
         if (level.world.openCastleDungeon) level.world.openCastleDungeon();
         else {
           if (dungeon.group) dungeon.group.removeFromParent();
           if (dungeon.collider) level.world.removeCollider(dungeon.collider);
         }
-        this._spawnCastleDungeonWizards(m);
-        m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.z, 0x9b6bff, '🧙');
-        level.bus.emit('toast', t('🔓 Прохід відкрито! Пройди 50-метрове підземелля і переможи 5 чаклунів!'));
+        this._spawnCastleDungeonEnemies(m);
+        m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.entranceZ, 0x9b6bff, '🧙');
+        level.bus.emit('toast', t('🔓 Прохід відкрито! У підземеллі 5 чаклунів і 11 камʼяних зомбі!'));
       }
       return;
     }
 
     if (m.phase === 'dungeon') {
-      const left = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length;
-      m.title = t('Зачисть підземелля: чаклуни {n}/5', { n: 5 - left });
+      const wizardLeft = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length;
+      const stoneLeft = m.dungeonStones.filter((z) => z.state !== 'dead' && !z.gone).length;
+      m.title = t('Зачисть підземелля: чаклуни {w}/5 · камʼяні {s}/11', { w: 5 - wizardLeft, s: 11 - stoneLeft });
       const dungeon = level.world.castleDungeon || m.site;
       if (Math.hypot(player.pos.x - dungeon.x, player.pos.z - dungeon.z) < 4.5) {
-        this.prompt = { text: t('🔒 Спочатку переможи чаклунів — залишилося: {n}', { n: left }), hold: false };
+        this.prompt = { text: t('🔒 Переможи всіх ворогів — залишилося: {n}', { n: wizardLeft + stoneLeft }), hold: false };
       }
-      if (left === 0) {
+      if (wizardLeft === 0 && stoneLeft === 0) {
         m.phase = 'rescue';
         m.title = t('Дійди до кінця підземелля і звільни людей');
         if (m.beam) m.beam.remove();
         m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
-        level.bus.emit('toast', t('🧙 Усі чаклуни переможені — люди чекають у кінці підземелля!'));
+        level.bus.emit('toast', t('🪨 Підземелля зачищено — люди чекають у кінці!'));
       }
       return;
     }
@@ -1650,7 +1653,7 @@ export class DynamicMissions {
     level.audio.horde();
   }
 
-  _spawnCastleDungeonWizards(m) {
+  _spawnCastleDungeonEnemies(m) {
     const level = this.level;
     const dungeon = level.world.castleDungeon;
     const spots = dungeon?.wizardSpawns || [];
@@ -1663,6 +1666,18 @@ export class DynamicMissions {
       });
       wizard.castleDungeonWizard = true;
       return wizard;
+    });
+    m.dungeonStones = (dungeon?.stoneSpawns || []).slice(0, 11).map((spot) => {
+      const stone = level.zombies.spawn('stone', spot.x, spot.z, {
+        horde: false,
+        guard: true,
+        zone: 'castle-dungeon',
+        anchor: { x: spot.x, z: spot.z, r: 4 },
+      });
+      stone.castleDungeonStone = true;
+      stone.aggroed = true;
+      stone.state = 'chase';
+      return stone;
     });
   }
 
@@ -1952,7 +1967,8 @@ export class DynamicMissions {
       } else if (m.type === 'castle') {
         const regularLeft = m.guards.filter((z) => !z.castleKnight && z.state !== 'dead' && !z.gone).length;
         const knightLeft = m.guards.filter((z) => z.castleKnight && z.state !== 'dead' && !z.gone).length;
-        const dungeonLeft = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length;
+        const dungeonLeft = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length
+          + m.dungeonStones.filter((z) => z.state !== 'dead' && !z.gone).length;
         const target = this._castleTarget(m) || m.site;
         a.push(
           Math.max(0, CASTLE_PHASES.indexOf(m.phase)),
@@ -2030,11 +2046,11 @@ export class DynamicMissions {
         if (phaseIndex >= 4 && level.world.openCastleDungeon) level.world.openCastleDungeon();
         if (m.phase === 'fight') m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: a[3] || 0, k: a[4] || 0 });
         else if (m.phase === 'dungeon') {
-          m.title = t('Зачисть підземелля: чаклуни {n}/5', { n: 5 - m.dungeonLeft });
+          m.title = t('Зачисть підземелля: вороги {n}/16', { n: 16 - m.dungeonLeft });
           if (previousPhase !== 'dungeon') {
             if (m.beam) m.beam.remove();
             const dungeon = level.world.castleDungeon || m.site;
-            m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.z, 0x9b6bff, '🧙');
+            m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.entranceZ, 0x9b6bff, '🧙');
           }
         }
         else if (m.phase === 'rescue') {
@@ -2279,7 +2295,7 @@ export class DynamicMissions {
       } else if (m.type === 'castle') {
         const dungeon = level.world.castleDungeon || m.site;
         if (m.phase === 'dungeon' && near(dungeon.x, dungeon.z, 4.5) && m.dungeonLeft > 0) {
-          this.prompt = { text: t('🔒 Спочатку переможи чаклунів — залишилося: {n}', { n: m.dungeonLeft }), hold: false };
+          this.prompt = { text: t('🔒 Переможи всіх ворогів — залишилося: {n}', { n: m.dungeonLeft }), hold: false };
         } else if (m.phase === 'rescue' && near(dungeon.x, dungeon.z, 4.5)) {
           this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
           if (net) net.holdE = true;

@@ -1878,6 +1878,8 @@ export class World {
       const w = smoothstep(rv.width, rv.width * 0.45, d);
       if (w > 0) h = lerp(h, rv.level - rv.depth, w);
     }
+    const dungeonFloor = this.castleDungeon?.open ? this.castleDungeon.floorHeightAt(x, z) : null;
+    if (dungeonFloor !== null && dungeonFloor !== undefined) h = dungeonFloor;
     return h;
   }
 
@@ -3239,7 +3241,9 @@ export class World {
 
     // темний вхід у підземелля на західному мурі, закритий видимими ґратами
     const dungeonX = x - r;
-    const dungeonY = this.groundH(dungeonX, z);
+    const dungeonSurfaceY = this.groundH(dungeonX, z);
+    const dungeonDepth = 6;
+    const dungeonY = dungeonSurfaceY - dungeonDepth;
     const dungeonShell = new THREE.Group();
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.4, 0.35), toonMat(0x171b24));
     mouth.position.set(0, 2.7, 0.8);
@@ -3252,7 +3256,7 @@ export class World {
     const dungeonLintel = new THREE.Mesh(new THREE.BoxGeometry(8.8, 1.4, 2.6), stoneM);
     dungeonLintel.position.set(0, 6.1, 0);
     dungeonShell.add(dungeonLintel);
-    dungeonShell.position.set(dungeonX, dungeonY, z);
+    dungeonShell.position.set(dungeonX, dungeonSurfaceY, z);
     dungeonShell.rotation.y = Math.PI / 2;
     this.staticGroup.add(dungeonShell);
 
@@ -3267,7 +3271,7 @@ export class World {
       bar.position.set(0, by, 0);
       grate.add(bar);
     }
-    grate.position.set(dungeonX + 0.35, dungeonY, z);
+    grate.position.set(dungeonX + 0.35, dungeonSurfaceY, z);
     grate.rotation.y = Math.PI / 2;
     grate.visible = false;
     this.scene.add(grate);
@@ -3288,8 +3292,19 @@ export class World {
       tunnel.add(mesh);
       return mesh;
     };
+    const rampLen = 10;
+    const rampAngle = Math.atan2(dungeonDepth, rampLen);
+    for (let i = 0; i < rampLen; i++) {
+      const px = tunnelStartX + i + 0.5;
+      const top = dungeonSurfaceY - dungeonDepth * (i + 0.5) / rampLen;
+      addBox(1.06, 0.65, 8.2, px, top - 0.325, z, floorM);
+      for (const side of [-1, 1]) addBox(1.06, 6, 0.6, px, top + 3, z + side * 4.2, tunnelM);
+    }
+    const rampCeiling = addBox(Math.hypot(rampLen, dungeonDepth), 0.45, 8.4,
+      tunnelStartX + rampLen / 2, dungeonSurfaceY + 5.8 - dungeonDepth / 2, z, ceilingM);
+    rampCeiling.rotation.z = -rampAngle;
     for (const [w, d, px, pz] of [
-      [20, 8.4, tunnelStartX + 10, z],
+      [10, 8.4, tunnelStartX + 15, z],
       [8.4, 10, tunnelStartX + 20, z + 5],
       [20, 8.4, tunnelStartX + 30, tunnelEndZ],
     ]) {
@@ -3326,10 +3341,19 @@ export class World {
     }
     this.staticGroup.add(tunnel);
 
-    const dungeonCollider = { x: dungeonX + 0.5, z, r: 3.3, top: dungeonY + 5.5 };
+    const dungeonCollider = { x: dungeonX + 0.5, z, r: 3.3, top: dungeonSurfaceY + 5.5 };
+    const floorHeightAt = (px, pz) => {
+      if (px >= tunnelStartX && px <= tunnelStartX + 20 && Math.abs(pz - z) <= 4.2) {
+        return dungeonSurfaceY - dungeonDepth * Math.min(1, (px - tunnelStartX) / rampLen);
+      }
+      if (Math.abs(px - (tunnelStartX + 20)) <= 4.2 && pz >= z && pz <= tunnelEndZ) return dungeonY;
+      if (px >= tunnelStartX + 20 && px <= tunnelEndX && Math.abs(pz - tunnelEndZ) <= 4.2) return dungeonY;
+      return null;
+    };
     this.castleDungeon = {
       group: grate, entrance: dungeonShell, tunnel, grate, collider: dungeonCollider,
-      x: tunnelEndX - 3.5, z: tunnelEndZ, y: dungeonY, entranceX: dungeonX,
+      x: tunnelEndX - 3.5, z: tunnelEndZ, y: dungeonY, surfaceY: dungeonSurfaceY,
+      depth: dungeonDepth, entranceX: dungeonX, entranceZ: z, floorHeightAt,
       length: 50,
       path: [
         { x: tunnelStartX, z },
@@ -3343,6 +3367,14 @@ export class World {
         { x: tunnelStartX + 20, z: z + 6 },
         { x: tunnelStartX + 27, z: tunnelEndZ },
         { x: tunnelStartX + 36, z: tunnelEndZ },
+      ],
+      stoneSpawns: [
+        { x: tunnelStartX + 4, z: z - 2 }, { x: tunnelStartX + 7, z: z + 2 },
+        { x: tunnelStartX + 11, z: z + 1.5 }, { x: tunnelStartX + 14, z: z - 2 },
+        { x: tunnelStartX + 18, z: z + 2 }, { x: tunnelStartX + 18, z: z + 5 },
+        { x: tunnelStartX + 22, z: z + 8 }, { x: tunnelStartX + 26, z: tunnelEndZ + 2 },
+        { x: tunnelStartX + 30, z: tunnelEndZ - 2 }, { x: tunnelStartX + 34, z: tunnelEndZ + 2 },
+        { x: tunnelStartX + 38, z: tunnelEndZ - 2 },
       ],
       active: false, open: false,
     };

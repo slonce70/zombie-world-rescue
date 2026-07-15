@@ -75,6 +75,7 @@ export class Player {
     this.superPower = null;
     this._superSparkT = 0;
     this.stunAmmoT = 0; // 💫 гаджет «Оглушливі кулі»: кулі пістолета/магнума оглушують зомбі
+    this.stunT = 0;
     this.invisibleT = 0;
     this.invisibleRegenRate = 0;
     this.appleT = 0; this.appleBonus = 20; // 🍎 золоте яблуко: тимчасовий maxHealth бонус згасає сам
@@ -301,6 +302,9 @@ export class Player {
   update(dt, input, allowControl) {
     const world = this.world;
     if (this.respawnProtect > 0) this.respawnProtect -= dt;
+    const stunned = this.stunT > 0;
+    if (stunned) this.stunT = Math.max(0, this.stunT - dt);
+    allowControl = allowControl && !stunned;
 
     // --- 🔭 оптика снайперки ---
     const wantScope = (input.rmbDown || input.touchScope)

@@ -24,6 +24,8 @@ assert(
     && worldSource.includes('lintel.position.set(0, 7.4, 0);')
     && worldSource.includes('mouth.position.set(0, 2.7, 0.8);')
     && worldSource.includes('length: 50,')
+    && worldSource.includes('const dungeonDepth = 6;')
+    && worldSource.includes('floorHeightAt')
     && !worldSource.includes('const broken = i === 1'),
   'мури суцільні, брама без верхньої діри, ґрати видно, а вежі цілі',
 );
@@ -243,11 +245,15 @@ try {
       dungeonPhysicsGone: !g.level.world.colliders.includes(dungeon.collider),
       title: castle.title,
       dungeonLength: dungeon.length,
+      dungeonDepth: dungeon.surfaceY - g.level.world.groundH(dungeon.x, dungeon.z),
+      rampDrop: dungeon.surfaceY - g.level.world.groundH(dungeon.entranceX + 5.5, dungeon.entranceZ),
       pathLength: dungeon.path.slice(1).reduce((sum, point, i) => (
         sum + Math.hypot(point.x - dungeon.path[i].x, point.z - dungeon.path[i].z)
       ), 0),
       wizardCount: castle.dungeonWizards.length,
       wizardTypes: castle.dungeonWizards.map((z) => z.type),
+      stoneCount: castle.dungeonStones.length,
+      stoneStats: castle.dungeonStones.map((z) => [z.type, z.hp, z.maxHp, z.stats.dmg, z.stats.hitStun]),
       maxPathPush,
       dungeonMarker,
       castleNet,
@@ -258,21 +264,52 @@ try {
   assert(state.afterHelmet.join(',') === '150,400,150', 'постріл у голову пошкоджує шолом, не HP', JSON.stringify(state));
   assert(state.afterBreak[0] === 150 && state.afterBreak[1] === 0 && state.afterBreak[2] === false, 'зламаний нагрудник зникає');
   assert(state.afterBody.join(',') === '120,0' && state.phase === 'dungeon', 'після броні шкода йде в тіло, а зачистка відкриває підземелля', JSON.stringify(state));
-  assert(state.dungeonOpen && state.dungeonPhysicsGone && /(5 зомбі-чаклунів|чаклуни 0\/5)/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
+  assert(state.dungeonOpen && state.dungeonPhysicsGone && /(5 чаклунів|вороги 0\/16)/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
   assert(state.dungeonLength === 50 && state.pathLength === 50, 'прохід підземелля має рівно 50 метрів', JSON.stringify(state));
+  assert(state.dungeonDepth === 6 && state.rampDrop > 2.5, 'підземелля розташоване на 6 метрів під землею і має справжній спуск', JSON.stringify(state));
   assert(state.maxPathPush < 0.15, 'усі 50 метрів центрального проходу фізично прохідні', JSON.stringify(state));
   assert(state.wizardCount === 5 && state.wizardTypes.every((type) => type === 'wizard'), 'у підземеллі зʼявляються рівно 5 справжніх зомбі-чаклунів', JSON.stringify(state));
-  assert(state.dungeonMarker && state.castleNet[1] === 4 && state.castleNet[5] === 5, 'маркер чаклуна і co-op снапшот передають фазу підземелля та 5 ворогів', JSON.stringify(state));
-  assert(state.coopApplied.phase === 'dungeon' && state.coopApplied.left === 5 && state.coopApplied.guestOpenCalls === 1 && state.coopApplied.guestDestroyCalls === 1, 'co-op гість відкриває ґрати й отримує фазу підземелля зі снапшота', JSON.stringify(state));
+  assert(state.stoneCount === 11 && state.stoneStats.every((s) => s.join(',') === 'stone,500,500,10,0.5'), 'у підземеллі рівно 11 камʼяних зомбі: 500 HP, 10 шкоди, 0.5с оглушення', JSON.stringify(state.stoneStats));
+  assert(state.dungeonMarker && state.castleNet[1] === 4 && state.castleNet[5] === 16, 'маркер і co-op снапшот передають фазу підземелля та всіх 16 ворогів', JSON.stringify(state));
+  assert(state.coopApplied.phase === 'dungeon' && state.coopApplied.left === 16 && state.coopApplied.guestOpenCalls === 1 && state.coopApplied.guestDestroyCalls === 1, 'co-op гість відкриває ґрати й отримує 16 ворогів зі снапшота', JSON.stringify(state));
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const p = g.level.player;
+    p.health = 100; p.armor = 0; p.helmetMult = 1; p.gadgetShield = 0; p.buffs.bubble = 0; p.stunT = 0;
+    const stone = g.level.missions.delegate.get('castle').dungeonStones[0];
+    g.level.zombies._hurt(p, stone.stats.dmg, stone.x, stone.z, stone.stats.hitStun);
+    const stunT = p.stunT;
+    p.vel.set(0, 0, 0);
+    g.test.key('KeyW', true);
+    const beforeStun = p.pos.clone();
+    p.update(0.1, g.input, true);
+    const stunnedMove = p.pos.distanceTo(beforeStun);
+    p.stunT = 0; p.vel.set(0, 0, 0);
+    const beforeFree = p.pos.clone();
+    p.update(0.1, g.input, true);
+    g.test.key('KeyW', false);
+    return { health: p.health, stunT, stunnedMove, freeMove: p.pos.distanceTo(beforeFree) };
+  });
+  assert(state.health === 90 && state.stunT === 0.5 && state.stunnedMove < 0.02 && state.freeMove > 0.1, 'удар камʼяного зомбі забирає рівно 10 HP і блокує керування на 0.5 секунди', JSON.stringify(state));
 
   await page.evaluate(() => {
     const g = window.__game;
     const dungeon = g.level.world.castleDungeon;
-    g.test.teleport(dungeon.entranceX + 3, dungeon.z);
+    g.test.teleport(dungeon.entranceX + 3, dungeon.entranceZ);
     g.level.player.yaw = -Math.PI / 2;
   });
   await page.waitForTimeout(450);
   await page.screenshot({ path: 'test-results/poland-castle-dungeon.png' });
+
+  await page.evaluate(() => {
+    const g = window.__game;
+    const stone = g.level.missions.delegate.get('castle').dungeonStones[0];
+    g.test.teleport(stone.x - 3, stone.z);
+    g.level.player.yaw = -Math.PI / 2;
+  });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: 'test-results/poland-castle-stone-zombie.png' });
 
   state = await page.evaluate(() => {
     const g = window.__game;
@@ -292,8 +329,8 @@ try {
       prompt: g.level.missions.delegate.prompt?.text || '',
     };
   });
-  assert(state.phase === 'dungeon' && state.rescueProgress === 0.99 && state.civilians === 0 && state.storyState === 'active' && !state.bossUnlocked, 'людей не можна звільнити, поки 5 чаклунів живі', JSON.stringify(state));
-  assert(/залишилося: 5/.test(state.prompt), 'біля полонених HUD пояснює, що спочатку треба перемогти чаклунів', JSON.stringify(state));
+  assert(state.phase === 'dungeon' && state.rescueProgress === 0.99 && state.civilians === 0 && state.storyState === 'active' && !state.bossUnlocked, 'людей не можна звільнити, поки вороги підземелля живі', JSON.stringify(state));
+  assert(/залишилося: 16/.test(state.prompt), 'біля полонених HUD показує всіх 16 ворогів', JSON.stringify(state));
 
   state = await page.evaluate(() => {
     const g = window.__game;
@@ -309,7 +346,7 @@ try {
       marker: g.level.missions.getMarkers().find((marker) => marker.icon === '🧙'),
     };
   });
-  assert(state.phase === 'dungeon' && /4\/5/.test(state.title) && state.marker, 'після 4 чаклунів останній ворог ще блокує порятунок і лишається на мапі', JSON.stringify(state));
+  assert(state.phase === 'dungeon' && /4\/5/.test(state.title) && state.marker, 'після 4 чаклунів вороги ще блокують порятунок і лишаються на мапі', JSON.stringify(state));
 
   state = await page.evaluate(() => {
     const g = window.__game;
@@ -324,7 +361,29 @@ try {
       marker: g.level.missions.getMarkers().find((marker) => marker.icon === '🆘'),
     };
   });
-  assert(state.phase === 'rescue' && /кінця підземелля/i.test(state.title) && state.marker, 'пʼятий чаклун відкриває порятунок і перемикає мапу на 🆘', JSON.stringify(state));
+  assert(state.phase === 'dungeon' && /5\/5/.test(state.title) && !state.marker, 'після 5 чаклунів камʼяні зомбі ще блокують порятунок', JSON.stringify(state));
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const castle = g.level.missions.delegate.get('castle');
+    for (const stone of castle.dungeonStones.slice(0, 10)) stone.damage(99999, null, false);
+    g.level.missions.update(0.016, g.input, true);
+    return { phase: castle.phase, title: castle.title };
+  });
+  assert(state.phase === 'dungeon' && /10\/11/.test(state.title), 'після 10 камʼяних зомбі останній ще блокує порятунок', JSON.stringify(state));
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const castle = g.level.missions.delegate.get('castle');
+    castle.dungeonStones[10].damage(99999, null, false);
+    g.level.missions.update(0.016, g.input, true);
+    return {
+      phase: castle.phase,
+      title: castle.title,
+      marker: g.level.missions.getMarkers().find((marker) => marker.icon === '🆘'),
+    };
+  });
+  assert(state.phase === 'rescue' && /кінця підземелля/i.test(state.title) && state.marker, 'останній камʼяний зомбі відкриває порятунок і перемикає мапу на 🆘', JSON.stringify(state));
 
   await page.evaluate(() => {
     const g = window.__game;

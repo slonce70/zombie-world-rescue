@@ -388,11 +388,12 @@ export class HostNet {
   }
 
   // шкода гравцю pid (від зомбі/снарядів/вибухів)
-  hurtPlayer(proxy, dmg, fx, fz) {
+  hurtPlayer(proxy, dmg, fx, fz, stun = 0) {
     if (proxy.pid === 1) {
       this.level.player.takeDamage(dmg, fx, fz);
+      if (stun && this.level.player.health > 0) this.level.player.stunT = Math.max(this.level.player.stunT || 0, stun);
     } else {
-      this.session.transport.send(proxy.pid, { t: 'hurt', dmg, fx: r1(fx), fz: r1(fz) });
+      this.session.transport.send(proxy.pid, { t: 'hurt', dmg, fx: r1(fx), fz: r1(fz), stun });
     }
   }
 
