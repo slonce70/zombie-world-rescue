@@ -226,7 +226,7 @@ export class Zombies {
     const castleKnight = finalType === 'gladiator' && opts.castleKnight === true;
     if (castleKnight) Object.assign(stats, { hp: 150, chestHp: 500, helmetHp: 250 });
     const rig = finalType === 'boss' ? makeBoss(bossStyle) : makeZombie(finalType, vrng, castleKnight ? 'castleKnight' : '');
-    const y = this.world.groundH(x, z);
+    const y = opts.zone === 'castle-dungeon' ? this.world.dungeonGroundH(x, z) : this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
     this.scene.add(rig.group);
@@ -1180,7 +1180,7 @@ export class Zombies {
           const a = this.rng.next() * 6.28;
           z.x = z.anchor.x + Math.cos(a) * z.anchor.r * 0.5;
           z.z = z.anchor.z + Math.sin(a) * z.anchor.r * 0.5;
-          z.y = this.world.groundH(z.x, z.z);
+          z.y = z.zone === 'castle-dungeon' ? this.world.dungeonGroundH(z.x, z.z) : this.world.groundH(z.x, z.z);
           rig.group.position.set(z.x, z.y, z.z);
         }
         if (this.rng.chance(0.02)) rig.group.rotation.y += 0.3;
@@ -1710,11 +1710,14 @@ export class Zombies {
         }
         // 🏔️ чесні схили: у відвісну кручу зомбі не лізе — обходить уздовж стіни
         if (this.world._terrainMod) {
+          const groundAt = z.zone === 'castle-dungeon'
+            ? (x, zPos) => this.world.dungeonGroundH(x, zPos)
+            : (x, zPos) => this.world.groundH(x, zPos);
           // 🚀 висоту під зомбі семплимо раз/кадр: на старті кадру (x,z) ще ті самі,
           // що в кінці минулого (рух застосовується нижче) — переюзаємо кеш точним збігом.
-          const ghO = (z._ghX === z.x && z._ghZ === z.z) ? z._gh : this.world.groundH(z.x, z.z);
+          const ghO = (z._ghX === z.x && z._ghZ === z.z) ? z._gh : groundAt(z.x, z.z);
           const ok = (ax, az) =>
-            this.world.groundH(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
+            groundAt(ax, az) - ghO <= Math.hypot(ax - z.x, az - z.z) * 1.6 + 0.35;
           if (!ok(z.x + mx, z.z + mz)) {
             if (ok(z.x + mx, z.z)) mz = 0;
             else if (ok(z.x, z.z + mz)) mx = 0;
@@ -1745,7 +1748,7 @@ export class Zombies {
     const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
     z.x = solved.x;
     z.z = solved.z;
-    const gh = this.world.groundH(z.x, z.z);
+    const gh = z.zone === 'castle-dungeon' ? this.world.dungeonGroundH(z.x, z.z) : this.world.groundH(z.x, z.z);
     z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
     z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
 

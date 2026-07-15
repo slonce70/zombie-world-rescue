@@ -99,7 +99,11 @@ export function buildTestApi(game) {
     setLevelTime: (t) => { g.level.stats.time = t; },
     teleport: (x, z) => {
       const p = g.level.player;
-      p.pos.set(x, g.level.world.groundH(x, z), z);
+      const dungeonFloor = g.level.world.castleDungeon?.open
+        ? g.level.world.castleDungeon.floorHeightAt(x, z)
+        : null;
+      p.inCastleDungeon = dungeonFloor !== null && dungeonFloor !== undefined;
+      p.pos.set(x, p.inCastleDungeon ? dungeonFloor : g.level.world.groundH(x, z), z);
       p.vel.set(0, 0, 0);
     },
     setAim: (yaw, pitch) => {

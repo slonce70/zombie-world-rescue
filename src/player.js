@@ -52,6 +52,7 @@ export class Player {
     this.yaw = 0; // дивимось на північ (-Z), до села
     this.pitch = 0;
     this.onGround = true;
+    this.inCastleDungeon = false;
 
     this.maxHealth = 100;
     this.health = 100;
@@ -517,7 +518,22 @@ export class Player {
       }
     }
 
-    const gh = Math.max(world.groundH(this.pos.x, this.pos.z), world.floorAt(this.pos.x, this.pos.z, this.pos.y));
+    const surfaceH = world.groundH(this.pos.x, this.pos.z);
+    const dungeon = world.castleDungeon?.open ? world.castleDungeon : null;
+    const dungeonH = dungeon ? dungeon.floorHeightAt(this.pos.x, this.pos.z) : null;
+    if (dungeonH !== null && dungeonH !== undefined) {
+      const enteredThroughMouth = preSlopeX < dungeon.tunnelStartX
+        && this.pos.x >= dungeon.tunnelStartX
+        && Math.abs(this.pos.z - dungeon.entranceZ) < 3.7;
+      const alreadyBelowGround = this.pos.y < surfaceH - 1.5;
+      if (enteredThroughMouth || alreadyBelowGround) this.inCastleDungeon = true;
+    } else {
+      this.inCastleDungeon = false;
+    }
+    const supportH = this.inCastleDungeon && dungeonH !== null && dungeonH !== undefined
+      ? dungeonH
+      : surfaceH;
+    const gh = Math.max(supportH, world.floorAt(this.pos.x, this.pos.z, this.pos.y));
     if (this.pos.y <= gh) {
       // 🦶 приземлення з падіння: короткий squash (провал камери в 1-й особі / сплюск тіла в 3-й)
       if (!this.onGround && this.vel.y < -4) this.landDip = 1;
@@ -1201,6 +1217,7 @@ export class Player {
     this.vel.set(0, 0, 0);
     this.yaw = 0;
     this.pitch = 0;
+    this.inCastleDungeon = false;
     this.health = this.maxHealth;
     this.respawnProtect = 3;
     this.ammo[this.cur].mag = this.weapon.mag;

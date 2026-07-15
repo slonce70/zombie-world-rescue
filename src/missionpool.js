@@ -602,9 +602,9 @@ export class DynamicMissions {
     return out;
   }
 
-  getMarkers() {
+  getMarkers(missions = this.missions) {
     const mk = [];
-    for (const m of this.missions) {
+    for (const m of missions) {
       if (m.state !== 'active') continue;
       if (m.type === 'hunt') {
         // маркер — найближчий живий еліт
@@ -1689,7 +1689,7 @@ export class DynamicMissions {
       const rig = makeCivilian(kind, level.rng);
       const x = dungeon.x - 1.4 + i * 1.4;
       const z = dungeon.z - 1.2;
-      rig.group.position.set(x, level.world.groundH(x, z), z);
+      rig.group.position.set(x, level.world.dungeonGroundH(x, z), z);
       level.scene.add(rig.group);
       this.civilians.push({ rig, kind, x, z, state: 'follow', angle: (i / kinds.length) * Math.PI * 2, cheerT: 2.5 });
     });

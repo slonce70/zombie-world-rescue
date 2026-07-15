@@ -1878,9 +1878,14 @@ export class World {
       const w = smoothstep(rv.width, rv.width * 0.45, d);
       if (w > 0) h = lerp(h, rv.level - rv.depth, w);
     }
-    const dungeonFloor = this.castleDungeon?.open ? this.castleDungeon.floorHeightAt(x, z) : null;
-    if (dungeonFloor !== null && dungeonFloor !== undefined) h = dungeonFloor;
     return h;
+  }
+
+  // Підземна опора окрема від поверхні: звичайний groundH завжди лишається
+  // землею над тунелем, тому герой не може провалитися в нього згори.
+  dungeonGroundH(x, z) {
+    const floor = this.castleDungeon?.open ? this.castleDungeon.floorHeightAt(x, z) : null;
+    return floor ?? this.groundH(x, z);
   }
 
   roadDist(x, z) {
@@ -3324,20 +3329,50 @@ export class World {
       const alongX = w > d;
       const len = Math.max(w, d);
       for (let off = -len / 2 + 0.9; off < len / 2; off += 1.8) {
-        this._addCollider(px + (alongX ? off : 0), pz + (alongX ? 0 : off), 0.55, dungeonY + 6, 0.45);
+        this._addCollider(px + (alongX ? off : 0), pz + (alongX ? 0 : off), 0.55, dungeonY + 5.7, 0.45);
       }
     }
-    addBox(0.6, 6, 8.4, tunnelEndX, dungeonY + 3, tunnelEndZ, tunnelM);
-    for (let off = -3.2; off <= 3.2; off += 1.6) this._addCollider(tunnelEndX, tunnelEndZ + off, 0.55, dungeonY + 6, 0.45);
+    // Велика фінальна зала 18x18 м після 50-метрового проходу: тут достатньо
+    // місця для 16 ворогів, полонених і нормального бою, а не тісної кімнати.
+    const chamberSize = 18;
+    const chamberX = tunnelEndX + chamberSize / 2;
+    addBox(chamberSize, 0.35, chamberSize, chamberX, dungeonY + 0.08, tunnelEndZ, floorM);
+    addBox(chamberSize, 0.45, chamberSize, chamberX, dungeonY + 6.1, tunnelEndZ, ceilingM);
+    for (const side of [-1, 1]) {
+      const wz = tunnelEndZ + side * chamberSize / 2;
+      addBox(chamberSize, 6, 0.6, chamberX, dungeonY + 3, wz, tunnelM);
+      for (let off = -chamberSize / 2 + 0.9; off < chamberSize / 2; off += 1.8) {
+        this._addCollider(chamberX + off, wz, 0.55, dungeonY + 5.7, 0.45);
+      }
+    }
+    const chamberEndX = tunnelEndX + chamberSize;
+    addBox(0.6, 6, chamberSize, chamberEndX, dungeonY + 3, tunnelEndZ, tunnelM);
+    for (let off = -chamberSize / 2 + 0.9; off < chamberSize / 2; off += 1.8) {
+      this._addCollider(chamberEndX, tunnelEndZ + off, 0.55, dungeonY + 5.7, 0.45);
+    }
+    // Задня стіна з дверним отвором у коридор.
+    const sideWallD = (chamberSize - 8.4) / 2;
+    for (const side of [-1, 1]) {
+      const wz = tunnelEndZ + side * (4.2 + sideWallD / 2);
+      addBox(0.6, 6, sideWallD, tunnelEndX, dungeonY + 3, wz, tunnelM);
+      this._addCollider(tunnelEndX, wz, sideWallD / 2, dungeonY + 5.7, 0.45);
+    }
     const torchM = toonMat(0xff9f32, 0xff6a14, 0.85);
     for (const [tx, tz] of [
       [tunnelStartX + 6, z - 3.75], [tunnelStartX + 14, z + 3.75],
       [tunnelStartX + 16.25, z + 7], [tunnelStartX + 27, tunnelEndZ - 3.75],
       [tunnelStartX + 35, tunnelEndZ + 3.75],
+      [chamberX - 6, tunnelEndZ - 8.4], [chamberX + 6, tunnelEndZ - 8.4],
+      [chamberX - 6, tunnelEndZ + 8.4], [chamberX + 6, tunnelEndZ + 8.4],
     ]) {
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 7), torchM);
       flame.position.set(tx, dungeonY + 2.7, tz);
       tunnel.add(flame);
+    }
+    for (const lx of [chamberX - 5, chamberX + 5]) {
+      const light = new THREE.PointLight(0xff8a36, 1.25, 18, 2);
+      light.position.set(lx, dungeonY + 3.4, tunnelEndZ);
+      tunnel.add(light);
     }
     this.staticGroup.add(tunnel);
 
@@ -3348,13 +3383,15 @@ export class World {
       }
       if (Math.abs(px - (tunnelStartX + 20)) <= 4.2 && pz >= z && pz <= tunnelEndZ) return dungeonY;
       if (px >= tunnelStartX + 20 && px <= tunnelEndX && Math.abs(pz - tunnelEndZ) <= 4.2) return dungeonY;
+      if (px >= tunnelEndX && px <= chamberEndX && Math.abs(pz - tunnelEndZ) <= chamberSize / 2) return dungeonY;
       return null;
     };
     this.castleDungeon = {
       group: grate, entrance: dungeonShell, tunnel, grate, collider: dungeonCollider,
-      x: tunnelEndX - 3.5, z: tunnelEndZ, y: dungeonY, surfaceY: dungeonSurfaceY,
-      depth: dungeonDepth, entranceX: dungeonX, entranceZ: z, floorHeightAt,
+      x: chamberX, z: tunnelEndZ, y: dungeonY, surfaceY: dungeonSurfaceY,
+      depth: dungeonDepth, entranceX: dungeonX, entranceZ: z, tunnelStartX, floorHeightAt,
       length: 50,
+      chamberSize,
       path: [
         { x: tunnelStartX, z },
         { x: tunnelStartX + 20, z },
@@ -3365,16 +3402,16 @@ export class World {
         { x: tunnelStartX + 8, z },
         { x: tunnelStartX + 16, z },
         { x: tunnelStartX + 20, z: z + 6 },
-        { x: tunnelStartX + 27, z: tunnelEndZ },
-        { x: tunnelStartX + 36, z: tunnelEndZ },
+        { x: chamberX - 4, z: tunnelEndZ - 4 },
+        { x: chamberX + 4, z: tunnelEndZ + 4 },
       ],
       stoneSpawns: [
         { x: tunnelStartX + 4, z: z - 2 }, { x: tunnelStartX + 7, z: z + 2 },
         { x: tunnelStartX + 11, z: z + 1.5 }, { x: tunnelStartX + 14, z: z - 2 },
         { x: tunnelStartX + 18, z: z + 2 }, { x: tunnelStartX + 18, z: z + 5 },
-        { x: tunnelStartX + 22, z: z + 8 }, { x: tunnelStartX + 26, z: tunnelEndZ + 2 },
-        { x: tunnelStartX + 30, z: tunnelEndZ - 2 }, { x: tunnelStartX + 34, z: tunnelEndZ + 2 },
-        { x: tunnelStartX + 38, z: tunnelEndZ - 2 },
+        { x: tunnelStartX + 22, z: z + 8 },
+        { x: chamberX - 5, z: tunnelEndZ + 5 }, { x: chamberX, z: tunnelEndZ - 5 },
+        { x: chamberX + 5, z: tunnelEndZ + 1 }, { x: chamberX + 2, z: tunnelEndZ + 6 },
       ],
       active: false, open: false,
     };

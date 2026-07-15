@@ -7,8 +7,8 @@ import { World } from './world.js';
 import { Player, WEAPONS, WEAPON_SLOTS } from './player.js';
 import { Zombies, BESTIARY_TYPE_IDS } from './zombies.js';
 import { DynamicMissions, rollMissionSet, MISSION_TYPES } from './missionpool.js';
-import { StoryMissions } from './story/storymissions.js';
-import { shouldUseStoryMissions, storyPreview } from './story/countryStories.js';
+import { StoryMissions, storyMissionPreview } from './story/storymissions.js';
+import { shouldUseStoryMissions } from './story/countryStories.js';
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
@@ -123,7 +123,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 513;
+const APP_VERSION = 514;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1119,12 +1119,12 @@ class Game {
   _missionPreviewHtml(countryId) {
     const c = COUNTRIES[countryId];
     if (!c) return '';
-    const storyIcons = storyPreview(countryId);
+    const runIndex = (this.save.missionRuns && this.save.missionRuns[countryId]) || 0;
+    const storyIcons = storyMissionPreview(countryId, c.seed, runIndex);
     if (storyIcons) {
       const chips = storyIcons.map((icon) => `<span>${icon}</span>`);
       return `<span class="mission-preview">${chips.join('')}</span>`;
     }
-    const runIndex = (this.save.missionRuns && this.save.missionRuns[countryId]) || 0;
     const types = rollMissionSet(countryId, c.seed, runIndex);
     const labels = {
       rescue: t('Порятунок'), repair: t('Ремонт'), clear: t('Склад'), collect: t('Припаси'),
