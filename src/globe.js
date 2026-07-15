@@ -3,6 +3,13 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
 import { countryStars, STARS_PER_COUNTRY } from './stars.js';
+import { frontCountryState } from './worldfront.js';
+
+const FRONT_GLOBE_COLORS = Object.freeze({
+  threat: ['#c93455', '#ff7b6d'],
+  restoring: ['#d7a62a', '#ffe08a'],
+  safe: ['#25aeb8', '#79edf2'],
+});
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
   const phi = (lon + 180) * Math.PI / 180;
@@ -34,6 +41,7 @@ export class Globe {
     this.t = 0;
     this.raycaster = new THREE.Raycaster();
     this._ndc = new THREE.Vector2();
+    this._paintedFront = null;
 
     // світло
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
@@ -240,6 +248,21 @@ export class Globe {
     }
   }
 
+  _frontState(id) {
+    if (!CAMPAIGN_ORDER.includes(id)) return null;
+    const state = frontCountryState(this.game.save.front, id);
+    return state && state.state !== 'neutral' ? state : null;
+  }
+
+  _frontStatusLine(id) {
+    const state = this._frontState(id);
+    if (!state) return '';
+    const label = state.state === 'restoring' ? t('відбудова')
+      : state.state === 'safe' ? t('безпечно') : t('загроза');
+    const threat = state.state === 'threat' ? ` ${'⚠️'.repeat(state.threat)}` : '';
+    return `<br>🛰️ ${label}${threat}`;
+  }
+
   repaint() {
     const ctx = this.texCanvas.getContext('2d');
     const w = this.texCanvas.width, h = this.texCanvas.height;
@@ -266,8 +289,14 @@ export class Globe {
         fill = this.hoverId === id ? '#ff6b57' : '#e04a3a';
         stroke = '#9c2f24';
       }
+      const front = this._frontState(id);
+      if (front) {
+        [fill, stroke] = FRONT_GLOBE_COLORS[front.state];
+        if (this.hoverId === id) fill = stroke;
+      }
       this._paintCountry(ctx, f, fill, stroke, w, h);
     }
+    this._paintedFront = this.game.save.front;
     this.texture.needsUpdate = true;
 
     // ID-канва для піків
@@ -363,10 +392,10 @@ export class Globe {
         const starLine = CAMPAIGN_ORDER.includes(c.id)
           ? t('<br>⭐ {n}/{m} зірок', { n: countryStars(this.game.save, c.id), m: STARS_PER_COUNTRY })
           : '';
-        tooltip.innerHTML = t('✅ <b>{n}</b> — звільнено! Натисни, щоб зіграти ще раз', { n: known ? known.name : c.name }) + starLine;
+        tooltip.innerHTML = t('✅ <b>{n}</b> — звільнено! Натисни, щоб зіграти ще раз', { n: known ? known.name : c.name }) + starLine + this._frontStatusLine(c.id);
         tooltip.classList.add('available');
       } else if (isCountryOpen(this.game.save.liberated, c.id)) {
-        tooltip.innerHTML = t('🔴 {f} <b>{n}</b> — тут зомбі! Натисни, щоб звільнити', { f: known ? known.flag : '', n: known ? known.name : c.name });
+        tooltip.innerHTML = t('🔴 {f} <b>{n}</b> — тут зомбі! Натисни, щоб звільнити', { f: known ? known.flag : '', n: known ? known.name : c.name }) + this._frontStatusLine(c.id);
         tooltip.classList.add('available');
       } else {
         tooltip.innerHTML = t('🔒 <b>{n}</b> — спочатку звільни Україну', { n: c.name });
@@ -414,6 +443,7 @@ export class Globe {
   }
 
   update(dt) {
+    if (this.ready && this._paintedFront !== this.game.save.front) this.repaint();
     this.t += dt;
     // плавне обертання до цілі
     this.group.rotation.y += (this.targetRotY - this.group.rotation.y) * Math.min(1, dt * 8);

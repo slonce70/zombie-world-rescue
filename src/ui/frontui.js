@@ -9,6 +9,21 @@ const TEMPLATE_UI = {
   hunt: { icon: '🎯', name: 'Полювання', desc: 'Знайди маяки і знешкодь командира' },
 };
 
+const STAGE_UI = {
+  'rescue-group': 'Порятунок групи',
+  'evacuation-zone': 'Зона евакуації',
+  'commander-pursuer': 'Командир-переслідувач',
+  'destroy-nests': 'Знищення гнізд',
+  'close-portals': 'Закриття порталів',
+  'commander-queen': 'Командир-королева',
+  'repair-generator': 'Ремонт генератора',
+  'defense-waves': 'Оборона від хвиль',
+  'commander-ram': 'Командир-таран',
+  'activate-beacons': 'Активація маяків',
+  'elite-squad': 'Елітний загін',
+  'commander-stalker': 'Командир-сталкер',
+};
+
 const SPECIALIST_UI = {
   dispatcher: { icon: '📡', name: 'Диспетчер', desc: 'Без бонусу — зате завжди поруч' },
   medic: { icon: '🩺', name: 'Медик', desc: '+25% лікування і аптечка' },
@@ -154,7 +169,7 @@ export class FrontUI {
 
   _readViewModel() {
     try {
-      if (typeof this.game.getFrontViewModel === 'function') return this.game.getFrontViewModel();
+      if (typeof this.game.getFrontViewModel === 'function') return this.game.getFrontViewModel(this.selectedSpecialistId);
       if (typeof this.game.frontViewModel === 'function') return this.game.frontViewModel();
       if (this.game.frontViewModel && typeof this.game.frontViewModel === 'object') return this.game.frontViewModel;
     } catch (error) { /* a malformed save is rendered as locked, never crashes the globe */ }
@@ -175,6 +190,7 @@ export class FrontUI {
       status: STATUS_LABEL[op.status] ? op.status : 'available',
       recommended: !!op.recommended,
       countryState: op.countryState && typeof op.countryState === 'object' ? op.countryState : null,
+      stages: Array.isArray(op.stages) ? op.stages.filter((stage) => typeof stage === 'string').slice(0, 3) : [],
     }));
     const specialists = Array.isArray(raw.specialists)
       ? raw.specialists.map((item) => ({
@@ -286,6 +302,13 @@ export class FrontUI {
       : t('🎁 Розвідай');
     const threat = '⚠️'.repeat(op.threat);
     const commander = op.commander ? `<span class="front-op-intel">👑 ${esc(op.commander)}</span>` : '';
+    const stages = op.stages.map((stage, index) => {
+      const label = STAGE_UI[stage] || stage.replace(/[-_]+/g, ' ');
+      return `<span role="listitem" data-stage-id="${esc(stage)}"><b>${index + 1}</b>${esc(t(label))}</span>`;
+    }).join('');
+    const stageIntel = stages
+      ? `<span class="front-op-stages" role="list" aria-label="${esc(t('Розвіддані етапів'))}">${stages}</span>`
+      : '';
     const restoring = op.countryState && op.countryState.state === 'restoring';
     const countryState = restoring ? 'rebuilding'
       : (op.countryState && ['threat', 'safe'].includes(op.countryState.state) ? op.countryState.state : 'threat');
@@ -298,6 +321,7 @@ export class FrontUI {
         <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))}</span>
         <span class="front-op-desc">${esc(t(template.desc))}</span>
         ${commander}
+        ${stageIntel}
       </span>
       <span class="front-op-side"><span class="front-threat" aria-label="${esc(t('Загроза {n} з 3', { n: op.threat }))}">${threat}</span><span>${esc(rewardText)}</span></span>
     </button>`;
@@ -360,7 +384,7 @@ export class FrontUI {
     this._click();
     this.selectedSpecialistId = button.dataset.specialistId;
     if (typeof this.game.selectFrontSpecialist === 'function') this.game.selectFrontSpecialist(this.selectedSpecialistId);
-    this.render(this.vm);
+    this.render();
   }
 
   _selectProject(event) {

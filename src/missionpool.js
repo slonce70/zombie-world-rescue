@@ -121,11 +121,12 @@ const SLOT_ALIASES = { rescue: 0, tower: 1, warehouse: 2 };
 export class DynamicMissions {
   // storyTypes — примусовий набір для сюжетного рівня (StoryMissions передає
   // storyMissionSet(...)); пріоритет: тестовий хук > сюжет > природний роль
-  constructor(level, storyTypes = null) {
+  constructor(level, storyTypes = null, { objectiveOnly = false } = {}) {
     this.level = level;
     this.L = level.world.layout;
     const game = level.game;
     this.mirror = !!level.mirror;
+    this.objectiveOnly = !!objectiveOnly;
     // у коопі гість будує місії з runIndex ХОСТА — щоб набір збігався
     const runIndex = level.runIndex !== undefined
       ? level.runIndex
@@ -141,7 +142,10 @@ export class DynamicMissions {
       { slot: 'C', site: this.L.warehouse, beamAt: { x: this.L.warehouse.x - 2, z: this.L.warehouse.z - 7.5 } },
       { slot: 'D', site: this.L.village, beamAt: { x: this.L.village.x + 8, z: this.L.village.z + 8 } },
     ];
-    this.missions = types.map((type, i) => this._makeMission(type, sites[i], i));
+    const missionSites = this.objectiveOnly
+      ? types.map((type) => sites.find((site) => MISSION_TYPES[type].slots.includes(site.slot)))
+      : sites;
+    this.missions = types.map((type, i) => this._makeMission(type, missionSites[i], i));
 
     this.civilians = [];
     this.prompt = null;
@@ -520,7 +524,7 @@ export class DynamicMissions {
       const prefix = m.optional ? '⭐ ' : '';
       out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done' });
     }
-    if (this.allDone && !this.bossStarted) {
+    if (!this.objectiveOnly && this.allDone && !this.bossStarted) {
       out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });
     } else if (this.bossStarted) {
       out.push({ icon: '👑', title: t('Бій з босом!'), done: false });
@@ -586,6 +590,11 @@ export class DynamicMissions {
     level.audio.mission();
     level.bus.emit('missionDone', m);
     level.netEv('md', m.slotIndex, m.reward, m.type);
+    if (this.objectiveOnly) {
+      this.allDone = true;
+      level.game._onFrontObjectiveComplete(level);
+      return;
+    }
     const count = Math.round(m.horde * ((level.country && level.country.difficulty.counts) || 1));
     const fresh = !this.pendingHorde;
     if (this.pendingHorde) this.pendingHorde.count += count;
@@ -878,14 +887,19 @@ export class DynamicMissions {
       this['_up_' + m.type](m, dt, input, allowControl);
     }
 
-    // усі ОСНОВНІ місії виконані → арена боса (додаткова ⭐ не блокує)
+    // усі ОСНОВНІ місії виконані → Front переходить до кульмінації,
+    // звичайна кампанія відкриває арену боса.
     if (!this.allDone && this.missions.filter((m) => !m.optional).every((m) => m.state === 'done')
       && !level.zombies.hordeActive && !this.pendingHorde) {
       this.allDone = true;
-      this.bossUnlocked = true;
-      this.bossBeam = level.effects.makeBeam(this.L.arena.x, this.L.arena.z, 0xff44aa, '👑');
-      level.audio.bossRoar();
-      level.bus.emit('bossUnlocked');
+      if (level.operation) {
+        level.game._onFrontObjectiveComplete(level);
+      } else {
+        this.bossUnlocked = true;
+        this.bossBeam = level.effects.makeBeam(this.L.arena.x, this.L.arena.z, 0xff44aa, '👑');
+        level.audio.bossRoar();
+        level.bus.emit('bossUnlocked');
+      }
     }
     if (this.bossUnlocked && !this.bossStarted) {
       const challengers = level.players || [{ pos: player.pos, health: player.health }];
@@ -1010,7 +1024,8 @@ export class DynamicMissions {
     }
     if (d < 3.6 || holders > 0) {
       if (holders > 0) {
-        m.progress = Math.min(1, m.progress + (dt * holders) / 12);
+        const repairSpeed = level.operationEffects && level.operationEffects.repairSpeedMultiplier || 1;
+        m.progress = Math.min(1, m.progress + (dt * holders * repairSpeed) / 12);
         m.tickT -= dt;
         if (m.tickT <= 0) {
           m.tickT = 0.35;
