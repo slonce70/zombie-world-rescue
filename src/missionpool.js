@@ -260,7 +260,12 @@ export class DynamicMissions {
       m.rescueProgress = 0;
       m.guards = [];
       m.explosive = this._makeCastleExplosive(m);
-      if (m.beam && m.beam.group) m.beam.group.visible = false;
+      m.plantPoint = this._castlePlantPoint(m);
+      if (m.beam && m.beam.group) {
+        m.beam.group.position.x = m.explosive.x;
+        m.beam.group.position.z = m.explosive.z;
+        m.beam.group.visible = false;
+      }
     } else if (type === 'barracks') {
       m.hp = 2500;
       m.maxHp = 2500;
@@ -281,11 +286,9 @@ export class DynamicMissions {
 
   _makeCastleExplosive(m) {
     const level = this.level;
-    const gate = level.world.castleGate;
-    const gx = gate ? gate.x : m.site.x;
-    const gz = gate ? gate.z : m.site.z + m.site.r;
-    const x = gx - 12;
-    const z = gz + 9;
+    const stash = level.country.map.sites?.warehouse || level.country.map.storySites?.railDepot;
+    const x = stash ? stash.x + 8 : m.site.x + 70;
+    const z = stash ? stash.z - 8 : m.site.z + 70;
     const y = level.world.groundH(x, z);
     const group = new THREE.Group();
     const crate = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.1), toonMat(0x8a5a32));
@@ -1458,10 +1461,15 @@ export class DynamicMissions {
 
   _castleTarget(m) {
     if (m.phase === 'find') return m.explosive;
-    if (m.phase === 'carry') return this.level.world.castleGate || m.site;
-    if (m.phase === 'plant' || m.phase === 'fight') return this.level.world.castleGate || m.site;
+    if (m.phase === 'carry' || m.phase === 'plant') return m.plantPoint;
+    if (m.phase === 'fight') return this.level.world.castleGate || m.site;
     if (m.phase === 'rescue') return this.level.world.castleDungeon || m.site;
     return null;
+  }
+
+  _castlePlantPoint(m) {
+    const gate = this.level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
+    return { x: gate.x, z: gate.z + 6 };
   }
 
   _castleObjectiveActive() {
@@ -1491,6 +1499,10 @@ export class DynamicMissions {
         explosive.taken = true;
         m.phase = 'carry';
         m.title = t('Віднеси вибухівку до воріт замку');
+        if (m.beam && m.beam.group) {
+          m.beam.group.position.x = m.plantPoint.x;
+          m.beam.group.position.z = m.plantPoint.z;
+        }
         level.audio.pickup();
         level.bus.emit('toast', t('🧨 Ящик у тебе — неси його до воріт!'));
       }
@@ -1502,8 +1514,7 @@ export class DynamicMissions {
       explosive.z = player.pos.z;
       explosive.mesh.position.set(player.pos.x, player.pos.y + 0.75, player.pos.z - 0.75);
       explosive.mesh.rotation.y = player.yaw || 0;
-      const gate = level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
-      const near = Math.hypot(player.pos.x - gate.x, player.pos.z - gate.z) < 5;
+      const near = Math.hypot(player.pos.x - m.plantPoint.x, player.pos.z - m.plantPoint.z) < 3.5;
       if (near) {
         m.phase = 'plant';
         m.title = t('Заклади вибухівку біля воріт');
@@ -1512,10 +1523,10 @@ export class DynamicMissions {
     }
 
     if (m.phase === 'plant') {
-      const gate = level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
-      explosive.mesh.position.set(gate.x, level.world.groundH(gate.x, gate.z) + 0.05, gate.z + 1.1);
+      const point = m.plantPoint;
+      explosive.mesh.position.set(point.x, level.world.groundH(point.x, point.z) + 0.05, point.z);
       explosive.mesh.rotation.y = 0;
-      const near = Math.hypot(player.pos.x - gate.x, player.pos.z - gate.z) < 5.5;
+      const near = Math.hypot(player.pos.x - point.x, player.pos.z - point.z) < 3.5;
       if (near) this.prompt = { text: t('Тримай {k} — заклади вибухівку', { k: interactKey() }), hold: true, progress: m.plantProgress };
       if (near && allowControl && input.down('KeyE')) {
         m.plantProgress = Math.min(1, m.plantProgress + dt / 2.2);
