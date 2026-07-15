@@ -5,6 +5,7 @@ import { t } from './i18n.js';
 import { WEAPONS } from './player.js';
 import { GADGETS } from './extras.js';
 import { clamp } from './utils.js';
+import { momentumProgress, momentumTier, MOMENTUM_TIERS } from './combatmomentum.js';
 
 // 🪧 черга банерів: мінімальний показ (нижче цього новий низькопріоритетний чекає в черзі)
 // і максимальна довжина черги (переповнення викидає найстаріший низькопріоритетний).
@@ -355,14 +356,20 @@ export class HUD {
     const combo = level.combo ? level.combo.n : 0;
     if (combo >= 3) {
       this.el.combo.classList.add('show');
+      const tier = momentumTier(level.combo);
+      this.el.combo.dataset.tier = String(tier);
+      this.el.combo.style.setProperty('--combo-left', `${Math.round(momentumProgress(level.combo) * 100)}%`);
       if (combo !== this._lastCombo) {
-        this.el.combo.textContent = `🔥 x${combo}`;
+        const tierIcon = ['🔥', '🔥', '⚔️', '☄️'][tier];
+        const next = MOMENTUM_TIERS[tier + 1];
+        this.el.combo.innerHTML = `<span class="combo-count">${tierIcon} x${combo}</span>${next ? `<span class="combo-next">→ ${next.at}</span>` : '<span class="combo-next">MAX</span>'}<span class="combo-life"></span>`;
         this.el.combo.classList.remove('pop');
         void this.el.combo.offsetWidth;
         this.el.combo.classList.add('pop');
       }
     } else {
       this.el.combo.classList.remove('show');
+      this.el.combo.dataset.tier = '0';
     }
     this._lastCombo = combo;
 

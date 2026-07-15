@@ -14,6 +14,7 @@ import { HUD } from './hud.js';
 import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
 import { Draft } from './draft.js';
 import { RunBuild } from './runbuild.js';
+import { advanceMomentum, tickMomentum } from './combatmomentum.js';
 import {
   EXPEDITION_NODE_TYPES, EXPEDITION_STEPS, chooseExpeditionNode, completeExpeditionNode,
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
@@ -121,7 +122,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 503;
+const APP_VERSION = 504;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -3518,11 +3519,19 @@ class Game {
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
-      c.n++;
-      c.t = 3.2;
-      if (c.n > c.best) c.best = c.n;
+      const momentum = advanceMomentum(c);
       if (c.best > this.save.stats.bestCombo) this.save.stats.bestCombo = c.best;
       if (c.n >= 3) this.hud.comboPop(c.n);
+      if (momentum.tierUp) {
+        const titles = [null, '🔥 РОЗІГРІВ!', '⚔️ НАТИСК!', '☄️ НЕСТРИМНИЙ!'];
+        const descriptions = [null,
+          '+10% швидкості · +15% темпу вогню й перезарядки',
+          '+25% шкоди · +15% швидкості · +25% темпу',
+          '+50% шкоди · +25% швидкості · +40% темпу'];
+        this.hud.banner(t(titles[momentum.tier]), t(descriptions[momentum.tier]), 2.7, { prio: 1 });
+        this.hud.powerFlash(momentum.tier === 3 ? 'rgba(255,74,52,0.58)' : 'rgba(255,210,63,0.48)');
+        this.audio.levelUp();
+      }
       if (c.n % 5 === 0) {
         const bonus = c.n * 2;
         level.addCoins(bonus);
@@ -5187,10 +5196,7 @@ class Game {
         // 🌪️ піщана буря Єгипту: оверлей туману лягає ПІСЛЯ нічного перерахунку
         if (this.level.sandstorm) this.level.sandstorm.update(simDt);
         // комбо згасає разом із симуляцією: freeze-frame не краде серію
-        if (this.level.combo.t > 0) {
-          this.level.combo.t -= simDt;
-          if (this.level.combo.t <= 0) this.level.combo.n = 0;
-        }
+        tickMomentum(this.level.combo, simDt);
         this._updateMusic(simDt);
         // відлік смерті
         if (this.deathT >= 0) {
