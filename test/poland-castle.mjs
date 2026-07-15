@@ -16,7 +16,14 @@ const assert = (value, message, details = '') => {
 };
 
 const worldSource = await readFile(new URL('../src/world.js', import.meta.url), 'utf8');
-assert(worldSource.includes('const N = 48;') && worldSource.includes('block.rotation.y = -ang - Math.PI / 2;'), 'секції муру стоять вздовж стіни без щілин');
+assert(
+  worldSource.includes('const N = 48;')
+    && worldSource.includes('block.rotation.y = -ang - Math.PI / 2;')
+    && worldSource.includes('dungeonGap < 0.1')
+    && worldSource.includes('const h = 8.5;')
+    && !worldSource.includes('const broken = i === 1'),
+  'мури суцільні, однакової висоти, а вежі цілі',
+);
 
 try {
   await page.goto(`${base}/?test&fresh`);
