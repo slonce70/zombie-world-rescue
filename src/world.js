@@ -3157,20 +3157,17 @@ export class World {
       const tx = x + Math.cos(a) * r;
       const tz = z + Math.sin(a) * r;
       const ty = this.groundH(tx, tz);
-      const broken = i === 1; // одна вежа зруйнована
-      const h = broken ? 8 : 14;
+      const h = 14;
       const tower = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4.0, h, 12), i % 2 ? stoneM : stoneM2);
       tower.position.set(tx, ty + h / 2, tz);
       tower.castShadow = true;
       this.staticGroup.add(tower);
-      if (!broken) {
-        for (let b = 0; b < 8; b++) {
-          const ba = (b / 8) * Math.PI * 2;
-          const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.8), stoneM);
-          merlon.position.set(tx + Math.cos(ba) * 3.2, ty + h + 0.6, tz + Math.sin(ba) * 3.2);
-          merlon.rotation.y = -ba;
-          this.staticGroup.add(merlon);
-        }
+      for (let b = 0; b < 8; b++) {
+        const ba = (b / 8) * Math.PI * 2;
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.8), stoneM);
+        merlon.position.set(tx + Math.cos(ba) * 3.2, ty + h + 0.6, tz + Math.sin(ba) * 3.2);
+        merlon.rotation.y = -ba;
+        this.staticGroup.add(merlon);
       }
       this._addCollider(tx, tz, 4.1, ty + h, 3.7);
     }
@@ -3180,11 +3177,11 @@ export class World {
       const ang = (i / N) * Math.PI * 2;
       const gateGap = Math.abs(ang - Math.PI / 2);
       const dungeonGap = Math.abs(ang - Math.PI);
-      if (gateGap < 0.22 || dungeonGap < 0.16) continue;
+      if (gateGap < 0.22 || dungeonGap < 0.1) continue;
       const bx = x + Math.cos(ang) * r;
       const bz = z + Math.sin(ang) * r;
       const by = this.groundH(bx, bz);
-      const h = this.rng.chance(0.12) ? 5.5 : 7.5;
+      const h = 8.5;
       const block = new THREE.Mesh(new THREE.BoxGeometry(5.0, h, 2.2), this.rng.chance(0.5) ? stoneM : stoneM2);
       block.position.set(bx, by + h / 2, bz);
       block.rotation.y = -ang - Math.PI / 2;
