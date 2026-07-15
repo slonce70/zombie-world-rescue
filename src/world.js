@@ -3145,10 +3145,12 @@ export class World {
     this._makeSign(x, z + r + 3, t('ОБЕРЕЖНО: СЛИЗЬКО! ⛸'), 0);
   }
 
-  // 🏰 руїни замку — арена боса
+  // 🏰 великий замок — відкритий центральний двір лишається ареною боса
   _lmCastleRuin({ x, z, r }) {
     const stoneM = toonMat(0x8d949c);
     const stoneM2 = toonMat(0x767e88);
+    const ironM = toonMat(0x303846);
+    const woodM = toonMat(0x5f3d28);
     // кутові вежі
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
@@ -3156,60 +3158,166 @@ export class World {
       const tz = z + Math.sin(a) * r;
       const ty = this.groundH(tx, tz);
       const broken = i === 1; // одна вежа зруйнована
-      const h = broken ? 4 : 9;
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, h, 10), i % 2 ? stoneM : stoneM2);
+      const h = broken ? 8 : 14;
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 4.0, h, 12), i % 2 ? stoneM : stoneM2);
       tower.position.set(tx, ty + h / 2, tz);
       tower.castShadow = true;
       this.staticGroup.add(tower);
       if (!broken) {
-        for (let b = 0; b < 6; b++) {
-          const ba = (b / 6) * Math.PI * 2;
-          const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.6), stoneM);
-          merlon.position.set(tx + Math.cos(ba) * 2.2, ty + h + 0.45, tz + Math.sin(ba) * 2.2);
+        for (let b = 0; b < 8; b++) {
+          const ba = (b / 8) * Math.PI * 2;
+          const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 0.8), stoneM);
+          merlon.position.set(tx + Math.cos(ba) * 3.2, ty + h + 0.6, tz + Math.sin(ba) * 3.2);
           merlon.rotation.y = -ba;
           this.staticGroup.add(merlon);
         }
       }
-      this._addCollider(tx, tz, 2.9, ty + h, 2.6);
+      this._addCollider(tx, tz, 4.1, ty + h, 3.7);
     }
-    // зруйновані стіни між вежами (з проходом-брамою на півдні)
-    const N = 30;
+    // високі мури; отвори лишаємо тільки під головну браму (+Z) і підземелля (-X)
+    const N = 40;
     for (let i = 0; i < N; i++) {
       const ang = (i / N) * Math.PI * 2;
-      let dAng = Math.abs(ang - Math.PI / 2);
-      if (dAng > Math.PI) dAng = Math.PI * 2 - dAng;
-      if (dAng < 0.3) continue; // брама
-      // пропуски-руйнування
-      if (this.rng.chance(0.22)) continue;
+      const gateGap = Math.abs(ang - Math.PI / 2);
+      const dungeonGap = Math.abs(ang - Math.PI);
+      if (gateGap < 0.22 || dungeonGap < 0.16) continue;
       const bx = x + Math.cos(ang) * r;
       const bz = z + Math.sin(ang) * r;
       const by = this.groundH(bx, bz);
-      const h = this.rng.range(2.2, 4.2);
-      const block = new THREE.Mesh(new THREE.BoxGeometry(2.4, h, 1.6), this.rng.chance(0.5) ? stoneM : stoneM2);
-      block.position.set(bx, by + h / 2 - 0.3, bz);
-      block.rotation.y = -ang + this.rng.range(-0.1, 0.1);
+      const h = this.rng.chance(0.12) ? 5.5 : 7.5;
+      const block = new THREE.Mesh(new THREE.BoxGeometry(5.0, h, 2.2), this.rng.chance(0.5) ? stoneM : stoneM2);
+      block.position.set(bx, by + h / 2, bz);
+      block.rotation.y = -ang;
       block.castShadow = true;
       this.staticGroup.add(block);
-      this._addCollider(bx, bz, 1.5, by + h, 1.3);
+      this._addCollider(bx, bz, 2.6, by + h, 2.1);
     }
-    // брама: дві колони + прапори
+
+    // справжня двостулкова брама на дорозі до замку
+    const gateZ = z + r;
+    const gateY = this.groundH(x, gateZ);
     for (const side of [-1, 1]) {
-      const px = x + side * 5, pz = z + r;
-      const py = this.groundH(px, pz);
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.2, 6, 8), stoneM);
-      col.position.set(px, py + 3, pz);
+      const px = x + side * 6;
+      const py = this.groundH(px, gateZ);
+      const col = new THREE.Mesh(new THREE.BoxGeometry(3.0, 10, 3.2), stoneM);
+      col.position.set(px, py + 5, gateZ);
       col.castShadow = true;
       this.staticGroup.add(col);
-      this._addCollider(px, pz, 1.3, py + 6, 1.1);
+      this._addCollider(px, gateZ, 1.9, py + 10, 1.7);
       const flagGeo = new THREE.PlaneGeometry(1.6, 0.9, 6, 2);
       const flag = new THREE.Mesh(flagGeo, new THREE.MeshToonMaterial({
         color: 0x8d3bbd, gradientMap: toonMat(0).gradientMap, side: THREE.DoubleSide,
       }));
-      flag.position.set(px + 0.85, py + 6.5, pz);
+      flag.position.set(px + 0.85, py + 10.8, gateZ);
       this.scene.add(flag);
       this.animatedFlags.push(flag);
     }
+    const gateGroup = new THREE.Group();
+    const doors = [];
+    for (const side of [-1, 1]) {
+      const door = new THREE.Mesh(new THREE.BoxGeometry(4.5, 6.4, 0.45), woodM);
+      door.position.set(side * 2.27, 3.2, 0);
+      door.castShadow = true;
+      gateGroup.add(door);
+      doors.push(door);
+      for (let yBand = 1.1; yBand < 6.3; yBand += 2.0) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 0.52), ironM);
+        band.position.set(side * 2.27, yBand, 0);
+        gateGroup.add(band);
+      }
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(15, 2.0, 3.4), stoneM2);
+    lintel.position.set(0, 9.0, 0);
+    gateGroup.add(lintel);
+    gateGroup.position.set(x, gateY, gateZ + 0.15);
+    gateGroup.visible = false;
+    this.scene.add(gateGroup);
+    const gateCollider = { x, z: gateZ, r: 4.8, top: gateY + 6.6 };
+    const gateOccluder = { x, z: gateZ, r: 4.6, h: gateY + 6.6 };
+    this.castleGate = {
+      group: gateGroup, doors, collider: gateCollider, occluder: gateOccluder,
+      x, z: gateZ, y: gateY, active: false, destroyed: false,
+    };
+
+    // темний вхід у підземелля на західному мурі, закритий видимими ґратами
+    const dungeonX = x - r;
+    const dungeonY = this.groundH(dungeonX, z);
+    const dungeonShell = new THREE.Group();
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.4, 0.35), toonMat(0x171b24));
+    mouth.position.y = 2.7;
+    dungeonShell.add(mouth);
+    for (const side of [-1, 1]) {
+      const jamb = new THREE.Mesh(new THREE.BoxGeometry(1.3, 6.2, 2.6), stoneM2);
+      jamb.position.set(side * 3.7, 3.1, 0);
+      dungeonShell.add(jamb);
+    }
+    const dungeonLintel = new THREE.Mesh(new THREE.BoxGeometry(8.8, 1.4, 2.6), stoneM);
+    dungeonLintel.position.set(0, 6.1, 0);
+    dungeonShell.add(dungeonLintel);
+    dungeonShell.position.set(dungeonX, dungeonY, z);
+    dungeonShell.rotation.y = Math.PI / 2;
+    this.staticGroup.add(dungeonShell);
+
+    const grate = new THREE.Group();
+    for (let bx = -3; bx <= 3; bx += 1) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 5.2, 0.2), ironM);
+      bar.position.set(bx, 2.6, 0);
+      grate.add(bar);
+    }
+    for (const by of [1.0, 3.0, 5.0]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.18, 0.22), ironM);
+      bar.position.set(0, by, 0);
+      grate.add(bar);
+    }
+    grate.position.set(dungeonX + 0.35, dungeonY, z);
+    grate.rotation.y = Math.PI / 2;
+    grate.visible = false;
+    this.scene.add(grate);
+    const dungeonCollider = { x: dungeonX + 0.5, z, r: 3.3, top: dungeonY + 5.5 };
+    this.castleDungeon = {
+      group: grate, entrance: dungeonShell, grate, collider: dungeonCollider,
+      x: dungeonX + 4.5, z, y: dungeonY, entranceX: dungeonX, active: false, open: false,
+    };
+
     this._makeSign(x + 10, z + r + 6, t('НЕБЕЗПЕКА: БОС!'), 0);
+  }
+
+  activateCastleMission() {
+    const gate = this.castleGate;
+    const dungeon = this.castleDungeon;
+    if (!gate || !dungeon || gate.active) return false;
+    gate.active = true;
+    dungeon.active = true;
+    gate.group.visible = true;
+    dungeon.grate.visible = true;
+    this.colliders.push(gate.collider, dungeon.collider);
+    this.occluders.push(gate.occluder);
+    this._buildGrid();
+    return true;
+  }
+
+  destroyCastleGate() {
+    const gate = this.castleGate;
+    if (!gate || gate.destroyed) return false;
+    gate.destroyed = true;
+    gate.group.removeFromParent();
+    const ci = this.colliders.indexOf(gate.collider);
+    if (ci >= 0) this.colliders.splice(ci, 1);
+    const oi = this.occluders.indexOf(gate.occluder);
+    if (oi >= 0) this.occluders.splice(oi, 1);
+    this._buildGrid();
+    return true;
+  }
+
+  openCastleDungeon() {
+    const dungeon = this.castleDungeon;
+    if (!dungeon || dungeon.open) return false;
+    dungeon.open = true;
+    dungeon.grate.removeFromParent();
+    const i = this.colliders.indexOf(dungeon.collider);
+    if (i >= 0) this.colliders.splice(i, 1);
+    this._buildGrid();
+    return true;
   }
 
   // 🚂 залізничне депо: рейки, вагони, платформа

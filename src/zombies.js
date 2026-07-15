@@ -222,7 +222,9 @@ export class Zombies {
         stats.chaseSpeed *= wm.speedMul;
       }
     }
-    const rig = finalType === 'boss' ? makeBoss(bossStyle) : makeZombie(finalType, vrng);
+    const castleKnight = finalType === 'gladiator' && opts.castleKnight === true;
+    if (castleKnight) Object.assign(stats, { hp: 150, chestHp: 500, helmetHp: 250 });
+    const rig = finalType === 'boss' ? makeBoss(bossStyle) : makeZombie(finalType, vrng, castleKnight ? 'castleKnight' : '');
     const y = this.world.groundH(x, z);
     rig.group.position.set(x, y, z);
     rig.group.rotation.y = this.rng.next() * 6.28;
@@ -233,7 +235,7 @@ export class Zombies {
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = finalType === 'boss' ? 1 : this.diff.hp * coopScale;
-    const maxHp = this.hpWithSettings(stats.hp * hpScale, opts);
+    const maxHp = castleKnight ? 150 : this.hpWithSettings(stats.hp * hpScale, opts);
     stats.hp = maxHp;
     const z_ = {
       nid, rig, type: finalType, stats,
@@ -244,6 +246,7 @@ export class Zombies {
       guard: !!opts.guard,
       zone: opts.zone || null,
       horde: !!opts.horde,
+      castleKnight,
       aggroed: !!opts.horde,
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,
@@ -314,16 +317,16 @@ export class Zombies {
       z_.shieldObj = shield;
       z_.shieldRecastCd = 0; // стартує зі щитом; >0 лише після зламу
     }
-    if (finalType === 'ironclad') {
-      // 🦾 нагрудник: окрема група на тулубі (клонована з шаблоном)
-      z_.chestHp = z_.chestMax = stats.chestHp;
+    z_.chestHp = z_.chestMax = stats.chestHp || 0;
+    z_.helmetHp = z_.helmetMax = stats.helmetHp || 0;
+    if (z_.chestMax > 0 || z_.helmetMax > 0) {
+      // Броня — іменовані групи, клоновані разом із шаблоном персонажа.
       rig.body.traverse((o) => {
         if (o.name === 'chestPlate') z_.chestObj = o;
+        if (o.name === 'helmetArmor') z_.helmetObj = o;
         if (o.name === 'chestCracks1') { z_.chestCracks1 = o; o.visible = false; }
         if (o.name === 'chestCracks2') { z_.chestCracks2 = o; o.visible = false; }
       });
-    } else {
-      z_.chestHp = 0;
     }
     if (finalType === 'vampire') {
       // 🔥 вогонь горіння на сонці — per-instance, чіпляємо як щит (на rig.body). Тоглиться вдень в update().
@@ -765,10 +768,13 @@ export class Zombies {
         return;
       }
     }
-    // 🦾 нагрудник броньовика: ловить усе, КРІМ влучань у голову
-    if (z.chestHp > 0 && !headshot) {
-      const dealt = Math.min(amt, z.chestHp);
-      z.chestHp -= amt;
+    // 🛡️ Нагрудник ловить body-shot, шолом castleKnight — headshot.
+    const armorKind = headshot ? 'helmet' : 'chest';
+    const armorHpKey = `${armorKind}Hp`;
+    const armorObjKey = `${armorKind}Obj`;
+    if (z[armorHpKey] > 0) {
+      const dealt = Math.min(amt, z[armorHpKey]);
+      z[armorHpKey] -= amt;
       if (dealt > 0) this.level.bus.emit('zombieDamaged', dealt, z);
       this._aggro(z);
       for (const o of this.list) {
@@ -776,27 +782,27 @@ export class Zombies {
           && Math.hypot(o.x - z.x, o.z - z.z) < 13) this._aggro(o);
       }
       const level = this.level;
-      if (!this._ironHintShown) {
+      if (armorKind === 'chest' && z.type === 'ironclad' && !this._ironHintShown) {
         this._ironHintShown = true;
         level.bus.emit('toast', t('🦾 Броньовик! Нагрудник не проб\'єш — цілься в ГОЛОВУ!'));
       }
-      const sparkPos = new THREE.Vector3(z.x, z.y + 1.2, z.z);
-      if (z.chestHp > 0) {
-        if (z.chestCracks1) z.chestCracks1.visible = z.chestHp <= z.chestMax * 0.6;
-        if (z.chestCracks2) z.chestCracks2.visible = z.chestHp <= z.chestMax * 0.3;
+      const sparkPos = new THREE.Vector3(z.x, z.y + (headshot ? z.rig.height * 0.82 : 1.2), z.z);
+      if (z[armorHpKey] > 0) {
+        if (armorKind === 'chest' && z.chestCracks1) z.chestCracks1.visible = z.chestHp <= z.chestMax * 0.6;
+        if (armorKind === 'chest' && z.chestCracks2) z.chestCracks2.visible = z.chestHp <= z.chestMax * 0.3;
         level.effects.burst(sparkPos, 0xc9d4e2, 3, { speed: 2.4, up: 1.4, life: 0.3, size: 0.65 });
         level.audio.clang();
       } else {
-        // 💥 нагрудник пробито! (тіло лишається — цілься в голову/добивай — навмисний 2-крок)
-        z.chestHp = 0;
-        if (z.chestObj) z.chestObj.visible = false;
-        if (z.chestCracks1) z.chestCracks1.visible = false;
-        if (z.chestCracks2) z.chestCracks2.visible = false;
+        // Броню знято, тіло лишається цілим — наступний постріл уже шкодить HP.
+        z[armorHpKey] = 0;
+        if (z[armorObjKey]) z[armorObjKey].visible = false;
+        if (armorKind === 'chest' && z.chestCracks1) z.chestCracks1.visible = false;
+        if (armorKind === 'chest' && z.chestCracks2) z.chestCracks2.visible = false;
         level.effects.burst(sparkPos, 0x7d8aa0, 12, { speed: 4, up: 3.5, life: 0.7, size: 1.2 });
         level.effects.ring(new THREE.Vector3(z.x, z.y, z.z), 0xc9d4e2, 2.2);
         level.audio.shieldBreak();
-        level.bus.emit('chestBroken', z);
-        level.netEv('zcb', z.nid);
+        level.bus.emit(armorKind === 'helmet' ? 'helmetBroken' : 'chestBroken', z);
+        if (armorKind === 'chest') level.netEv('zcb', z.nid);
       }
       return;
     }

@@ -1,4 +1,4 @@
-// Карта Польщі: містечко Зимове — ринкова площа, замерзле озеро, руїни замку, депо
+// Карта Польщі: містечко Зимове — ринкова площа, замерзле озеро, великий замок, депо
 import { ridge } from '../utils.js';
 
 export default {
@@ -15,12 +15,12 @@ export default {
     rescue: { x: -26, z: -12, r: 14 },       // кам'яниця на захід від площі
     tower: { x: 140, z: -62, r: 16 },        // пагорб за озером
     warehouse: { x: -112, z: 62, r: 22 },    // склад біля депо
-    arena: { x: 12, z: -162, r: 30 },        // руїни замку
+    arena: { x: 12, z: -162, r: 30 },        // відкритий двір замку — арена боса
   },
   storySites: {
     townSquare: { x: 0, z: -10, r: 16 },
     railDepot: { x: -112, z: 62, r: 12 },
-    castleRuin: { x: 12, z: -162, r: 18 },
+    castleRuin: { x: 12, z: -162, r: 36 },
     arena: { x: 12, z: -162, r: 28 },
     bonfires: [
       { x: -18, z: -20, r: 5 },
@@ -66,7 +66,7 @@ export default {
   landmarkParams: {
     townSquare: { x: 0, z: -10, r: 22 },
     frozenLake: { x: 92, z: 32, r: 36 },
-    castleRuin: { x: 12, z: -162, r: 30 },
+    castleRuin: { x: 12, z: -162, r: 36 },
     railDepot: { x: -112, z: 62 },
     garlandTrees: { spots: [[-6, -2], [8, -20], [-40, 50], [30, 60]] },
   },

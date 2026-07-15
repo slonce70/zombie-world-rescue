@@ -38,7 +38,7 @@ SLOW=4 node test/e2e.mjs
 ```bash
 sha=$(git rev-parse --short HEAD)
 cd worker
-npx wrangler deploy --tag v502 --message "v502 $sha"
+npx wrangler deploy --tag v503 --message "v503 $sha"
 ```
 
 Worker має бути backward-compatible з попереднім клієнтом. При production-регресії виконати `npx wrangler rollback <previous-version-id>`.
@@ -68,9 +68,9 @@ cd worker && npx wrangler deployments list
 Тільки після live-перевірки:
 
 ```bash
-git tag v502
-git push origin v502
-gh release create v502 --target main --title "v502 — Завершений Живий фронт" --notes-file CHANGELOG.md --latest
+git tag v503
+git push origin v503
+gh release create v503 --target main --title "v503 — Великий штурм замку" --notes-file CHANGELOG.md --latest
 ```
 
 Для аварійного виправлення Pages не зменшувати версію cache: зробити revert, підняти номер і випустити наступний patch через ті самі гейти.
