@@ -31,6 +31,8 @@ try {
     const map = g.level.country.map;
     const castleSite = map.storySites.castleRuin;
     const arenaSite = map.storySites.arena;
+    const warehouse = map.sites.warehouse;
+    const gate = g.level.world.castleGate;
     g.test.completeStoryObjective('pol-castle');
     return {
       radius: castle.site.r,
@@ -42,12 +44,20 @@ try {
       gateVisible: g.level.world.castleGate.group.visible,
       gateCollider: g.level.world.colliders.includes(g.level.world.castleGate.collider),
       dungeonCollider: g.level.world.colliders.includes(g.level.world.castleDungeon.collider),
+      crateGateDistance: Math.hypot(castle.explosive.x - gate.x, castle.explosive.z - gate.z),
+      crateWarehouseDistance: Math.hypot(castle.explosive.x - warehouse.x, castle.explosive.z - warehouse.z),
+      plantGateDistance: Math.hypot(castle.plantPoint.x - gate.x, castle.plantPoint.z - gate.z),
+      gateColliderRadius: gate.collider.r,
+      crateBeamDistance: Math.hypot(castle.explosive.x - castle.beam.group.position.x, castle.explosive.z - castle.beam.group.position.z),
     };
   });
   assert(state.radius >= 34, 'замок справді великий', JSON.stringify(state));
   assert(state.siteDistance > state.requiredDistance, 'замок є окремою будівлею далеко від арени', JSON.stringify(state));
   assert(state.phase === 'find' && state.castleState === 'locked' && state.storyState === 'locked', 'замкнена сюжетна ціль не виконується завчасно', JSON.stringify(state));
   assert(state.gateVisible && state.gateCollider && state.dungeonCollider, 'ворота й підземелля активні лише для castle mission');
+  assert(state.crateGateDistance > 100 && state.crateWarehouseDistance < 12, 'ящик захований біля складу, а не біля замку', JSON.stringify(state));
+  assert(state.crateBeamDistance < 0.1, '3D-маяк показує на далекий ящик', JSON.stringify(state));
+  assert(state.plantGateDistance > state.gateColliderRadius + 1, 'точка встановлення доступна перед колайдером воріт', JSON.stringify(state));
   await page.evaluate(() => {
     const g = window.__game;
     const arena = g.level.country.map.storySites.arena;
@@ -102,6 +112,8 @@ try {
       towerPoint: g.level.world.repairPoint,
       placement: g.__trainMissionPlacement,
       waveSites: g.__trainWaveSites,
+      plantPoint: castle.plantPoint,
+      castleBeam: { x: castle.beam.group.position.x, z: castle.beam.group.position.z },
     };
   });
   assert(state.trainDone === 'done' && state.trainStarted, 'пульт у депо справді запускає сюжетний поїзд', JSON.stringify(state));
@@ -110,6 +122,7 @@ try {
   assert(Math.hypot(state.placement.point.x - state.placement.beam.x, state.placement.point.z - state.placement.beam.z) < 0.1, '3D-маяк поїзда стоїть біля пульта', JSON.stringify(state.placement));
   assert(state.waveSites.length === 2 && state.waveSites.every((site) => Math.hypot(state.trainPoint.x - site.x, state.trainPoint.z - site.z) < 15), 'обидві хвилі нападають біля поїзда', JSON.stringify(state.waveSites));
   assert(state.phase === 'carry' && /воріт/i.test(state.title), 'ящик підбирається і HUD переходить до воріт', JSON.stringify(state));
+  assert(Math.hypot(state.plantPoint.x - state.castleBeam.x, state.plantPoint.z - state.castleBeam.z) < 0.1, '3D-маяк після підбору переходить до точки встановлення', JSON.stringify(state));
   state = await page.evaluate(() => {
     const g = window.__game;
     const delegate = g.level.missions.delegate;
@@ -133,9 +146,9 @@ try {
   await page.evaluate(() => {
     const g = window.__game;
     const castle = g.level.missions.delegate.get('castle');
-    const gate = g.level.world.castleGate;
-    g.test.teleport(gate.x, gate.z + 4);
+    g.test.teleport(castle.plantPoint.x, castle.plantPoint.z);
     g.level.missions.update(0.016, g.input, true);
+    if (castle.phase !== 'plant') throw new Error(`біля воріт має зʼявитися встановлення, маємо ${castle.phase}`);
     castle.plantProgress = 0.99;
     g.test.key('KeyE', true);
     g.level.missions.update(0.1, g.input, true);
