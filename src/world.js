@@ -3175,7 +3175,7 @@ export class World {
       this._addCollider(tx, tz, 4.1, ty + h, 3.7);
     }
     // високі мури; отвори лишаємо тільки під головну браму (+Z) і підземелля (-X)
-    const N = 40;
+    const N = 48;
     for (let i = 0; i < N; i++) {
       const ang = (i / N) * Math.PI * 2;
       const gateGap = Math.abs(ang - Math.PI / 2);
@@ -3187,7 +3187,7 @@ export class World {
       const h = this.rng.chance(0.12) ? 5.5 : 7.5;
       const block = new THREE.Mesh(new THREE.BoxGeometry(5.0, h, 2.2), this.rng.chance(0.5) ? stoneM : stoneM2);
       block.position.set(bx, by + h / 2, bz);
-      block.rotation.y = -ang;
+      block.rotation.y = -ang - Math.PI / 2;
       block.castShadow = true;
       this.staticGroup.add(block);
       this._addCollider(bx, bz, 2.6, by + h, 2.1);
