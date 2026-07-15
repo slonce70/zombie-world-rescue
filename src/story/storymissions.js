@@ -190,7 +190,10 @@ export class StoryMissions {
       if (active.id === 'pol-castle') {
         const mission = this.delegate.get('castle');
         const target = mission && this.delegate._castleTarget(mission);
-        if (target) mk.push({ x: target.x, z: target.z, color: '#ff9e63', icon: mission.phase === 'rescue' ? '🆘' : '🏰' });
+        if (target) mk.push({
+          x: target.x, z: target.z, color: '#ff9e63',
+          icon: mission.phase === 'rescue' ? '🆘' : mission.phase === 'dungeon' ? '🧙' : '🏰',
+        });
       } else {
         const mission = this._delegateMissionForObjective(active);
         const targets = mission && mission.points ? mission.points.filter((point) => !point.done) : this._objectiveTargets(active);

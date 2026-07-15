@@ -121,6 +121,7 @@ export function rollMissionSet(countryId, seed, runIndex) {
 
 // аліаси старих ID — щоб тести і збережені посилання працювали
 const SLOT_ALIASES = { rescue: 0, tower: 1, warehouse: 2 };
+const CASTLE_PHASES = ['find', 'carry', 'plant', 'fight', 'dungeon', 'rescue', 'done'];
 
 export class DynamicMissions {
   // storyTypes — примусовий набір для сюжетного рівня (StoryMissions передає
@@ -259,6 +260,7 @@ export class DynamicMissions {
       m.plantProgress = 0;
       m.rescueProgress = 0;
       m.guards = [];
+      m.dungeonWizards = [];
       m.explosive = this._makeCastleExplosive(m);
       m.plantPoint = this._castlePlantPoint(m);
       if (m.beam && m.beam.group) {
@@ -626,7 +628,10 @@ export class DynamicMissions {
       }
       if (m.type === 'castle') {
         const target = this._castleTarget(m);
-        if (target) mk.push({ x: target.x, z: target.z, color: '#ff9e63', icon: m.phase === 'rescue' ? '🆘' : '🏰' });
+        if (target) mk.push({
+          x: target.x, z: target.z, color: '#ff9e63',
+          icon: m.phase === 'rescue' ? '🆘' : m.phase === 'dungeon' ? '🧙' : '🏰',
+        });
         continue;
       }
       if (m.points) {
@@ -1463,6 +1468,11 @@ export class DynamicMissions {
     if (m.phase === 'find') return m.explosive;
     if (m.phase === 'carry' || m.phase === 'plant') return m.plantPoint;
     if (m.phase === 'fight') return this.level.world.castleGate || m.site;
+    if (m.phase === 'dungeon') {
+      if (this.mirror && m.dungeonTarget) return m.dungeonTarget;
+      return m.dungeonWizards.find((z) => z.state !== 'dead' && !z.gone)
+        || this.level.world.castleDungeon || m.site;
+    }
     if (m.phase === 'rescue') return this.level.world.castleDungeon || m.site;
     return null;
   }
@@ -1542,16 +1552,34 @@ export class DynamicMissions {
       const knightLeft = m.guards.filter((z) => z.castleKnight && z.state !== 'dead' && !z.gone).length;
       m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: 25 - regularLeft, k: 5 - knightLeft });
       if (regularLeft === 0 && knightLeft === 0) {
-        m.phase = 'rescue';
-        m.title = t('Спустись у відкрите підземелля і звільни людей');
+        m.phase = 'dungeon';
+        m.title = t('Зайди у підземелля і переможи 5 зомбі-чаклунів');
         const dungeon = level.world.castleDungeon || m.site;
         if (level.world.openCastleDungeon) level.world.openCastleDungeon();
         else {
           if (dungeon.group) dungeon.group.removeFromParent();
           if (dungeon.collider) level.world.removeCollider(dungeon.collider);
         }
+        this._spawnCastleDungeonWizards(m);
+        m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.z, 0x9b6bff, '🧙');
+        level.bus.emit('toast', t('🔓 Прохід відкрито! Пройди 50-метрове підземелля і переможи 5 чаклунів!'));
+      }
+      return;
+    }
+
+    if (m.phase === 'dungeon') {
+      const left = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length;
+      m.title = t('Зачисть підземелля: чаклуни {n}/5', { n: 5 - left });
+      const dungeon = level.world.castleDungeon || m.site;
+      if (Math.hypot(player.pos.x - dungeon.x, player.pos.z - dungeon.z) < 4.5) {
+        this.prompt = { text: t('🔒 Спочатку переможи чаклунів — залишилося: {n}', { n: left }), hold: false };
+      }
+      if (left === 0) {
+        m.phase = 'rescue';
+        m.title = t('Дійди до кінця підземелля і звільни людей');
+        if (m.beam) m.beam.remove();
         m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
-        level.bus.emit('toast', t('🔓 Замок зачищено — прохід у підземелля відкрито!'));
+        level.bus.emit('toast', t('🧙 Усі чаклуни переможені — люди чекають у кінці підземелля!'));
       }
       return;
     }
@@ -1559,9 +1587,16 @@ export class DynamicMissions {
     if (m.phase === 'rescue') {
       const dungeon = level.world.castleDungeon || { x: m.site.x, z: m.site.z };
       const near = Math.hypot(player.pos.x - dungeon.x, player.pos.z - dungeon.z) < 4.5;
+      let holders = near && allowControl && input.down('KeyE') ? 1 : 0;
+      if (level.players) {
+        for (const pl of level.players) {
+          if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+          if (Math.hypot(pl.pos.x - dungeon.x, pl.pos.z - dungeon.z) < 4.5) holders++;
+        }
+      }
       if (near) this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
-      if (near && allowControl && input.down('KeyE')) {
-        m.rescueProgress = Math.min(1, m.rescueProgress + dt / 2);
+      if (holders > 0) {
+        m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 2);
         if (m.rescueProgress >= 1) this._rescueCastlePeople(m);
       } else if (m.rescueProgress > 0) {
         m.rescueProgress = Math.max(0, m.rescueProgress - dt * 0.4);
@@ -1613,6 +1648,22 @@ export class DynamicMissions {
       m.guards.push(zombie);
     }
     level.audio.horde();
+  }
+
+  _spawnCastleDungeonWizards(m) {
+    const level = this.level;
+    const dungeon = level.world.castleDungeon;
+    const spots = dungeon?.wizardSpawns || [];
+    m.dungeonWizards = spots.slice(0, 5).map((spot) => {
+      const wizard = level.zombies.spawn('wizard', spot.x, spot.z, {
+        horde: false,
+        guard: true,
+        zone: 'castle-dungeon',
+        anchor: { x: spot.x, z: spot.z, r: 4 },
+      });
+      wizard.castleDungeonWizard = true;
+      return wizard;
+    });
   }
 
   _rescueCastlePeople(m) {
@@ -1898,6 +1949,17 @@ export class DynamicMissions {
         for (const n of m.nestList) a.push(Math.round(n.progress * 100) / 100);
       } else if (m.type === 'barracks') {
         a.push(Math.max(0, Math.ceil(m.hp)));
+      } else if (m.type === 'castle') {
+        const regularLeft = m.guards.filter((z) => !z.castleKnight && z.state !== 'dead' && !z.gone).length;
+        const knightLeft = m.guards.filter((z) => z.castleKnight && z.state !== 'dead' && !z.gone).length;
+        const dungeonLeft = m.dungeonWizards.filter((z) => z.state !== 'dead' && !z.gone).length;
+        const target = this._castleTarget(m) || m.site;
+        a.push(
+          Math.max(0, CASTLE_PHASES.indexOf(m.phase)),
+          Math.round(m.rescueProgress * 100) / 100,
+          25 - regularLeft, 5 - knightLeft, dungeonLeft,
+          Math.round(target.x * 10) / 10, Math.round(target.z * 10) / 10,
+        );
       } else if (m.type === 'escort') a.push(m.started ? 1 : 0);
       else if (m.points) {
         a.push(m.activated);
@@ -1957,6 +2019,32 @@ export class DynamicMissions {
         m.hp = Math.max(0, Number(a[1]) || 0);
         m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: Math.ceil(m.hp) });
         if (m.hp <= 0) { m.destroyed = true; this._destroyBarracksVisual(m); }
+      } else if (m.type === 'castle') {
+        const previousPhase = m.phase;
+        const phaseIndex = Math.max(0, Math.min(CASTLE_PHASES.length - 1, Number(a[1]) || 0));
+        m.phase = CASTLE_PHASES[phaseIndex];
+        m.rescueProgress = Number(a[2]) || 0;
+        m.dungeonLeft = Number(a[5]) || 0;
+        m.dungeonTarget = Number.isFinite(a[6]) && Number.isFinite(a[7]) ? { x: a[6], z: a[7] } : null;
+        if (phaseIndex >= 3 && level.world.destroyCastleGate) level.world.destroyCastleGate();
+        if (phaseIndex >= 4 && level.world.openCastleDungeon) level.world.openCastleDungeon();
+        if (m.phase === 'fight') m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: a[3] || 0, k: a[4] || 0 });
+        else if (m.phase === 'dungeon') {
+          m.title = t('Зачисть підземелля: чаклуни {n}/5', { n: 5 - m.dungeonLeft });
+          if (previousPhase !== 'dungeon') {
+            if (m.beam) m.beam.remove();
+            const dungeon = level.world.castleDungeon || m.site;
+            m.beam = level.effects.makeBeam(dungeon.entranceX + 2, dungeon.z, 0x9b6bff, '🧙');
+          }
+        }
+        else if (m.phase === 'rescue') {
+          m.title = t('Дійди до кінця підземелля і звільни людей');
+          if (previousPhase !== 'rescue') {
+            if (m.beam) m.beam.remove();
+            const dungeon = level.world.castleDungeon || m.site;
+            m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
+          }
+        }
       } else if (m.type === 'escort') {
         if (a[1] && !m.started) { m.started = true; if (!m.traveler) this._spawnTraveler(m); }
         else if (!a[1]) { m.started = false; this._removeTraveler(m); }
@@ -2187,6 +2275,14 @@ export class DynamicMissions {
         if (near(m.site.x, m.site.z + 2, 5)) {
           this.prompt = { text: t('🧳 Натисни {k} — забери мандрівника', { k: interactKey() }), hold: false };
           if (pressE) { net.sendUse('escort'); input.justPressed.delete('KeyE'); pressE = false; }
+        }
+      } else if (m.type === 'castle') {
+        const dungeon = level.world.castleDungeon || m.site;
+        if (m.phase === 'dungeon' && near(dungeon.x, dungeon.z, 4.5) && m.dungeonLeft > 0) {
+          this.prompt = { text: t('🔒 Спочатку переможи чаклунів — залишилося: {n}', { n: m.dungeonLeft }), hold: false };
+        } else if (m.phase === 'rescue' && near(dungeon.x, dungeon.z, 4.5)) {
+          this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+          if (net) net.holdE = true;
         }
       } else if (m.points) {
         const cfg = ACT_CFG[m.type];

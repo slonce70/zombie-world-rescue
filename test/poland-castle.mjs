@@ -17,12 +17,13 @@ const assert = (value, message, details = '') => {
 
 const worldSource = await readFile(new URL('../src/world.js', import.meta.url), 'utf8');
 assert(
-  worldSource.includes('const N = 48;')
+  worldSource.includes('const N = Math.max(24, Math.round((48 * r / 36) / 4) * 4);')
     && worldSource.includes('block.rotation.y = -ang - Math.PI / 2;')
-    && worldSource.includes('dungeonGap < 0.1')
+    && worldSource.includes('gateGap < 7.9 || dungeonGap < 3.6')
     && worldSource.includes('const h = 8.5;')
     && worldSource.includes('lintel.position.set(0, 7.4, 0);')
     && worldSource.includes('mouth.position.set(0, 2.7, 0.8);')
+    && worldSource.includes('length: 50,')
     && !worldSource.includes('const broken = i === 1'),
   'мури суцільні, брама без верхньої діри, ґрати видно, а вежі цілі',
 );
@@ -210,18 +211,120 @@ try {
     }
     g.level.missions.update(0.016, g.input, true);
     const dungeon = g.level.world.castleDungeon;
+    const pathSamples = [];
+    for (let i = 1; i < dungeon.path.length; i++) {
+      const a = dungeon.path[i - 1], b = dungeon.path[i];
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      for (let d = 1; d < len; d += 1) pathSamples.push({
+        x: a.x + (b.x - a.x) * d / len,
+        z: a.z + (b.z - a.z) * d / len,
+      });
+    }
+    const maxPathPush = pathSamples.reduce((max, point) => {
+      const hit = g.level.world.collide(point.x, point.z, 0.45, dungeon.y + 1);
+      return Math.max(max, Math.hypot(hit.x - point.x, hit.z - point.z));
+    }, 0);
+    const dungeonMarker = g.level.missions.getMarkers().find((marker) => marker.icon === '🧙');
+    const delegate = g.level.missions.delegate;
+    const snapshot = delegate.netState();
+    const castleNet = snapshot.s[castle.slotIndex];
+    const originalOpen = g.level.world.openCastleDungeon;
+    const originalDestroy = g.level.world.destroyCastleGate;
+    let guestOpenCalls = 0, guestDestroyCalls = 0;
+    g.level.world.openCastleDungeon = function (...args) { guestOpenCalls++; return originalOpen.apply(this, args); };
+    g.level.world.destroyCastleGate = function (...args) { guestDestroyCalls++; return originalDestroy.apply(this, args); };
+    castle.phase = 'find';
+    delegate.applyNet(snapshot);
+    g.level.world.openCastleDungeon = originalOpen;
+    g.level.world.destroyCastleGate = originalDestroy;
     return {
       afterChest, afterHelmet, afterBreak, afterBody, phase: castle.phase,
       dungeonOpen: dungeon.open,
       dungeonPhysicsGone: !g.level.world.colliders.includes(dungeon.collider),
       title: castle.title,
+      dungeonLength: dungeon.length,
+      pathLength: dungeon.path.slice(1).reduce((sum, point, i) => (
+        sum + Math.hypot(point.x - dungeon.path[i].x, point.z - dungeon.path[i].z)
+      ), 0),
+      wizardCount: castle.dungeonWizards.length,
+      wizardTypes: castle.dungeonWizards.map((z) => z.type),
+      maxPathPush,
+      dungeonMarker,
+      castleNet,
+      coopApplied: { phase: castle.phase, left: castle.dungeonLeft, guestOpenCalls, guestDestroyCalls },
     };
   });
   assert(state.afterChest.join(',') === '150,400,250', 'постріл у тіло пошкоджує нагрудник, не HP', JSON.stringify(state));
   assert(state.afterHelmet.join(',') === '150,400,150', 'постріл у голову пошкоджує шолом, не HP', JSON.stringify(state));
   assert(state.afterBreak[0] === 150 && state.afterBreak[1] === 0 && state.afterBreak[2] === false, 'зламаний нагрудник зникає');
-  assert(state.afterBody.join(',') === '120,0' && state.phase === 'rescue', 'після броні шкода йде в тіло, а зачистка відкриває порятунок', JSON.stringify(state));
-  assert(state.dungeonOpen && state.dungeonPhysicsGone && /відкрите підземелля/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
+  assert(state.afterBody.join(',') === '120,0' && state.phase === 'dungeon', 'після броні шкода йде в тіло, а зачистка відкриває підземелля', JSON.stringify(state));
+  assert(state.dungeonOpen && state.dungeonPhysicsGone && /(5 зомбі-чаклунів|чаклуни 0\/5)/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
+  assert(state.dungeonLength === 50 && state.pathLength === 50, 'прохід підземелля має рівно 50 метрів', JSON.stringify(state));
+  assert(state.maxPathPush < 0.15, 'усі 50 метрів центрального проходу фізично прохідні', JSON.stringify(state));
+  assert(state.wizardCount === 5 && state.wizardTypes.every((type) => type === 'wizard'), 'у підземеллі зʼявляються рівно 5 справжніх зомбі-чаклунів', JSON.stringify(state));
+  assert(state.dungeonMarker && state.castleNet[1] === 4 && state.castleNet[5] === 5, 'маркер чаклуна і co-op снапшот передають фазу підземелля та 5 ворогів', JSON.stringify(state));
+  assert(state.coopApplied.phase === 'dungeon' && state.coopApplied.left === 5 && state.coopApplied.guestOpenCalls === 1 && state.coopApplied.guestDestroyCalls === 1, 'co-op гість відкриває ґрати й отримує фазу підземелля зі снапшота', JSON.stringify(state));
+
+  await page.evaluate(() => {
+    const g = window.__game;
+    const dungeon = g.level.world.castleDungeon;
+    g.test.teleport(dungeon.entranceX + 3, dungeon.z);
+    g.level.player.yaw = -Math.PI / 2;
+  });
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: 'test-results/poland-castle-dungeon.png' });
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const castle = g.level.missions.delegate.get('castle');
+    const dungeon = g.level.world.castleDungeon;
+    g.test.teleport(dungeon.x, dungeon.z);
+    castle.rescueProgress = 0.99;
+    g.test.key('KeyE', true);
+    g.level.missions.update(0.1, g.input, true);
+    g.test.key('KeyE', false);
+    return {
+      phase: castle.phase,
+      rescueProgress: castle.rescueProgress,
+      civilians: g.level.missions.civilians.length,
+      storyState: g.level.missions.get('pol-castle').state,
+      bossUnlocked: g.level.missions.bossUnlocked,
+      prompt: g.level.missions.delegate.prompt?.text || '',
+    };
+  });
+  assert(state.phase === 'dungeon' && state.rescueProgress === 0.99 && state.civilians === 0 && state.storyState === 'active' && !state.bossUnlocked, 'людей не можна звільнити, поки 5 чаклунів живі', JSON.stringify(state));
+  assert(/залишилося: 5/.test(state.prompt), 'біля полонених HUD пояснює, що спочатку треба перемогти чаклунів', JSON.stringify(state));
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const castle = g.level.missions.delegate.get('castle');
+    for (const wizard of castle.dungeonWizards.slice(0, 4)) {
+      wizard.shieldHp = 0;
+      wizard.damage(99999, null, false);
+    }
+    g.level.missions.update(0.016, g.input, true);
+    return {
+      phase: castle.phase,
+      title: castle.title,
+      marker: g.level.missions.getMarkers().find((marker) => marker.icon === '🧙'),
+    };
+  });
+  assert(state.phase === 'dungeon' && /4\/5/.test(state.title) && state.marker, 'після 4 чаклунів останній ворог ще блокує порятунок і лишається на мапі', JSON.stringify(state));
+
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const castle = g.level.missions.delegate.get('castle');
+    const wizard = castle.dungeonWizards[4];
+    wizard.shieldHp = 0;
+    wizard.damage(99999, null, false);
+    g.level.missions.update(0.016, g.input, true);
+    return {
+      phase: castle.phase,
+      title: castle.title,
+      marker: g.level.missions.getMarkers().find((marker) => marker.icon === '🆘'),
+    };
+  });
+  assert(state.phase === 'rescue' && /кінця підземелля/i.test(state.title) && state.marker, 'пʼятий чаклун відкриває порятунок і перемикає мапу на 🆘', JSON.stringify(state));
 
   await page.evaluate(() => {
     const g = window.__game;
