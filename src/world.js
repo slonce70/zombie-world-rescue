@@ -65,7 +65,7 @@ export class World {
     this._buildBarn();
     this._buildTower();
     this._buildWarehouse();
-    if (!(map.landmarks || []).includes('castleRuin')) this._buildArena();
+    this._buildArena();
     this._buildLandmarks();
     this._buildFun();
     this._buildClouds();
@@ -3145,7 +3145,7 @@ export class World {
     this._makeSign(x, z + r + 3, t('ОБЕРЕЖНО: СЛИЗЬКО! ⛸'), 0);
   }
 
-  // 🏰 великий замок — відкритий центральний двір лишається ареною боса
+  // 🏰 великий замок — окрема сюжетна будівля, не арена боса
   _lmCastleRuin({ x, z, r }) {
     const stoneM = toonMat(0x8d949c);
     const stoneM2 = toonMat(0x767e88);
@@ -3279,7 +3279,7 @@ export class World {
       x: dungeonX + 4.5, z, y: dungeonY, entranceX: dungeonX, active: false, open: false,
     };
 
-    this._makeSign(x + 10, z + r + 6, t('НЕБЕЗПЕКА: БОС!'), 0);
+    this._makeSign(x + 10, z + r + 6, t('ВЕЛИКИЙ ЗАМОК'), 0);
   }
 
   activateCastleMission() {
@@ -3378,6 +3378,25 @@ export class World {
       plat.position.set(px, this.groundH(px, z + 5.2) + 0.3, z + 5.2);
       this.staticGroup.add(plat);
     }
+    // окремий пульт сюжетного рятувального поїзда — не радіовежа
+    const px = x + 9, pz = z + 4.2;
+    const py = this.groundH(px, pz);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.7), toonMat(0x4d5a6e));
+    panel.position.set(px, py + 0.7, pz);
+    this.staticGroup.add(panel);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.46, 0.06), toonMat(0xff5544, 0xff2211, 0.6));
+    screen.position.set(px, py + 0.92, pz - 0.38);
+    this.scene.add(screen);
+    this.trainStartPoint = { x: px, z: pz - 1.1 };
+    this.trainControlScreen = screen;
+    this.rescueTrainStarted = false;
+  }
+
+  startRescueTrain() {
+    if (this.rescueTrainStarted) return false;
+    this.rescueTrainStarted = true;
+    if (this.trainControlScreen) this.trainControlScreen.material = toonMat(0x55ff88, 0x22ff66, 0.8);
+    return true;
   }
 
   // 🎄 ялинки з гірляндами

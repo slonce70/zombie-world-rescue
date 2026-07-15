@@ -122,7 +122,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
 {
   const ctxU = await browser.newContext({ viewport: { width: 1024, height: 768 } });
   const U = await ctxU.newPage();
-  await U.goto(`${BASE}/?test&fresh`);
+  await U.goto(`${BASE}/?test&fresh`, { timeout: T(30000) });
   await U.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
   const res = await U.evaluate(async () => {
     const { saveHasProgress, cloudSaveEnabled, DEFAULT_HERO, NEW_SAVE_COINS, SAVE_PROGRESS_KEYS, liberatedIds, liberatedCount, hasLiberated } = await import('/src/net/cloudsave.js');
@@ -283,7 +283,7 @@ const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } }
 const A = await ctxA.newPage();
 const errorsA = [];
 A.on('pageerror', (e) => errorsA.push(e.message));
-await A.goto(`${BASE}/${URL_PARAMS}`);
+await A.goto(`${BASE}/${URL_PARAMS}`, { timeout: T(30000) });
 await A.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 const codeA = await A.evaluate(async () => {
   const g = window.__game;
@@ -334,7 +334,7 @@ console.log('▸ Гравець Б: чистий браузер + код = пр�
 const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const B = await ctxB.newPage();
 // ?fresh не даємо: інакше adopt-нутий сейв знову зітреться після перезавантаження
-await B.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await B.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`, { timeout: T(30000) });
 await B.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 B.on('dialog', (d) => d.accept());
 await B.click('#btn-menu');
@@ -385,7 +385,7 @@ check('Б успадкував cid (далі синхрон той самий)',
 console.log('▸ bootSync: «почистив браузер» (cid зберігся через відновлення)');
 const ctxC = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const C = await ctxC.newPage();
-await C.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await C.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`, { timeout: T(30000) });
 await C.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await C.evaluate((cid) => {
   localStorage.setItem('zr-save-v1', JSON.stringify({ cid })); // свіжий сейв, але cid відомий
@@ -414,7 +414,7 @@ await D.addInitScript((cid) => {
     cloudTs: 0,
   }));
 }, cidA);
-await D.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`);
+await D.goto(`${await ensureAppServer()}/?test&cloud&relay=ws://localhost:${RELAY_PORT}`, { timeout: T(30000) });
 await D.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await D.waitForFunction(() => !!localStorage.getItem('zr-save-conflict-v1'), null, { timeout: T(8000) }).catch(() => null);
 const conflict = await D.evaluate(() => {
@@ -447,7 +447,7 @@ check('експорт качає zr-progres.json', !!dl && dl.suggestedFilename(
 console.log('▸ Аварійний екран');
 const ctxE = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const E = await ctxE.newPage();
-await E.goto(`${await ensureAppServer()}/?test&fresh`);
+await E.goto(`${await ensureAppServer()}/?test&fresh`, { timeout: T(30000) });
 await E.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: T(25000) });
 await E.evaluate(() => setTimeout(() => { throw new Error('тестовий вибух'); }, 0));
 await E.waitForFunction(

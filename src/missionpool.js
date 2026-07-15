@@ -9,7 +9,7 @@ import { livingWorldReward, pickLivingWorldEvent, shouldOfferLivingWorld } from 
 
 // назви «пристрою для ремонту» за країною — смак без зміни механіки
 const REPAIR_NAMES = {
-  UKR: t('радіовежу'), POL: t('генератор'), DEU: t('насосну станцію'), FRA: t('антену зв\'язку'),
+  UKR: t('радіовежу'), DEU: t('насосну станцію'), FRA: t('антену зв\'язку'),
   TUR: t('маяк Босфору'), EGY: t('сонячну станцію'),
 };
 
@@ -182,10 +182,14 @@ export class DynamicMissions {
   _makeMission(type, slotInfo, idx) {
     const level = this.level;
     const mt = MISSION_TYPES[type];
+    const train = type === 'repair' && level.countryId === 'POL' && !!level.world.trainStartPoint;
     if (type === 'castle') {
       if (level.world.activateCastleMission) level.world.activateCastleMission();
       const castle = level.country.map.storySites.castleRuin;
       slotInfo = { slot: 'C', site: castle, beamAt: { x: castle.x, z: castle.z } };
+    } else if (train) {
+      const depot = level.country.map.storySites.railDepot;
+      slotInfo = { slot: slotInfo.slot, site: depot, beamAt: level.world.trainStartPoint };
     }
     const m = {
       id: type, type, slotIndex: idx, icon: mt.icon, reward: mt.reward, horde: mt.horde,
@@ -198,7 +202,9 @@ export class DynamicMissions {
       m.opened = false;
       m.openedT = -1;
     } else if (type === 'repair') {
-      m.title = t('Полагодь {x}', { x: REPAIR_NAMES[level.countryId] || t('радіовежу') });
+      m.train = train;
+      m.repairPoint = m.train ? level.world.trainStartPoint : level.world.repairPoint;
+      m.title = m.train ? t('Запусти рятувальний поїзд') : t('Полагодь {x}', { x: REPAIR_NAMES[level.countryId] || t('радіовежу') });
       m.progress = 0;
       m.tickT = 0;
       m.waves = [false, false];
@@ -1061,9 +1067,9 @@ export class DynamicMissions {
   _up_repair(m, dt, input, allowControl) {
     const level = this.level;
     const player = level.player;
-    const rp = level.world.repairPoint;
+    const rp = m.repairPoint || level.world.repairPoint;
     const d = Math.hypot(player.pos.x - rp.x, player.pos.z - rp.z);
-    // кооп: рахуємо всіх, хто тримає E біля вежі (разом — швидше!)
+    // кооп: рахуємо всіх, хто тримає E біля пристрою (разом — швидше!)
     let holders = 0;
     if (d < 3.6 && allowControl && input.down('KeyE')) holders++;
     if (level.players) {
@@ -1074,7 +1080,9 @@ export class DynamicMissions {
     }
     if (d < 3.6) {
       this.prompt = {
-        text: m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() }),
+        text: m.train
+          ? t('Тримай {k} — заведи поїзд', { k: interactKey() })
+          : (m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() })),
         hold: true, progress: m.progress,
       };
     }
@@ -1102,10 +1110,13 @@ export class DynamicMissions {
           level.bus.emit('toast', t('👂 Ще одна хвиля наближається! ⚠️'));
         }
         if (m.progress >= 1) {
-          level.world.setTowerFixed();
-          level.netEv('tower');
+          if (m.train) level.world.startRescueTrain();
+          else {
+            level.world.setTowerFixed();
+            level.netEv('tower');
+          }
           this._complete(m.id);
-          level.bus.emit('toast', t('Полагоджено! Сигнал надіслано 📡'));
+          level.bus.emit('toast', m.train ? t('🚂 Рятувальний поїзд запущено!') : t('Полагоджено! Сигнал надіслано 📡'));
         }
       }
     }
@@ -1791,7 +1802,10 @@ export class DynamicMissions {
       const m = this.missions[i];
       if (!m) return;
       if (m.type === 'rescue') m.opened = !!a[1];
-      else if (m.type === 'repair') m.progress = a[1];
+      else if (m.type === 'repair') {
+        m.progress = a[1];
+        if (m.train && (a[0] || m.progress >= 1)) level.world.startRescueTrain();
+      }
       else if (m.type === 'clear') this.crateReady = !!a[1];
       else if (m.type === 'collect') m.found = a[1];
       else if (m.type === 'defense') { m.started = !!a[1]; m.timer = a[2]; }
@@ -1980,10 +1994,12 @@ export class DynamicMissions {
           if (pressE) { net.sendUse('barn'); input.justPressed.delete('KeyE'); pressE = false; }
         }
       } else if (m.type === 'repair') {
-        const rp = level.world.repairPoint;
+        const rp = m.repairPoint || level.world.repairPoint;
         if (near(rp.x, rp.z, 3.6)) {
           this.prompt = {
-            text: m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() }),
+            text: m.train
+              ? t('Тримай {k} — заведи поїзд', { k: interactKey() })
+              : (m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() })),
             hold: true, progress: m.progress,
           };
           if (net) net.holdE = true;
