@@ -105,13 +105,36 @@ export function storyMissionSet(countryId, seed, runIndex) {
     locked[slot] = true;
     satisfied.add(type);
   }
-  // 🎁 4-й (бонус) слот не має дублювати перші три
+  // 🎁 Навчальна Україна в старому пулі має лише 3 слоти; сюжетна
+  // кампанія додає їй таке саме четверте бонусне завдання, як іншим країнам.
+  if (set.length < 4) {
+    const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((type) => !set.includes(type));
+    set.push(dPool[rng.int(0, dPool.length - 1)]);
+  }
+  // 4-й (бонус) слот не має дублювати перші три
   if (set.length > 3 && set.slice(0, 3).includes(set[3])) {
     const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((type) => !set.slice(0, 3).includes(type));
     if (dPool.length) set[3] = dPool[rng.int(0, dPool.length - 1)];
   }
   if (bonusRequired) set[3] = bonusRequired;
   return set;
+}
+
+// Чотири завдання, які реально створяться на рівні: сюжетні іконки +
+// додаткові місії, не зайняті сюжетом. HUD і меню країни мають показувати
+// один і той самий повний набір.
+export function storyMissionPreview(countryId, seed, runIndex) {
+  const story = getCountryStory(countryId);
+  if (!story) return null;
+  const usedTypes = new Set(story.objectives.map((obj) => {
+    const preferred = STORY_DELEGATE_MATCHES[obj.id]?.preferred || [];
+    return preferred[0];
+  }).filter(Boolean));
+  const icons = story.objectives.map((obj) => obj.icon);
+  for (const type of storyMissionSet(countryId, seed, runIndex)) {
+    if (!usedTypes.has(type)) icons.push(MISSION_TYPES[type]?.icon || '🎯');
+  }
+  return icons;
 }
 
 export class StoryMissions {
@@ -175,6 +198,11 @@ export class StoryMissions {
       title: this._objectiveTitle(obj),
       done: obj.state === 'done',
     }));
+    const delegateHud = this.delegate.getHudList();
+    for (const mission of this._extraDelegateMissions()) {
+      const index = this.delegate.missions.indexOf(mission);
+      if (delegateHud[index]) out.push(delegateHud[index]);
+    }
     if (this.bossUnlocked && !this.bossStarted) {
       out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });
     } else if (this.bossStarted) {
@@ -202,8 +230,8 @@ export class StoryMissions {
         }
       }
     }
-    for (const marker of this.delegate.getMarkers()) {
-      if (marker.icon === '🌍') mk.push(marker);
+    for (const marker of this.delegate.getMarkers(this._extraDelegateMissions())) {
+      if (marker.icon !== '👑') mk.push(marker);
     }
     if (this.bossUnlocked && !this.bossStarted) {
       const arena = this._site('arena') || (this.level.world && this.level.world.layout && this.level.world.layout.arena);
@@ -387,6 +415,11 @@ export class StoryMissions {
     const slotMission = this.delegate.missions[obj.slotIndex] || null;
     if (slotMission && !this._isReservedForOtherObjective(slotMission, obj)) return slotMission;
     return null;
+  }
+
+  _extraDelegateMissions() {
+    const used = new Set(this.objectives.map((obj) => this._delegateMissionForObjective(obj)).filter(Boolean));
+    return this.delegate.missions.filter((mission) => !used.has(mission));
   }
 
   _isReservedForOtherObjective(mission, currentObj) {

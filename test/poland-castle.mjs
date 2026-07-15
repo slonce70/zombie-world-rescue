@@ -227,6 +227,24 @@ try {
       return Math.max(max, Math.hypot(hit.x - point.x, hit.z - point.z));
     }, 0);
     const dungeonMarker = g.level.missions.getMarkers().find((marker) => marker.icon === '🧙');
+    const player = g.level.player;
+    const surfaceX = dungeon.tunnelStartX + 15;
+    const surfaceY = g.level.world.groundH(surfaceX, dungeon.entranceZ);
+    player.inCastleDungeon = false;
+    player.pos.set(surfaceX, surfaceY, dungeon.entranceZ);
+    player.vel.set(0, 0, 0);
+    player.onGround = true;
+    player._updateGravityCollide(0.1, g.input, false);
+    const surfaceFall = surfaceY - player.pos.y;
+    player.inCastleDungeon = false;
+    player.pos.set(dungeon.tunnelStartX - 0.15, dungeon.surfaceY, dungeon.entranceZ);
+    player.vel.set(3, 0, 0);
+    player.onGround = true;
+    player._updateGravityCollide(0.1, g.input, false);
+    const entranceDescent = {
+      inside: player.inCastleDungeon,
+      drop: dungeon.surfaceY - player.pos.y,
+    };
     const delegate = g.level.missions.delegate;
     const snapshot = delegate.netState();
     const castleNet = snapshot.s[castle.slotIndex];
@@ -245,8 +263,12 @@ try {
       dungeonPhysicsGone: !g.level.world.colliders.includes(dungeon.collider),
       title: castle.title,
       dungeonLength: dungeon.length,
-      dungeonDepth: dungeon.surfaceY - g.level.world.groundH(dungeon.x, dungeon.z),
-      rampDrop: dungeon.surfaceY - g.level.world.groundH(dungeon.entranceX + 5.5, dungeon.entranceZ),
+      dungeonDepth: dungeon.surfaceY - g.level.world.dungeonGroundH(dungeon.x, dungeon.z),
+      rampDrop: dungeon.surfaceY - g.level.world.dungeonGroundH(dungeon.entranceX + 5.5, dungeon.entranceZ),
+      chamberSize: dungeon.chamberSize,
+      chamberFloor: g.level.world.dungeonGroundH(dungeon.x, dungeon.z),
+      surfaceFall,
+      entranceDescent,
       pathLength: dungeon.path.slice(1).reduce((sum, point, i) => (
         sum + Math.hypot(point.x - dungeon.path[i].x, point.z - dungeon.path[i].z)
       ), 0),
@@ -267,6 +289,9 @@ try {
   assert(state.dungeonOpen && state.dungeonPhysicsGone && /(5 чаклунів|вороги 0\/16)/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
   assert(state.dungeonLength === 50 && state.pathLength === 50, 'прохід підземелля має рівно 50 метрів', JSON.stringify(state));
   assert(state.dungeonDepth === 6 && state.rampDrop > 2.5, 'підземелля розташоване на 6 метрів під землею і має справжній спуск', JSON.stringify(state));
+  assert(state.chamberSize === 18, 'після 50-метрового проходу є велика підземна зала 18×18 м', JSON.stringify(state));
+  assert(state.surfaceFall < 0.05, 'гравець над тунелем не провалюється крізь землю', JSON.stringify(state));
+  assert(state.entranceDescent.inside && state.entranceDescent.drop > 0, 'у підземелля можна спуститися лише через вхід', JSON.stringify(state));
   assert(state.maxPathPush < 0.15, 'усі 50 метрів центрального проходу фізично прохідні', JSON.stringify(state));
   assert(state.wizardCount === 5 && state.wizardTypes.every((type) => type === 'wizard'), 'у підземеллі зʼявляються рівно 5 справжніх зомбі-чаклунів', JSON.stringify(state));
   assert(state.stoneCount === 11 && state.stoneStats.every((s) => s.join(',') === 'stone,500,500,10,0.5'), 'у підземеллі рівно 11 камʼяних зомбі: 500 HP, 10 шкоди, 0.5с оглушення', JSON.stringify(state.stoneStats));
@@ -331,6 +356,8 @@ try {
   });
   assert(state.phase === 'dungeon' && state.rescueProgress === 0.99 && state.civilians === 0 && state.storyState === 'active' && !state.bossUnlocked, 'людей не можна звільнити, поки вороги підземелля живі', JSON.stringify(state));
   assert(/залишилося: 16/.test(state.prompt), 'біля полонених HUD показує всіх 16 ворогів', JSON.stringify(state));
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: 'test-results/poland-castle-chamber.png' });
 
   state = await page.evaluate(() => {
     const g = window.__game;

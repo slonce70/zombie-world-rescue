@@ -52,8 +52,13 @@ await page.waitForSelector('#overlay-solo.show', { timeout: 10000 });
 await page.click('.solo-mode[data-mode="campaign"]');
 await page.waitForSelector('#solo-countries #country-list .country-item[data-id="UKR"] .mission-preview span', { timeout: 10000 });
 
-const preview = await page.evaluate(() => [...document.querySelectorAll('#solo-countries #country-list .country-item[data-id="UKR"] .mission-preview span')].map((el) => el.textContent));
-check(preview.join('') === '🆘📡🛡️', 'UKR preview uses story icons', preview.join(''));
+const previews = await page.evaluate(() => [...document.querySelectorAll('#solo-countries #country-list .country-item')].map((country) => ({
+  id: country.dataset.id,
+  icons: [...country.querySelectorAll('.mission-preview span')].map((el) => el.textContent),
+})));
+const preview = previews.find((country) => country.id === 'UKR')?.icons || [];
+check(preview.length === 4 && preview.slice(0, 3).join('') === '🆘📡🛡️', 'UKR preview shows 3 story goals and its extra mission', preview.join(''));
+check(previews.every((country) => country.icons.length === 4), 'every campaign country preview shows all 4 missions', JSON.stringify(previews));
 
 await page.click('#solo-countries #country-list .country-item[data-id="UKR"]');
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
@@ -68,6 +73,8 @@ let st = await page.evaluate(() => ({
 }));
 check(st.kind === 'StoryMissions', 'UKR solo campaign uses StoryMissions', JSON.stringify(st));
 check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense', 'UKR story objective IDs are present', JSON.stringify(st.ids));
+const ukrHudCount = await page.evaluate(() => window.__game.level.missions.getHudList().length);
+check(ukrHudCount === 4, 'UKR HUD shows all 4 real missions', String(ukrHudCount));
 check(st.replayNightRaid === false, 'first UKR story start does not enable replayNightRaid', JSON.stringify(st));
 check(!/Нічний рейд/.test(st.current), 'first UKR story objective does not announce Night Raid', JSON.stringify(st));
 
@@ -155,8 +162,10 @@ st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
   ids: window.__game.test.storyObjectiveIds(),
   marker: window.__game.level.missions.getMarkers()[0],
+  hudCount: window.__game.level.missions.getHudList().length,
 }));
 check(st.kind === 'StoryMissions' && st.ids[0] === 'egy-seals' && st.marker.icon === '🪬', 'EGY starts with seal story', JSON.stringify(st));
+check(st.hudCount === 4, 'EGY HUD shows its 2 story goals and 2 extra missions', JSON.stringify(st));
 st = await completeStoryObjectiveSnapshot('egy-seals', 'tomb');
 check(st.real && st.real.state === 'done' && st.story.state === 'done' && /мум/i.test(st.current), 'EGY seal story completes real tomb delegate and advances to ambush', JSON.stringify(st));
 check(st.events.length === 1 && st.events[0]?.id === 'egy-seals' && st.events[0]?.title === st.storyTitle, 'EGY seal completion emits one story missionDone payload', JSON.stringify({ storyTitle: st.storyTitle, events: st.events, hud: st.hud }));
@@ -196,11 +205,13 @@ for (const c of NEW_STORIES) {
     marker: window.__game.level.missions.getMarkers()[0],
     current: window.__game.level.missions.currentStoryObjective(),
     npc: !!(window.__game.level.missions.npcState && window.__game.level.missions.npcState.rig),
+    hudCount: window.__game.level.missions.getHudList().length,
   }));
   check(s.kind === 'StoryMissions' && s.ids && s.ids[0] === c.first, `${c.id} starts its story (${c.first})`, JSON.stringify(s.ids));
   check(!!s.marker && s.marker.icon === c.icon, `${c.id} first marker is ${c.icon}`, JSON.stringify(s.marker));
   check(c.word.test(s.current), `${c.id} HUD shows first story objective`, s.current);
   check(s.npc, `${c.id} story NPC spawned`, String(s.npc));
+  check(s.hudCount === 4, `${c.id} HUD shows all 4 real missions`, String(s.hudCount));
   // 📖 інтро-банер: назва глави і репліка НПС потрапляють у DOM
   const intro = await page.evaluate(() => {
     const m = window.__game.level.missions;
