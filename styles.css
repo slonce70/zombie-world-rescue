@@ -69,6 +69,7 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
   box-shadow: 0 6px 18px rgba(60,180,80,.45); animation: gift-pulse 1.6s ease-in-out infinite;
 }
 #camp-quest-chip.show { display: inline-flex; }
+#gift-chip, #camp-quest-chip { pointer-events: auto; }
 /* 🏕️ панель квесту табору */
 .campquest-title { font-size: 20px; font-weight: 900; margin: 6px 0; text-align: center; }
 .campquest-desc { opacity: .85; text-align: center; margin: 0 0 12px; }
