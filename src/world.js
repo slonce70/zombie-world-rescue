@@ -2090,7 +2090,7 @@ export class World {
   // ---------- терен ----------
   _buildTerrain() {
     // на картах із великим рельєфом — густіша сітка, щоб скелі були чіткі
-    const SIZE = 460;
+    const SIZE = Math.max(460, this.layout.BOUND * 2 + 60);
     const SEG = this._terrainMod && this.quality.shadow >= 2048 ? 176 : 130;
     const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     geo.rotateX(-Math.PI / 2);

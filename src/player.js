@@ -758,6 +758,18 @@ export class Player {
       const origin = this._shootOrigin.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
       const dir = this.forwardVec(this._shootDir).normalize();
       const hit = level.zombies ? level.zombies.hitTest(origin, dir, w.range || 3) : null;
+      const missionEngine = level.missions && (level.missions.delegate || level.missions);
+      const barracksHit = missionEngine && missionEngine.barracksHitTest
+        ? missionEngine.barracksHitTest(origin, dir, w.range || 3) : null;
+      if (barracksHit && (!hit || barracksHit.t < hit.t)) {
+        const damage = w.dmg * dmgMult;
+        missionEngine.damageBarracks(damage, barracksHit.point);
+        level.effects.burst(barracksHit.point, 0xff8a3d, 8, { speed: 2.4, life: 0.4 });
+        level.audio.hit(false);
+        level.stats.shotsHit++;
+        this._applyRecoil(w);
+        return;
+      }
       if (hit) {
         const baseDmg = level.soulCollector && this.cur === 'sword' ? 30 : w.dmg;
         if (level.mirror) level.net.shotReport(this.cur, hit.point, [[hit.zombie.nid, Math.round(baseDmg * dmgMult), 0]], [], [], false);
@@ -843,6 +855,16 @@ export class Player {
       if (portalHit && portalHit.t < blockT && (!hit || portalHit.t < hit.t)) {
         level.portal.damagePortal(portalHit.portal, w.dmg * dmgMult);
         if (i < 3) level.effects.tracer(this._muzzlePos, portalHit.point);
+        anyHit = true;
+        continue;
+      }
+      const missionEngine = level.missions && (level.missions.delegate || level.missions);
+      const barracksHit = missionEngine && missionEngine.barracksHitTest
+        ? missionEngine.barracksHitTest(origin, dir, MAX_D) : null;
+      if (barracksHit && barracksHit.t <= blockT && (!hit || barracksHit.t < hit.t)) {
+        const damage = w.dmg * dmgMult;
+        missionEngine.damageBarracks(damage, barracksHit.point);
+        if (i < 3) level.effects.tracer(this._muzzlePos, barracksHit.point);
         anyHit = true;
         continue;
       }
@@ -1031,6 +1053,14 @@ export class Player {
         if (wallT < MAX_D) endPoint = this._shootEnd.copy(origin).addScaledVector(dir, wallT);
       }
     }
+    const missionEngine = level.missions && (level.missions.delegate || level.missions);
+    const barracksHit = missionEngine && missionEngine.barracksHitTest
+      ? missionEngine.barracksHitTest(origin, dir, MAX_D) : null;
+    if (barracksHit && barracksHit.t <= this.world.shotBlockDist(origin, dir, barracksHit.t + 0.1)) {
+      missionEngine.damageBarracks(dmg, barracksHit.point);
+      endPoint = barracksHit.point;
+      anyHit = true;
+    }
     // яскравий ціановий промінь від ствола до точки влучання (перевикористовуємо trace-пул)
     if (netReport) netReport.endPoint = { x: endPoint.x, y: endPoint.y, z: endPoint.z };
     level.effects.laserBeam(this._muzzlePos, endPoint);
@@ -1062,6 +1092,15 @@ export class Player {
         else { z.lastHitBy = 1; z.damage(dmg * falloff, this._flameDir.clone(), false, { fire: true }); }
         anyHit = true;
       }
+    }
+    const missionEngine = level.missions && (level.missions.delegate || level.missions);
+    const barracksHit = missionEngine && missionEngine.barracksHitTest
+      ? missionEngine.barracksHitTest(origin, dir, w.range) : null;
+    if (barracksHit) {
+      const falloff = 1 - (barracksHit.t / w.range) * 0.65;
+      const dealt = dmg * Math.max(0.35, falloff);
+      missionEngine.damageBarracks(dealt, barracksHit.point);
+      anyHit = true;
     }
     // конус вогняних частинок (перевикористовуємо систему частинок effects.js)
     level.effects.flameCone(this._muzzlePos, dir, w.range);

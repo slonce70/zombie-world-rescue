@@ -31,6 +31,7 @@ export const STORY_DELEGATE_MATCHES = {
   'deu-workshop': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
   'deu-convoy': { preferred: ['convoy'] },
   'deu-gate': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
+  'deu-barracks': { preferred: ['barracks'] },
   // 🇫🇷 фірмова balloon (слоти A/C) — та сама страховка широкими списками
   'fra-kitchen': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
   'fra-balloon': { preferred: ['balloon'] },
@@ -74,9 +75,12 @@ export function storyMissionSet(countryId, seed, runIndex) {
   const story = getCountryStory(countryId);
   if (!story) return set;
   const required = [];
+  let bonusRequired = null;
   for (const obj of story.objectives) {
     const pref = (STORY_DELEGATE_MATCHES[obj.id] && STORY_DELEGATE_MATCHES[obj.id].preferred) || [];
-    if (pref[0] && !required.includes(pref[0])) required.push(pref[0]);
+    if (!pref[0]) continue;
+    if (MISSION_TYPES[pref[0]].slots.includes('D')) bonusRequired = pref[0];
+    else if (!required.includes(pref[0])) required.push(pref[0]);
   }
   const rng = new RNG((seed * 31 + runIndex * 7777 + 91) >>> 0); // окремий сід від rollMissionSet
   const locked = [false, false, false]; // слоти A/B/C, які вже тримають потрібний тип
@@ -106,6 +110,7 @@ export function storyMissionSet(countryId, seed, runIndex) {
     const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((type) => !set.slice(0, 3).includes(type));
     if (dPool.length) set[3] = dPool[rng.int(0, dPool.length - 1)];
   }
+  if (bonusRequired) set[3] = bonusRequired;
   return set;
 }
 
@@ -399,8 +404,8 @@ export class StoryMissions {
   }
 
   _objectiveTitle(obj) {
-    if (obj.id === 'pol-castle' && this.delegate) {
-      const mission = this.delegate.get('castle');
+    if ((obj.id === 'pol-castle' || obj.id === 'deu-barracks') && this.delegate) {
+      const mission = this.delegate.get(obj.id === 'pol-castle' ? 'castle' : 'barracks');
       if (mission && mission.title) return mission.title;
     }
     return typeof obj.title === 'function' ? obj.title() : (obj.title || obj.id);

@@ -178,12 +178,19 @@ try {
       if (zombie.state !== 'dead') zombie.damage(99999, null, false);
     }
     g.level.missions.update(0.016, g.input, true);
-    return { afterChest, afterHelmet, afterBreak, afterBody, phase: castle.phase };
+    const dungeon = g.level.world.castleDungeon;
+    return {
+      afterChest, afterHelmet, afterBreak, afterBody, phase: castle.phase,
+      dungeonOpen: dungeon.open,
+      dungeonPhysicsGone: !g.level.world.colliders.includes(dungeon.collider),
+      title: castle.title,
+    };
   });
   assert(state.afterChest.join(',') === '150,400,250', 'постріл у тіло пошкоджує нагрудник, не HP', JSON.stringify(state));
   assert(state.afterHelmet.join(',') === '150,400,150', 'постріл у голову пошкоджує шолом, не HP', JSON.stringify(state));
   assert(state.afterBreak[0] === 150 && state.afterBreak[1] === 0 && state.afterBreak[2] === false, 'зламаний нагрудник зникає');
   assert(state.afterBody.join(',') === '120,0' && state.phase === 'rescue', 'після броні шкода йде в тіло, а зачистка відкриває порятунок', JSON.stringify(state));
+  assert(state.dungeonOpen && state.dungeonPhysicsGone && /відкрите підземелля/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
 
   await page.evaluate(() => {
     const g = window.__game;

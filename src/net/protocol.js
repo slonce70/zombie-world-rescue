@@ -2,7 +2,7 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 16; // v500: host-authoritative World Front (`fr` start spec + `frun` state)
+export const PROTO_VERSION = 17; // v506: host-authoritative map size (`ms` in start spec)
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {
