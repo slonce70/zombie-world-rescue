@@ -25,9 +25,14 @@ try {
     const g = window.__game;
     const story = g.level.missions;
     const castle = story.delegate.get('castle');
+    const map = g.level.country.map;
+    const castleSite = map.storySites.castleRuin;
+    const arenaSite = map.storySites.arena;
     g.test.completeStoryObjective('pol-castle');
     return {
       radius: castle.site.r,
+      siteDistance: Math.hypot(castleSite.x - arenaSite.x, castleSite.z - arenaSite.z),
+      requiredDistance: castleSite.r + arenaSite.r + 10,
       phase: castle.phase,
       castleState: castle.state,
       storyState: story.get('pol-castle').state,
@@ -37,13 +42,41 @@ try {
     };
   });
   assert(state.radius >= 34, 'замок справді великий', JSON.stringify(state));
+  assert(state.siteDistance > state.requiredDistance, 'замок є окремою будівлею далеко від арени', JSON.stringify(state));
   assert(state.phase === 'find' && state.castleState === 'locked' && state.storyState === 'locked', 'замкнена сюжетна ціль не виконується завчасно', JSON.stringify(state));
   assert(state.gateVisible && state.gateCollider && state.dungeonCollider, 'ворота й підземелля активні лише для castle mission');
+  await page.evaluate(() => {
+    const g = window.__game;
+    const arena = g.level.country.map.storySites.arena;
+    g.test.teleport(arena.x, arena.z + 60);
+    g.level.player.yaw = 0;
+  });
+  await page.waitForTimeout(6500);
+  await page.screenshot({ path: 'test-results/poland-separate-arena.png' });
 
   await page.evaluate(() => {
     const g = window.__game;
     g.test.completeStoryObjective('pol-bonfires');
-    g.test.completeStoryObjective('pol-train');
+    const train = g.level.missions.delegate.get('repair');
+    g.__trainMissionPlacement = {
+      point: train.repairPoint,
+      site: train.site,
+      beam: { x: train.beam.group.position.x, z: train.beam.group.position.z },
+    };
+    g.test.teleport(train.repairPoint.x, train.repairPoint.z - 7);
+    g.level.player.yaw = Math.PI;
+  });
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: 'test-results/poland-train-control.png' });
+  await page.evaluate(() => {
+    const g = window.__game;
+    const train = g.level.missions.delegate.get('repair');
+    g.test.teleport(train.repairPoint.x, train.repairPoint.z);
+    train.progress = 0.99;
+    g.test.key('KeyE', true);
+    g.level.missions.update(0.2, g.input, true);
+    g.test.key('KeyE', false);
+    g.__trainWaveSites = g.level.missions.delegate.pendingWaves.map((wave) => wave.site);
     g.test.finishHorde();
     const castle = g.level.missions.delegate.get('castle');
     g.test.teleport(castle.explosive.x, castle.explosive.z);
@@ -52,16 +85,42 @@ try {
     g.test.key('KeyE', false);
   });
   state = await page.evaluate(() => {
-    const story = window.__game.level.missions;
+    const g = window.__game;
+    const story = g.level.missions;
     const castle = story.delegate.get('castle');
-    return { phase: castle.phase, title: story.currentStoryObjective(), marker: story.getMarkers()[0] };
+    const train = story.delegate.get('repair');
+    return {
+      phase: castle.phase,
+      title: story.currentStoryObjective(),
+      marker: story.getMarkers()[0],
+      trainDone: story.get('pol-train').state,
+      trainStarted: g.level.world.rescueTrainStarted,
+      trainPoint: train.repairPoint,
+      towerPoint: g.level.world.repairPoint,
+      placement: g.__trainMissionPlacement,
+      waveSites: g.__trainWaveSites,
+    };
   });
+  assert(state.trainDone === 'done' && state.trainStarted, 'пульт у депо справді запускає сюжетний поїзд', JSON.stringify(state));
+  assert(Math.hypot(state.trainPoint.x - state.towerPoint.x, state.trainPoint.z - state.towerPoint.z) > 100, 'пульт поїзда не використовує радіовежу', JSON.stringify(state));
+  assert(Math.hypot(state.placement.point.x - state.placement.site.x, state.placement.point.z - state.placement.site.z) < 15, 'хвилі захисту поїзда привʼязані до депо', JSON.stringify(state.placement));
+  assert(Math.hypot(state.placement.point.x - state.placement.beam.x, state.placement.point.z - state.placement.beam.z) < 0.1, '3D-маяк поїзда стоїть біля пульта', JSON.stringify(state.placement));
+  assert(state.waveSites.length === 2 && state.waveSites.every((site) => Math.hypot(state.trainPoint.x - site.x, state.trainPoint.z - site.z) < 15), 'обидві хвилі нападають біля поїзда', JSON.stringify(state.waveSites));
   assert(state.phase === 'carry' && /воріт/i.test(state.title), 'ящик підбирається і HUD переходить до воріт', JSON.stringify(state));
+  state = await page.evaluate(() => {
+    const g = window.__game;
+    const delegate = g.level.missions.delegate;
+    const snapshot = delegate.netState();
+    g.level.world.rescueTrainStarted = false;
+    delegate.applyNet(snapshot);
+    return { trainStarted: g.level.world.rescueTrainStarted };
+  });
+  assert(state.trainStarted, 'co-op снапшот відновлює зелений стан пульта поїзда');
 
   await page.evaluate(() => {
     const g = window.__game;
     const gate = g.level.world.castleGate;
-    g.test.teleport(gate.x, gate.z + 4);
+    g.test.teleport(gate.x, gate.z + 60);
     g.level.missions.update(0.016, g.input, true);
     g.level.player.yaw = 0;
   });
@@ -71,6 +130,9 @@ try {
   await page.evaluate(() => {
     const g = window.__game;
     const castle = g.level.missions.delegate.get('castle');
+    const gate = g.level.world.castleGate;
+    g.test.teleport(gate.x, gate.z + 4);
+    g.level.missions.update(0.016, g.input, true);
     castle.plantProgress = 0.99;
     g.test.key('KeyE', true);
     g.level.missions.update(0.1, g.input, true);
