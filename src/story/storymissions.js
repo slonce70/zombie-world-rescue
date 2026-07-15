@@ -22,7 +22,7 @@ export const STORY_DELEGATE_MATCHES = {
   // Ліки: compatible-списки сусідніх цілей покривають пули ВСІХ слотів.
   'pol-bonfires': { preferred: ['bonfire'] },
   'pol-train': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests', 'clear', 'collect', 'hunt', 'escort', 'rescue'] },
-  'pol-castle': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'escort', 'rescue', 'repair'] },
+  'pol-castle': { preferred: ['castle'] },
   'egy-seals': { preferred: ['tomb'] },
   'egy-ambush': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'escort', 'rescue', 'repair'] },
   // 🇩🇪 фірмова convoy може зайняти слот A або C — тому сусідні цілі мають
@@ -138,6 +138,7 @@ export class StoryMissions {
       ? level.runIndex
       : (level.game.save.missionRuns && level.game.save.missionRuns[level.countryId]) || 0;
     this.delegate = new DynamicMissions(level, storyMissionSet(level.countryId, level.country.seed, runIndex));
+    this._syncDelegateLocks();
     this.npcState = spawnStoryNpc(
       level,
       this.story && this.story.npc,
@@ -181,8 +182,14 @@ export class StoryMissions {
     const mk = [];
     const active = this.objectives.find((o) => o.state === 'active');
     if (active) {
-      for (const site of this._objectiveTargets(active)) {
-        mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
+      if (active.id === 'pol-castle') {
+        const mission = this.delegate.get('castle');
+        const target = mission && this.delegate._castleTarget(mission);
+        if (target) mk.push({ x: target.x, z: target.z, color: '#ff9e63', icon: mission.phase === 'rescue' ? '🆘' : '🏰' });
+      } else {
+        for (const site of this._objectiveTargets(active)) {
+          mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
+        }
       }
     }
     for (const marker of this.delegate.getMarkers()) {
@@ -236,6 +243,7 @@ export class StoryMissions {
       return;
     }
     if (obj.state === 'done') return;
+    if (obj.state !== 'active') return;
 
     const delegateMission = this._delegateMissionForObjective(obj);
     if (delegateMission && delegateMission.state !== 'done') {
@@ -391,6 +399,10 @@ export class StoryMissions {
   }
 
   _objectiveTitle(obj) {
+    if (obj.id === 'pol-castle' && this.delegate) {
+      const mission = this.delegate.get('castle');
+      if (mission && mission.title) return mission.title;
+    }
     return typeof obj.title === 'function' ? obj.title() : (obj.title || obj.id);
   }
 
@@ -433,6 +445,7 @@ export class StoryMissions {
       obj.state = foundNext ? 'locked' : 'active';
       foundNext = true;
     }
+    this._syncDelegateLocks();
     // 🗣️ репліка «start» нової активної цілі — рівно раз на перехід
     // (_advanceObjectiveState викликається щокадру з _syncObjectiveStates)
     const active = this.objectives.find((o) => o.state === 'active');
@@ -468,11 +481,20 @@ export class StoryMissions {
   _syncObjectiveStates() {
     for (const obj of this.objectives) {
       const mission = this._delegateMissionForObjective(obj);
-      if (mission && mission.state === 'done') {
+      if (obj.state === 'active' && mission && mission.state === 'done') {
         obj.state = 'done';
       }
     }
     this._advanceObjectiveState();
     if (this.objectives.every((o) => o.state === 'done')) this._unlockBoss();
+  }
+
+  _syncDelegateLocks() {
+    if (!this.delegate) return;
+    for (const obj of this.objectives) {
+      const mission = this._delegateMissionForObjective(obj);
+      if (!mission || mission.state === 'done') continue;
+      mission.state = obj.state === 'active' ? 'active' : 'locked';
+    }
   }
 }

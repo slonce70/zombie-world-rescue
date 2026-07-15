@@ -34,6 +34,9 @@ export const MISSION_TYPES = {
   balloon: { icon: '🎈', slots: ['A', 'C'], reward: 120, horde: 16, kind: 'fetch', country: 'FRA' },
   bazaar: { icon: '🧿', slots: ['A', 'C'], reward: 120, horde: 16, kind: 'fetch', country: 'TUR' },
   tomb: { icon: '⚱️', slots: ['B', 'C'], reward: 140, horde: 20, kind: 'fetch', country: 'EGY' },
+  // Сюжетний штурм Польщі. Не позначаємо country, бо bonfire лишається
+  // фірмовою випадковою місією країни, а castle додає storyMissionSet().
+  castle: { icon: '🏰', slots: ['C'], reward: 250, horde: 0, kind: 'castle' },
 };
 
 // конфіги двигунів: activate — N точок, біля кожної тримай E
@@ -179,6 +182,11 @@ export class DynamicMissions {
   _makeMission(type, slotInfo, idx) {
     const level = this.level;
     const mt = MISSION_TYPES[type];
+    if (type === 'castle') {
+      if (level.world.activateCastleMission) level.world.activateCastleMission();
+      const castle = level.country.map.storySites.castleRuin;
+      slotInfo = { slot: 'C', site: castle, beamAt: { x: castle.x, z: castle.z } };
+    }
     const m = {
       id: type, type, slotIndex: idx, icon: mt.icon, reward: mt.reward, horde: mt.horde,
       state: 'active', site: slotInfo.site, slot: slotInfo.slot,
@@ -234,6 +242,15 @@ export class DynamicMissions {
       m.deliverProgress = 0;
       m.items = this._spawnFetchItems(m, cfg);
       m.dest = this._makeDeliverPoint(m, cfg);
+    } else if (type === 'castle') {
+      m.phase = 'find';
+      m.title = t('Знайди ящик з вибухівкою');
+      m.started = false;
+      m.plantProgress = 0;
+      m.rescueProgress = 0;
+      m.guards = [];
+      m.explosive = this._makeCastleExplosive(m);
+      if (m.beam && m.beam.group) m.beam.group.visible = false;
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
     if (idx === 3) {
@@ -242,6 +259,35 @@ export class DynamicMissions {
       m.horde = Math.round(m.horde * 0.5);
     }
     return m;
+  }
+
+  _makeCastleExplosive(m) {
+    const level = this.level;
+    const gate = level.world.castleGate;
+    const gx = gate ? gate.x : m.site.x;
+    const gz = gate ? gate.z : m.site.z + m.site.r;
+    const x = gx - 12;
+    const z = gz + 9;
+    const y = level.world.groundH(x, z);
+    const group = new THREE.Group();
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.1), toonMat(0x8a5a32));
+    crate.position.y = 0.48;
+    crate.castShadow = true;
+    group.add(crate);
+    const red = toonMat(0xc92d2d, 0x7a1111, 0.25);
+    for (let i = 0; i < 4; i++) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.82, 8), red);
+      stick.rotation.z = Math.PI / 2;
+      stick.position.set(-0.42 + i * 0.28, 0.96, 0);
+      stick.castShadow = true;
+      group.add(stick);
+    }
+    const icon = this._makeIconSprite('🧨', 1.7);
+    icon.position.y = 2.15;
+    group.add(icon);
+    group.position.set(x, y, z);
+    level.scene.add(group);
+    return { x, z, y, mesh: group, icon, taken: false };
   }
 
   // ---------- 🔦/💧/🔥/🚚 двигун «активуй точки» ----------
@@ -557,6 +603,11 @@ export class DynamicMissions {
         mk.push({ x: m.dest.x, z: m.dest.z, color: '#44ccff', icon: '📡' });
         continue;
       }
+      if (m.type === 'castle') {
+        const target = this._castleTarget(m);
+        if (target) mk.push({ x: target.x, z: target.z, color: '#ff9e63', icon: m.phase === 'rescue' ? '🆘' : '🏰' });
+        continue;
+      }
       if (m.points) {
         const next = m.points.find((p) => !p.done);
         if (next) mk.push({ x: next.x, z: next.z, color: '#ffd23f', icon: m.icon });
@@ -596,6 +647,10 @@ export class DynamicMissions {
       return;
     }
     const count = Math.round(m.horde * ((level.country && level.country.difficulty.counts) || 1));
+    if (count <= 0) {
+      this._maybeStartLivingWorld(m);
+      return;
+    }
     const fresh = !this.pendingHorde;
     if (this.pendingHorde) this.pendingHorde.count += count;
     else this.pendingHorde = { t: 5, count };
@@ -960,6 +1015,7 @@ export class DynamicMissions {
       // до старту — на точці зустрічі; після — веде до вежі
       return m.started ? { x: m.dest.x, z: m.dest.z } : { x: m.site.x, z: m.site.z + 2 };
     }
+    if (m.type === 'castle') return this._castleTarget(m);
     if (m.points) {
       const next = m.points.find((p) => !p.done);
       return next ? { x: next.x, z: next.z } : null;
@@ -1376,6 +1432,171 @@ export class DynamicMissions {
   _up_balloon(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.balloon, dt, input, allowControl); }
   _up_bazaar(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.bazaar, dt, input, allowControl); }
   _up_tomb(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.tomb, dt, input, allowControl); }
+
+  _castleTarget(m) {
+    if (m.phase === 'find') return m.explosive;
+    if (m.phase === 'carry') return this.level.world.castleGate || m.site;
+    if (m.phase === 'plant' || m.phase === 'fight') return this.level.world.castleGate || m.site;
+    if (m.phase === 'rescue') return this.level.world.castleDungeon || m.site;
+    return null;
+  }
+
+  _castleObjectiveActive() {
+    const story = this.level.missions;
+    if (!story || !Array.isArray(story.objectives)) return true;
+    const objective = story.objectives.find((o) => o.id === 'pol-castle');
+    return !objective || objective.state === 'active';
+  }
+
+  _up_castle(m, dt, input, allowControl) {
+    if (!this._castleObjectiveActive()) return;
+    const level = this.level;
+    const player = level.player;
+    if (!m.started) {
+      m.started = true;
+      if (m.beam && m.beam.group) m.beam.group.visible = true;
+      level.bus.emit('toast', t('🏰 Знайди вибухівку і пробийся до великого замку!'));
+    }
+
+    const explosive = m.explosive;
+    if (m.phase === 'find') {
+      explosive.mesh.position.y = explosive.y + Math.abs(Math.sin(performance.now() / 350)) * 0.12;
+      const near = Math.hypot(player.pos.x - explosive.x, player.pos.z - explosive.z) < 3.4;
+      if (near) this.prompt = { text: t('Натисни {k} — підняти ящик з вибухівкою', { k: interactKey() }), hold: false };
+      if (near && allowControl && input.pressed('KeyE')) {
+        input.justPressed.delete('KeyE');
+        explosive.taken = true;
+        m.phase = 'carry';
+        m.title = t('Віднеси вибухівку до воріт замку');
+        level.audio.pickup();
+        level.bus.emit('toast', t('🧨 Ящик у тебе — неси його до воріт!'));
+      }
+      return;
+    }
+
+    if (m.phase === 'carry') {
+      explosive.x = player.pos.x;
+      explosive.z = player.pos.z;
+      explosive.mesh.position.set(player.pos.x, player.pos.y + 0.75, player.pos.z - 0.75);
+      explosive.mesh.rotation.y = player.yaw || 0;
+      const gate = level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
+      const near = Math.hypot(player.pos.x - gate.x, player.pos.z - gate.z) < 5;
+      if (near) {
+        m.phase = 'plant';
+        m.title = t('Заклади вибухівку біля воріт');
+      }
+      return;
+    }
+
+    if (m.phase === 'plant') {
+      const gate = level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
+      explosive.mesh.position.set(gate.x, level.world.groundH(gate.x, gate.z) + 0.05, gate.z + 1.1);
+      explosive.mesh.rotation.y = 0;
+      const near = Math.hypot(player.pos.x - gate.x, player.pos.z - gate.z) < 5.5;
+      if (near) this.prompt = { text: t('Тримай {k} — заклади вибухівку', { k: interactKey() }), hold: true, progress: m.plantProgress };
+      if (near && allowControl && input.down('KeyE')) {
+        m.plantProgress = Math.min(1, m.plantProgress + dt / 2.2);
+        if (m.plantProgress >= 1) this._blastCastleGate(m);
+      } else if (m.plantProgress > 0) {
+        m.plantProgress = Math.max(0, m.plantProgress - dt * 0.4);
+      }
+      return;
+    }
+
+    if (m.phase === 'fight') {
+      const regularLeft = m.guards.filter((z) => !z.castleKnight && z.state !== 'dead' && !z.gone).length;
+      const knightLeft = m.guards.filter((z) => z.castleKnight && z.state !== 'dead' && !z.gone).length;
+      m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: 25 - regularLeft, k: 5 - knightLeft });
+      if (regularLeft === 0 && knightLeft === 0) {
+        m.phase = 'rescue';
+        m.title = t('Врятуй людей з підземелля замку');
+        const dungeon = level.world.castleDungeon || m.site;
+        m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
+        level.bus.emit('toast', t('🆘 Замок зачищено — люди чекають у підземеллі!'));
+      }
+      return;
+    }
+
+    if (m.phase === 'rescue') {
+      const dungeon = level.world.castleDungeon || { x: m.site.x, z: m.site.z };
+      const near = Math.hypot(player.pos.x - dungeon.x, player.pos.z - dungeon.z) < 4.5;
+      if (near) this.prompt = { text: t('Тримай {k} — відчини підземелля', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+      if (near && allowControl && input.down('KeyE')) {
+        m.rescueProgress = Math.min(1, m.rescueProgress + dt / 2);
+        if (m.rescueProgress >= 1) this._rescueCastlePeople(m);
+      } else if (m.rescueProgress > 0) {
+        m.rescueProgress = Math.max(0, m.rescueProgress - dt * 0.4);
+      }
+    }
+  }
+
+  _blastCastleGate(m) {
+    const level = this.level;
+    const gate = level.world.castleGate || { x: m.site.x, z: m.site.z + m.site.r };
+    level.scene.remove(m.explosive.mesh);
+    if (level.world.destroyCastleGate) level.world.destroyCastleGate();
+    else {
+      if (gate.group) gate.group.removeFromParent();
+      if (gate.collider) level.world.removeCollider(gate.collider);
+      gate.destroyed = true;
+    }
+    level.effects.robotBoom(new THREE.Vector3(gate.x, level.world.groundH(gate.x, gate.z) + 1.6, gate.z));
+    if (m.beam) { m.beam.remove(); m.beam = null; }
+    this.prompt = null;
+    m.phase = 'fight';
+    m.title = t('Зачисть замок: зомбі 0/25 · лицарі 0/5');
+    this._spawnCastleGuards(m);
+    level.bus.emit('toast', t('💥 Ворота знищено! Зачисть 25 зомбі та 5 лицарів!'));
+    level.bus.emit('toast', t('⚔️ Лицар-зомбі: тіло 150, нагрудник 500, шолом 250!'));
+  }
+
+  _spawnCastleGuards(m) {
+    const level = this.level;
+    const rng = new RNG(level.country.seed + 503);
+    const radius = Math.max(18, Math.min(30, (m.site.r || 36) - 7));
+    level.zombies.clearNear(m.site.x, m.site.z, radius + 2);
+    for (let i = 0; i < 30; i++) {
+      const knight = i >= 25;
+      const ring = i % 3 === 0 ? radius * 0.45 : radius * 0.78;
+      const a = (i / 30) * Math.PI * 2 + rng.range(-0.09, 0.09);
+      const x = m.site.x + Math.cos(a) * ring;
+      const z = m.site.z + Math.sin(a) * ring;
+      const type = knight ? 'gladiator' : (i % 6 === 0 ? 'runner' : i % 9 === 0 ? 'snowman' : 'walker');
+      const zombie = level.zombies.spawn(type, x, z, {
+        horde: false,
+        guard: true,
+        castleKnight: knight,
+        anchor: { x: m.site.x, z: m.site.z, r: radius },
+      });
+      zombie.castleGuard = true;
+      zombie.aggroed = true;
+      zombie.state = 'chase';
+      m.guards.push(zombie);
+    }
+    level.audio.horde();
+  }
+
+  _rescueCastlePeople(m) {
+    const level = this.level;
+    const dungeon = level.world.castleDungeon || { x: m.site.x, z: m.site.z };
+    if (level.world.openCastleDungeon) level.world.openCastleDungeon();
+    else {
+      if (dungeon.group) dungeon.group.removeFromParent();
+      if (dungeon.collider) level.world.removeCollider(dungeon.collider);
+    }
+    const kinds = ['kid', 'granny', 'medic'];
+    kinds.forEach((kind, i) => {
+      const rig = makeCivilian(kind, level.rng);
+      const x = dungeon.x - 1.4 + i * 1.4;
+      const z = dungeon.z - 1.2;
+      rig.group.position.set(x, level.world.groundH(x, z), z);
+      level.scene.add(rig.group);
+      this.civilians.push({ rig, kind, x, z, state: 'follow', angle: (i / kinds.length) * Math.PI * 2, cheerT: 2.5 });
+    });
+    m.phase = 'done';
+    level.bus.emit('toast', t('🎉 Людей врятовано з підземелля!'));
+    this._complete(m.id);
+  }
 
   _upFetch(m, cfg, dt, input, allowControl) {
     const level = this.level;

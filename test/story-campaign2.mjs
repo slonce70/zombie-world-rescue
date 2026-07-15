@@ -56,6 +56,9 @@ const pol = getCountryStory('POL');
 assert.equal(pol.objectives[0].kind, 'activate');
 assert.equal(pol.objectives[0].count, 3);
 assert.equal(pol.objectives[1].site, 'railDepot');
+assert.equal(pol.objectives[2].kind, 'castle');
+assert.equal(pol.objectives[2].count, 30);
+assert.equal(pol.objectives[2].reward, 250);
 
 const egy = getCountryStory('EGY');
 assert.equal(egy.objectives[0].kind, 'fetch');
@@ -130,6 +133,7 @@ assert.ok(ukraineMap.storySites.village);
 const polandMap = await loadMapModule('poland');
 assert.ok(polandMap.storySites.railDepot);
 assert.ok(polandMap.storySites.castleRuin);
+assert.ok(polandMap.storySites.castleRuin.r >= 34, 'великий польський замок має радіус не менше 34 м');
 assert.equal(polandMap.storySites.bonfires.length, 3);
 
 const egyptMap = await loadMapModule('egypt');

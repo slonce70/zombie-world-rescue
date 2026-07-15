@@ -652,12 +652,13 @@ const ZOMBIE_PANTS = [0x4a4458, 0x504a40, 0x3e4a55];
 
 // Шаблони зомбі: 3 варіанти на тип, запечені один раз — нові зомбі клонуються
 const zombieTemplates = new Map();
-export function makeZombie(type, rng) {
-  if (!zombieTemplates.has(type)) zombieTemplates.set(type, [null, null, null]);
-  const arr = zombieTemplates.get(type);
+export function makeZombie(type, rng, variant = '') {
+  const templateKey = variant ? `${type}:${variant}` : type;
+  if (!zombieTemplates.has(templateKey)) zombieTemplates.set(templateKey, [null, null, null]);
+  const arr = zombieTemplates.get(templateKey);
   const idx = rng.int(0, 2);
   if (!arr[idx]) {
-    const rig = buildZombie(type, rng);
+    const rig = buildZombie(type, rng, variant);
     // сніговик має фіктивні кістки/torso і власний апдейтер — лишається на bakeRig
     if (rig.kind === 'snowman') bakeRig(rig);
     else bakeRigSkinned(rig);
@@ -984,7 +985,7 @@ export function makeIconSprite(emoji) {
   return spr;
 }
 
-function buildZombie(type, rng) {
+function buildZombie(type, rng, variant = '') {
   if (type === 'snowman') return buildSnowman(rng);
   if (type === 'mummy') {
     // 🧻 мумія: вся в бинтах, очі світяться з-під пов'язок
@@ -1310,40 +1311,48 @@ function buildZombie(type, rng) {
     const bronzeM = toonMat(0xc89b4a, 0x8a6a2a, 0.25);   // бронза/латунь
     const bronzeD = toonMat(0xb0863a);
     const crestM = toonMat(0xc62828);   // багряний кінський гребінь
-    // 🪖 бронзовий шолом-каска (галея) з нащічниками
-    const helm = sphere(0.3, bronzeM, 14, 10);
-    helm.position.y = 0.2;
-    helm.scale.set(1.04, 0.82, 1.04);
-    rig.parts.head.add(helm);
-    const rim = cylinder(0.31, 0.33, 0.06, bronzeD, 14);
-    rim.position.y = 0.1;
-    rig.parts.head.add(rim);
-    // нащічники
-    for (const side of [-1, 1]) {
-      const cheek = box(0.07, 0.18, 0.18, bronzeD);
-      cheek.position.set(side * 0.26, -0.02, -0.04);
-      rig.parts.head.add(cheek);
-    }
-    // переніссник
-    const nasal = box(0.06, 0.2, 0.06, bronzeD);
-    nasal.position.set(0, 0.02, -0.27);
-    rig.parts.head.add(nasal);
-    // 🔺 поперечний кінський гребінь (crista) — головна впізнавана риса
-    for (let i = 0; i < 7; i++) {
-      const h = 0.26 - Math.abs(i - 3) * 0.04;
-      const tuft = box(0.05, h, 0.07, crestM);
-      tuft.position.set(0, 0.46, 0.16 - i * 0.05);
-      rig.parts.head.add(tuft);
-    }
-    // бронзовий нагрудник (мускульна кіраса)
-    const cuirass = box(0.5, 0.5, 0.16, bronzeM);
-    cuirass.position.set(0, 0.34, -0.26);
-    rig.parts.torso.add(cuirass);
-    // наплічник на правому плечі
-    const pauldron = sphere(0.18, bronzeD, 8, 6);
-    pauldron.position.set(0.36, 0.56, 0);
-    pauldron.scale.set(1.2, 0.7, 1.2);
-    rig.parts.torso.add(pauldron);
+    const addArmor = (r, separate) => {
+      const helmetArmor = new THREE.Group();
+      helmetArmor.name = 'helmetArmor';
+      const helm = sphere(0.3, bronzeM, 14, 10);
+      helm.position.y = 0.2;
+      helm.scale.set(1.04, 0.82, 1.04);
+      helmetArmor.add(helm);
+      const rim = cylinder(0.31, 0.33, 0.06, bronzeD, 14);
+      rim.position.y = 0.1;
+      helmetArmor.add(rim);
+      for (const side of [-1, 1]) {
+        const cheek = box(0.07, 0.18, 0.18, bronzeD);
+        cheek.position.set(side * 0.26, -0.02, -0.04);
+        helmetArmor.add(cheek);
+      }
+      const nasal = box(0.06, 0.2, 0.06, bronzeD);
+      nasal.position.set(0, 0.02, -0.27);
+      helmetArmor.add(nasal);
+      for (let i = 0; i < 7; i++) {
+        const h = 0.26 - Math.abs(i - 3) * 0.04;
+        const tuft = box(0.05, h, 0.07, crestM);
+        tuft.position.set(0, 0.46, 0.16 - i * 0.05);
+        helmetArmor.add(tuft);
+      }
+      if (separate) bakeGroupMeshes(helmetArmor, { castShadow: true });
+      r.parts.head.add(helmetArmor);
+
+      const chestPlate = new THREE.Group();
+      chestPlate.name = 'chestPlate';
+      const cuirass = box(0.5, 0.5, 0.16, bronzeM);
+      cuirass.position.set(0, 0.34, -0.26);
+      chestPlate.add(cuirass);
+      const pauldron = sphere(0.18, bronzeD, 8, 6);
+      pauldron.position.set(0.36, 0.56, 0);
+      pauldron.scale.set(1.2, 0.7, 1.2);
+      chestPlate.add(pauldron);
+      if (separate) bakeGroupMeshes(chestPlate, { castShadow: true });
+      r.parts.torso.add(chestPlate);
+    };
+    // Лише castleKnight тримає броню окремо; звичайний gladiator лишається однодроуколовим.
+    if (variant === 'castleKnight') rig._postBake = (r) => addArmor(r, true);
+    else addArmor(rig, false);
     // 🛡️ круглий щит (parma) у лівій руці
     const shield = cylinder(0.34, 0.34, 0.07, bronzeD, 16);
     shield.rotation.x = Math.PI / 2;
