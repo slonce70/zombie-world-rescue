@@ -3224,7 +3224,7 @@ export class World {
       }
     }
     const lintel = new THREE.Mesh(new THREE.BoxGeometry(15, 2.0, 3.4), stoneM2);
-    lintel.position.set(0, 9.0, 0);
+    lintel.position.set(0, 7.4, 0);
     gateGroup.add(lintel);
     gateGroup.position.set(x, gateY, gateZ + 0.15);
     gateGroup.visible = false;
@@ -3241,7 +3241,7 @@ export class World {
     const dungeonY = this.groundH(dungeonX, z);
     const dungeonShell = new THREE.Group();
     const mouth = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.4, 0.35), toonMat(0x171b24));
-    mouth.position.y = 2.7;
+    mouth.position.set(0, 2.7, 0.8);
     dungeonShell.add(mouth);
     for (const side of [-1, 1]) {
       const jamb = new THREE.Mesh(new THREE.BoxGeometry(1.3, 6.2, 2.6), stoneM2);
