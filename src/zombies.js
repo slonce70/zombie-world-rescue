@@ -12,6 +12,7 @@ const TYPE_STATS = {
   headphones: { hp: 102, speed: 1.6, chaseSpeed: 3.3, aggro: 24, dmg: 10, attackR: 1.8, coins: 11, pitch: 1.05, stunImmune: true },
   boxer: { hp: 125, speed: 1.55, chaseSpeed: 3.5, aggro: 26, dmg: 7, attackR: 1.9, coins: 16, pitch: 0.8, punchEvery: 3, punchPush: 5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
+  stone: { hp: 500, speed: 0.9, chaseSpeed: 1.8, aggro: 24, dmg: 10, attackR: 2.1, coins: 25, pitch: 0.5, hitStun: 0.5 },
   // 🛡 щитоносець: тіло слабке (20 hp), але щит дуже міцний (1000) — НЕ ламай у лоб, ОБІЙДИ збоку/ззаду!
   // фронтальний конус щита (v42) лишається: збоку та ззаду тіло вразливе.
   shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 1000 },
@@ -235,7 +236,7 @@ export class Zombies {
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = finalType === 'boss' ? 1 : this.diff.hp * coopScale;
-    const maxHp = castleKnight ? 150 : this.hpWithSettings(stats.hp * hpScale, opts);
+    const maxHp = castleKnight ? 150 : finalType === 'stone' ? 500 : this.hpWithSettings(stats.hp * hpScale, opts);
     stats.hp = maxHp;
     const z_ = {
       nid, rig, type: finalType, stats,
@@ -1262,7 +1263,8 @@ export class Zombies {
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
             const confusedBonus = z.confusedT > 0 ? (z.confusedDmgBonus || 0) : 0;
-            const hit = this._hurt(tgt, st.dmg * this.diff.dmg + confusedBonus, z.x, z.z);
+            const damage = (z.type === 'stone' ? st.dmg : st.dmg * this.diff.dmg) + confusedBonus;
+            const hit = this._hurt(tgt, damage, z.x, z.z, st.hitStun || 0);
             if (hit && st.punchEvery) {
               z.punchHits = (z.punchHits || 0) + 1;
               if (z.punchHits % st.punchEvery === 0) this._punchPush(tgt, z.x, z.z, st.punchPush || 5);
@@ -1906,7 +1908,7 @@ export class Zombies {
   }
 
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
-  _hurt(tgt, dmg, fx, fz) {
+  _hurt(tgt, dmg, fx, fz, stun = 0) {
     if (!tgt) return false;
     if (tgt.zombie) {
       const dir = new THREE.Vector3(tgt.zombie.x - fx, 0, tgt.zombie.z - fz).normalize();
@@ -1918,8 +1920,11 @@ export class Zombies {
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
     const floorY = Math.max(this.world.groundH(tgt.pos.x, tgt.pos.z), this.world.floorAt(tgt.pos.x, tgt.pos.z, tgt.pos.y));
     if (tgt.pos.y - floorY > 3) return false;
-    if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz);
-    else this.level.player.takeDamage(dmg, fx, fz);
+    if (this.level.net && this.level.net.authority) this.level.net.hurtPlayer(tgt, dmg, fx, fz, stun);
+    else {
+      this.level.player.takeDamage(dmg, fx, fz);
+      if (stun && this.level.player.health > 0) this.level.player.stunT = Math.max(this.level.player.stunT || 0, stun);
+    }
     return true;
   }
 

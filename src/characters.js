@@ -1093,9 +1093,14 @@ function buildZombie(type, rng, variant = '') {
       glove.scale.set(1.25, 0.9, 1.1);
       arm.add(glove);
     }
-  } else if (type === 'tank') {
+  } else if (type === 'tank' || type === 'stone') {
+    const stone = type === 'stone';
     rig = makeHumanoid(Object.assign(common, {
       scale: 1.35, belly: 1.65, armsForward: 0.9, headR: 0.22,
+      ...(stone ? {
+        skin: 0x777b80, bellySkin: true, shirt: 0x5f646a, pants: 0x4c5055, shoes: 0x3d4145,
+        eyeWhite: 0xffb347, pupilColor: 0x5a2d00, hair: false,
+      } : {}),
       bellySkin: true, eyeL: 0.055, eyeR: 0.075,
     }));
   } else if (type === 'shield') {

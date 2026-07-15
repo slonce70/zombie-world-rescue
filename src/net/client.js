@@ -144,7 +144,10 @@ export class GuestNet {
       case 'state': this._applyState(d); return true;
       case 'hurt': {
         const p = this.level.player;
-        if (p && p.health > 0) p.takeDamage(d.dmg, d.fx, d.fz);
+        if (p && p.health > 0) {
+          p.takeDamage(d.dmg, d.fx, d.fz);
+          if (d.stun && p.health > 0) p.stunT = Math.max(p.stunT || 0, d.stun);
+        }
         return true;
       }
       case 'healed': {
