@@ -25,7 +25,10 @@ export function showVictory(game) {
   if (game.level.operation) {
     const s = game.level.stats;
     const finalStage = game.level.operation.stage === 2;
-    if (game.level.net && game.level.net.authority) game.level.netEv('vict');
+    if (game.level.net && game.level.net.authority) {
+      game.level.netEv('vict');
+      game.level.net.flushEvents();
+    }
     game._finishFrontStage(true);
     game.input.exitLock();
     document.querySelector('#overlay-victory h1').textContent = finalStage
@@ -49,7 +52,10 @@ export function showVictory(game) {
   }
   if (game.level.expedition) {
     const s = game.level.stats;
-    if (game.level.net && game.level.net.authority) game.level.netEv('vict');
+    if (game.level.net && game.level.net.authority) {
+      game.level.netEv('vict');
+      game.level.net.flushEvents();
+    }
     game._finishExpeditionNode(true);
     game.input.exitLock();
     document.querySelector('#overlay-victory h1').textContent = t('🧭 ЕТАП ПРОЙДЕНО!');
@@ -140,7 +146,10 @@ export function showVictory(game) {
   if (starInfo && starInfo.eggsGranted > 0) game.hud.toast(t('🥚 Ти заробив {n} яйце петса! Відкрий у Альбомі → 🐾 Петси', { n: starInfo.eggsGranted }), 5);
   // 🤝 бонус за гру РАЗОМ — обом сторонам локально (як _grantWeeklyCoop): wire не чіпаємо
   game._grantCoopWin();
-  if (game.level.net && game.level.net.authority) game.level.netEv('vict');
+  if (game.level.net && game.level.net.authority) {
+    game.level.netEv('vict');
+    game.level.net.flushEvents();
+  }
   game.globe.setLiberated();
   game.input.exitLock();
   const mins = Math.floor(s.time / 60);
