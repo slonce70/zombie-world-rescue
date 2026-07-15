@@ -30,7 +30,7 @@ export function frontMetricPayload(game, event) {
   const firstSeen = game && game.save && game.save.front && game.save.front.stats && game.save.front.stats.firstSeenDay;
   const cohort = /^\d{4}-\d{2}-\d{2}$/.test(firstSeen || '') ? firstSeen : new Date().toISOString().slice(0, 10);
   const lang = ['uk', 'en', 'ru'].includes(getLang()) ? getLang() : 'uk';
-  return { version: Number(window.__APP_VERSION) || 510, event, cohort, platform: platformClass(), lang };
+  return { version: Number(window.__APP_VERSION) || 511, event, cohort, platform: platformClass(), lang };
 }
 
 export async function sendFrontMetric(game, event) {

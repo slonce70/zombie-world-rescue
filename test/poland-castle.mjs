@@ -21,8 +21,10 @@ assert(
     && worldSource.includes('block.rotation.y = -ang - Math.PI / 2;')
     && worldSource.includes('dungeonGap < 0.1')
     && worldSource.includes('const h = 8.5;')
+    && worldSource.includes('lintel.position.set(0, 7.4, 0);')
+    && worldSource.includes('mouth.position.set(0, 2.7, 0.8);')
     && !worldSource.includes('const broken = i === 1'),
-  'мури суцільні, однакової висоти, а вежі цілі',
+  'мури суцільні, брама без верхньої діри, ґрати видно, а вежі цілі',
 );
 
 try {
