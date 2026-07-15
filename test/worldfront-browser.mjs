@@ -56,7 +56,7 @@ try {
   const board = await page.evaluate(() => {
     const game = window.__game;
     game.save.liberated = { UKR: true, POL: true, DEU: true };
-    game.save.friends = { UKR: true, DEU: true };
+    game.save.friends = { UKR: true, POL: true, DEU: true };
     game.save.front = null;
     game._ensureFront();
     game.frontui.render();
@@ -73,6 +73,22 @@ try {
   check(await page.locator('.front-operation').first().evaluate((node) => node.classList.contains('recommended')), 'recommended operation leads the board');
   check(await page.locator('#btn-front-go').isVisible(), 'primary action remains visible at 1280x720');
   await screenshot('front-board-1280x720');
+
+  await page.locator('[data-specialist-id="POL"]').click();
+  check(await page.locator('.front-op-intel').count() === 3, 'Scout reveals commander intel before the operation starts');
+
+  const radioStageChips = await page.evaluate(() => {
+    const game = window.__game;
+    game.save.front.projects.radio = 2;
+    game.frontui.render();
+    return document.querySelectorAll('.front-op-stages [data-stage-id]').length;
+  });
+  check(radioStageChips === 9, 'Radio Tower level 2 reveals all three stages for every operation');
+  await page.evaluate(() => {
+    const game = window.__game;
+    game.save.front.projects.radio = 0;
+    game.frontui.render();
+  });
 
   const initial = await page.evaluate(() => {
     const game = window.__game;
@@ -97,12 +113,19 @@ try {
       const before = level.zombies.list.filter((zombie) => zombie.frontEncounter).length;
       game._enterFrontPhase(level, 1);
       const pressure = level.zombies.list.filter((zombie) => zombie.frontEncounter).length - before;
+      game._onFrontObjectiveComplete(level);
+      const objectiveAdvanced = level.operation.stage < 2
+        ? game.save.front.active && game.save.front.active.stage === level.operation.stage + 1
+        : level.zombies.list.some((zombie) => zombie.frontCommander);
       game._enterFrontPhase(level, 3);
       game.renderer.render(level.scene, level.player.camera);
       return {
         stage: level.operation.stage,
+        missionCount: Array.isArray(level.missions && level.missions.missions) ? level.missions.missions.length : null,
+        campaignBossUnlocked: !!(level.missions && level.missions.bossUnlocked),
         support: level.operationEffects.support,
         phases: level.frontDirector.plan.phases.map((phase) => phase.id),
+        objectiveAdvanced,
         pressure,
         pressureBudget: level.frontDirector.plan.phases[1].spawnBudget,
         rewardDrop: level.frontRewardDrop,
@@ -111,17 +134,31 @@ try {
     });
     check(stageState.stage === stage, `stage ${stage + 1} restores canonical index`);
     check(stageState.support === 'medkit', 'medic has a visible medical support object');
+    check(stageState.missionCount === (stage === 2 ? 0 : 1), `stage ${stage + 1} has one short objective (commander-only finale)`);
+    check(!stageState.campaignBossUnlocked, 'Front stage does not unlock the ordinary campaign boss');
     check(stageState.phases.join(',') === 'quiet,pressure,spike,reward', 'Encounter Director has four deterministic phases');
+    check(stageState.objectiveAdvanced,
+      stage === 2 ? 'commander-only finale spawns immediately' : 'objective completion finishes the short stage immediately');
     if (stageState.stage === 0) {
       check(stageState.pressure === stageState.pressureBudget, 'pressure phase executes its deterministic spawn budget');
       check(stageState.rewardDrop, 'reward phase creates a safe supply drop');
       check(stageState.drawDelta <= 10, 'Front stage stays inside the +10 draw-call budget');
       await screenshot('front-active-1280x720');
     }
-    await page.evaluate(() => {
-      window.__game._finishFrontStage(true);
-      window.__game.endLevel();
-    });
+    if (stage === 2) {
+      await page.evaluate(() => {
+        const game = window.__game;
+        const commander = game.level.zombies.list.find((zombie) => zombie.frontCommander);
+        game.level.bus.emit('zombieKilled', commander);
+      });
+      await page.waitForFunction(() => window.__game.victoryShown, null, { timeout: 5_000 });
+      const commanderFinished = await page.evaluate(() => {
+        const game = window.__game;
+        return !game.save.front.active && game.save.front.board.some((item) => item.status === 'claimed');
+      });
+      check(commanderFinished, 'defeating the final commander completes and claims the operation');
+    }
+    await page.evaluate(() => window.__game.endLevel());
     await page.waitForFunction(() => window.__game.state === 'globe');
   }
 

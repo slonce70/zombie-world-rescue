@@ -454,13 +454,14 @@ export function frontCountryState(value, countryId) {
   };
 }
 
-export function frontViewModel(value, save = {}) {
+export function frontViewModel(value, save = {}, { previewSpecialist = null } = {}) {
   const context = {};
   if (save && Object.hasOwn(save, 'friends')) context.rescuedFriends = save.friends;
   const front = sanitizeFront(value, context);
   if (!front) return null;
   const rescued = cleanIds(save && save.friends, COUNTRY_SET, CAMPAIGN_COUNTRIES.length);
   const radio = front.projects.radio;
+  const scoutIntel = SPECIALIST_ROLES[front.active ? front.active.specialist : previewSpecialist] === 'scout';
   const selectable = !front.active && front.projectProgress === 0 && front.board.every((operation) => operation.status === 'available');
   const available = front.board.filter((operation) => operation.status === 'available');
   const recommended = front.active
@@ -472,7 +473,7 @@ export function frontViewModel(value, save = {}) {
       ...operation,
       recommended: operation.id === recommended,
       countryState: frontCountryState(front, operation.country),
-      commander: radio >= 1 ? template.commander : null,
+      commander: radio >= 1 || scoutIntel ? template.commander : null,
       stages: radio >= 2 ? template.stages.slice() : [],
       reward: radio >= 3 ? { coins: 200 + operation.threat * 50, crystals: 1 + operation.threat } : null,
     };

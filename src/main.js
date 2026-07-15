@@ -121,7 +121,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 501;
+const APP_VERSION = 502;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -139,15 +139,15 @@ const BIOME_EXPOSURE = {
   sakura: 1.05,
 };
 const FRONT_MISSION_PRESETS = Object.freeze({
-  'rescue-group': ['rescue', 'escort', 'collect'],
-  'destroy-nests': ['nests', 'clear', 'hunt'],
-  'repair-generator': ['repair', 'defense', 'clear'],
-  'activate-beacons': ['lights', 'hunt', 'collect'],
-  'elite-squad': ['hunt', 'defense', 'clear'],
-  'commander-pursuer': ['hunt', 'defense', 'clear'],
-  'commander-queen': ['hunt', 'nests', 'clear'],
-  'commander-ram': ['hunt', 'repair', 'defense'],
-  'commander-stalker': ['hunt', 'lights', 'clear'],
+  'rescue-group': ['rescue'],
+  'destroy-nests': ['nests'],
+  'repair-generator': ['repair'],
+  'activate-beacons': ['lights'],
+  'elite-squad': ['hunt'],
+  'commander-pursuer': [],
+  'commander-queen': [],
+  'commander-ram': [],
+  'commander-stalker': [],
 });
 // Підказки будуються при показі (а не при завантаженні): keyHint потребує
 // живого input.touchMode, щоб на телефоні згадувати екранні кнопки, а не клавіші.
@@ -2335,9 +2335,9 @@ class Game {
     return this.save.front;
   }
 
-  getFrontViewModel() {
+  getFrontViewModel(previewSpecialist = null) {
     const front = this.save.front ? sanitizeFront(this.save.front, this._frontContext()) : null;
-    return front ? frontViewModel(front, this.save) : null;
+    return front ? frontViewModel(front, this.save, { previewSpecialist }) : null;
   }
 
   openFront() {
@@ -2478,6 +2478,10 @@ class Game {
       level.effects.spawnPickup(x, z, 'medkit', 9999, y + 0.3);
       return;
     }
+    if (fx.extraCache) {
+      level.effects.spawnPickup(x + 1.5, z, 'ammo', 9999, y + 0.3);
+      level.effects.spawnPickup(x - 1.5, z, 'grenade', 9999, y + 0.3);
+    }
     const group = new THREE.Group();
     group.name = `front-support-${fx.support}`;
     const color = fx.support === 'fortified-barrier' ? 0x5d86a8 : fx.support === 'signal-flare' ? 0xffc642 : 0x6cbf67;
@@ -2575,17 +2579,25 @@ class Game {
     if (director.remaining <= 0) this._enterFrontPhase(level, director.phaseIndex + 1);
   }
 
+  _onFrontObjectiveComplete(level) {
+    if (!level || !level.operation || level.frontObjectiveComplete) return;
+    level.frontObjectiveComplete = true;
+    if (level.operation.stage === 2) {
+      if (level.frontDirector && level.frontDirector.phaseIndex < 2) this._enterFrontPhase(level, 2);
+      return;
+    }
+    this._showVictory();
+  }
+
   _frontCanComplete(level) {
     if (!level || !level.operation || !level.frontDirector) return true;
     if (level.net && !level.net.authority && level.frontRemoteComplete) return true;
-    const phase = level.frontDirector.plan.phases[level.frontDirector.phaseIndex];
-    if (!phase || phase.id !== 'reward') return false;
-    return level.operation.stage !== 2 || !!level.frontCommanderDefeated;
+    return level.operation.stage === 2 ? !!level.frontCommanderDefeated : !!level.frontObjectiveComplete;
   }
 
   _showFrontModeResult(level, won, icon, objective, detail) {
+    if (won) level.frontObjectiveComplete = true;
     if (won && !this._frontCanComplete(level)) {
-      level.frontObjectiveComplete = true;
       level.frontPendingResult = { icon, objective, detail };
       return false;
     }
@@ -2597,6 +2609,7 @@ class Game {
     else this.audio.defeat();
     this.audio.setMode(null);
     this.input.exitLock();
+    if (won && level.net && level.net.authority) level.netEv('vict');
     this._finishFrontStage(!!won);
     const retry = document.getElementById('btn-arena-retry');
     if (retry) retry.style.display = 'none';
@@ -3097,7 +3110,7 @@ class Game {
         isPlayground,
       }) && !this._forceMissionSet && !level.expedition && !operation;
       const frontMissions = operation && FRONT_MISSION_PRESETS[operation.missionPreset];
-      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, frontMissions || null);
+      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, frontMissions || null, { objectiveOnly: !!operation });
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
       if (useStory) level.rescueCage = new HiddenRescue(level);
@@ -3460,7 +3473,7 @@ class Game {
       // Гард на смерть: draft.isOpen морозить сим — відкритий над мертвим гравцем завісив би респавн.
       // У ?test вимкнено (сценарні тести здають місії пачками; вмикається &draft — test/draft-campaign.mjs),
       // такий самий патерн, як ?test-вимкнення хмари з опцією &cloud.
-      if (!level.net && level.runBuild && !level.storm && !this.victoryShown && this.draft
+      if (!level.net && level.runBuild && !level.storm && !level.operation && !this.victoryShown && this.draft
         && level.player.health > 0 && (!this.testMode || this.params.has('draft'))) this.draft.open();
       // 🌟 «момент могутності»: супер-пікап на 2-й зданій місії (або раніше на елітній хвилі)
       level.superMissions = (level.superMissions || 0) + 1;

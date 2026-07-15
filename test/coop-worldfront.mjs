@@ -151,7 +151,23 @@ try {
     realGame._showVictory = () => { remoteVictoryAccepted = realGame._frontCanComplete(realGame.level); };
     realGame.netVictory();
     const remoteCompleteFlag = realGame.level.frontRemoteComplete;
+
+    let modeVictoryBroadcasts = 0;
+    let modeStageFinished = false;
+    const previousFinishFrontStage = realGame._finishFrontStage;
+    realGame.level = {
+      operation: { stage: 0 }, bossDefeated: false, frontObjectiveComplete: true,
+      net: { authority: true }, netEv: (type) => { if (type === 'vict') modeVictoryBroadcasts++; },
+      frontDirector: { phaseIndex: 1, plan: { phases: [{ id: 'quiet' }, { id: 'pressure' }, { id: 'spike' }, { id: 'reward' }] } },
+      stats: { kills: 0 },
+    };
+    realGame.victoryShown = false;
+    realGame._finishFrontStage = (won) => { modeStageFinished = won; };
+    realGame._showFrontModeResult(realGame.level, true, '🛡️', 'Оборона', 'OK');
+    realGame._hideOverlay('overlay-arena-end');
+
     realGame._showVictory = previousShowVictory;
+    realGame._finishFrontStage = previousFinishFrontStage;
     realGame.level = previousLevel;
     realGame.victoryShown = previousVictory;
 
@@ -162,7 +178,7 @@ try {
       applied, appliedBeforeBadStart, reconnectApplied, captured: captured.frun,
       guestPersonalFront: guestGame.save.front,
       hostFrontButton, guestFrontButton,
-      remoteVictoryAccepted, remoteCompleteFlag,
+      remoteVictoryAccepted, remoteCompleteFlag, modeVictoryBroadcasts, modeStageFinished,
     };
   });
 
@@ -203,6 +219,8 @@ try {
     'room exposes Front entry to the host only');
   check(out.remoteCompleteFlag && out.remoteVictoryAccepted,
     'trusted host victory bypasses the guest-only Director clock');
+  check(out.modeVictoryBroadcasts === 1 && out.modeStageFinished,
+    'host Front defense/portal result broadcasts victory before finishing locally');
 
   const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_|favicon/i.test(e));
   check(realErrors.length === 0, 'no browser JS errors', realErrors.join(' | '));

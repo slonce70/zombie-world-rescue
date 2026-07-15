@@ -168,3 +168,13 @@ test('INIT owns local counters and rejects unavailable specialists', () => {
   });
   assert.equal(result.front.active.specialist, 'dispatcher');
 });
+
+test('active scout reveals commander intel without a Radio Tower level', () => {
+  let front = createFront({ seed: 508, liberated: ['UKR', 'POL', 'DEU'], rescuedFriends: ['POL'] });
+  const operationId = front.board[0].id;
+  front = reduce(front, {
+    type: 'START_OPERATION', operationId, specialist: 'POL', rescuedFriends: ['POL'],
+  }).front;
+  const view = frontViewModel(front, { friends: { POL: true } });
+  assert.ok(view.board.find((operation) => operation.id === operationId).commander);
+});

@@ -273,6 +273,7 @@ body.in-level #hud { display: block; }
 
 /* тости */
 #toasts { position: absolute; left: 50%; bottom: 32%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+body.banner-active #toasts { bottom: 12%; }
 .toast {
   background: var(--ui-bg); border: 2px solid var(--ui-border); border-radius: 12px;
   color: #fff; font-weight: 700; font-size: 16px; padding: 9px 20px;
@@ -1602,6 +1603,13 @@ body.touch-mode #touch-coach.show { display: block; }
 .front-op-country .front-marker { margin-right: 5px; vertical-align: 1px; }
 .front-op-desc, .front-op-intel { margin-top: 3px; color: #8fa9c1; font-size: 11px; font-weight: 700; }
 .front-op-intel { color: #ffd98a; }
+.front-op-stages { display: flex !important; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.front-op-stages > span {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0; padding: 3px 6px;
+  border: 1px solid rgba(140, 213, 255, .24); border-radius: 7px;
+  color: #bedcf2; background: rgba(78, 163, 214, .08); font-size: 9px; font-weight: 800;
+}
+.front-op-stages b { color: #8cd5ff; }
 .front-op-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; color: #cfe3f6; font-size: 11px; font-weight: 900; white-space: nowrap; }
 .front-threat { color: var(--front-danger); letter-spacing: -2px; }
 .front-empty { grid-column: 1/-1; padding: 22px; border: 1px dashed var(--ui-border); border-radius: 14px; color: #9fb8d4; font-weight: 800; text-align: center; }
@@ -1658,6 +1666,7 @@ body.touch-mode #touch-coach.show { display: block; }
   .front-op-flag { font-size: 25px; }
   .front-op-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 5px; }
   .front-op-desc, .front-op-intel { display: none !important; }
+  .front-op-stages > span { padding: 2px 5px; font-size: 8px; }
   .front-setup-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
   .front-setup-grid .front-section + .front-section { margin-top: 0; }
   .front-choice { min-height: 58px; padding: 7px 8px; }
