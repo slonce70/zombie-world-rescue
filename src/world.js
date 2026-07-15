@@ -3172,12 +3172,13 @@ export class World {
       this._addCollider(tx, tz, 4.1, ty + h, 3.7);
     }
     // високі мури; отвори лишаємо тільки під головну браму (+Z) і підземелля (-X)
-    const N = 48;
+    // кратність 4 тримає ворота й підземелля точно на центрах секцій за будь-якого масштабу
+    const N = Math.max(24, Math.round((48 * r / 36) / 4) * 4);
     for (let i = 0; i < N; i++) {
       const ang = (i / N) * Math.PI * 2;
-      const gateGap = Math.abs(ang - Math.PI / 2);
-      const dungeonGap = Math.abs(ang - Math.PI);
-      if (gateGap < 0.22 || dungeonGap < 0.1) continue;
+      const gateGap = Math.abs(ang - Math.PI / 2) * r;
+      const dungeonGap = Math.abs(ang - Math.PI) * r;
+      if (gateGap < 7.9 || dungeonGap < 3.6) continue;
       const bx = x + Math.cos(ang) * r;
       const bz = z + Math.sin(ang) * r;
       const by = this.groundH(bx, bz);
@@ -3270,10 +3271,80 @@ export class World {
     grate.rotation.y = Math.PI / 2;
     grate.visible = false;
     this.scene.add(grate);
+
+    // Прохід 20 + 10 + 20 = рівно 50 метрів. S-подібна форма вміщується
+    // навіть у маленькій версії замку й не пробиває протилежний мур.
+    const tunnel = new THREE.Group();
+    const tunnelStartX = dungeonX + 0.5;
+    const tunnelEndX = tunnelStartX + 40;
+    const tunnelEndZ = z + 10;
+    const floorM = toonMat(0x4b5058);
+    const tunnelM = toonMat(0x626973);
+    const ceilingM = toonMat(0x3d424a);
+    const addBox = (w, h, d, px, py, pz, mat) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(px, py, pz);
+      mesh.receiveShadow = true;
+      tunnel.add(mesh);
+      return mesh;
+    };
+    for (const [w, d, px, pz] of [
+      [20, 8.4, tunnelStartX + 10, z],
+      [8.4, 10, tunnelStartX + 20, z + 5],
+      [20, 8.4, tunnelStartX + 30, tunnelEndZ],
+    ]) {
+      addBox(w, 0.35, d, px, dungeonY + 0.08, pz, floorM);
+      addBox(w, 0.45, d, px, dungeonY + 6.1, pz, ceilingM);
+    }
+    const wallSpecs = [
+      [20, 0.6, tunnelStartX + 10, z - 4.2],
+      [16, 0.6, tunnelStartX + 8, z + 4.2],
+      [0.6, 10, tunnelStartX + 15.8, z + 5],
+      [0.6, 6, tunnelStartX + 24.2, z + 3],
+      [16, 0.6, tunnelStartX + 32, tunnelEndZ - 4.2],
+      [20, 0.6, tunnelStartX + 30, tunnelEndZ + 4.2],
+    ];
+    for (const [w, d, px, pz] of wallSpecs) {
+      addBox(w, 6, d, px, dungeonY + 3, pz, tunnelM);
+      const alongX = w > d;
+      const len = Math.max(w, d);
+      for (let off = -len / 2 + 0.9; off < len / 2; off += 1.8) {
+        this._addCollider(px + (alongX ? off : 0), pz + (alongX ? 0 : off), 0.55, dungeonY + 6, 0.45);
+      }
+    }
+    addBox(0.6, 6, 8.4, tunnelEndX, dungeonY + 3, tunnelEndZ, tunnelM);
+    for (let off = -3.2; off <= 3.2; off += 1.6) this._addCollider(tunnelEndX, tunnelEndZ + off, 0.55, dungeonY + 6, 0.45);
+    const torchM = toonMat(0xff9f32, 0xff6a14, 0.85);
+    for (const [tx, tz] of [
+      [tunnelStartX + 6, z - 3.75], [tunnelStartX + 14, z + 3.75],
+      [tunnelStartX + 16.25, z + 7], [tunnelStartX + 27, tunnelEndZ - 3.75],
+      [tunnelStartX + 35, tunnelEndZ + 3.75],
+    ]) {
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 7), torchM);
+      flame.position.set(tx, dungeonY + 2.7, tz);
+      tunnel.add(flame);
+    }
+    this.staticGroup.add(tunnel);
+
     const dungeonCollider = { x: dungeonX + 0.5, z, r: 3.3, top: dungeonY + 5.5 };
     this.castleDungeon = {
-      group: grate, entrance: dungeonShell, grate, collider: dungeonCollider,
-      x: dungeonX + 4.5, z, y: dungeonY, entranceX: dungeonX, active: false, open: false,
+      group: grate, entrance: dungeonShell, tunnel, grate, collider: dungeonCollider,
+      x: tunnelEndX - 3.5, z: tunnelEndZ, y: dungeonY, entranceX: dungeonX,
+      length: 50,
+      path: [
+        { x: tunnelStartX, z },
+        { x: tunnelStartX + 20, z },
+        { x: tunnelStartX + 20, z: tunnelEndZ },
+        { x: tunnelEndX, z: tunnelEndZ },
+      ],
+      wizardSpawns: [
+        { x: tunnelStartX + 8, z },
+        { x: tunnelStartX + 16, z },
+        { x: tunnelStartX + 20, z: z + 6 },
+        { x: tunnelStartX + 27, z: tunnelEndZ },
+        { x: tunnelStartX + 36, z: tunnelEndZ },
+      ],
+      active: false, open: false,
     };
 
     this._makeSign(x + 10, z + r + 6, t('ВЕЛИКИЙ ЗАМОК'), 0);
