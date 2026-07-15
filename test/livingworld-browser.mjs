@@ -23,7 +23,11 @@ await page.waitForFunction(() => window.__game.state === 'level' && window.__gam
 const live = await page.evaluate(() => {
   const g = window.__game;
   const ms = g.level.missions;
-  ms._complete(ms.missions[1].id);
+  // StoryMissions locks later story objectives, so exercise the dynamic mission
+  // that actually owns Living World instead of trying to skip the story order.
+  const delegate = ms.delegate || ms;
+  const eligible = delegate.missions.find((m) => m.slotIndex > 0);
+  delegate._complete(eligible.id);
   const ev = ms.livingWorld;
   const markers = ms.getMarkers().filter((m) => m.icon === '🌍').length;
   const beforeCoins = g.save.coins;
