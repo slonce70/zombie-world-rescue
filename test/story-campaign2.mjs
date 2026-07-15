@@ -82,7 +82,7 @@ assert.deepEqual(storyPreview('LAB'), null);
 
 // 📖 Кампанія 2.0 (v282): усі 12 кампанійних країн мають історію з 3 цілями та НПС
 const EXPECTED_STORY_SHAPE = {
-  DEU: { npcKind: 'granny', npcSite: 'cityGate', ids: ['deu-workshop', 'deu-convoy', 'deu-gate'], icons: '🔧🚚🛡️' },
+  DEU: { npcKind: 'granny', npcSite: 'cityGate', ids: ['deu-workshop', 'deu-convoy', 'deu-gate', 'deu-barracks'], icons: '🔧🚚🛡️🏚️' },
   FRA: { npcKind: 'kid', npcSite: 'cafe', ids: ['fra-kitchen', 'fra-balloon', 'fra-cellar'], icons: '🥐🎈🍇' },
   ESP: { npcKind: 'granny', npcSite: 'fiestaSquare', ids: ['esp-band', 'esp-bells', 'esp-fireworks'], icons: '🎺🔔🎆' },
   PRT: { npcKind: 'kid', npcSite: 'harborSquare', ids: ['prt-fishers', 'prt-lighthouse', 'prt-docks'], icons: '⛵🚨⚓' },

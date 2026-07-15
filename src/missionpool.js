@@ -37,6 +37,7 @@ export const MISSION_TYPES = {
   // Сюжетний штурм Польщі. Не позначаємо country, бо bonfire лишається
   // фірмовою випадковою місією країни, а castle додає storyMissionSet().
   castle: { icon: '🏰', slots: ['C'], reward: 250, horde: 0, kind: 'castle' },
+  barracks: { icon: '🏚️', slots: ['D'], reward: 220, horde: 0, kind: 'barracks' },
 };
 
 // конфіги двигунів: activate — N точок, біля кожної тримай E
@@ -187,6 +188,9 @@ export class DynamicMissions {
       if (level.world.activateCastleMission) level.world.activateCastleMission();
       const castle = level.country.map.storySites.castleRuin;
       slotInfo = { slot: 'C', site: castle, beamAt: { x: castle.x, z: castle.z } };
+    } else if (type === 'barracks') {
+      const barracks = level.country.map.storySites.barracks;
+      slotInfo = { slot: 'D', site: barracks, beamAt: { x: barracks.x, z: barracks.z } };
     } else if (train) {
       const depot = level.country.map.storySites.railDepot;
       slotInfo = { slot: slotInfo.slot, site: depot, beamAt: level.world.trainStartPoint };
@@ -257,9 +261,17 @@ export class DynamicMissions {
       m.guards = [];
       m.explosive = this._makeCastleExplosive(m);
       if (m.beam && m.beam.group) m.beam.group.visible = false;
+    } else if (type === 'barracks') {
+      m.hp = 2500;
+      m.maxHp = 2500;
+      m.spawnFastT = 2;
+      m.spawnGiantT = 7;
+      m.destroyed = false;
+      m.barracks = this._makeZombieBarracks(m);
+      m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: m.hp });
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
-    if (idx === 3) {
+    if (idx === 3 && type !== 'barracks') {
       m.optional = true;
       m.reward = Math.round(m.reward * 1.5);
       m.horde = Math.round(m.horde * 0.5);
@@ -1520,10 +1532,15 @@ export class DynamicMissions {
       m.title = t('Зачисть замок: зомбі {z}/25 · лицарі {k}/5', { z: 25 - regularLeft, k: 5 - knightLeft });
       if (regularLeft === 0 && knightLeft === 0) {
         m.phase = 'rescue';
-        m.title = t('Врятуй людей з підземелля замку');
+        m.title = t('Спустись у відкрите підземелля і звільни людей');
         const dungeon = level.world.castleDungeon || m.site;
+        if (level.world.openCastleDungeon) level.world.openCastleDungeon();
+        else {
+          if (dungeon.group) dungeon.group.removeFromParent();
+          if (dungeon.collider) level.world.removeCollider(dungeon.collider);
+        }
         m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
-        level.bus.emit('toast', t('🆘 Замок зачищено — люди чекають у підземеллі!'));
+        level.bus.emit('toast', t('🔓 Замок зачищено — прохід у підземелля відкрито!'));
       }
       return;
     }
@@ -1531,7 +1548,7 @@ export class DynamicMissions {
     if (m.phase === 'rescue') {
       const dungeon = level.world.castleDungeon || { x: m.site.x, z: m.site.z };
       const near = Math.hypot(player.pos.x - dungeon.x, player.pos.z - dungeon.z) < 4.5;
-      if (near) this.prompt = { text: t('Тримай {k} — відчини підземелля', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+      if (near) this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
       if (near && allowControl && input.down('KeyE')) {
         m.rescueProgress = Math.min(1, m.rescueProgress + dt / 2);
         if (m.rescueProgress >= 1) this._rescueCastlePeople(m);
@@ -1590,11 +1607,6 @@ export class DynamicMissions {
   _rescueCastlePeople(m) {
     const level = this.level;
     const dungeon = level.world.castleDungeon || { x: m.site.x, z: m.site.z };
-    if (level.world.openCastleDungeon) level.world.openCastleDungeon();
-    else {
-      if (dungeon.group) dungeon.group.removeFromParent();
-      if (dungeon.collider) level.world.removeCollider(dungeon.collider);
-    }
     const kinds = ['kid', 'granny', 'medic'];
     kinds.forEach((kind, i) => {
       const rig = makeCivilian(kind, level.rng);
@@ -1607,6 +1619,121 @@ export class DynamicMissions {
     m.phase = 'done';
     level.bus.emit('toast', t('🎉 Людей врятовано з підземелля!'));
     this._complete(m.id);
+  }
+
+  _makeZombieBarracks(m) {
+    const level = this.level;
+    const { x, z } = m.site;
+    const y = level.world.groundH(x, z);
+    const group = new THREE.Group();
+    const wallM = toonMat(0x59616b);
+    const darkM = toonMat(0x252b33);
+    const roofM = toonMat(0x702f2f);
+    const toxicM = toonMat(0x76c442);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(11, 5.5, 8), wallM);
+    body.position.y = 2.75;
+    body.castShadow = true;
+    group.add(body);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 3.2, 4), roofM);
+    roof.position.y = 7.1;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    group.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.2, 0.35), darkM);
+    door.position.set(0, 2.1, 4.15);
+    group.add(door);
+    for (const side of [-1, 1]) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.5, 0.3), toxicM);
+      window.position.set(side * 3.3, 3.3, 4.18);
+      group.add(window);
+    }
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 8), toonMat(0xd8d3bd));
+    skull.position.set(0, 6.1, 4.3);
+    group.add(skull);
+    group.position.set(x, y, z);
+    level.scene.add(group);
+    const collider = { x, z, r: 5.2, top: y + 8.8 };
+    const occluder = { x, z, r: 5.4, h: y + 8.8 };
+    level.world.colliders.push(collider);
+    level.world.occluders.push(occluder);
+    level.world._buildGrid();
+    return { group, collider, occluder, x, z, y, radius: 6.2 };
+  }
+
+  barracksHitTest(origin, dir, maxD) {
+    const m = this.missions.find((mission) => mission.type === 'barracks' && mission.state === 'active' && !mission.destroyed);
+    if (!m || !m.barracks) return null;
+    const b = m.barracks;
+    const cx = b.x, cy = b.y + 3.7, cz = b.z;
+    const ox = origin.x - cx, oy = origin.y - cy, oz = origin.z - cz;
+    const proj = ox * dir.x + oy * dir.y + oz * dir.z;
+    const c = ox * ox + oy * oy + oz * oz - b.radius * b.radius;
+    const disc = proj * proj - c;
+    if (disc < 0) return null;
+    const tHit = -proj - Math.sqrt(disc);
+    const t = tHit >= 0 ? tHit : -proj + Math.sqrt(disc);
+    if (t < 0 || t > maxD) return null;
+    return { mission: m, t, point: origin.clone().addScaledVector(dir, t) };
+  }
+
+  damageBarracks(damage, point = null) {
+    const m = this.missions.find((mission) => mission.type === 'barracks' && mission.state === 'active' && !mission.destroyed);
+    if (!m) return false;
+    const dmg = Math.max(0, Math.min(1000, Number(damage) || 0));
+    if (!dmg) return false;
+    m.hp = Math.max(0, m.hp - dmg);
+    m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: Math.ceil(m.hp) });
+    const p = point || new THREE.Vector3(m.site.x, m.barracks.y + 3, m.site.z);
+    this.level.effects.burst(p, 0xff8a3d, 5, { speed: 2.2, up: 2.4, life: 0.35, size: 0.8 });
+    if (m.hp > 0) return true;
+    m.destroyed = true;
+    this._destroyBarracksVisual(m);
+    this.level.effects.robotBoom(new THREE.Vector3(m.site.x, m.barracks.y + 2.5, m.site.z));
+    this.level.bus.emit('toast', t('💥 Казарму зруйновано — зомбі більше не виходять!'));
+    this._complete(m.id);
+    return true;
+  }
+
+  _destroyBarracksVisual(m) {
+    if (!m || !m.barracks || m.barracks.removed) return;
+    m.barracks.removed = true;
+    this.level.scene.remove(m.barracks.group);
+    this.level.world.removeCollider(m.barracks.collider);
+    const oi = this.level.world.occluders.indexOf(m.barracks.occluder);
+    if (oi >= 0) this.level.world.occluders.splice(oi, 1);
+  }
+
+  _up_barracks(m, dt) {
+    const alive = this.level.zombies.list.filter((z) => z.barracksSpawn && z.state !== 'dead' && !z.gone).length;
+    if (alive >= 40) {
+      m.spawnFastT = Math.min(2, Math.max(0.1, m.spawnFastT));
+      m.spawnGiantT = Math.min(7, Math.max(0.1, m.spawnGiantT));
+      return;
+    }
+    m.spawnFastT -= dt;
+    m.spawnGiantT -= dt;
+    while (m.spawnFastT <= 0 && !m.destroyed) {
+      m.spawnFastT += 2;
+      this._spawnBarracksZombie(m, this.level.rng.chance(0.5) ? 'runner' : 'walker');
+    }
+    while (m.spawnGiantT <= 0 && !m.destroyed) {
+      m.spawnGiantT += 7;
+      this._spawnBarracksZombie(m, 'tank');
+    }
+  }
+
+  _spawnBarracksZombie(m, type) {
+    const a = this.level.rng.range(-0.45, 0.45);
+    const x = m.site.x + Math.sin(a) * 3;
+    const z = m.site.z + 6 + Math.cos(a) * 1.5;
+    const zombie = this.level.zombies.spawn(type, x, z, {
+      horde: false,
+      guard: true,
+      anchor: { x: m.site.x, z: m.site.z, r: 24 },
+    });
+    zombie.barracksSpawn = true;
+    zombie.aggroed = true;
+    zombie.state = 'chase';
   }
 
   _upFetch(m, cfg, dt, input, allowControl) {
@@ -1758,6 +1885,8 @@ export class DynamicMissions {
       else if (m.type === 'nests') {
         a.push(m.cleared);
         for (const n of m.nestList) a.push(Math.round(n.progress * 100) / 100);
+      } else if (m.type === 'barracks') {
+        a.push(Math.max(0, Math.ceil(m.hp)));
       } else if (m.type === 'escort') a.push(m.started ? 1 : 0);
       else if (m.points) {
         a.push(m.activated);
@@ -1813,6 +1942,10 @@ export class DynamicMissions {
       else if (m.type === 'nests') {
         m.cleared = a[1];
         m.nestList.forEach((n, j) => { if (!n.cleared) n.progress = a[2 + j] || 0; });
+      } else if (m.type === 'barracks') {
+        m.hp = Math.max(0, Number(a[1]) || 0);
+        m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: Math.ceil(m.hp) });
+        if (m.hp <= 0) { m.destroyed = true; this._destroyBarracksVisual(m); }
       } else if (m.type === 'escort') {
         if (a[1] && !m.started) { m.started = true; if (!m.traveler) this._spawnTraveler(m); }
         else if (!a[1]) { m.started = false; this._removeTraveler(m); }
@@ -1946,6 +2079,7 @@ export class DynamicMissions {
     const m = this.missions[slot];
     if (!m || m.state === 'done') return;
     m.state = 'done';
+    if (type === 'barracks') { m.hp = 0; m.destroyed = true; this._destroyBarracksVisual(m); }
     if (m.beam) { m.beam.remove(); m.beam = null; }
     if (m.zone) { this.level.scene.remove(m.zone.ring); m.zone = null; }
     if (m.dest && m.dest.ring) {

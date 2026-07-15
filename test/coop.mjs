@@ -75,7 +75,13 @@ try {
   check('обидва клієнти на глобусі', true);
 
   // хост обирає улюбленця ДО створення кімнати — друг має побачити його поряд (повний синк)
-  await A.evaluate(() => { const g = window.__game; if (!g.save.pets.includes('cat')) g.save.pets.push('cat'); g.save.activePet = 'cat'; });
+  await A.evaluate(() => {
+    const g = window.__game;
+    if (!g.save.pets.includes('cat')) g.save.pets.push('cat');
+    g.save.activePet = 'cat';
+    g.save.mapSize = 'large';
+  });
+  await B.evaluate(() => { window.__game.save.mapSize = 'small'; });
 
   // 2. хост створює кімнату
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
@@ -103,6 +109,14 @@ try {
   await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
   await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
   check('обидва увійшли в рівень', true);
+  const mapSizes = await Promise.all([A, B].map((page) => page.evaluate(() => ({
+    mode: window.__game.level.mapSize,
+    bound: window.__game.level.world.layout.BOUND,
+  }))));
+  check('гість грає на великій карті хоста, а не на своїй маленькій',
+    mapSizes.every((s) => s.mode === 'large' && Math.abs(s.bound - 253.3333333) < 0.001),
+    JSON.stringify(mapSizes));
+
 
   // 5. гість отримує стан: зомбі-маріонетки і предмети
   await B.waitForFunction(() => {

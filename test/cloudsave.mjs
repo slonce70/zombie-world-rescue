@@ -142,7 +142,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'activeDance', 'activeGadget', 'activePet', 'activeSkin', 'activeTitle', 'activeTowerSkin', 'activeTracer',
       'activeCloneSkin',
       'bestiary', 'bestiaryGoals', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
-      'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'strongZombies', 'toughZombies', 'liberated', 'medals',
+      'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'strongZombies', 'toughZombies', 'mapSize', 'liberated', 'medals',
       'megaPity', 'megaQuests', 'missionRuns', 'modeBest', 'modeRewards', 'modeWins', 'passLvl', 'pets', 'quests', 'records', 'skins', 'soulLevel',
       'cloneSkins',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
