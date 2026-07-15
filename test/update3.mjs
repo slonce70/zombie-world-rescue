@@ -282,6 +282,7 @@ await page.evaluate(() => {
   g.test.completeMission('rescue');
   g.test.completeMission('tower');
   g.test.completeMission('warehouse');
+  g.level.missions._complete('deu-barracks');
 });
 await waitFor(async () => {
   await page.evaluate(() => window.__game.test.finishHorde());

@@ -34,7 +34,7 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('☰ меню: 14 другорядних кнопок у висувному меню', menu.side === 14, `${menu.side}`);
+  check('☰ меню: 15 другорядних кнопок у висувному меню', menu.side === 15, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');

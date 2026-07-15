@@ -234,7 +234,7 @@ const memCycle = await page.evaluate(() => {
 
   killHorde();
   stepUntilCorpsesGone();
-  const afterFirstKill = { textures: g.renderer.info.memory.textures, dead: l.zombies.list.filter((z) => z.state === 'dead').length };
+  const afterFirstKill = { textures: g.renderer.info.memory.textures, dead: l.zombies.list.filter((z) => z.horde && z.state === 'dead').length };
   respawnWave();
   const respawned = l.zombies.list.filter((z) => z.horde && z.state !== 'dead').length;
   killHorde();
@@ -245,7 +245,7 @@ const memCycle = await page.evaluate(() => {
     afterFirstKill,
     respawned,
     texturesAfter: g.renderer.info.memory.textures,
-    deadAfter: l.zombies.list.filter((z) => z.state === 'dead').length,
+    deadAfter: l.zombies.list.filter((z) => z.horde && z.state === 'dead').length,
   };
 });
 
