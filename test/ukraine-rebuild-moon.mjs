@@ -28,9 +28,19 @@ const ukraine = await page.evaluate(() => {
     player.pos.set(tool.x, tool.y, tool.z);
     delegate._up_rebuild(rebuild, 0.1, press(), true);
   }
+  const toolModels = rebuild.tools.map((tool) => tool.mesh.children.length);
+  const wrongToolMisses = !delegate.resourceHitTest(
+    player.pos.clone().set(rebuild.woodNodes[0].x, rebuild.woodNodes[0].y + 2.1, rebuild.woodNodes[0].z + 3),
+    player.pos.clone().set(0, 0, -1), 3.6, 'pickaxe');
   for (const point of rebuild.points) {
-    player.pos.set(point.x, point.y, point.z);
-    delegate._up_rebuild(rebuild, 1.2, hold, true);
+    const tool = point.kind === 'wood' ? 'axe' : 'pickaxe';
+    const y = point.y + (point.kind === 'wood' ? 2.1 : 0.75);
+    const origin = player.pos.clone().set(point.x, y, point.z + 3);
+    const dir = player.pos.clone().set(0, 0, -1);
+    for (let hit = 0; hit < 4; hit++) {
+      const target = delegate.resourceHitTest(origin, dir, 3.6, tool);
+      delegate.damageResource(target.node, target.point, tool);
+    }
   }
   player.pos.set(rebuild.dest.x, rebuild.dest.y, rebuild.dest.z);
   delegate._up_rebuild(rebuild, 30, hold, true);
@@ -47,7 +57,12 @@ const ukraine = await page.evaluate(() => {
       villageX: delegate.L.village.x,
       villageZ: delegate.L.village.z,
     },
-    rebuild: { wood: rebuild.wood, stone: rebuild.stone, progress: rebuild.buildProgress, monument: !!rebuild.rebuilt },
+    rebuild: {
+      wood: rebuild.wood, stone: rebuild.stone, progress: rebuild.buildProgress,
+      buildingParts: rebuild.rebuilt.children.length,
+      mainBuildingWidth: rebuild.rebuilt.children[0].geometry.parameters.width,
+      tools: player.weapons.filter((w) => w === 'axe' || w === 'pickaxe'), toolModels, wrongToolMisses,
+    },
     bossUnlocked: story.bossUnlocked,
   };
 });
@@ -57,8 +72,10 @@ check(ukraine.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense,ukr-rebuild',
 check(ukraine.defense.type === 'defense' && ukraine.defense.timer <= 0
   && ukraine.defense.x === ukraine.defense.villageX && ukraine.defense.z === ukraine.defense.villageZ,
   'оборона реально триває 22 секунди на сільській площі', JSON.stringify(ukraine.defense));
-check(ukraine.rebuild.wood === 120 && ukraine.rebuild.stone === 50 && ukraine.rebuild.progress === 1 && ukraine.rebuild.monument,
-  'сокира/кірка → 120 дерева + 50 каменю → 30 секунд відбудови', JSON.stringify(ukraine.rebuild));
+check(ukraine.rebuild.wood === 120 && ukraine.rebuild.stone === 50 && ukraine.rebuild.progress === 1
+  && ukraine.rebuild.tools.join(',') === 'axe,pickaxe' && ukraine.rebuild.toolModels.every((n) => n > 2)
+  && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15,
+  'реальні вибірні інструменти → правильне рубання/видобування → великий міський штаб', JSON.stringify(ukraine.rebuild));
 check(ukraine.states.every((state) => state === 'done') && ukraine.bossUnlocked,
   'після українських завдань відкривається бос', JSON.stringify(ukraine));
 

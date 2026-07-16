@@ -3,7 +3,7 @@
 // Реалізує той самий інтерфейс, що й старі Missions.
 import * as THREE from 'three';
 import { t, interactKey } from './i18n.js';
-import { makeCivilian, updateRig, setAnim, toonMat } from './characters.js';
+import { makeCivilian, makeGunMesh, updateRig, setAnim, toonMat } from './characters.js';
 import { dampAngle, RNG } from './utils.js';
 import { livingWorldReward, pickLivingWorldEvent, shouldOfferLivingWorld } from './livingworld.js';
 
@@ -472,20 +472,120 @@ export class DynamicMissions {
       { ...this._spawnFetchItems(m, axeCfg)[0], kind: 'axe', cfg: axeCfg },
       { ...this._spawnFetchItems(m, pickCfg)[0], kind: 'pickaxe', cfg: pickCfg },
     ];
+    for (const tool of m.tools) {
+      this.level.scene.remove(tool.mesh);
+      tool.mesh = makeGunMesh(tool.kind).group;
+      tool.mesh.scale.setScalar(2.1);
+      tool.mesh.rotation.set(-0.35, tool.kind === 'axe' ? 0.6 : -0.6, 0.15);
+      tool.mesh.position.set(tool.x, tool.y + 0.7, tool.z);
+      this.level.scene.add(tool.mesh);
+    }
     m.wood = 0;
     m.stone = 0;
     m.buildProgress = 0;
     m.phase = 'tools';
     m.title = t('Знайди сокиру й кірку');
     m.woodNodes = this._spawnActPoints(m, { n: 3, emoji: '🌲', color: 0x4f9a4b, spread: 'map', seedOffset: 303 })
-      .map((p) => ({ ...p, kind: 'wood', amount: 40 }));
+      .map((p) => ({ ...p, kind: 'wood', amount: 40, hp: 4 }));
     m.stoneNodes = this._spawnActPoints(m, { n: 2, emoji: '🪨', color: 0x9299a3, spread: 'map', seedOffset: 404 })
-      .map((p) => ({ ...p, kind: 'stone', amount: 25 }));
+      .map((p) => ({ ...p, kind: 'stone', amount: 25, hp: 4 }));
     m.points = [...m.woodNodes, ...m.stoneNodes];
-    for (const p of m.points) p.mesh.visible = false;
+    for (const p of m.points) {
+      this.level.scene.remove(p.mesh);
+      p.mesh = this._makeResourceMesh(p.kind);
+      p.mesh.position.set(p.x, p.y, p.z);
+      p.mesh.visible = false;
+      this.level.scene.add(p.mesh);
+    }
     m.dest = this._makeDeliverPoint(m, { color: 0xffc857, deliver: 'cityCenter', deliverEmoji: '🏗️' });
+    m.buildingAt = { x: m.site.x, z: m.site.z, y: this.level.world.groundH(m.site.x, m.site.z) };
+    m.dest.x = m.site.x;
+    m.dest.z = m.site.z + 13;
+    m.dest.y = this.level.world.groundH(m.dest.x, m.dest.z);
+    m.dest.ring.position.set(m.dest.x, m.dest.y + 0.25, m.dest.z);
+    m.dest.icon.position.set(m.dest.x, m.dest.y + 3.2, m.dest.z);
     m.dest.ring.visible = false;
     m.dest.icon.visible = false;
+  }
+
+  _makeResourceMesh(kind) {
+    const g = new THREE.Group();
+    if (kind === 'wood') {
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 4.2, 10), toonMat(0x76502c));
+      trunk.position.y = 2.1;
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(2.2, 4.5, 9), toonMat(0x3f8a42));
+      crown.position.y = 5.4;
+      trunk.castShadow = crown.castShadow = true;
+      g.add(trunk, crown);
+    } else {
+      const rockM = toonMat(0x7e8791);
+      for (const [x, y, z, s] of [[0, 0.75, 0, 1.25], [0.8, 0.48, 0.35, 0.75], [-0.7, 0.4, 0.4, 0.65]]) {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockM);
+        rock.position.set(x, y, z);
+        rock.rotation.set(x + 0.2, z + 0.3, y);
+        rock.castShadow = true;
+        g.add(rock);
+      }
+    }
+    return g;
+  }
+
+  _makeCityCenter(m) {
+    const level = this.level;
+    const g = new THREE.Group();
+    const wallM = toonMat(0xe4d4b7);
+    const roofM = toonMat(0x376fa8);
+    const stoneM = toonMat(0xaeb6bf);
+    const windowM = new THREE.MeshBasicMaterial({ color: 0xffd77a });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(16, 7, 9), wallM);
+    body.position.y = 3.5;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(8.7, 3.6, 4), roofM);
+    roof.position.y = 8.8;
+    roof.rotation.y = Math.PI / 4;
+    const entrance = new THREE.Mesh(new THREE.BoxGeometry(5.5, 6, 2.2), stoneM);
+    entrance.position.set(0, 3, 5);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.2), toonMat(0x654126));
+    door.position.set(0, 1.6, 6.15);
+    g.add(body, roof, entrance, door);
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 8), wallM);
+      wing.position.set(side * 9.5, 2.5, 0.4);
+      const wingRoof = new THREE.Mesh(new THREE.ConeGeometry(4.5, 2.5, 4), roofM);
+      wingRoof.position.set(side * 9.5, 6.2, 0.4);
+      wingRoof.rotation.y = Math.PI / 4;
+      g.add(wing, wingRoof);
+      for (const x of [side * 7.8, side * 10.8]) {
+        for (const y of [2.1, 4.1]) {
+          const win = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.35, 0.15), windowM);
+          win.position.set(x, y, 4.48);
+          g.add(win);
+        }
+      }
+    }
+    for (const x of [-5.4, -2.8, 2.8, 5.4]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.5, 0.15), windowM);
+      win.position.set(x, 4.1, 4.58);
+      g.add(win);
+    }
+    for (const x of [-1.9, 1.9]) {
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 5, 10), stoneM);
+      column.position.set(x, 2.5, 6.1);
+      g.add(column);
+    }
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 8), toonMat(0x808890));
+    pole.position.set(0, 12.4, 0);
+    const flag = new THREE.Group();
+    const blue = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.55, 0.06), new THREE.MeshBasicMaterial({ color: 0x2072c9 }));
+    const yellow = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.55, 0.06), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
+    blue.position.set(1.15, 13.8, 0); yellow.position.set(1.15, 13.25, 0);
+    flag.add(blue, yellow);
+    g.add(pole, flag);
+    g.position.set(m.buildingAt.x, m.buildingAt.y, m.buildingAt.z);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    level.scene.add(g);
+    level.world.colliders.push({ x: m.buildingAt.x, z: m.buildingAt.z, r: 9, top: m.buildingAt.y + 14 });
+    level.world._buildGrid();
+    return g;
   }
 
   // ---------- допоміжні споруди місій ----------
@@ -1380,7 +1480,7 @@ export class DynamicMissions {
     if (m.phase === 'tools') {
       for (const tool of m.tools) {
         if (tool.taken) continue;
-        tool.mesh.position.y = tool.y + Math.abs(Math.sin(performance.now() / 400 + tool.x)) * 0.14;
+        tool.mesh.position.y = tool.y + 0.7 + Math.abs(Math.sin(performance.now() / 400 + tool.x)) * 0.14;
         if (Math.hypot(player.pos.x - tool.x, player.pos.z - tool.z) >= 3.4) continue;
         this.prompt = { text: tool.kind === 'axe'
           ? t('Натисни {k} — взяти сокиру', { k: interactKey() })
@@ -1389,6 +1489,7 @@ export class DynamicMissions {
           input.justPressed.delete('KeyE');
           tool.taken = true;
           level.scene.remove(tool.mesh);
+          player.giveWeapon(tool.kind);
           level.audio.pickup();
           level.bus.emit('toast', tool.kind === 'axe' ? t('🪓 Сокиру знайдено!') : t('⛏️ Кірку знайдено!'));
           if (m.tools.every((it) => it.taken)) {
@@ -1407,25 +1508,11 @@ export class DynamicMissions {
         if (p.done) continue;
         const d = Math.hypot(player.pos.x - p.x, player.pos.z - p.z);
         if (d >= 3.6) continue;
-        this.prompt = { text: p.kind === 'wood'
-          ? t('Тримай {k} — рубай дерево', { k: interactKey() })
-          : t('Тримай {k} — добувай камінь', { k: interactKey() }), hold: true, progress: p.progress };
-        if (allowControl && input.down('KeyE')) {
-          p.progress = Math.min(1, p.progress + dt / 1.2);
-          if (p.progress >= 1) {
-            p.done = true;
-            m[p.kind] += p.amount;
-            level.scene.remove(p.mesh);
-            level.audio.checkpoint();
-          }
-        }
+        const needed = p.kind === 'wood' ? 'axe' : 'pickaxe';
+        this.prompt = player.cur === needed
+          ? { text: p.kind === 'wood' ? t('Атакуй дерево сокирою') : t('Атакуй камінь кіркою'), hold: false, progress: (4 - p.hp) / 4 }
+          : { text: p.kind === 'wood' ? t('Обери сокиру: X або колесо зброї') : t('Обери кірку: X або колесо зброї'), hold: false };
         break;
-      }
-      if (m.points.every((p) => p.done)) {
-        m.phase = 'build';
-        m.dest.ring.visible = true;
-        m.dest.icon.visible = true;
-        level.bus.emit('toast', t('🏗️ Ресурси зібрано — відновлюй центр міста 30 секунд!'));
       }
       return;
     }
@@ -1437,15 +1524,7 @@ export class DynamicMissions {
     if (d < m.dest.r && allowControl && input.down('KeyE')) {
       m.buildProgress = Math.min(1, m.buildProgress + dt / 30);
       if (m.buildProgress >= 1) {
-        const monument = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 6), toonMat(0xc9b37c));
-        const column = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.1, 4, 10), toonMat(0xe0d2ae));
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.4, 4), toonMat(0x4f76a8));
-        base.position.y = 0.25; column.position.y = 2.5; roof.position.y = 5.2; roof.rotation.y = Math.PI / 4;
-        monument.add(base, column, roof);
-        monument.position.set(m.dest.x, m.dest.y, m.dest.z);
-        level.scene.add(monument);
-        m.rebuilt = monument;
+        m.rebuilt = this._makeCityCenter(m);
         level.bus.emit('toast', t('🏗️ Центр міста відновлено!'));
         this._complete(m.id);
       }
@@ -2113,6 +2192,49 @@ export class DynamicMissions {
     const t = tHit >= 0 ? tHit : -proj + Math.sqrt(disc);
     if (t < 0 || t > maxD) return null;
     return { mission: m, t, point: origin.clone().addScaledVector(dir, t) };
+  }
+
+  resourceHitTest(origin, dir, maxD, tool) {
+    const m = this.missions.find((mission) => mission.type === 'rebuild' && mission.state === 'active' && mission.phase === 'resources');
+    if (!m || !['axe', 'pickaxe'].includes(tool)) return null;
+    let best = null;
+    for (const node of m.points) {
+      if (node.done || (node.kind === 'wood' ? tool !== 'axe' : tool !== 'pickaxe')) continue;
+      const cy = node.y + (node.kind === 'wood' ? 2.1 : 0.75);
+      const radius = node.kind === 'wood' ? 1.15 : 1.45;
+      const ox = origin.x - node.x, oy = origin.y - cy, oz = origin.z - node.z;
+      const proj = ox * dir.x + oy * dir.y + oz * dir.z;
+      const disc = proj * proj - (ox * ox + oy * oy + oz * oz - radius * radius);
+      if (disc < 0) continue;
+      const near = -proj - Math.sqrt(disc);
+      const far = -proj + Math.sqrt(disc);
+      const t = near >= 0 ? near : far;
+      if (t >= 0 && t <= maxD && (!best || t < best.t)) {
+        best = { node, t, point: origin.clone().addScaledVector(dir, t) };
+      }
+    }
+    return best;
+  }
+
+  damageResource(node, point, tool) {
+    const m = this.missions.find((mission) => mission.type === 'rebuild' && mission.state === 'active' && mission.phase === 'resources');
+    if (!m || !node || node.done || (node.kind === 'wood' ? tool !== 'axe' : tool !== 'pickaxe')) return false;
+    node.hp--;
+    node.mesh.rotation.z += node.kind === 'wood' ? 0.025 : 0;
+    node.mesh.scale.setScalar(0.94 + node.hp * 0.015);
+    this.level.effects.burst(point, node.kind === 'wood' ? 0xb9793d : 0xaeb6bf, 7, { speed: 2.5, up: 2.5, life: 0.45, size: 0.8 });
+    if (node.hp > 0) return true;
+    node.done = true;
+    m[node.kind] += node.amount;
+    this.level.scene.remove(node.mesh);
+    this.level.audio.checkpoint();
+    if (m.points.every((p) => p.done)) {
+      m.phase = 'build';
+      m.dest.ring.visible = true;
+      m.dest.icon.visible = true;
+      this.level.bus.emit('toast', t('🏗️ Ресурси зібрано — відновлюй центр міста 30 секунд!'));
+    }
+    return true;
   }
 
   damageBarracks(damage, point = null) {

@@ -18,6 +18,8 @@ export const WEAPONS = {
   sword: { name: 'Меч', icon: '🗡️', dmg: 300, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.04, infinite: true, melee: true, range: 3.0 },
   // 🔨 молот — єдина зброя режиму «Оборона турелі»: 35 шкоди, 1 удар/с
   hammer: { name: 'Молот', icon: '🔨', dmg: 35, rpm: 60, mag: Infinity, spread: 0, auto: false, reloadT: 1.0, recoil: 0.06, infinite: true, melee: true, range: 3.2 },
+  axe: { name: 'Сокира', icon: '🪓', dmg: 45, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, infinite: true, melee: true, range: 3.6 },
+  pickaxe: { name: 'Кірка', icon: '⛏️', dmg: 35, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, infinite: true, melee: true, range: 3.6 },
   bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
   // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.
@@ -362,6 +364,9 @@ export class Player {
         const have = this.weapons;
         const next = have[(have.indexOf(this.cur) + 1) % have.length];
         this.switchWeapon(next);
+      }
+      if (input.pressed('KeyX') && this.weapons.includes('axe')) {
+        this.switchWeapon(this.cur === 'axe' && this.weapons.includes('pickaxe') ? 'pickaxe' : 'axe');
       }
       if (input.pressed('KeyV')) {
         this.firstPerson = !this.firstPerson;
@@ -802,6 +807,14 @@ export class Player {
       const missionEngine = level.missions && (level.missions.delegate || level.missions);
       const barracksHit = missionEngine && missionEngine.barracksHitTest
         ? missionEngine.barracksHitTest(origin, dir, w.range || 3) : null;
+      const resourceHit = missionEngine && missionEngine.resourceHitTest
+        ? missionEngine.resourceHitTest(origin, dir, w.range || 3, this.cur) : null;
+      if (resourceHit && (!hit || resourceHit.t < hit.t) && (!barracksHit || resourceHit.t < barracksHit.t)) {
+        missionEngine.damageResource(resourceHit.node, resourceHit.point, this.cur);
+        level.audio.hit(false);
+        this._applyRecoil(w);
+        return;
+      }
       if (barracksHit && (!hit || barracksHit.t < hit.t)) {
         const damage = w.dmg * dmgMult;
         missionEngine.damageBarracks(damage, barracksHit.point);

@@ -3646,6 +3646,38 @@ export function makeGunMesh(kind) {
     grip.rotation.x = -0.25;
     g.add(shaft, ring1, ring2, gem, grip);
     muzzle.position.set(0, 0.02, -0.72);
+  } else if (kind === 'axe') {
+    const woodM = toonMat(0x704523);
+    const steelM = toonMat(0xb8c4cf, 0xffffff, 0.25);
+    const shaft = cylinder(0.035, 0.045, 0.78, woodM, 10);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.12;
+    const head = box(0.09, 0.13, 0.3, steelM);
+    head.position.set(0, 0.02, -0.49);
+    head.rotation.y = -0.18;
+    const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.055, 3), steelM);
+    blade.rotation.z = Math.PI / 2;
+    blade.position.set(0.12, 0.02, -0.54);
+    blade.scale.set(1, 1, 0.65);
+    g.add(shaft, head, blade);
+    muzzle.position.set(0, 0.02, -0.68);
+  } else if (kind === 'pickaxe') {
+    const woodM = toonMat(0x704523);
+    const steelM = toonMat(0x9daab7, 0xffffff, 0.22);
+    const shaft = cylinder(0.035, 0.045, 0.82, woodM, 10);
+    shaft.rotation.x = Math.PI / 2;
+    shaft.position.z = -0.12;
+    const bar = cylinder(0.045, 0.055, 0.48, steelM, 10);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(0, 0.02, -0.53);
+    for (const side of [-1, 1]) {
+      const tip = cone(0.075, 0.28, steelM, 8);
+      tip.rotation.z = side * Math.PI / 2;
+      tip.position.set(side * 0.36, 0.02, -0.53);
+      g.add(tip);
+    }
+    g.add(shaft, bar);
+    muzzle.position.set(0, 0.02, -0.68);
   } else if (kind === 'sword') {
     const bladeM = toonMat(0xc9d0d8, 0xffffff, 0.25);
     const edgeM = toonMat(0xe8eef6, 0xffffff, 0.35);
@@ -3749,7 +3781,7 @@ export function makeFPArms(gunKind) {
   const g = new THREE.Group();
   const skinM = toonMat(0xffc9a3);
   const sleeveM = toonMat(0x2f80c3);
-  const sword = gunKind === 'sword' || gunKind === 'hammer'; // молот тримаємо як меч
+  const sword = ['sword', 'hammer', 'axe', 'pickaxe'].includes(gunKind); // інструменти тримаємо як меч
   const gun = makeGunMesh(gunKind);
   if (sword) {
     gun.group.position.set(0.06, -0.04, 0.08);
