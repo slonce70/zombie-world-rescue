@@ -2,13 +2,14 @@
 // v53+: ESP/PRT/ITA більше НЕ дають зброю за склад — ящик дає МОНЕТИ (вогнемет/лазер тепер за
 // зірковий рівень). Перевіряємо: (а) ящик ESP дає монети рядком-тостом без код-витоку;
 // (б) ящик країни ЗІ зброєю (DEU → smg) усе ще видає зброю рядком-тостом без витоку.
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
-const check = (c, m) => { console.log((c ? '✅' : '❌') + ' ' + m); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 
 async function openCrate(country) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

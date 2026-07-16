@@ -1,11 +1,9 @@
 // 🎮 Тест оновлення 10 (v14): нове головне меню (ГРАТИ / ГРАТИ РАЗОМ),
 // соло-меню режимів, відкриття всього світу після України, червоні країни на глобусі.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failures = 0;
@@ -14,8 +12,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
@@ -211,8 +208,7 @@ try {
   console.error('❌ ТЕСТ ВПАВ:', e.message.split('\n')[0]);
   await page.screenshot({ path: 'shots/u10-fail.png' }).catch(() => {});
 } finally {
-  await browser.close().catch(() => {});
-closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 ОНОВЛЕННЯ 10 (МЕНЮ + СВІТ) ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

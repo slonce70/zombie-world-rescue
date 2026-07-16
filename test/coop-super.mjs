@@ -5,6 +5,7 @@
 //
 // Порядок (а)→(г)→(б)→(в) навмисний: супер один на рівень, тож mid-join мусить статись, ПОКИ
 // зірка ще не підібрана — інакше другого спавну не буде.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
@@ -20,7 +21,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const relay = await spawnRelay(RELAY_PORT);
 

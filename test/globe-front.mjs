@@ -1,9 +1,6 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base, close } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const { BASE: base, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1280, height: 720 } }, captureErrors: false });
 
 try {
   await page.goto(`${base}/?test&fresh`);
@@ -51,6 +48,5 @@ try {
   }
   console.log('✅ Living Front threat, restoration and safe states reach the globe');
 } finally {
-  await browser.close();
-  close();
+  await closeTest();
 }

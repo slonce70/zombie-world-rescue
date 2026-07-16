@@ -1,6 +1,6 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { spawn } from 'child_process';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function ensureWebServer({ port = 8741, quiet = true } = {}) {
   const base = `http://localhost:${port}`;

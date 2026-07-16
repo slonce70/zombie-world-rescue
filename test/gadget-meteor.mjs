@@ -1,10 +1,10 @@
 // ☄️ Гаджет «Метеорит»: викликає метеорит на НАЙБЛИЖЧОГО зомбі — 250 шкоди згори
 // (обходить фронтальний щит і нагрудник). Перезарядка 45с.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });

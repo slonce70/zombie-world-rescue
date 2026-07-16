@@ -1,14 +1,12 @@
 // v500 World Front network contract: host-only state/results, compact starts,
 // canonical reconnect snapshots and stable reward ids.
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, extra);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 960, height: 720 } });

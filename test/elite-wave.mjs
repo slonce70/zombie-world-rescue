@@ -1,11 +1,11 @@
 // 👹 Елітна хвиля (v287): кожна ~3-тя орда у СОЛО — банер «⚠️ Елітна хвиля!» за 3с +
 // стінгер, 2–4 еліти; по зачистці падає скриня. 🎁 Церемонія скрині: DOM-оверлей
 // зʼявляється й видає нагороду. Reuse для мегабокса й подарунка дня — теж церемонія.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });

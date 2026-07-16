@@ -1,15 +1,11 @@
 // 📣 Тест M5 Task 1: безпечні пінги — гість→хост і хост→гість як тости.
 // Дзеркалить харнес test/coop.mjs (власний dev-relay + два браузери, хост створює
 // кімнату через __game.test.coopCreate, гість приєднується coopJoin, старт рівня).
-import { chromium } from 'playwright';
-import { waitFor as waitForAsync } from './_browser.mjs';
-import { ensureWebServer } from './_server.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openCoopTest, waitFor as waitForAsync } from './_browser.mjs';
 import { mkdirSync } from 'fs';
-import { spawnRelay } from './_relay.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8749; // окремий порт від coop.mjs (8743), щоб тести не билися
-const RELAY = `ws://localhost:${RELAY_PORT}`;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
@@ -18,11 +14,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs * SLOW, label, 300);
-
-// власний relay на окремому порту — тест самодостатній
-const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = {
   args: [
@@ -34,10 +26,7 @@ const LAUNCH = {
     '--disable-renderer-backgrounding',
   ],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const hostPage = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const guestPage = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, RELAY, A: hostPage, B: guestPage, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false });
 const errsA = [];
 const errsB = [];
 hostPage.on('pageerror', (e) => errsA.push(e.message));
@@ -138,10 +127,7 @@ try {
   await hostPage.screenshot({ path: 'shots/m5-fail-A.png' }).catch(() => {});
   await guestPage.screenshot({ path: 'shots/m5-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close();
-  await browserB.close();
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 M5 ПІНГ-ТЕСТ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

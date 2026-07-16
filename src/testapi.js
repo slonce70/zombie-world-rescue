@@ -136,7 +136,6 @@ export function buildTestApi(game) {
     },
     god: () => { g.level.player.respawnProtect = 1e9; },
     giveCoins: (n) => g.level.addCoins(n),
-    giveRifle: () => g.level.player.giveRifle(),
     giveWeapon: (id) => g.unlockWeapon(id),
     throwGrenade: () => g.level.player.throwGrenade(),
     spawnZombie: (type, x, z) => g.level.zombies.spawn(type, x, z, {}),
@@ -205,23 +204,9 @@ export function buildTestApi(game) {
     // оновлення 4
     addXp: (n) => g.progress.addXp(n),
     megaForce: (roll) => { g._megaForce = roll; },
-    openMegabox: () => g.level.megabox && g.level.megabox.open(),
-    placeTramp: () => g.level.gadgets._placeTramp(),
-    placeWall: () => g.level.gadgets._placeWall(),
     unlockGadget: (id) => {
       if (!g.save.gadgetsOwned.includes(id)) g.save.gadgetsOwned.push(id);
       g.save.activeGadget = id;
-      g.saveGame();
-    },
-    giveGadgets: (tramps = 1, walls = 1) => {
-      // ponytail: legacy screenshot helper; gadgets are now unlocks, not consumable counts.
-      const ids = [];
-      if (tramps > 0) ids.push('tramp');
-      if (walls > 0) ids.push('wall');
-      for (const id of ids) {
-        if (!g.save.gadgetsOwned.includes(id)) g.save.gadgetsOwned.push(id);
-      }
-      if (!g.save.activeGadget && ids.length) g.save.activeGadget = ids[0];
       g.saveGame();
     },
     useGadget: () => g.level.gadgets.use(),
@@ -236,7 +221,6 @@ export function buildTestApi(game) {
     dismountScooter: () => g.level.vehicles.dismount(),
     startStorm: (c) => g.startStorm(c),
     // 🌪️ піщана буря EGY: форс-старт + інтроспекція стану для тестів
-    startSandstorm: () => (g.level && g.level.sandstorm ? g.level.sandstorm.forceStart() : false),
     sandstormState: () => (g.level && g.level.sandstorm ? g.level.sandstorm.state() : null),
     startArena: () => g.startArena(),
     startKnockout: () => g.startKnockout(),
@@ -314,42 +298,6 @@ export function buildTestApi(game) {
       }
       g.level.pvp.update();
     },
-    finishBank: () => {
-      const s = g.level.bank && g.level.bank.zombieBank;
-      if (s) g.level.bank.damageSafe(s, 99999, true);
-    },
-    finishPortal: () => {
-      if (!g.level.portal) return;
-      for (const p of g.level.portal.portals) g.level.portal.damagePortal(p, 99999);
-    },
-    finishMaze: () => {
-      if (!g.level.maze) return;
-      for (const k of g.level.maze.keys) g.level.maze.collectKey(k);
-      g.level.maze.finish();
-    },
-    finishHumans: () => {
-      if (!g.level.humans) return;
-      for (const z of [...g.level.zombies.list]) {
-        if (!z.humans || z.state === 'dead') continue;
-        z.shieldHp = 0;
-        z.damage(99999, null, false);
-      }
-      g.level.humans.update(0.05);
-    },
-    finishSoulCollector: () => {
-      if (!g.level.soulCollector) return;
-      for (const z of [...g.level.zombies.list]) {
-        if (z.soulGhost && z.state !== 'dead') z.damage(99999, null, false);
-      }
-      g.level.soulCollector.update(0.05);
-    },
-    finishRadiation: () => {
-      if (!g.level.radiation) return;
-      for (const z of [...g.level.zombies.list]) {
-        if (z.radiationMode && z.state !== 'dead') z.damage(99999, null, false);
-      }
-      g.level.radiation.update(0.05);
-    },
     questEvent: (ev, data) => g.quests.onEvent(ev, data || {}),
     regenQuests: (dateKey) => {
       g.save.quests = null;
@@ -410,7 +358,6 @@ export function buildTestApi(game) {
     coopSetMode: (mo) => g.coop.session.setMode(mo),
     coopSetRole: (r) => g.coop.session.setMyRole(r),
     coopStartLevel: () => g.coop.session.startLevel(),
-    coopLeave: () => g.coop.session.leave(),
     coopState: () => {
       const s = g.coop.session;
       const net = g.level && g.level.net;

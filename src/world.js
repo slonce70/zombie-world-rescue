@@ -3325,8 +3325,10 @@ export class World {
     const wallSpecs = [
       [20, 0.6, tunnelStartX + 10, z - 4.2],
       [16, 0.6, tunnelStartX + 8, z + 4.2],
+      [0.6, 4.2, tunnelStartX + 20, z - 2.1],
       [0.6, 10, tunnelStartX + 15.8, z + 5],
       [0.6, 6, tunnelStartX + 24.2, z + 3],
+      [4.2, 0.6, tunnelStartX + 17.9, tunnelEndZ],
       [16, 0.6, tunnelStartX + 32, tunnelEndZ - 4.2],
       [20, 0.6, tunnelStartX + 30, tunnelEndZ + 4.2],
     ];
@@ -3397,7 +3399,7 @@ export class World {
       return null;
     };
     this.castleDungeon = {
-      group: grate, entrance: dungeonShell, tunnel, grate, collider: dungeonCollider,
+      group: grate, entrance: dungeonShell, mouth, tunnel, grate, collider: dungeonCollider,
       x: chamberX, z: tunnelEndZ, y: dungeonY, surfaceY: dungeonSurfaceY,
       depth: dungeonDepth, entranceX: dungeonX, entranceZ: z, tunnelStartX, floorHeightAt,
       enemyMinX: tunnelStartX + rampLen,
@@ -3462,6 +3464,7 @@ export class World {
     const dungeon = this.castleDungeon;
     if (!dungeon || dungeon.open) return false;
     dungeon.open = true;
+    dungeon.mouth.visible = false;
     dungeon.grate.removeFromParent();
     const i = this.colliders.indexOf(dungeon.collider);
     if (i >= 0) this.colliders.splice(i, 1);

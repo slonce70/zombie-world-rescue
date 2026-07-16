@@ -1,6 +1,5 @@
-import * as THREE from 'three';
 import { t } from './i18n.js';
-import { clampActorToRect, clampZombieToRect } from './roomkit.js';
+import { buildRectArena, clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const RADIATION_UNLOCK_COUNTRIES = 12;
 export const RADIATION_ROOM_SIZE = 50;
@@ -61,28 +60,11 @@ export class RadiationMode {
   }
 
   _buildRoom() {
-    const { level, cx, cz, _half: h } = this;
-    const wallM = new THREE.MeshStandardMaterial({ color: 0x21362b, roughness: 0.85, metalness: 0.05 });
-    const railM = new THREE.MeshStandardMaterial({ color: 0x95ff4d, emissive: 0x244d12, roughness: 0.45, metalness: 0.08 });
-    const floorM = new THREE.MeshStandardMaterial({ color: 0x24382d, roughness: 0.92 });
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(this.roomSize, 0.18, this.roomSize), floorM);
-    floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
-    floor.receiveShadow = true;
-    level.scene.add(floor);
-    const mkWall = (x, z, sx, sz) => {
-      const y = level.world.groundH(x, z) + 1.4;
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.8, sz), wallM);
-      wall.position.set(x, y, z);
-      wall.castShadow = true;
-      wall.receiveShadow = true;
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.12, sz + 0.03), railM);
-      stripe.position.set(x, y + 0.25, z);
-      level.scene.add(wall, stripe);
-    };
-    mkWall(cx, cz - h, this.roomSize, 0.35);
-    mkWall(cx, cz + h, this.roomSize, 0.35);
-    mkWall(cx - h, cz, 0.35, this.roomSize);
-    mkWall(cx + h, cz, 0.35, this.roomSize);
+    buildRectArena(this.level, this.cx, this.cz, this.roomSize, {
+      wall: { color: 0x21362b, roughness: 0.85, metalness: 0.05 },
+      rail: { color: 0x95ff4d, emissive: 0x244d12, roughness: 0.45, metalness: 0.08 },
+      floor: { color: 0x24382d, roughness: 0.92 },
+    });
   }
 
   _spawnZombie() {

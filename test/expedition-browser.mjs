@@ -1,11 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 let fail = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '✅' : '❌'} ${msg}`, extra); if (!ok) fail++; };
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage();
+const check = makeCheck(() => fail++);
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { headless: true }, context: { viewport: { width: 1280, height: 720 } }, captureErrors: false });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
@@ -34,8 +31,7 @@ try {
   check(chosen.status === 'active' && chosen.step === 1 && chosen.build.length === 1, 'вибір маршруту зберігає картку й наступний етап');
   check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
 } finally {
-  await browser.close();
-  closeServer();
+  await closeTest();
 }
 
 if (fail) process.exit(1);

@@ -1,12 +1,13 @@
 // Гард синхронізації версій (без браузера, миттєвий): version.json {v} мусить
 // дорівнювати APP_VERSION у src/main.js — інакше авто-оновлення тихо не спрацює
 // і користувачі застрягнуть на старому білді. Також звіряємо, що PROTO_VERSION існує.
+import { makeCheck } from './_browser.mjs';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const root = fileURLToPath(new URL('..', import.meta.url)); // коректний шлях навіть із не-ASCII теками
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
 const versionJson = JSON.parse(readFileSync(root + 'version.json', 'utf8'));
 const mainSrc = readFileSync(root + 'src/main.js', 'utf8');

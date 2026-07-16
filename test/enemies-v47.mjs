@@ -3,18 +3,14 @@
 //      щит 100 → ламається → ре-каст за ~5с.
 //  (б) Щитоносець: shieldHp=1000; звичайний щит вогнемет ламає; fireproof щит вогонь НЕ бере,
 //      а фланг/куля по тілу працює.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 // CI під софт-рендером (SLOW=4): ігровий час тече повільніше — масштабуємо всі чекання/таймаути.
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const { BASE, ctx, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
@@ -174,6 +170,5 @@ check(fireproof.bodyHp1 < fireproof.bodyHp0, `фланг: тіло вразли�
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 2).join(' | '));
 console.log(fail === 0 ? '\n🎉 V47 ВОРОГИ ПРАЦЮЮТЬ' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail === 0 ? 0 : 1);

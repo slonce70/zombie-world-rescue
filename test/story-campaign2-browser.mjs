@@ -1,12 +1,9 @@
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, browser, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 let failed = 0;
-const check = (ok, msg, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 const completeStoryObjectiveSnapshot = (objectiveId, delegateId) => page.evaluate(({ objectiveId, delegateId }) => {
   const missions = window.__game.level.missions;

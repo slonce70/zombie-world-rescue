@@ -1,10 +1,11 @@
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base, close } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE: base, page, closeTest } = await openBrowserTest({
+  launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] },
+  context: { viewport: { width: 1280, height: 800 } },
+  captureErrors: false,
+});
 
 try {
   await page.goto(`${base}/?test&fresh`);
@@ -38,6 +39,5 @@ try {
   await page.screenshot({ path: 'test-results/globe-reminder-buttons.png' });
   console.log('✅ Подарунок дня і Квест табору ловлять клік поверх глобуса');
 } finally {
-  await browser.close();
-  close();
+  await closeTest();
 }

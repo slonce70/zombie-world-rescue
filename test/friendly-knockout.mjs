@@ -1,25 +1,9 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawnRelay } from './_relay.mjs';
+import { openCoopTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8761;
-const RELAY = `ws://localhost:${RELAY_PORT}`;
-const relay = await spawnRelay(RELAY_PORT);
-const browserA = await chromium.launch({ args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
-const browserB = await chromium.launch({ args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, RELAY, A, B, errors, closeTest } = await openCoopTest({ relayPort: RELAY_PORT });
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-for (const p of [A, B]) {
-  p.on('pageerror', (e) => errors.push(e.message));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-}
+const check = makeCheck(() => failed++);
 
 try {
   console.log('▸ Дружній нокаут у кооп-лобі');
@@ -80,10 +64,7 @@ try {
   failed++;
   console.error('  ❌ ТЕСТ ВПАВ:', e.message.split('\n')[0]);
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 check(errors.length === 0, 'без JS-помилок консолі', errors.slice(0, 5).join(' | '));

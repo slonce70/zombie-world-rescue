@@ -7,15 +7,12 @@
 //     тепер делегує ukr-rescue у місію типу 'rescue';
 //  3) браузер: активуй-місія — 1 з N точок дає ЧЕКПОЙНТ (без голосу «виконано»),
 //     і лише фінальна точка грає mission() рівно один раз.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 let failed = 0;
-const check = (ok, msg, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

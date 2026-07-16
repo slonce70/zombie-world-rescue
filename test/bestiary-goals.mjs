@@ -1,7 +1,7 @@
 // 🦁 Бестіарій-колекція (R2-5.3): одноразові нагороди за 10/20/усі зібрані види зомбі.
 //    10 видів → +1000 монет, 20 видів → +25💎, усі види → +50💎 + титул «Зоолог».
 import { chromium } from 'playwright';
-import { waitFor as waitForAsync } from './_browser.mjs';
+import { waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -9,10 +9,7 @@ const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 
 let failed = 0;
-const check = (ok, msg, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 const waitFor = (page, fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 200);
 

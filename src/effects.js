@@ -1726,7 +1726,7 @@ export class Effects {
     ctx.textBaseline = 'middle';
     ctx.fillText(icon, 64, 70);
     const tex = new THREE.CanvasTexture(cv);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
     sprite.scale.set(2.6, 2.6, 1);
     sprite.position.y = 7;
     g.add(sprite);

@@ -1,10 +1,10 @@
 // Спільний спавн dev-relay із перевіркою, що тест говорить зі СВОЇМ процесом,
 // а не з осиротілим реле зі старим кодом на тому ж порту.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Якщо порт уже зайнятий ЖИВИМ relay — це сирота з попереднього прогону на тому ж порту
 // (тест упав до relay.kill()). Глушимо її за pid із /health і чекаємо звільнення порту.

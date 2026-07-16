@@ -1,11 +1,12 @@
 // Публічні профілі у «Грати разом»: коротка статистика поруч зі списком гравців.
 // node test/lobby-profiles.mjs
+import { makeCheck } from './_browser.mjs';
 import { spawnRelay } from './_relay.mjs';
 
 const PORT = 8757;
 const API = `http://localhost:${PORT}`;
 let failed = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 const relay = await spawnRelay(PORT);
 const ping = (cid, nick, profile) => fetch(`${API}/lobby/ping`, {

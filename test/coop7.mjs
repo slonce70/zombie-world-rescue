@@ -1,6 +1,7 @@
 // 🤝⚔️ Кооп-тест 7: складність ×N гравців (HP/шкода зомбі і босів),
 // чип кода кімнати в HUD, вхід ТРЕТЬОГО гравця зі списку кімнат прямо в гру,
 // будь-яка країна у кооп-лобі після України.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { mkdirSync } from 'fs';
@@ -15,7 +16,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);
 

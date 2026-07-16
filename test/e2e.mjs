@@ -1,14 +1,11 @@
 // Повне наскрізне проходження: 3 місії → орди → бос → перемога
 // Усі очікування — полінг ігрового стану (headless час тече повільніше за реальний)
-import { chromium } from 'playwright';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 import { mkdirSync } from 'fs';
-import { ensureWebServer } from './_server.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
@@ -18,10 +15,7 @@ const ev = (fn, ...args) => page.evaluate(([f, a]) => window.__game.test[f](...a
 const shot = (name) => page.screenshot({ path: `shots/${name}.png` });
 const log = (...a) => console.log('▸', ...a);
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 
 // SLOW=N множить усі таймаути: на CI-ранері з софтверним рендером ігровий час
 // тече у рази повільніше реального (dt-кламп) — локально це нічого не коштує,
@@ -243,6 +237,5 @@ check(lib.UKR === true, 'Україна позначена звільненою'
 console.log('');
 console.log(failed === 0 ? '🎉 УСІ ПЕРЕВІРКИ ПРОЙДЕНО' : `❌ ПРОВАЛЕНО ПЕРЕВІРОК: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);

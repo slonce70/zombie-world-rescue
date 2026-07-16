@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { t } from './i18n.js';
-import { clampActorToRect } from './roomkit.js';
+import { clampActorToRect, clearRectBlockers } from './roomkit.js';
 
 export const MAZE_UNLOCK_COUNTRIES = 11;
 export const MAZE_ROOM_SIZE = 76;
@@ -189,9 +189,6 @@ export class MazeMode {
   }
 
   _clearRoomBlockers() {
-    const inside = (c) => Math.abs(c.x - this.cx) < this._half - 1 && Math.abs(c.z - this.cz) < this._half - 1;
-    this.level.world.colliders = this.level.world.colliders.filter((c) => !inside(c));
-    this.level.world.occluders = this.level.world.occluders.filter((c) => !inside(c));
-    if (typeof this.level.world._buildGrid === 'function') this.level.world._buildGrid();
+    clearRectBlockers(this.level.world, this.cx, this.cz, this._half);
   }
 }

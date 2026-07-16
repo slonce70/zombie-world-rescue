@@ -1,10 +1,10 @@
 // 🌟 «Момент могутності» (v288): 1×/соло-рівень падає супер-пікап (після 2-ї місії
 // АБО на елітній хвилі). Схопив → одна з двох сил (🔥 Шквал / 🧲 Магніт-буря) з
 // відліком на HUD; сила згасає сама. Перевіряємо спавн, активацію, згасання, «1 на рівень».
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 await page.goto(`${BASE}/?test&fresh&seed=1&country=UKR`, { waitUntil: 'commit', timeout: 60000 });

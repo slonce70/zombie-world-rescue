@@ -1,10 +1,8 @@
 // Смоук-тест: глобус і вхід у рівень, скріншоти, помилки консолі.
 // Тепер із РЕАЛЬНИМИ перевірками й кодом виходу — щоб зламана гра валила CI, а не світилась зеленим.
-import { chromium } from 'playwright';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 import { mkdirSync } from 'fs';
-import { ensureWebServer } from './_server.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 const shot = async (p, name) => {
   try {
@@ -14,14 +12,13 @@ const shot = async (p, name) => {
   }
 };
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
 // 1. Глобус
 await page.goto(BASE + '/?test&fresh');
@@ -91,6 +88,5 @@ check(realErrors.length === 0, `без JS-помилок консолі (${realE
 if (realErrors.length) console.log('CONSOLE ERRORS:\n' + realErrors.join('\n'));
 
 console.log(failed === 0 ? '\n🎉 СМОУК ПРОЙДЕНО' : `\n❌ СМОУК ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);

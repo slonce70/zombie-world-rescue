@@ -2,18 +2,15 @@
 // пінг лобі ще в польоті. Раніше _ping при _busy просто повертався і викидав
 // вантаж {day} — результат шторму зникав. Тепер вантаж чекає в _pendingExtra
 // і летить одразу після завершення поточного запиту. node test/lobby-dayscore-queue.mjs
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const { BASE, ctx, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 let fail = 0;
-const check = (c, m, extra = '') => { console.log((c ? '✅' : '❌') + ' ' + m + (extra ? ' ' + extra : '')); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 
 try {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const page = await ctx.newPage();
+
   await page.goto(`${BASE}/?test&fresh`);
   await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
 
@@ -56,8 +53,7 @@ try {
   check(out.calls && out.calls[1] && out.calls[1].hasDay && out.calls[1].score === 7,
     'відкладений пінг несе day.score=7 (результат НЕ загубився)', JSON.stringify(out.calls && out.calls[1]));
 } finally {
-  await browser.close();
-  closeServer();
+  await closeTest();
 }
 
 console.log('');

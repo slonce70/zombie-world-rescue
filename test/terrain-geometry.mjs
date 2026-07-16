@@ -1,16 +1,10 @@
 // Regression checks for terrain-attached geometry: rivers and pyramid collision.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  OK' : '  FAIL', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 
 async function loadCountry(id) {
   await page.goto(`${BASE}/?test&fresh&country=${id}`);
@@ -165,8 +159,7 @@ check(pyramid.lowStepBlocked > 0.2,
 check(pyramid.insideBlocked > 0.2,
   `EGY: pyramid interior cannot be entered through walls (${pyramid.insideBlocked}m push)`);
 
-await browser.close();
-closeServer();
+await closeTest();
 
 if (failed) {
   console.error(`terrain geometry regressions: ${failed}`);

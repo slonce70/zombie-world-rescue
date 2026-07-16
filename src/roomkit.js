@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 // Спільні хелпери кімнатних режимів: утримання акторів/зомбі у прямокутній
 // арені. До цього ця пара методів була дослівно скопійована у кожен режим
 // (souls/bank/knockout/pvp/portal/worldboss/defense/turretwar/humans/…).
@@ -33,4 +35,37 @@ export function clampZombieToRect(z, cx, cz, halfW, halfD, floorY = null, opts =
       else z.rig.group.position.y = floorY;
     }
   }
+}
+
+export function clearRectBlockers(world, cx, cz, halfW, halfD = halfW) {
+  const inside = (c) => Math.abs(c.x - cx) < halfW - 1 && Math.abs(c.z - cz) < halfD - 1;
+  world.colliders = world.colliders.filter((c) => !inside(c));
+  world.occluders = world.occluders.filter((c) => !inside(c));
+  if (typeof world._buildGrid === 'function') world._buildGrid();
+}
+
+export function buildRectArena(level, cx, cz, size, materials) {
+  const half = size / 2;
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(size, 0.18, size),
+    new THREE.MeshStandardMaterial(materials.floor),
+  );
+  floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
+  floor.receiveShadow = true;
+  level.scene.add(floor);
+  const wallM = new THREE.MeshStandardMaterial(materials.wall);
+  const railM = new THREE.MeshStandardMaterial(materials.rail);
+  const addWall = (x, z, w, d) => {
+    const y = level.world.groundH(x, z) + 1.4;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 2.8, d), wallM);
+    wall.position.set(x, y, z);
+    wall.castShadow = wall.receiveShadow = true;
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d + 0.03), railM);
+    stripe.position.set(x, y + 0.25, z);
+    level.scene.add(wall, stripe);
+  };
+  addWall(cx, cz - half, size, 0.35);
+  addWall(cx, cz + half, size, 0.35);
+  addWall(cx - half, cz, 0.35, size);
+  addWall(cx + half, cz, 0.35, size);
 }

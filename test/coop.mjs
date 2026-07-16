@@ -1,12 +1,9 @@
 // 🤝 Кооп-тест: дві вкладки → кімната → лобі → спільний рівень → синхронізація
-import { chromium } from 'playwright';
+import { openCoopTest } from './_browser.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdirSync } from 'fs';
-import { spawnRelay } from './_relay.mjs';
-import { ensureWebServer } from './_server.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8743;
-const RELAY = `ws://localhost:${RELAY_PORT}`;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failures = 0;
@@ -14,10 +11,8 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 // власний relay на окремому порту — тест самодостатній
-const relay = await spawnRelay(RELAY_PORT);
 
 // два ОКРЕМІ браузери: у headless фонова вкладка майже не отримує кадрів,
 // а хост мусить крутити світ безперервно
@@ -31,10 +26,7 @@ const LAUNCH = {
     '--disable-renderer-backgrounding',
   ],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false });
 const errsA = [];
 const errsB = [];
 A.on('pageerror', (e) => errsA.push(e.message));
@@ -259,10 +251,7 @@ try {
   await A.screenshot({ path: 'shots/coop-fail-A.png' }).catch(() => {});
   await B.screenshot({ path: 'shots/coop-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close();
-  await browserB.close();
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ТЕСТ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

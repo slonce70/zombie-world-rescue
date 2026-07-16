@@ -1,11 +1,11 @@
 // 🇨🇳 Китай (CHN) — 11-та, фінальна країна кампанії.
 // Перевіряє карту china.js + біом greatwall + ландмарк Велика стіна + боса emperor +
 // нового ворога terracotta + позицію в CAMPAIGN_ORDER (остання) + нагороду монетами.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 console.log('▸ Китай (CHN)');
 await page.goto(`${BASE}/?test&fresh&country=CHN`, { waitUntil: 'commit', timeout: 60000 });

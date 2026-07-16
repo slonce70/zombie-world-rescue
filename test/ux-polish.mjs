@@ -1,14 +1,11 @@
 import { chromium } from 'playwright';
-import { waitFor as waitForAsync } from './_browser.mjs';
+import { waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 const waitFor = (page, fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 200);
 

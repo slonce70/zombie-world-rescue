@@ -9,18 +9,12 @@
 // Хостовий шлях (coop.js _hostHello: `if (nickIsBad(nick)) nick='Гравець'`)
 // і UI-відмову (_acceptNick) перевіряємо через ту саму функцію nickIsBad,
 // бо повний 2-вкладковий relay-сценарій заради одного поля ростера — надмірний.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, extra);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 
@@ -169,7 +163,6 @@ check(r2.protoSkin === 'classic' && r2.stringSkin === 'classic',
 
 check(errs.length === 0, 'без помилок сторінки', errs.join(' | '));
 
-await browser.close();
-closeServer();
+await closeTest();
 console.log(failed === 0 ? '\n✅ coop-nick: усі перевірки пройдені' : `\n❌ coop-nick: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);

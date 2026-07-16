@@ -2,6 +2,7 @@
 // runbuild.js не має імпортів — вантажимо його в node напряму. Репо стоїть на
 // "type":"commonjs", тож читаємо ESM-джерело текстом і вантажимо через data:-URL
 // (так node трактує src/runbuild.js як ES-модуль, не чіпаючи ні файл, ні package.json).
+import { makeCheck } from './_browser.mjs';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 const srcPath = fileURLToPath(new URL('../src/runbuild.js', import.meta.url));
@@ -10,7 +11,7 @@ const { CARD_POOL, COMBOS, RunBuild } =
   await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
 
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const mkPlayer = () => ({ damageMult: 1, speedMult: 1, maxHealth: 100, health: 100, grenades: 2, maxArmor: 50, armor: 0 });
 const combatSnapshot = (p) => [p.damageMult, p.speedMult, p.maxHealth, p.health, p.grenades, p.armor, p.lifeSteal || 0];
 

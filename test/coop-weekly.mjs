@@ -1,31 +1,14 @@
 // 🗓️🤝 Командне випробування тижня: хост — джерело істини (ключ тижня у spec),
 // гість грає режим зі spec навіть із «іншою» локальною датою; перемога дає
 // +25💎 обом одноразово на тиждень; соло-флаг тижня не зачеплено.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawnRelay } from './_relay.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openCoopTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8767;
-const RELAY = `ws://localhost:${RELAY_PORT}`;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const relay = await spawnRelay(RELAY_PORT);
-const LAUNCH = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, RELAY, A, B, errors, closeTest } = await openCoopTest({ relayPort: RELAY_PORT });
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (const p of [A, B]) {
-  p.on('pageerror', (e) => errors.push(e.message));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-}
+const check = makeCheck(() => failed++);
 
 try {
   console.log('▸ Командне випробування тижня');
@@ -216,10 +199,7 @@ try {
   failed++;
   console.error('  ❌ ТЕСТ ВПАВ:', e.message.split('\n')[0]);
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 const realErrs = errors.filter((e) => !e.includes('favicon'));

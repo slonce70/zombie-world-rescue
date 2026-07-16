@@ -1,19 +1,15 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawnRelay } from './_relay.mjs';
+import { makeCheck, openCoopTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const relay = await spawnRelay(8790);
+const RELAY_PORT = 8790;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const url = `${BASE}/?test&fresh&relay=ws://localhost:8790`;
 const launch = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] };
-const browsers = [await chromium.launch(launch), await chromium.launch(launch)];
-const [A, B] = await Promise.all(browsers.map(async (b) => (await b.newContext()).newPage()));
+const { BASE, RELAY, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch, captureErrors: false });
+const url = `${BASE}/?test&fresh&relay=${RELAY}`;
 for (const page of [A, B]) page.setDefaultTimeout(60_000 * SLOW);
 const errors = [];
 for (const p of [A, B]) p.on('pageerror', (e) => errors.push(e.message));
 let fail = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '✅' : '❌'} ${msg}`, extra); if (!ok) fail++; };
+const check = makeCheck(() => fail++);
 
 try {
   await Promise.all([A.goto(url), B.goto(url)]);
@@ -55,9 +51,7 @@ try {
   fail++;
   console.error('❌', e.message.split('\n')[0]);
 } finally {
-  await Promise.all(browsers.map((b) => b.close().catch(() => {})));
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 if (fail) process.exit(1);

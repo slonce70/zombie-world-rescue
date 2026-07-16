@@ -1,10 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises';
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base, close } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const { BASE: base, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1440, height: 900 } }, captureErrors: false });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -291,6 +288,15 @@ try {
     return {
       afterChest, afterHelmet, afterBreak, afterBody, phase: castle.phase,
       dungeonOpen: dungeon.open,
+      dungeonMouthHidden: !dungeon.mouth.visible,
+      dungeonMarkerOccluded: castle.beam.sprite.material.depthTest,
+      dungeonCornerSeals: [
+        { x: dungeon.tunnelStartX + 20, z: dungeon.entranceZ - 2.1 },
+        { x: dungeon.tunnelStartX + 17.9, z: dungeon.entranceZ + 10 },
+      ].map((point) => {
+        const hit = g.level.world.collide(point.x, point.z, 0.45, dungeon.y + 1);
+        return Math.hypot(hit.x - point.x, hit.z - point.z);
+      }),
       dungeonPhysicsGone: !g.level.world.colliders.includes(dungeon.collider),
       title: castle.title,
       dungeonLength: dungeon.length,
@@ -327,6 +333,7 @@ try {
   assert(state.afterBreak[0] === 150 && state.afterBreak[1] === 0 && state.afterBreak[2] === false, 'зламаний нагрудник зникає');
   assert(state.afterBody.join(',') === '120,0' && state.phase === 'dungeon', 'після броні шкода йде в тіло, а зачистка відкриває підземелля', JSON.stringify(state));
   assert(state.dungeonOpen && state.dungeonPhysicsGone && /(5 чаклунів|вороги 0\/16)/i.test(state.title), 'після зачистки прохід у підземелля відкривається автоматично', JSON.stringify(state));
+  assert(state.dungeonMouthHidden && state.dungeonMarkerOccluded && state.dungeonCornerSeals.every((push) => push > 0.2), 'відкритий вхід не перекритий панеллю, повороти й маркери не просвічують крізь стіни', JSON.stringify(state));
   assert(state.dungeonLength === 50 && state.pathLength === 50, 'прохід підземелля має рівно 50 метрів', JSON.stringify(state));
   assert(state.dungeonDepth === 6 && state.rampDrop > 2.5, 'підземелля розташоване на 6 метрів під землею і має справжній спуск', JSON.stringify(state));
   assert(state.chamberSize === 18, 'після 50-метрового проходу є велика підземна зала 18×18 м', JSON.stringify(state));
@@ -506,6 +513,5 @@ try {
   assert(errors.length === 0, 'у браузері немає помилок', errors.join('\n'));
   console.log('✅ Poland castle assault pass');
 } finally {
-  await browser.close();
-  close();
+  await closeTest();
 }

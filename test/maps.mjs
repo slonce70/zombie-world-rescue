@@ -1,6 +1,6 @@
 // Тести оновлення «Живі карти»: інтер'єри, бочки, золотий, батути, лід, м'яч, аеродроп, якість
 import { chromium } from 'playwright';
-import { waitFor as waitForAsync } from './_browser.mjs';
+import { waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -11,10 +11,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 
 // ===== Завантаження і якість =====

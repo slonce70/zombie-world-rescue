@@ -1,14 +1,11 @@
 // Тести оновлення 6 «Живі завдання»: динамічні місії з пулу, нові типи,
 // випадковий лут, перероздача після перемоги
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 async function loadCountry(c, pre = null) {
   await page.goto(`${BASE}/?test&fresh`);
   await page.waitForFunction(() => window.__game?.state === 'globe', null, { timeout: 30000 });
