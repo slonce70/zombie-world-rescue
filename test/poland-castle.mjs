@@ -246,12 +246,35 @@ try {
     const surfaceFall = surfaceY - player.pos.y;
     player.inCastleDungeon = false;
     player.pos.set(dungeon.tunnelStartX - 0.15, dungeon.surfaceY, dungeon.entranceZ);
-    player.vel.set(3, 0, 0);
+    player.vel.set(5, 0, 0);
     player.onGround = true;
-    player._updateGravityCollide(0.1, g.input, false);
+    player._updateGravityCollide(0.2, g.input, false);
     const entranceDescent = {
       inside: player.inCastleDungeon,
       drop: dungeon.surfaceY - player.pos.y,
+    };
+    player.pos.set(dungeon.tunnelStartX + 3, dungeon.surfaceY - 2, dungeon.entranceZ);
+    player.inCastleDungeon = true;
+    player.health = 10000;
+    for (const wizard of castle.dungeonWizards) wizard.summonCd = 0;
+    for (let i = 0; i < 80; i++) g.level.zombies.update(0.05);
+    const dungeonEnemies = g.level.zombies.list.filter((z) => z.zone === 'castle-dungeon' && z.state !== 'dead');
+    const enemiesContained = dungeonEnemies.every((z) => (
+      z.x >= dungeon.enemyMinX && dungeon.floorHeightAt(z.x, z.z) !== null
+    ));
+    const summoned = g.level.zombies.list.filter((z) => z._summonedBy);
+    const summonedContained = summoned.length >= 5 && summoned.every((z) => (
+      z.zone === 'castle-dungeon' && z.x >= dungeon.enemyMinX
+    ));
+    player.pos.set(dungeon.x, dungeon.y, dungeon.z + dungeon.chamberSize / 2 - 0.8);
+    player.vel.set(0, 0, 8);
+    player.inCastleDungeon = true;
+    player.onGround = true;
+    for (let i = 0; i < 8; i++) player._updateGravityCollide(0.1, g.input, false);
+    const wallCollision = {
+      inside: player.inCastleDungeon,
+      floor: dungeon.floorHeightAt(player.pos.x, player.pos.z),
+      y: player.pos.y,
     };
     const delegate = g.level.missions.delegate;
     const snapshot = delegate.netState();
@@ -277,6 +300,15 @@ try {
       chamberFloor: g.level.world.dungeonGroundH(dungeon.x, dungeon.z),
       surfaceFall,
       entranceDescent,
+      stairCount: dungeon.stairCount,
+      stairHeights: Array.from({ length: dungeon.stairCount }, (_, i) => (
+        dungeon.floorHeightAt(dungeon.tunnelStartX + (i + 0.25) * 10 / dungeon.stairCount, dungeon.entranceZ)
+      )),
+      enemiesBehindStairs: castle.dungeonWizards.concat(castle.dungeonStones)
+        .every((z) => z.x >= dungeon.enemyMinX),
+      enemiesContained,
+      summonedContained,
+      wallCollision,
       pathLength: dungeon.path.slice(1).reduce((sum, point, i) => (
         sum + Math.hypot(point.x - dungeon.path[i].x, point.z - dungeon.path[i].z)
       ), 0),
@@ -300,6 +332,11 @@ try {
   assert(state.chamberSize === 18, 'після 50-метрового проходу є велика підземна зала 18×18 м', JSON.stringify(state));
   assert(state.surfaceFall < 0.05, 'гравець над тунелем не провалюється крізь землю', JSON.stringify(state));
   assert(state.entranceDescent.inside && state.entranceDescent.drop > 0, 'у підземелля можна спуститися лише через вхід', JSON.stringify(state));
+  assert(state.stairCount === 20 && state.stairHeights.every((height, i, all) => i === 0 || height < all[i - 1]), 'від землі вниз ведуть 20 послідовних фізичних сходинок', JSON.stringify(state));
+  assert(state.enemiesBehindStairs, 'усі вороги зʼявляються під землею за сходами, а не на вході', JSON.stringify(state));
+  assert(state.enemiesContained, 'вороги та викликані чаклунами зомбі не можуть піднятися сходами на поверхню', JSON.stringify(state));
+  assert(state.summonedContained, 'чаклуни створюють підземних прислужників, а не поверхневих зомбі', JSON.stringify(state));
+  assert(state.wallCollision.inside && state.wallCollision.floor !== null && state.wallCollision.y < state.chamberFloor + 0.05, 'зіткнення зі стіною лишає гравця у підземеллі без телепорту нагору', JSON.stringify(state.wallCollision));
   assert(state.maxPathPush < 0.15, 'усі 50 метрів центрального проходу фізично прохідні', JSON.stringify(state));
   assert(state.wizardCount === 5 && state.wizardTypes.every((type) => type === 'wizard'), 'у підземеллі зʼявляються рівно 5 справжніх зомбі-чаклунів', JSON.stringify(state));
   assert(state.stoneCount === 11 && state.stoneStats.every((s) => s.join(',') === 'stone,500,500,10,0.5'), 'у підземеллі рівно 11 камʼяних зомбі: 500 HP, 10 шкоди, 0.5с оглушення', JSON.stringify(state.stoneStats));
@@ -329,11 +366,26 @@ try {
   await page.evaluate(() => {
     const g = window.__game;
     const dungeon = g.level.world.castleDungeon;
-    g.test.teleport(dungeon.entranceX + 3, dungeon.entranceZ);
+    g.test.teleport(dungeon.tunnelStartX + 0.75, dungeon.entranceZ);
     g.level.player.yaw = -Math.PI / 2;
+    g.level.player.pitch = -0.28;
+    g.hud.clearBanners();
+    g.hud.el.toasts.replaceChildren();
+    g.hud.el.hud.style.visibility = 'hidden';
+    g.__hiddenDungeonRigs = g.level.zombies.list
+      .filter((z) => z.zone === 'castle-dungeon')
+      .map((z) => z.rig.group);
+    for (const group of g.__hiddenDungeonRigs) group.visible = false;
+    for (const arm of Object.values(g.level.player.fpArms)) arm.group.visible = false;
   });
   await page.waitForTimeout(450);
   await page.screenshot({ path: 'test-results/poland-castle-dungeon.png' });
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.hud.el.hud.style.visibility = '';
+    for (const group of g.__hiddenDungeonRigs) group.visible = true;
+    g.level.player._applyView();
+  });
 
   await page.evaluate(() => {
     const g = window.__game;
