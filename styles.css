@@ -512,6 +512,7 @@ body.touch-mode .grenade-key { display: none; }
 /* тач-кермо видно ЛИШЕ в бою (body.in-level) — на глобусі/в меню джойстик і кнопки сховані */
 #touch-ui { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 15; }
 body.touch-mode.in-level #touch-ui { display: block; }
+body.touch-mode.moon-mission #touch-ui { display: block; }
 /* нижні кнопки прив'язані до low edge малого вьюпорта → завжди над адресним рядком */
 #touch-ui { height: 100dvh; }
 #joy-base {

@@ -126,7 +126,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 523;
+const APP_VERSION = 524;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -662,8 +662,8 @@ class Game {
       // Кооп-нагороди гостя мають окремий ledger: host snapshot ніколи не
       // підміняє особисті board/projects/restored.
       frontCoopClaims: [],
-      // 🌙 окрема жива сцена порятунку Місяця: три відновлені реле й одноразово запущене ядро
-      moonRescue: { relays: [], done: false },
+      // 🌙 жива місячна місія: реле, оборона, бос і одноразова нагорода
+      moonRescue: { relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false },
     };
   }
 
@@ -772,9 +772,14 @@ class Game {
           .filter((id) => typeof id === 'string' && /^front:[A-Za-z0-9_:-]{1,90}$/.test(id)))].slice(-128);
         const moon = out.moonRescue && typeof out.moonRescue === 'object' && !Array.isArray(out.moonRescue) ? out.moonRescue : {};
         const moonRelays = [...new Set((Array.isArray(moon.relays) ? moon.relays : []).filter((id) => ['solar', 'comms', 'oxygen'].includes(id)))];
+        const moonDefenseDone = !!moon.defenseDone;
+        const moonBossDefeated = !!moon.bossDefeated;
         out.moonRescue = {
           relays: moonRelays,
-          done: !!moon.done && moonRelays.length === 3,
+          defenseDone: moonDefenseDone,
+          bossDefeated: moonBossDefeated,
+          rewarded: !!moon.rewarded || !!moon.done,
+          done: moonRelays.length === 3 && moonDefenseDone && moonBossDefeated,
         };
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
@@ -1277,6 +1282,7 @@ class Game {
     this._hideOverlay('overlay-menu');
     this._showGlobeUI(false);
     document.body.classList.remove('in-level'); // це не рівень — ховаємо бойовий HUD (амуніція/мінікарта/тач)
+    document.body.classList.toggle('moon-mission', mode === 'moon');
     this.state = 'hqbase';
     this.hqbase.enter(mode);
     this.clock.getDelta(); // не накопичуємо dt за час на меню
@@ -1285,6 +1291,7 @@ class Game {
   exitHQBase() {
     this.audio.click();
     this.hqbase.exit();
+    document.body.classList.remove('moon-mission');
     this.state = 'globe';
     this._showGlobeUI(true);
   }

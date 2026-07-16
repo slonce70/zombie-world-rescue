@@ -101,23 +101,42 @@ const moon = await page.evaluate(() => {
   const g = window.__game;
   const before = { xp: g.save.xp, crystals: g.save.crystals };
   const initial = g.hqbase.debugState();
-  for (const relay of g.hqbase.targets.filter((target) => target.userData.moonRelay)) g.hqbase._hitTarget(relay);
-  const core = g.hqbase.targets.find((target) => target.userData.moonCore);
-  g.hqbase._hitTarget(core);
+  g.input.keys.add('KeyW');
+  for (let i = 0; i < 60; i++) g.hqbase.update(1 / 60);
+  g.input.keys.delete('KeyW');
+  const walked = g.hqbase.debugState();
+  g.hqbase.moonHealth = 10000;
+  for (const relay of g.hqbase.targets.filter((target) => target.userData.moonRelay)) {
+    g.hqbase.hero.position.set(relay.position.x, 0, relay.position.z);
+    g.input.keys.add('KeyE');
+    for (let i = 0; i < 41; i++) g.hqbase.update(0.1);
+    g.input.keys.delete('KeyE');
+  }
+  const repaired = g.hqbase.debugState();
+  g.hqbase.hero.position.set(0, 0, -2);
+  for (let i = 0; i < 310; i++) g.hqbase.update(0.1);
+  const defended = g.hqbase.debugState();
+  const boss = g.hqbase.moonEnemies.find((enemy) => enemy.boss);
+  g.hqbase._pointer.set(0, 0);
+  g.hqbase._raycaster.setFromCamera(g.hqbase._pointer, g.hqbase.camera);
+  const fired = g.hqbase._shootMoon(true);
+  while (boss && boss.hp > 0) g.hqbase._hitMoonEnemy(boss);
   const completed = g.hqbase.debugState();
   const reward = { xp: g.save.xp - before.xp, crystals: g.save.crystals - before.crystals };
   g.exitHQBase();
   g.enterHQBase('moon');
-  const reopenedCore = g.hqbase.targets.find((target) => target.userData.moonCore);
-  g.hqbase._hitTarget(reopenedCore);
   const repeated = { xp: g.save.xp - before.xp, crystals: g.save.crystals - before.crystals };
-  return { initial, completed, reward, repeated, status: document.getElementById('moonbase-status')?.textContent || '' };
+  return { initial, walked, repaired, defended, fired, completed, reward, repeated, status: document.getElementById('moonbase-status')?.textContent || '' };
 });
 
-check(moon.initial.mode === 'moon' && moon.initial.moonCrew === 3 && moon.initial.children >= 12,
-  'Порятунок Місяця — окрема жива 3D-база з екіпажем', JSON.stringify(moon.initial));
-check(moon.completed.moonRelays === 3 && moon.completed.moonDone && moon.reward.xp === 500 && moon.reward.crystals === 3,
-  'три реле запускають ядро й одноразову нагороду', JSON.stringify(moon));
+check(moon.initial.mode === 'moon' && moon.initial.moonCrew === 3 && moon.initial.moonHero && moon.initial.moonEnemies >= 3,
+  'Порятунок Місяця — керована жива 3D-база з екіпажем і ворогами', JSON.stringify(moon.initial));
+check(moon.walked.moonHero.z < moon.initial.moonHero.z - 4,
+  'герой ходить Місяцем за керуванням WASD', JSON.stringify({ initial: moon.initial.moonHero, walked: moon.walked.moonHero }));
+check(moon.repaired.moonRelays === 3 && moon.defended.moonDefenseDone && moon.defended.moonBossHp === 1200 && moon.fired,
+  'три реле та 30-секундна оборона відкривають Місячного титана', JSON.stringify(moon));
+check(moon.completed.moonDone && moon.completed.moonBossHp === 0 && moon.reward.xp === 500 && moon.reward.crystals === 3,
+  'перемога над титаном завершує місію й видає одноразову нагороду', JSON.stringify(moon));
 check(moon.repeated.xp === 500 && moon.repeated.crystals === 3 && /врятована|saved|спасена/i.test(moon.status),
   'місячна база зберігається, нагорода не дублюється', JSON.stringify(moon));
 
