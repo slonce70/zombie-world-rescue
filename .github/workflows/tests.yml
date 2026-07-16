@@ -76,7 +76,7 @@ jobs:
       - name: Smoke
         run: node test/smoke.mjs
       - name: Campaign progression
-        run: node test/campaign.mjs
+        run: node test/campaign.mjs && node test/ukraine-rebuild-moon.mjs
       - name: Version check
         run: node test/version-check.mjs
       - name: Cloud save and policy

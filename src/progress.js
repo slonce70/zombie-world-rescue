@@ -250,7 +250,8 @@ const QUEST_POOL = [
   { id: 'horde', icon: '🌊', target: 2, title: (n) => t('Відбий {n} орди', { n }), ev: 'horde' },
 ];
 const QUEST_REWARD_COINS = 120;
-const MEGA_QUESTS = [
+export const MEGA_QUEST_REFRESH_MS = 2 * 24 * 60 * 60 * 1000;
+export const MEGA_QUESTS = [
   {
     id: 'damage10000', icon: '⚡', ev: 'damage', target: 10000,
     title: () => t('МЕГА: нанеси {n} шкоди', { n: 10000 }),
@@ -346,6 +347,23 @@ const MEGA_QUESTS = [
       label: () => t('☢️ Титул «Радіаційний гравець» · 💎 3'),
     },
   },
+  {
+    id: 'magnumDamage5000', icon: '🔫', ev: 'damage', weapon: 'magnum', target: 5000,
+    title: () => t('МЕГА: нанеси {n} шкоди з магнума', { n: 5000 }),
+    reward: {
+      crystals: 5,
+      xp: 1000,
+      label: () => t('⭐ 1000 XP · 💎 5'),
+    },
+  },
+  {
+    id: 'shotgunKills100', icon: '💥', ev: 'kill', weapon: 'shotgun', target: 100,
+    title: () => t('МЕГА: переможи {n} зомбі з дробовика', { n: 100 }),
+    reward: {
+      xp: 500,
+      label: () => t('⭐ 500 XP'),
+    },
+  },
 ];
 const WEAPON_NAMES = {
   pistol: t('пістолета'), rifle: t('автомата'), shotgun: t('дробовика'),
@@ -426,7 +444,7 @@ export class DailyQuests {
     return (this.game.save.quests && this.game.save.quests.list) || [];
   }
 
-  ensureMegaQuests() {
+  ensureMegaQuests(now = Date.now()) {
     const save = this.game.save;
     if (!save.megaQuests || typeof save.megaQuests !== 'object' || Array.isArray(save.megaQuests)) save.megaQuests = {};
     let changed = false;
@@ -441,11 +459,19 @@ export class DailyQuests {
         q.progress = Math.max(0, Math.min(def.target, q.progress | 0));
         q.done = !!q.done || (!def.current && q.progress >= def.target);
       }
+      if (q.done && !(q.doneAt > 0)) { q.doneAt = now; changed = true; }
+      if (q.done && now - q.doneAt >= MEGA_QUEST_REFRESH_MS) {
+        q.progress = 0;
+        q.done = false;
+        q.doneAt = 0;
+        changed = true;
+      }
       if (!def.current) continue;
       const current = Math.max(0, Math.min(def.target, def.current(save) | 0));
       if (current > q.progress) { q.progress = current; changed = true; }
       if (!q.done && q.progress >= def.target && this.megaUnlocked) {
         q.done = true;
+        q.doneAt = now;
         changed = true;
         rewards.push(def);
       }
@@ -497,11 +523,13 @@ export class DailyQuests {
         const state = this.game.save.megaQuests[q.id];
         if (state.done || q.ev !== ev) continue;
         if (q.bossId && data.bossId !== q.bossId) continue;
+        if (q.weapon && data.weapon !== q.weapon) continue;
         state.progress += (data.n || 1);
         changed = true;
         if (state.progress >= q.target) {
           state.progress = q.target;
           state.done = true;
+          state.doneAt = Date.now();
           this._rewardMega(q);
         }
       }

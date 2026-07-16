@@ -2,9 +2,14 @@
 // Масштабуємо весь просторовий конфіг разом, щоб межа не відрізала сюжетні місця.
 export const MAP_SIZE_MODES = Object.freeze(['small', 'standard', 'large', 'huge']);
 export const MAP_SIZE_METERS = Object.freeze({ small: 500, standard: 750, large: 950, huge: 1250 });
+export const MAP_STYLE_MODES = Object.freeze(['classic', 'forest', 'lakes', 'stone']);
 
 export function sanitizeMapSize(value) {
   return MAP_SIZE_MODES.includes(value) ? value : 'standard';
+}
+
+export function sanitizeMapStyle(value) {
+  return MAP_STYLE_MODES.includes(value) ? value : 'classic';
 }
 
 export function mapSizeScale(value) {

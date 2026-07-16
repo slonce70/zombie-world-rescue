@@ -74,7 +74,10 @@ import {
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 import { frontMetricsEnabled, sendFrontMetric, sendFrontReturns, setFrontMetricsEnabled } from './net/frontmetrics.js';
-import { MAP_SIZE_MODES, MAP_SIZE_METERS, sanitizeMapSize, scaleMap } from './mapsize.js';
+import {
+  MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES,
+  sanitizeMapSize, sanitizeMapStyle, scaleMap,
+} from './mapsize.js';
 
 // v305: розпил main.js — таблиці режимів, нагороди, альбом, енд-скріни й тест-хуки
 // переїхали у власні модулі; тут лишились тонкі делегати (тіла з this→game).
@@ -123,13 +126,16 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 521;
+const APP_VERSION = 522;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: t('Авто'), high: t('Гарна'), fast: t('Швидка') };
 const MAP_SIZE_LABELS = {
   small: t('Мала'), standard: t('Стандартна'), large: t('Велика'), huge: t('Дуже велика'),
+};
+const MAP_STYLE_LABELS = {
+  classic: t('Класична'), forest: t('Лісова'), lakes: t('Озерна'), stone: t('Камʼяна'),
 };
 const DEFAULT_EXPOSURE = 1.06;
 const BIOME_EXPOSURE = {
@@ -504,6 +510,17 @@ class Game {
     });
     this._applyMapSize();
 
+    const mapStyleBtn = document.getElementById('btn-map-style');
+    if (mapStyleBtn) mapStyleBtn.addEventListener('click', () => {
+      const current = sanitizeMapStyle(this.save.mapStyle);
+      this.save.mapStyle = MAP_STYLE_MODES[(MAP_STYLE_MODES.indexOf(current) + 1) % MAP_STYLE_MODES.length];
+      this.saveGame();
+      this._applyMapStyle();
+      this.audio.click();
+      if (this.hud) this.hud.toast(t('🌍 Новий вид карти буде в наступній грі'));
+    });
+    this._applyMapStyle();
+
     // 🐣 Режим Малюк: за замовчуванням УВІМКНЕНО на телефоні, ВИМКНЕНО на десктопі.
     // kidMode === null/undefined → ще не обрано вручну → беремо тип пристрою.
     // Щойно дитина/батько торкнеться кнопки, вибір стає явним (true/false) і більше не перезаписується.
@@ -601,7 +618,8 @@ class Game {
       modeBest: {}, modeWins: {}, modeRewards: {}, weekly: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
-      missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false, mapSize: 'standard', cloudTs: 0, goal: null,
+      missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false,
+      mapSize: 'standard', mapStyle: 'classic', cloudTs: 0, goal: null,
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
       coopRole: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
@@ -806,6 +824,7 @@ class Game {
         out.strongZombies = !!out.strongZombies;
         out.toughZombies = !!out.toughZombies;
         out.mapSize = sanitizeMapSize(out.mapSize);
+        out.mapStyle = sanitizeMapStyle(out.mapStyle);
         // 🎭 кооп-роль: лише з білого списку (зіпсоване/чуже → null, без ролі)
         if (!['guard', 'medic', 'scout'].includes(out.coopRole)) out.coopRole = null;
         if (typeof out.xp !== 'number' || !isFinite(out.xp)) out.xp = 0;
@@ -943,6 +962,13 @@ class Game {
     if (btn) btn.textContent = t('🗺️ Карта: {size} · {meters} м', {
       size: MAP_SIZE_LABELS[mode], meters: MAP_SIZE_METERS[mode],
     });
+  }
+
+  _applyMapStyle() {
+    const style = sanitizeMapStyle(this.save.mapStyle);
+    this.save.mapStyle = style;
+    const btn = document.getElementById('btn-map-style');
+    if (btn) btn.textContent = t('🌍 Вид карти: {style}', { style: MAP_STYLE_LABELS[style] });
   }
 
   // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (м'яка допомога з прицілом + CSS)
@@ -2810,7 +2836,8 @@ class Game {
     if (victoryNext) victoryNext.textContent = t('▶️ Далі');
     const baseCountry = COUNTRIES[countryId] || COUNTRIES.UKR;
     const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
-    const country = { ...baseCountry, map: scaleMap(baseCountry.map, mapSize) };
+    const mapStyle = sanitizeMapStyle((opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
+    const country = { ...baseCountry, map: { ...scaleMap(baseCountry.map, mapSize), mapStyle } };
     const coopFront = opts.operation && opts.coop && opts.coop.role === 'guest'
       ? opts.coop.session.frontRun : null;
     const savedFront = opts.operation
@@ -2946,6 +2973,7 @@ class Game {
       modeId,
       country,
       mapSize,
+      mapStyle,
       scene: new THREE.Scene(),
       bus: new Bus(),
       rng: new RNG(country.seed + 1),
@@ -3481,7 +3509,7 @@ class Game {
       if (level.playground) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this.save.stats.damageDealt += Math.round(n);
-      this.quests.onEvent('damage', { n: Math.round(n) });
+      this.quests.onEvent('damage', { n: Math.round(n), weapon: level.player.cur });
       if (n >= 8 && this.save.activeSkin === 'radiation' && (this.save.upgrades.radiationupgrade || 0) > 0 && z && z.state !== 'dead' && level.effects.radiationDrops) {
         level.effects.radiationDrops(new THREE.Vector3(z.x, z.y + (z.rig?.height || 1.6) * 0.45, z.z));
       }
