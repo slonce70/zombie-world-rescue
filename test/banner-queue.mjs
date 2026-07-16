@@ -2,15 +2,9 @@
 // prio≥1 перебиває одразу (витіснений — назад у чергу); переповнення (макс 3) викидає
 // найстаріший низькопріоритетний; clearBanners() чистить усе. Драйвимо hud._updateBanner(dt)
 // напряму — детерміновано, без залежності від rAF/таймерів.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 let failed = 0;
 const check = (ok, msg, d = '') => { console.log(ok ? '  ✅' : '  ❌', msg, d); if (!ok) failed++; };
@@ -102,6 +96,5 @@ check(r6.shown.flag === 1 && r6.shown.cur === 'H', '6: наступна наго
 
 check(errors.length === 0, 'без JS-помилок', errors.join(' | '));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

@@ -34,11 +34,6 @@ export function eggOddsText() {
   return EGG_TIERS.map((tr) => `${tr.pct}% ${tr.label()}`).join(' · ');
 }
 
-// Усі петси, що взагалі можуть випасти з яйця (для лічильника/тестів).
-export function eggPoolPetIds() {
-  return EGG_TIERS.flatMap((tr) => tr.pets).filter((id) => PETS[id]);
-}
-
 // ---------- Ріст петсів ----------
 export const PET_MAX_LEVEL = 3;
 // Вартість наступного рівня у кормі: Рів.1→2 = 3 🍖, Рів.2→3 = 6 🍖.
@@ -51,10 +46,6 @@ export const PET_MAGNET_BONUS = { 1: 1, 2: 1.05, 3: 1.10 };
 export function petLevel(save, id) {
   const lv = save && save.petLevels && save.petLevels[id];
   return (lv >= 1 && lv <= PET_MAX_LEVEL) ? (lv | 0) : 1;
-}
-
-export function petScale(save, id) {
-  return PET_LEVEL_SCALE[petLevel(save, id)] || 1;
 }
 
 export function feedCost(nextLevel) {

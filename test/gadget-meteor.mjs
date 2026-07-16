@@ -1,16 +1,10 @@
 // ☄️ Гаджет «Метеорит»: викликає метеорит на НАЙБЛИЖЧОГО зомбі — 250 шкоди згори
 // (обходить фронтальний щит і нагрудник). Перезарядка 45с.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
 const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
@@ -164,6 +158,5 @@ check(fire.expired === 0, 'вогонь згасає після 10 секунд 
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 МЕТЕОРИТ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

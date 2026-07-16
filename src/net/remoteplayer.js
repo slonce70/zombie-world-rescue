@@ -2,7 +2,7 @@
 // зброя в руці, плавна інтерполяція позиції зі снапшотів.
 import * as THREE from 'three';
 import { makeHero, makeGunMesh, PETS, HERO_HATS, HERO_FACES, setAnim, updateRig, bakeGroupMeshes } from '../characters.js';
-import { damp, dampAngle } from '../utils.js';
+import { damp, dampAngle, disposeObject } from '../utils.js';
 import { PF, idxToWeapon, WEAPON_IDX } from './protocol.js';
 import { t } from '../i18n.js';
 
@@ -250,21 +250,7 @@ export class RemotePlayer {
     // звільняємо унікальні per-instance GPU-ресурси (запечена гео тіла/зброї, нік+HP канвас-текстури,
     // сфера щита). Спільні кеші (toonMat/bakedMat/cachedGeo, позначені userData.shared) НЕ чіпаємо —
     // вони живуть на весь сеанс. Без цього кожен дисконект/реконнект лишав би їх у пам'яті GPU.
-    this._free(this.rig.group);
-    if (this.pet) this._free(this.pet.group);
-  }
-
-  _free(root) {
-    if (!root) return;
-    root.traverse((o) => {
-      if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
-      if (o.material) {
-        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-          if (!m || (m.userData && m.userData.shared)) return;
-          if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
-          m.dispose();
-        });
-      }
-    });
+    disposeObject(this.rig.group);
+    if (this.pet) disposeObject(this.pet.group);
   }
 }

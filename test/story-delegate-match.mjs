@@ -7,15 +7,9 @@
 //     тепер делегує ukr-rescue у місію типу 'rescue';
 //  3) браузер: активуй-місія — 1 з N точок дає ЧЕКПОЙНТ (без голосу «виконано»),
 //     і лише фінальна точка грає mission() рівно один раз.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 let failed = 0;
 const check = (ok, msg, detail = '') => {
@@ -167,6 +161,5 @@ await page.evaluate(() => { window.__game.test.forceMissions(null); });
 
 check(errors.length === 0, `no JS errors (${errors.slice(0, 2).join('|')})`);
 console.log(failed === 0 ? '✅ story delegate match pass' : `❌ story delegate match failed: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

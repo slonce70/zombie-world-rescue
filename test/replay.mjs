@@ -1,5 +1,6 @@
 // Перегравання рівня після перемоги: ресурси диспозяться і відновлюються коректно
 import { chromium } from 'playwright';
+import { waitFor as waitForAsync } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -15,15 +16,7 @@ const check = (cond, msg) => {
   if (!cond) failed++;
 };
 const state = () => page.evaluate(() => window.__game.test.state());
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await fn()) return true;
-    await page.waitForTimeout(300);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 
 async function speedrun() {
   await page.evaluate(() => {

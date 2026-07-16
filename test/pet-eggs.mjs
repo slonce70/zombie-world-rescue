@@ -3,15 +3,9 @@
 //  - відкриття яйця → новий петс АБО дублікат→корм; шанси надруковані
 //  - корм годує петса → рівень 1→3 → більший масштаб + баф магніту (коли петс активний)
 //  - скриня може включати яйце; яйце НІКОЛИ не продається в магазині (дитяча безпека)
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 900 } }, pageErrorPrefix: '' });
 
 let failed = 0;
 const check = (ok, msg, d = '') => { console.log(ok ? '  ✅' : '  ❌', msg, d); if (!ok) failed++; };
@@ -197,6 +191,5 @@ check(!shopRegistry, 'жоден товар SHOP_ITEMS не дає яйця', St
 
 check(errors.length === 0, `без JS-помилок (${errors.slice(0, 2).join(' | ')})`);
 console.log(failed === 0 ? '🎉 PET-EGGS OK' : `❌ ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

@@ -1,6 +1,5 @@
 import { readFileSync } from 'fs';
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
 const root = new URL('..', import.meta.url);
 let failed = 0;
@@ -25,13 +24,7 @@ check(/12 країн/i.test(manifest.description) && /фінальн/i.test(mani
   'manifest description reflects current campaign scale', manifest.description);
 
 console.log('▸ Mobile a11y: weapon wheel labels, escape close, focus return');
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true } });
 
 await page.goto(`${BASE}/?test&fresh&touch&country=UKR`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'level' && window.__game.touch, null, { timeout: 30000 });
@@ -65,7 +58,6 @@ check(wheelState.focusReturned === 'tb-weapon', 'closing weapon wheel returns fo
 const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_/i.test(e));
 check(realErrors.length === 0, `без JS-помилок консолі (${realErrors.length})`, realErrors.slice(0, 2).join('|'));
 
-await browser.close();
-closeServer();
+await closeTest();
 console.log(failed === 0 ? '🎉 MOBILE A11Y OK' : `❌ MOBILE A11Y FAILURES: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

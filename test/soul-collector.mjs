@@ -1,17 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&seed=35`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
@@ -180,8 +171,7 @@ check(rewards.rewards.gadget && rewards.rewards.skin && rewards.rewards.title &&
   'Шлях душ видає гаджет, скін Привид, титул Привид і гіпер невидимки', JSON.stringify(rewards.rewards));
 
 check(errors.length === 0, 'без JS-помилок консолі', errors.join('\n'));
-await browser.close();
-closeServer();
+await closeTest();
 console.log('');
 console.log(failed === 0 ? '🎉 ЗБИРАЧ ДУШ ПРАЦЮЄ' : `💥 ПРОВАЛЕНО: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

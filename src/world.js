@@ -2168,7 +2168,7 @@ export class World {
     for (const rv of this.rivers) {
       const positions = [];
       const half = rv.width * 0.82;
-      const pushWaterVertex = (x, z) => positions.push(x, this.groundH(x, z) + 0.2, z);
+      const pushWaterVertex = (x, z) => positions.push(x, rv.level, z);
       for (let s = 0; s < rv.pts.length - 1; s++) {
         const [ax, az] = rv.pts[s];
         const [bx, bz] = rv.pts[s + 1];

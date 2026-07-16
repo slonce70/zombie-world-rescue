@@ -1,15 +1,10 @@
 // 🎲 Мутатор тижня в соло-реплеях кампанії: ніч форситься, магазин закривається,
 // навала прискорює хвилі орди; перше проходження країни — без мутатора.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, captureConsole: false, pageErrorPrefix: '' });
 
 const startCountry = async (mod, countryId) => {
   await page.evaluate(({ mod, countryId }) => {
@@ -83,6 +78,5 @@ check(first.weeklyMod === null && !first.noShop, 'перше проходжен�
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 2).join(' | '));
 console.log(fail === 0 ? '\n🎉 MODIFIERS OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail ? 1 : 0);

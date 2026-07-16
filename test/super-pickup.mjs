@@ -1,17 +1,11 @@
 // 🌟 «Момент могутності» (v288): 1×/соло-рівень падає супер-пікап (після 2-ї місії
 // АБО на елітній хвилі). Схопив → одна з двох сил (🔥 Шквал / 🧲 Магніт-буря) з
 // відліком на HUD; сила згасає сама. Перевіряємо спавн, активацію, згасання, «1 на рівень».
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, pageErrorPrefix: '' });
 
 await page.goto(`${BASE}/?test&fresh&seed=1&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level' && window.__game.level && !!window.__game.level.missions, null, { timeout: 30000 });
@@ -95,6 +89,5 @@ check(magnet.superMagnet === true, 'getSuperMagnet() → монети з усі�
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 3).join(' | '));
 console.log(fail === 0 ? '\n🎉 SUPER-PICKUP OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail ? 1 : 0);

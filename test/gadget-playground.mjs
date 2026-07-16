@@ -1,18 +1,12 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const SAVE_KEY = 'zr-save-v1';
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, browser, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 let failed = 0;
-const errors = [];
 const check = (ok, msg, extra = '') => {
   console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
   if (!ok) failed++;
 };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
@@ -196,6 +190,5 @@ if (errors.length) {
   failed += errors.length;
 }
 console.log(failed === 0 ? '🎉 ПОЛІГОН ГАДЖЕТІВ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

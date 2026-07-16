@@ -1,30 +1,15 @@
 // Тести мобільного оновлення (Task 1): режим «Малюк» — лише м'яка допомога
 // прицілу, БЕЗ автовогню й гарантованого хедшоту. Десктоп не зачіпається.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, waitFor as waitForAsync } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 412, height: 915 } } });
 
 let failed = 0;
 const check = (cond, msg) => {
   console.log(cond ? '  ✅' : '  ❌', msg);
   if (!cond) failed++;
 };
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await fn()) return true;
-    await page.waitForTimeout(300);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 
 // ============ 🐣 Режим Малюк: без автовогню ============
 console.log('▸ Mobile: режим Малюк — без автовогню');
@@ -233,6 +218,5 @@ if (errors.length) {
   console.log('✅ Без помилок у консолі');
 }
 console.log(failed === 0 ? '🎉 УСІ ПЕРЕВІРКИ ПРОЙШЛИ' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

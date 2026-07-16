@@ -1,15 +1,10 @@
 // 🧪 Глава 3 «Лігво Вірусу»: анлок-гейт, локація LAB, МЕГА-СЛИЗНЯК (щит-фази,
 // призов крапель), нагороди першої перемоги (медаль/пет/💎) і компас.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, captureConsole: false, pageErrorPrefix: '' });
 
 await page.goto(`${BASE}/?test&fresh&seed=1`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
@@ -141,6 +136,5 @@ check(again.inShop === false || again.inShop === null, 'slimepet не прода
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 2).join(' | '));
 console.log(fail === 0 ? '\n🎉 CHAPTER3 OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail ? 1 : 0);

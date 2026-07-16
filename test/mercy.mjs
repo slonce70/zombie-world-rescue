@@ -1,18 +1,12 @@
 // 🕊️ R3 (v289) «Невидиме милосердя»: 2+ смерті поспіль на одній країні кампанії → наступний
 // забіг там дістає тихі послаблення (+50% аптечок, −1 еліт у хвилі, −10% HP зомбі).
 // КЛЮЧОВЕ: жодного UI («easy mode» ображає дитину). Перемога скидає лічильник.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
-const errors = [];
 
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 async function startRun(country) {
   await page.evaluate((c) => {
@@ -138,6 +132,5 @@ check(afterWin === false, 'наступний забіг без милосерд
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 3).join(' | '));
 console.log(fail === 0 ? '\n🎉 МИЛОСЕРДЯ OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail ? 1 : 0);

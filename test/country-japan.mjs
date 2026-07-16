@@ -1,14 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
 const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 console.log('▸ Японія (JPN)');
 // завантаження рівня JPN = перевірка карти japan.js + біому sakura + ландмарків торії/пагода
@@ -60,6 +54,5 @@ check(cfg.zombies > 0, 'зомбі на карті Японії', String(cfg.zom
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 ЯПОНІЯ ПРОЙДЕНА' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

@@ -1484,14 +1484,8 @@ export class DynamicMissions {
     const level = this.level;
     const sites = level.country.map.storySites;
     const dock = sites.shipDock, shore = sites.rescueShore, boards = sites.boardsCrate;
-    const waterY = level.world.groundH((dock.x + shore.x) / 2, (dock.z + shore.z) / 2) + 0.08;
-    const water = new THREE.Mesh(
-      new THREE.BoxGeometry(24, 0.12, Math.hypot(shore.x - dock.x, shore.z - dock.z) + 24),
-      new THREE.MeshToonMaterial({ color: 0x3fc8d8, transparent: true, opacity: 0.82 }),
-    );
-    water.position.set((dock.x + shore.x) / 2, waterY, (dock.z + shore.z) / 2);
-    water.rotation.y = Math.atan2(shore.x - dock.x, shore.z - dock.z);
-    level.scene.add(water);
+    const waterY = level.world.rivers[0]?.level
+      ?? level.world.groundH((dock.x + shore.x) / 2, (dock.z + shore.z) / 2) + 0.2;
 
     const ship = new THREE.Group();
     const hull = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.1, 9.5), toonMat(0x75462c));
@@ -1506,7 +1500,7 @@ export class DynamicMissions {
     sail.position.set(0, 4.4, -0.78);
     sail.rotation.y = Math.PI;
     ship.add(hull, deck, cabin, mast, sail);
-    ship.position.set(dock.x, waterY + 0.25, dock.z);
+    ship.position.set(dock.x, waterY - 0.22, dock.z);
     level.scene.add(ship);
 
     const crate = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.5), toonMat(0x9a6538));
@@ -1514,13 +1508,14 @@ export class DynamicMissions {
     level.scene.add(crate);
     const people = ['kid', 'granny', 'kid'].map((kind, i) => {
       const rig = makeCivilian(kind, level.rng);
-      rig.group.position.set(shore.x - 2 + i * 2, level.world.groundH(shore.x, shore.z), shore.z - 2);
+      const x = shore.x + 7, z = shore.z - 2 + i * 2;
+      rig.group.position.set(x, level.world.groundH(x, z), z);
       level.scene.add(rig.group);
       return rig;
     });
     Object.assign(m, {
       phase: 'find', repairProgress: 0, rescueProgress: 0, unloadProgress: 0, sailT: 0,
-      carrierPid: 0, riderMask: 0, dock, shore, boards, waterY, water, ship, crate, people, title: t('Знайди ящик із дошками'),
+      carrierPid: 0, riderMask: 0, dock, shore, boards, waterY, ship, crate, people, title: t('Знайди ящик із дошками'),
     });
   }
 
@@ -1543,14 +1538,14 @@ export class DynamicMissions {
     const a = returning ? m.shore : m.dock;
     const b = returning ? m.dock : m.shore;
     const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
-    m.ship.position.set(x, m.waterY + 0.25, z);
+    m.ship.position.set(x, m.waterY - 0.22, z);
     m.ship.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
     const player = this.level.player;
     if (movePlayer) {
-      player.pos.set(x, m.waterY + 1.55, z);
+      player.pos.set(x, m.waterY + 1.1, z);
       if (player.vel) player.vel.set(0, 0, 0);
     }
-    if (m.phase === 'returning') m.people.forEach((rig, i) => rig.group.position.set(x - 1.2 + i * 1.2, m.waterY + 1.48, z + 0.6));
+    if (m.phase === 'returning') m.people.forEach((rig, i) => rig.group.position.set(x - 1.2 + i * 1.2, m.waterY + 1.1, z + 0.6));
   }
 
   _syncShipVisual(m, movePlayer = false) {
@@ -1575,14 +1570,14 @@ export class DynamicMissions {
     else if (m.phase === 'returning') this._setShipPosition(m, m.sailT, true, movePlayer);
     else {
       const point = m.phase === 'rescue' || m.phase === 'return-board' ? m.shore : m.dock;
-      m.ship.position.set(point.x, m.waterY + 0.25, point.z);
+      m.ship.position.set(point.x, m.waterY - 0.22, point.z);
     }
 
     if (m.phase !== 'returning') {
       const unloaded = m.phase === 'unload' || m.state === 'done';
       m.people.forEach((rig, i) => {
-        const x = unloaded ? m.dock.x + 4 + i * 1.4 : m.shore.x - 2 + i * 2;
-        const z = unloaded ? m.dock.z + 3 : m.shore.z - 2;
+        const x = (unloaded ? m.dock.x : m.shore.x) + 7;
+        const z = (unloaded ? m.dock.z : m.shore.z) - 2 + i * 2;
         rig.group.position.set(x, level.world.groundH(x, z), z);
         if (unloaded) setAnim(rig, 'cheer');
       });
@@ -1681,7 +1676,8 @@ export class DynamicMissions {
         m.unloadProgress = Math.min(1, m.unloadProgress + (dt * holders) / 2);
         if (m.unloadProgress >= 1) {
           m.people.forEach((rig, i) => {
-            rig.group.position.set(m.dock.x + 4 + i * 1.4, level.world.groundH(m.dock.x + 4, m.dock.z + 3), m.dock.z + 3);
+            const x = m.dock.x + 7, z = m.dock.z - 2 + i * 2;
+            rig.group.position.set(x, level.world.groundH(x, z), z);
             setAnim(rig, 'cheer');
           });
           this._complete(m.id);

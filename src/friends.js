@@ -274,10 +274,6 @@ export class HiddenRescue {
     this.active = true;
   }
 
-  _guardsAlive() {
-    return this.guards.some((z) => z && z.state !== 'dead' && !z.gone);
-  }
-
   update(dt, input, allowControl) {
     if (!this.active) return;
     if (this.rig) updateRig(this.rig, dt);

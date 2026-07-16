@@ -5,21 +5,14 @@
 //  (4) 👑 МАТАДОР-бос виходить (style matador, HP з конфігу, дальня атака бандерильями);
 //  (5) звільнення ESP дає ВОГНЕМЕТ.
 import { chromium } from 'playwright';
+import { waitForPage } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
 const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
-async function waitFor(page, fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await page.evaluate(fn)) return true;
-    await page.waitForTimeout(300);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (page, fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();

@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { waitForPage } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -16,15 +17,7 @@ const check = (ok, msg, extra = '') => {
   if (!ok) failed++;
 };
 
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await page.evaluate(fn)) return true;
-    await page.waitForTimeout(250);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));

@@ -2,6 +2,7 @@
 // Дзеркалить харнес test/coop.mjs (власний dev-relay + два браузери, хост створює
 // кімнату через __game.test.coopCreate, гість приєднується coopJoin, старт рівня).
 import { chromium } from 'playwright';
+import { waitFor as waitForAsync } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
 import { spawnRelay } from './_relay.mjs';
@@ -18,15 +19,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs * SLOW) {
-    if (await fn()) return true;
-    await sleep(300);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs * SLOW, label, 300);
 
 // власний relay на окремому порту — тест самодостатній
 const relay = await spawnRelay(RELAY_PORT);

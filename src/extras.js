@@ -5,6 +5,7 @@ import {
   makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
   makeHero, updateRig, setAnim, PETS,
 } from './characters.js';
+import { petLevel, PET_LEVEL_SCALE } from './eggs.js';
 import { disposeObject } from './utils.js';
 
 const CLONE_FOOT_LIFT = 0.16;
@@ -250,9 +251,8 @@ export class Pet {
     this.grabbing = null;
     // 🐾 R5: рівень петса (1..3) → більша модель (×1.12/×1.25) + іскри на Рів.3.
     const save = level.game && level.game.save;
-    const lv = (save && save.petLevels && save.petLevels[this.id]) | 0;
-    this.petLevel = (lv >= 1 && lv <= 3) ? lv : 1;
-    this._baseScale = ({ 1: 1, 2: 1.12, 3: 1.25 })[this.petLevel] || 1;
+    this.petLevel = petLevel(save, this.id);
+    this._baseScale = PET_LEVEL_SCALE[this.petLevel];
     this.model.group.scale.setScalar(this._baseScale);
     this._sparkleT = 0;
     level.scene.add(this.model.group);

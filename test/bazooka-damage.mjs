@@ -1,14 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1024, height: 768 } })).newPage();
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1024, height: 768 } } });
 let failed = 0;
-const errors = [];
 const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
@@ -46,6 +40,5 @@ const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3
 check(realErrors.length === 0, `без JS-помилок консолі (${realErrors.length})`);
 if (realErrors.length) console.log(realErrors.join('\n'));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);

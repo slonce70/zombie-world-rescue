@@ -464,11 +464,6 @@ export class LivingHQ {
     this.campQuestBoard = 1;
   }
 
-  // тест-хук: тап по дошці квесту (відкриває панель квесту через головну гру)
-  tapCampQuestBoard() {
-    if (this.campQuestBoard) this._openCampQuest();
-  }
-
   _openCampQuest() {
     this.game.exitHQBase();      // як інші кнопки табору: спершу на глобус, тоді оверлей
     this.game._openCampQuest();

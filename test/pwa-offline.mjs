@@ -1,13 +1,6 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, ctx, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1024, height: 768 } } });
 
 let failed = 0;
 const check = (ok, msg, extra = '') => {
@@ -65,6 +58,5 @@ check(realErrors.length === 0, `без JS-помилок консолі (${realE
 if (realErrors.length) console.log(realErrors.join('\n'));
 
 await ctx.setOffline(false);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);

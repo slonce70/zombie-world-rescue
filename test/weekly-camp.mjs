@@ -2,15 +2,9 @@
 // (соло/кооп — локальні), клейм → +🥚+🍖 і claimed, БЕЗ FOMO (зміна тижня без клейму —
 // нагорода лишається; після клейму — новий квест), ретро-безпека (старий сейв без weeklyCamp).
 // Плюс перевірки hintOnce (по разу, збереження у save.hints).
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 900 } }, pageErrorPrefix: '' });
 
 let failed = 0;
 const check = (ok, msg, d = '') => { console.log(ok ? '  ✅' : '  ❌', msg, d); if (!ok) failed++; };
@@ -177,6 +171,5 @@ check(r11.id !== 'coins' && r11.p === 0 && !r11.claimable, '11: невідоми
 
 check(errors.length === 0, 'без JS-помилок', errors.join(' | '));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);
