@@ -1,10 +1,9 @@
-// 🏠 База Рятівника: маленька 3D-сцена-вітрина, куди дитина заходить зі Штабу.
-// Read-only: показує героя, трофеї звільнених країн, відкритий бестіарій і безпечні
-// тренувальні мішені. Жодного UGC/чату/мережі/нової економії (див. план living-rescue-hq).
+// 🏠 База Рятівника: безпечна 3D-вітрина зі Штабу; moon-mode переюзує її цикл
+// для окремої керованої бойової місії без UGC/чату/мережі чи нової валюти.
 import * as THREE from 'three';
-import { t } from './i18n.js';
+import { t, interactKey } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
-import { makeHero, HERO_SKINS, makeCivilian, setAnim, updateRig } from './characters.js';
+import { makeHero, makeZombie, makeBoss, HERO_SKINS, makeCivilian, setAnim, updateRig } from './characters.js';
 import { WORLD_BOSSES } from './worldboss.js';
 import { BESTIARY_TYPE_IDS } from './zombies.js';
 import {
@@ -14,7 +13,13 @@ import { weeklyCampState } from './weeklycamp.js';
 
 // маленький rng для makeCivilian (потрібні .pick/.f) — детермінізм тут не критичний
 function campRng() {
-  return { f: Math.random, range(a, b) { return a + (b - a) * Math.random(); }, pick(arr) { return arr[Math.floor(Math.random() * arr.length) % arr.length]; } };
+  return {
+    f: Math.random, next: Math.random,
+    range(a, b) { return a + (b - a) * Math.random(); },
+    int(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); },
+    chance(p) { return Math.random() < p; },
+    pick(arr) { return arr[Math.floor(Math.random() * arr.length) % arr.length]; },
+  };
 }
 
 export class LivingHQ {
@@ -43,6 +48,8 @@ export class LivingHQ {
     this.frontProjectProps = 0;
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
+    this._cameraTarget = new THREE.Vector3();
+    this.moonEnemies = [];
     this._onPointerDown = (e) => this._pickTarget(e);
   }
 
@@ -51,6 +58,12 @@ export class LivingHQ {
     this.ready = true;
     this.hitCount = 0;
     this.damageTotal = 0;
+    this.moonHealth = 100;
+    this.moonDefenseT = 30;
+    this.moonSpawnT = 1;
+    this.moonRepairT = 0;
+    this.moonRepairId = '';
+    this.moonKills = 0;
     this._ensureUi();
     this.build();
     this.onResize();
@@ -117,8 +130,17 @@ export class LivingHQ {
 
   _moonState() {
     const moon = this.game.save.moonRescue;
-    if (moon && Array.isArray(moon.relays)) return moon;
-    return (this.game.save.moonRescue = { relays: [], done: false });
+    if (moon && Array.isArray(moon.relays)) {
+      const oldDone = !!moon.done;
+      moon.defenseDone = !!moon.defenseDone;
+      moon.bossDefeated = !!moon.bossDefeated;
+      moon.rewarded = !!moon.rewarded || oldDone;
+      moon.done = moon.relays.length === 3 && moon.defenseDone && moon.bossDefeated;
+      return moon;
+    }
+    return (this.game.save.moonRescue = {
+      relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false,
+    });
   }
 
   _buildMoonRescue() {
@@ -134,7 +156,7 @@ export class LivingHQ {
     stars.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     this.scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16 })));
 
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshLambertMaterial({ color: 0x8b8f9d }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(18, 64), new THREE.MeshLambertMaterial({ color: 0x8b8f9d }));
     floor.rotation.x = -Math.PI / 2;
     this.scene.add(floor);
     const earth = new THREE.Mesh(new THREE.SphereGeometry(2.1, 32, 20), new THREE.MeshLambertMaterial({ color: 0x3d8fe8, emissive: 0x10274d }));
@@ -148,9 +170,9 @@ export class LivingHQ {
 
     const state = this._moonState();
     const relayDefs = [
-      ['solar', -4, 2.6, 0xffd45a],
-      ['comms', 0, 3.8, 0x65b8ff],
-      ['oxygen', 4, 2.6, 0x62e59a],
+      ['solar', -9, 1, 0xffd45a],
+      ['comms', 0, -10, 0x65b8ff],
+      ['oxygen', 9, 1, 0x62e59a],
     ];
     this.targets = relayDefs.map(([id, x, z, color]) => {
       const active = state.relays.includes(id);
@@ -170,10 +192,25 @@ export class LivingHQ {
         emissiveIntensity: state.done ? 1.2 : 0.5,
       })
     );
-    core.position.set(0, 1.7, -1.1);
+    core.position.set(0, 1.7, -2);
     core.userData = { isHqTarget: true, moonCore: true };
     this.scene.add(core);
     this.targets.push(core);
+    const defenseRing = new THREE.Mesh(
+      new THREE.RingGeometry(6.8, 7, 64),
+      new THREE.MeshBasicMaterial({ color: 0x65b8ff, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
+    );
+    defenseRing.rotation.x = -Math.PI / 2;
+    defenseRing.position.set(0, 0.04, -2);
+    this.scene.add(defenseRing);
+
+    this.heroRig = makeHero(this.game.save.activeSkin || 'classic', this.game.save.hero);
+    this.hero = this.heroRig.group;
+    this.hero.position.set(0, 0, 12);
+    this.hero.userData.isMoonHero = true;
+    this.scene.add(this.hero);
+    this.camera.position.set(0, 7, 21);
+    this.camera.lookAt(0, 1.2, 4);
 
     this.friends = [];
     ['medic', 'kid', 'granny'].forEach((kind, i) => {
@@ -189,6 +226,10 @@ export class LivingHQ {
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
     });
+    if (!state.done) {
+      if (state.defenseDone && !state.bossDefeated) this._spawnMoonEnemy(true);
+      else for (let i = 0; i < 3; i++) this._spawnMoonEnemy();
+    }
     this._refreshMoonUi();
   }
 
@@ -205,29 +246,193 @@ export class LivingHQ {
       this.game.saveGame();
       this.game.audio.checkpoint();
       this.game.hud.toast(t('📡 Місячне реле запущено ({n}/3)!', { n: state.relays.length }));
-      if (state.relays.length === 3) this.game.hud.toast(t('🌕 Усі реле працюють — активуй ядро Місяця!'));
+      if (state.relays.length === 3) this.game.hud.toast(t('🌕 Усі реле працюють — обороняй ядро 30 секунд!'));
       this._refreshMoonUi();
-      return;
     }
-    if (!target.userData.moonCore) return;
-    if (state.done) {
-      this.game.hud.toast(t('🌕 Місяць уже врятовано. База працює!'));
-      return;
-    }
-    if (state.relays.length < 3) {
-      this.game.hud.toast(t('🔒 Спочатку запусти три місячні реле.'));
-      return;
-    }
+  }
+
+  _completeMoonRescue() {
+    const state = this._moonState();
+    if (state.done) return;
+    state.bossDefeated = true;
     state.done = true;
-    this.game.save.crystals = (this.game.save.crystals || 0) + 3;
-    this.game.progress.addXp(500);
+    if (!state.rewarded) {
+      state.rewarded = true;
+      this.game.save.crystals = (this.game.save.crystals || 0) + 3;
+      this.game.progress.addXp(500);
+    }
+    this._clearMoonEnemies();
     this.game.saveGame();
-    target.material.color.setHex(0xfff3b0);
-    target.material.emissive.setHex(0xffd45a);
-    target.material.emissiveIntensity = 1.2;
+    const core = this.targets.find((target) => target.userData.moonCore);
+    if (core) {
+      core.material.color.setHex(0xfff3b0);
+      core.material.emissive.setHex(0xffd45a);
+      core.material.emissiveIntensity = 1.2;
+    }
     this.game.audio.levelUp();
     this.game.hud.toast(t('🌕 Місяць урятовано! +500 XP і +3 кристали.'));
     this._refreshMoonUi();
+  }
+
+  _spawnMoonEnemy(boss = false) {
+    if (boss && this.moonEnemies.some((enemy) => enemy.boss)) return;
+    const rig = boss ? makeBoss('mechTitan') : makeZombie('runner', campRng());
+    const angle = boss ? Math.PI : Math.PI / 2 + Math.random() * Math.PI;
+    const radius = boss ? 14 : 15 + Math.random() * 2;
+    const enemy = {
+      rig, boss, hp: boss ? 1200 : 120, maxHp: boss ? 1200 : 120,
+      speed: boss ? 1.25 : 2.25, damage: boss ? 18 : 9, attackT: 0,
+    };
+    rig.group.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+    rig.group.userData.moonEnemy = enemy;
+    rig.anim.speed = enemy.speed;
+    setAnim(rig, 'walk');
+    this.scene.add(rig.group);
+    this.moonEnemies.push(enemy);
+  }
+
+  _clearMoonEnemies() {
+    for (const enemy of this.moonEnemies) this.scene.remove(enemy.rig.group);
+    this.moonEnemies = [];
+  }
+
+  _hitMoonEnemy(enemy) {
+    if (!enemy || enemy.hp <= 0) return;
+    enemy.hp -= 50;
+    enemy.rig.anim.flinchT = 0.18;
+    if (this.game.audio?.click) this.game.audio.click();
+    if (enemy.hp > 0) return;
+    this.scene.remove(enemy.rig.group);
+    this.moonEnemies = this.moonEnemies.filter((item) => item !== enemy);
+    this.moonKills++;
+    if (enemy.boss) this._completeMoonRescue();
+    this._refreshMoonUi();
+  }
+
+  _shootMoon(autoAim = false) {
+    if (autoAim) {
+      // ponytail: linear auto-aim is fine for the hard cap of 10 enemies; add a spatial index only if Moon hordes grow.
+      const enemy = this.moonEnemies.reduce((best, item) => !best
+        || this.hero.position.distanceTo(item.rig.group.position) < this.hero.position.distanceTo(best.rig.group.position) ? item : best, null);
+      if (!enemy) return false;
+      this._hitMoonEnemy(enemy);
+      return true;
+    }
+    const hit = this._raycaster.intersectObjects(this.moonEnemies.map((enemy) => enemy.rig.group), true)[0];
+    if (!hit) return false;
+    let obj = hit.object;
+    while (obj && !obj.userData?.moonEnemy) obj = obj.parent;
+    if (!obj) return false;
+    this._hitMoonEnemy(obj.userData.moonEnemy);
+    return true;
+  }
+
+  _restartMoonCheckpoint() {
+    const state = this._moonState();
+    this._clearMoonEnemies();
+    this.moonHealth = 100;
+    this.moonDefenseT = 30;
+    this.moonSpawnT = 1;
+    this.hero.position.set(0, 0, 12);
+    if (state.defenseDone) this._spawnMoonEnemy(true);
+    else for (let i = 0; i < 3; i++) this._spawnMoonEnemy();
+    this.game.hud.toast(t('☄️ Скафандр пошкоджено — випробування починається з контрольної точки.'));
+  }
+
+  _updateMoon(dt) {
+    const state = this._moonState();
+    const input = this.game.input;
+    const hero = this.hero;
+    let mx = 0, mz = 0;
+    if (input.down('KeyW') || input.down('ArrowUp')) mz -= 1;
+    if (input.down('KeyS') || input.down('ArrowDown')) mz += 1;
+    if (input.down('KeyA') || input.down('ArrowLeft')) mx -= 1;
+    if (input.down('KeyD') || input.down('ArrowRight')) mx += 1;
+    if (input.touchMove) { mx += input.touchMove.x || 0; mz += input.touchMove.z || 0; }
+    const moving = Math.hypot(mx, mz) > 0.05;
+    if (moving) {
+      const len = Math.max(1, Math.hypot(mx, mz));
+      const speed = (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint) ? 7 : 4.8;
+      hero.position.x += (mx / len) * speed * dt;
+      hero.position.z += (mz / len) * speed * dt;
+      const radius = Math.hypot(hero.position.x, hero.position.z);
+      if (radius > 16.5) { hero.position.x *= 16.5 / radius; hero.position.z *= 16.5 / radius; }
+      hero.rotation.y = Math.atan2(mx, mz);
+      this.heroRig.anim.speed = speed;
+      setAnim(this.heroRig, speed > 5 ? 'run' : 'walk');
+    } else setAnim(this.heroRig, 'idle');
+    updateRig(this.heroRig, dt);
+
+    this._cameraTarget.set(hero.position.x, 6.5, hero.position.z + 9);
+    this.camera.position.lerp(this._cameraTarget, Math.min(1, dt * 6));
+    this.camera.lookAt(hero.position.x, 1.2, hero.position.z - 8);
+
+    if (input.touchMode && input.justClicked) {
+      this._pointer.set(0, 0);
+      this._raycaster.setFromCamera(this._pointer, this.camera);
+      this._shootMoon(true);
+    }
+
+    if (!state.done && state.relays.length < 3) {
+      const relay = this.targets.find((target) => target.userData.moonRelay && !state.relays.includes(target.userData.moonRelay)
+        && hero.position.distanceTo(target.position) < 2.8);
+      if (relay && input.down('KeyE')) {
+        const id = relay.userData.moonRelay;
+        if (this.moonRepairId !== id) { this.moonRepairId = id; this.moonRepairT = 0; }
+        this.moonRepairT += dt;
+        if (this.moonRepairT >= 4) {
+          this._activateMoonTarget(relay);
+          this.moonRepairId = '';
+          this.moonRepairT = 0;
+        }
+      } else { this.moonRepairId = ''; this.moonRepairT = 0; }
+    } else if (!state.done && !state.defenseDone) {
+      const inZone = Math.hypot(hero.position.x, hero.position.z + 2) < 7;
+      if (inZone) this.moonDefenseT = Math.max(0, this.moonDefenseT - dt);
+      if (this.moonDefenseT <= 0) {
+        state.defenseDone = true;
+        this._clearMoonEnemies();
+        this._spawnMoonEnemy(true);
+        this.game.saveGame();
+        this.game.hud.toast(t('🛡️ Ядро захищено — знищ Місячного титана!'));
+      }
+    } else if (!state.done && state.defenseDone && !this.moonEnemies.some((enemy) => enemy.boss)) {
+      this._spawnMoonEnemy(true);
+    }
+
+    if (!state.done) {
+      this.moonSpawnT -= dt;
+      const cap = state.defenseDone ? 5 : state.relays.length === 3 ? 9 : 6;
+      if (this.moonSpawnT <= 0 && this.moonEnemies.filter((enemy) => !enemy.boss).length < cap) {
+        this._spawnMoonEnemy();
+        this.moonSpawnT = state.relays.length === 3 && !state.defenseDone ? 2.2 : 4;
+      }
+    }
+
+    for (const enemy of this.moonEnemies) {
+      const group = enemy.rig.group;
+      const dx = hero.position.x - group.position.x;
+      const dz = hero.position.z - group.position.z;
+      const dist = Math.max(0.01, Math.hypot(dx, dz));
+      if (dist > (enemy.boss ? 2.8 : 1.5)) {
+        group.position.x += (dx / dist) * enemy.speed * dt;
+        group.position.z += (dz / dist) * enemy.speed * dt;
+        group.rotation.y = Math.atan2(dx, dz);
+        setAnim(enemy.rig, 'walk');
+      } else {
+        enemy.attackT -= dt;
+        setAnim(enemy.rig, 'attack');
+        if (enemy.attackT <= 0) {
+          this.moonHealth = Math.max(0, this.moonHealth - enemy.damage);
+          enemy.attackT = enemy.boss ? 1.2 : 1.5;
+        }
+      }
+      enemy.rig.anim.speed = enemy.speed;
+      updateRig(enemy.rig, dt);
+    }
+    if (this.moonHealth <= 0) this._restartMoonCheckpoint();
+    this._moonUiT = (this._moonUiT || 0) - dt;
+    if (this._moonUiT <= 0) { this._moonUiT = 0.15; this._refreshMoonUi(); }
   }
 
   _refreshMoonUi() {
@@ -235,10 +440,17 @@ export class LivingHQ {
     const ui = document.getElementById('moonbase-status');
     if (!ui) return;
     const state = this._moonState();
+    const boss = this.moonEnemies.find((enemy) => enemy.boss);
+    let objective;
+    if (state.done) objective = t('🌕 Місячна база врятована й населена');
+    else if (state.relays.length < 3) objective = this.moonRepairId
+      ? t('🔧 Ремонт реле: {n}/4 с', { n: Math.min(4, this.moonRepairT).toFixed(1) })
+      : t('📡 Завдання 1/3: віднови 3 реле — утримуй {k} поруч', { k: interactKey() });
+    else if (!state.defenseDone) objective = t('🛡️ Завдання 2/3: обороняй ядро ще {n} с', { n: Math.ceil(this.moonDefenseT) });
+    else objective = t('🤖 Завдання 3/3: знищ Місячного титана — {n} HP', { n: Math.max(0, boss?.hp || 0) });
     ui.innerHTML = `<div class="hqbase-mini-row ${state.done ? 'done' : ''}">
-      <span>${state.done ? t('🌕 Місячна база врятована й населена') : t('🌙 Запусти 3 реле, потім активуй ядро')}</span>
-      <b>${state.relays.length}/3</b>
-    </div>`;
+      <span>${objective}</span><b>❤️ ${this.moonHealth}</b>
+    </div><div class="hqbase-mini-row"><span>${t('🎮 Ходи WASD/джойстиком · стріляй кліком/кнопкою вогню')}</span><b>${state.relays.length}/3</b></div>`;
   }
 
   _hintText(data = {}) {
@@ -645,6 +857,10 @@ export class LivingHQ {
     this._pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._pointer, this.camera);
+    if (this.mode === 'moon') {
+      this._shootMoon();
+      return;
+    }
     const friendGroups = (this.friends || []).map((fr) => fr.rig.group);
     const hit = this._raycaster.intersectObjects([...(this.targets || []), ...(this.hints || []), ...(this.campBoardObjs || []), ...friendGroups], true)[0];
     if (!hit) return;
@@ -665,7 +881,6 @@ export class LivingHQ {
 
   _hitTarget(target) {
     if (target.userData.moonRelay || target.userData.moonCore) {
-      this._activateMoonTarget(target);
       return;
     }
     if (target.userData.isHqDummy) {
@@ -696,7 +911,8 @@ export class LivingHQ {
 
   update(dt) {
     if (!this.ready) return;
-    this.scene.rotation.y += dt * 0.03;
+    if (this.mode === 'moon') this._updateMoon(dt);
+    else this.scene.rotation.y += dt * 0.03;
     // 🤝 живий табір: друзі ходять між точками, часом махають
     for (const fr of this.friends || []) {
       const g = fr.rig.group;
@@ -739,6 +955,8 @@ export class LivingHQ {
   // зламаємо матеріали всієї гри.
   dispose() {
     this.hero = null;
+    this.heroRig = null;
+    this.moonEnemies = [];
     this.targets = [];
     this.dummies = [];
     this.hints = [];
@@ -790,6 +1008,12 @@ export class LivingHQ {
       moonRelays: this._moonState().relays.length,
       moonDone: this._moonState().done,
       moonCrew: this.mode === 'moon' ? (this.friends || []).length : 0,
+      moonHero: this.mode === 'moon' && this.hero ? { x: this.hero.position.x, z: this.hero.position.z } : null,
+      moonHealth: this.moonHealth || 0,
+      moonDefenseT: this.moonDefenseT || 0,
+      moonEnemies: (this.moonEnemies || []).length,
+      moonBossHp: this.moonEnemies?.find((enemy) => enemy.boss)?.hp || 0,
+      moonDefenseDone: !!this._moonState().defenseDone,
     };
   }
 
