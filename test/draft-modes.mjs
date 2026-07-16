@@ -3,6 +3,7 @@
 // Драфт-оверлей морозить цикл гри → після відкриття мусимо g.draft.pick(0), інакше зависання.
 // Гейт як у кампанії: у ?test драфт мовчить, вмикається лише з &draft.
 import { chromium } from 'playwright';
+import { waitFor as waitForAsync } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
@@ -15,15 +16,7 @@ const check = (ok, msg, detail = '') => {
   if (!ok) failed++;
 };
 
-async function waitFor(page, fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await fn()) return true;
-    await page.waitForTimeout(200);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (page, fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 200);
 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();

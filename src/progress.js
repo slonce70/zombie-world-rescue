@@ -476,8 +476,6 @@ export class DailyQuests {
     return this.list.filter((q) => !q.done).length + (this.megaUnlocked ? this.megaList.filter((q) => !q.done).length : 0);
   }
 
-  get doneCount() { return this.list.filter((q) => q.done).length; }
-
   // подія з гри: просуваємо відповідні завдання
   onEvent(ev, data = {}) {
     this.ensureToday();

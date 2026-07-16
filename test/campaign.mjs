@@ -1,30 +1,15 @@
 // Повне проходження кампанії від початку до кінця: усі країни поспіль
 // на одному сейві — місії, орди, боси, нагороди, прогресія.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, waitForPage } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
 const check = (cond, msg) => {
   console.log(cond ? '  ✅' : '  ❌', msg);
   if (!cond) failed++;
 };
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await page.evaluate(fn)) return true;
-    await page.waitForTimeout(350);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 
 await page.goto(`${BASE}/?test&fresh`);
 await waitFor(() => window.__game && window.__game.state === 'globe', 30000, 'глобус');
@@ -142,6 +127,5 @@ if (errors.length) {
   console.log('✅ Без помилок у консолі');
 }
 console.log(failed === 0 ? '🏆 КАМПАНІЮ ПРОЙДЕНО ВІД ПОЧАТКУ ДО КІНЦЯ' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

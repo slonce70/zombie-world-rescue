@@ -1,15 +1,8 @@
 // Тести оновлення 6 «Живі завдання»: динамічні місії з пулу, нові типи,
 // випадковий лут, перероздача після перемоги
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
 const check = (cond, msg) => {
@@ -237,6 +230,5 @@ if (errors.length) {
   console.log('✅ Без помилок у консолі');
 }
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 6 ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

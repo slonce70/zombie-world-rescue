@@ -1,21 +1,11 @@
 // 🦖 Загублений Острів (LOST) — фінальний бонус-рівень поза CAMPAIGN_ORDER.
 // Перевіряє: карту lostisland.js + біом prehistoric + вулкан-ландмарк + боса rex +
 // нагороду-лазер + ГЕЙТ розблокування (лише коли звільнено всі країни кампанії).
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+import { openBrowserTest, waitForPage } from './_browser.mjs';
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
 const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
-async function waitFor(fn, ms, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < ms) { if (await page.evaluate(fn)) return true; await page.waitForTimeout(350); }
-  console.log(`  ⚠️ Таймаут: ${label}`); return false;
-}
+const waitFor = (fn, ms, label) => waitForPage(page, fn, ms, label);
 
 console.log('▸ Острів Динозаврів (LOST)');
 await page.goto(`${BASE}/?test&fresh&country=LOST`, { waitUntil: 'commit', timeout: 60000 });
@@ -99,6 +89,5 @@ check(st.player.weapons.includes('laser'), 'ЛАЗЕР у арсеналі пі�
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 ОСТРІВ ДИНОЗАВРІВ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

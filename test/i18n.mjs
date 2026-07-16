@@ -1,10 +1,6 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
+const { BASE, page, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 let failed = 0;
@@ -199,6 +195,5 @@ check(mRu.some((s) => /Спаси|Почини|Зачисти/.test(s)), 'ru: м
 
 check(errs.length === 0, 'без JS-ошибок', errs.slice(0, 2).join('|'));
 console.log(failed === 0 ? '🎉 ЛОКАЛІЗАЦІЯ ПРАЦЮЄ' : `❌ ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

@@ -1,16 +1,10 @@
 // 🧛 Зомбі-вампір: 150 HP, швидкий НІЧНИЙ хижак (speed 1.7 / chase 4.0, dmg 14),
 // БЕЗ дальнього бою і БЕЗ щита. Зʼявляється лише вночі (nightK>0.5): нічний спавнер
 // у zombies.update() підсипає вампірів навколо гравця, доки живих < cap. Удень — пауза.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+import { openBrowserTest } from './_browser.mjs';
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
 const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 // FRA: ніч універсальна — вампір дозволений у будь-якій країні (гейт _allowVampire=true для всіх).
 await page.goto(`${BASE}/?test&fresh&country=FRA`, { waitUntil: 'commit', timeout: 60000 });
@@ -124,6 +118,5 @@ check(afterDay === 0, 'удень вампіри згоряють і гинут�
 console.log('');
 if (errors.length) { console.log('❌ ПОМИЛКИ КОНСОЛІ:'); for (const e of errors.slice(0, 10)) console.log('  ', e); failed += errors.length; }
 console.log(failed === 0 ? '🎉 ЗОМБІ-ВАМПІР ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

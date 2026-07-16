@@ -690,11 +690,6 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
   gap: 12px; margin-top: 12px;
   max-height: min(64vh, 620px); overflow-y: auto; padding-right: 6px;
 }
-.shop-cat {
-  grid-column: 1 / -1; text-align: left; color: var(--accent);
-  font-weight: 900; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;
-  margin-top: 6px; border-bottom: 1px solid var(--ui-border); padding-bottom: 4px;
-}
 .shop-item {
   position: relative;
   background: rgba(255,255,255,0.07); border: 2px solid var(--ui-border);
@@ -943,12 +938,6 @@ button.expedition-node:hover, .expedition-node.sel { border-color: #a78bfa; back
 .album-role { color: #cfe0f5; font-weight: 700; font-size: 12px; margin-top: 3px; }
 .album-flag { color: #9fb8d4; font-weight: 700; font-size: 12px; margin-top: 4px; }
 .album-hint { color: #9fb8d4; font-weight: 700; font-size: 11px; margin-top: 4px; line-height: 1.25; }
-.album-soon {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; padding: 48px 12px; text-align: center;
-}
-.album-soon-ico { font-size: 56px; opacity: 0.5; }
-.album-soon-text { color: var(--accent); font-weight: 900; font-size: 20px; letter-spacing: 1px; }
 /* 🥚 R5 «Колекція та яйця»: наступна ціль, рядок яєць, рівні петсів, лічильники еліт */
 .album-card { position: relative; }
 .album-card.next { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,210,63,.35), 0 0 14px rgba(255,210,63,.35); }
@@ -1490,7 +1479,6 @@ body.touch-mode #touch-coach.show { display: block; }
   .shop-icon { font-size: 22px; }
   .shop-name { font-size: 13px; margin-top: 2px; }
   .shop-desc { font-size: 10px; min-height: 0; }
-  .shop-cat { font-size: 11px; margin-top: 2px; }
   #overlay-wardrobe .overlay-card { display: flex; flex-direction: column; max-height: calc(100dvh - 16px); padding: 10px 16px; }
   #overlay-wardrobe .panel-header h2 { font-size: 26px; }
   #wardrobe-content { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 4px; }

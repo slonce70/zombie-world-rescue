@@ -1,17 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game, null, { timeout: 30000 });
@@ -399,8 +390,7 @@ const loseInfo = await page.evaluate(() => ({
 check(loseInfo.title.includes('БОС СИЛЬНІШИЙ') && loseInfo.deathT === -1,
   'смерть у світовому босі завершує забіг без респавну', JSON.stringify(loseInfo));
 
-await browser.close();
-closeServer();
+await closeTest();
 if (errors.length) {
   console.error(errors.join('\n'));
   failed += errors.length;

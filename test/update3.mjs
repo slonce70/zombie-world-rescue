@@ -1,14 +1,7 @@
 // Тести оновлення 3: щитоносець, базука, магазин 2.0, броня, бафи, Німеччина, Франція
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, waitFor as waitForAsync } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
-const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
 const check = (cond, msg) => {
@@ -16,15 +9,7 @@ const check = (cond, msg) => {
   if (!cond) failed++;
 };
 const state = () => page.evaluate(() => window.__game.test.state());
-async function waitFor(fn, timeoutMs, label) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeoutMs) {
-    if (await fn()) return true;
-    await page.waitForTimeout(300);
-  }
-  console.log(`  ⚠️ Таймаут: ${label}`);
-  return false;
-}
+const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 async function loadCountry(c, extra = '') {
   await page.goto(`${BASE}/?test&fresh&country=${c}${extra}`);
   await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'level', 30000, 'рівень ' + c);
@@ -400,6 +385,5 @@ check(campaign.order.length >= 8 && campaign.order[0] === 'UKR' && new Set(campa
 console.log('');
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 3 ПРОЙДЕНО' : `❌ ПРОВАЛЕНО: ${failed}`);
 console.log(errors.length ? 'CONSOLE ERRORS:\n' + errors.slice(0, 10).join('\n') : 'NO CONSOLE ERRORS');
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && errors.length === 0 ? 0 : 1);

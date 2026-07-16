@@ -24,7 +24,7 @@ import {
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
-import { Bus, RNG } from './utils.js';
+import { Bus, RNG, disposeObject } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
@@ -123,7 +123,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 519;
+const APP_VERSION = 520;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1847,25 +1847,11 @@ class Game {
     hp.cam.lookAt(0, 1.05, 0);
   }
 
-  // звільняємо унікальну per-instance гео/матеріали рига (запечене тіло — НЕ shared),
-  // спільні кеші (userData.shared) лишаємо. Інакше кожна правка в редакторі тече по GPU.
-  _freeRig(group) {
-    if (!group) return;
-    group.traverse((o) => {
-      if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
-      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
-        if (!m || (m.userData && m.userData.shared)) return;
-        if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
-        m.dispose();
-      });
-    });
-  }
-
   _rebuildHeroPreview() {
     const hp = this._heroPrev;
     if (!hp) return;
     hp.scene.remove(hp.rig.group);
-    this._freeRig(hp.rig.group); // не лишаємо запечену гео старого рига в пам'яті GPU
+    disposeObject(hp.rig.group); // не лишаємо запечену гео старого рига в пам'яті GPU
     hp.rig = makeHero('custom', this.save.hero);
     this._setHeroPreviewView(hp.view);
     this._setHeroPreviewPose(hp.pose);
@@ -1876,7 +1862,7 @@ class Game {
     const hp = this._heroPrev;
     if (!hp) return;
     cancelAnimationFrame(hp.raf);
-    this._freeRig(hp.rig.group);
+    disposeObject(hp.rig.group);
     // r160 dispose() НЕ звільняє WebGL-контекст — форсимо, інакше ~16 контекстів і канвас гасне
     if (hp.renderer.forceContextLoss) hp.renderer.forceContextLoss();
     hp.renderer.dispose();

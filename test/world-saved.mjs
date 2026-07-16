@@ -2,15 +2,9 @@
 // «Герой» в Альбомі. Тригер виділено у публічний game._maybeWorldSaved() — тест підробляє
 // 12/12 звільнених БЕЗ worldSaved і перевіряє: показ, +50💎, медаль 'WORLD', worldSaved=1,
 // одноразовість, кнопку «Ура!» і лічильники профілю героя проти підробленого save.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let fail = 0;
 const check = (ok, msg, x = '') => { console.log((ok ? '  ✅' : '  ❌') + ' ' + msg, x); if (!ok) fail++; };
@@ -99,6 +93,5 @@ check(hero.worldMedalRevealed, 'медаль 🌍 «Рятівник світу�
 
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 3).join(' | '));
 console.log(fail === 0 ? '\n🎉 СВІТ ВРЯТОВАНО OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(fail ? 1 : 0);
