@@ -3179,7 +3179,7 @@ export class World {
         merlon.rotation.y = -ba;
         this.staticGroup.add(merlon);
       }
-      this._addCollider(tx, tz, 4.1, ty + h, 3.7);
+      this._addCollider(tx, tz, 4.1, ty + h - 0.2, 3.7);
     }
     // високі мури; отвори лишаємо тільки під головну браму (+Z) і підземелля (-X)
     // кратність 4 тримає ворота й підземелля точно на центрах секцій за будь-якого масштабу

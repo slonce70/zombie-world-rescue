@@ -1661,6 +1661,7 @@ export class Zombies {
   _moveAndAnimateZombie(z, dt, distP, dxP, dzP, tp) {
     const st = z.stats;
     const rig = z.rig;
+    const startX = z.x, startZ = z.z;
     let targetX = null, targetZ = null, spd = 0;
     if (z.state === 'flee') {
       targetX = z.x - dxP;
@@ -1752,12 +1753,14 @@ export class Zombies {
       if (Math.abs(z.kbX) + Math.abs(z.kbZ) < 0.04) z.kbX = z.kbZ = 0;
     }
     // колізії зі світом
-    const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8);
+    const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8, z.y);
     z.x = solved.x;
     z.z = solved.z;
     const gh = z.zone === 'castle-dungeon' ? this.world.dungeonGroundH(z.x, z.z) : this.world.groundH(z.x, z.z);
     z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
     z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
+    const movedX = z.x - startX, movedZ = z.z - startZ;
+    moving = spd > 0 && movedX * movedX + movedZ * movedZ > 1e-8;
 
     // --- поворот і анімація ---
     let faceX = 0, faceZ = 0;
@@ -1765,8 +1768,8 @@ export class Zombies {
       faceX = dxP; faceZ = dzP;
     } else if (z.charging > 0) {
       faceX = z.chargeDX; faceZ = z.chargeDZ;
-    } else if (moving && targetX !== null) {
-      faceX = targetX - z.x; faceZ = targetZ - z.z;
+    } else if (moving) {
+      faceX = movedX; faceZ = movedZ;
     }
     if (faceX !== 0 || faceZ !== 0) {
       const targetYaw = Math.atan2(-faceX, -faceZ);
