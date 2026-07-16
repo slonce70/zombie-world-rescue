@@ -1525,7 +1525,7 @@ export class DynamicMissions {
 
   _shipTarget(m) {
     if (m.phase === 'find') return m.boards;
-    if (m.phase === 'rescue') return m.shore;
+    if (m.phase === 'sailing' || m.phase === 'rescue' || m.phase === 'return-board') return m.shore;
     return m.dock;
   }
 
