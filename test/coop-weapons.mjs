@@ -1,18 +1,12 @@
 // Co-op weapon regressions: network-visible weapon ids, continuous weapons from guest,
 // and host-side shot validation.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 
 let failed = 0;
-const check = (cond, msg, extra = '') => {
-  console.log(cond ? '  ✅' : '  ❌', msg, extra);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1000, height: 700 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
@@ -192,8 +186,7 @@ try {
   failed++;
   console.error('❌ ТЕСТ ВПАВ:', e.message);
 } finally {
-  await browser.close();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failed === 0 ? '\n🎉 COOP WEAPONS: мережеві регресії закриті' : `\n💥 COOP WEAPONS провалів: ${failed}`);

@@ -30,7 +30,7 @@ export const STORY_DELEGATE_MATCHES = {
   // невдалому ролі ціль лишиться без місії-делегата і бос не відкриється.
   'deu-workshop': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
   'deu-convoy': { preferred: ['convoy'] },
-  'deu-gate': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
+  'deu-gate': { preferred: ['defense'], compatible: ['clear', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
   'deu-barracks': { preferred: ['barracks'] },
   // 🇫🇷 фірмова balloon (слоти A/C) — та сама страховка широкими списками
   'fra-kitchen': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },

@@ -2,11 +2,11 @@
 //  - шаман (125 HP) воскресає ОДИН раз (перша смерть не вбиває), друга — вбиває;
 //  - тотем-пікап будується й дає гравцю заряд воскресіння;
 //  - гравець із тотемом воскресає замість гинути (раз), потім гине.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 // POL: difficulty.dmg 1.15 > 1 → шаман дозволений (гейт як у привида)
 await page.goto(`${BASE}/?test&fresh&country=POL`, { waitUntil: 'commit', timeout: 60000 });

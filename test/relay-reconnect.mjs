@@ -1,4 +1,5 @@
 // Relay-протокол: reconnect має замінювати старий сокет тим самим pid навіть у повній кімнаті.
+import { setTimeout as sleep } from 'node:timers/promises';
 import WebSocket from 'ws';
 import { spawnRelay } from './_relay.mjs';
 
@@ -9,7 +10,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const relay = await spawnRelay(PORT);
 

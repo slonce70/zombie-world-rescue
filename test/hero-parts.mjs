@@ -1,14 +1,8 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage();
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 720 } }, captureErrors: false });
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  OK' : '  FAIL'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 page.on('pageerror', (e) => { console.log('PAGEERROR:', e.message); failed++; });
 
@@ -54,6 +48,5 @@ check(res.faceClearance.cap >= 0.34 && res.faceClearance.beanie >= 0.32
   && res.faceClearance.ears >= 0.32 && res.faceClearance.party >= 0.36,
   'hat fronts stay above the face', JSON.stringify({ all: res.hatClearance, face: res.faceClearance }));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

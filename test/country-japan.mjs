@@ -1,8 +1,8 @@
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 console.log('▸ Японія (JPN)');
 // завантаження рівня JPN = перевірка карти japan.js + біому sakura + ландмарків торії/пагода

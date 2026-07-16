@@ -2,12 +2,12 @@
 // «Герой» в Альбомі. Тригер виділено у публічний game._maybeWorldSaved() — тест підробляє
 // 12/12 звільнених БЕЗ worldSaved і перевіряє: показ, +50💎, медаль 'WORLD', worldSaved=1,
 // одноразовість, кнопку «Ура!» і лічильники профілю героя проти підробленого save.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let fail = 0;
-const check = (ok, msg, x = '') => { console.log((ok ? '  ✅' : '  ❌') + ' ' + msg, x); if (!ok) fail++; };
+const check = makeCheck(() => fail++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

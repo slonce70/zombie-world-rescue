@@ -1,10 +1,10 @@
 // 🦖 Загублений Острів (LOST) — фінальний бонус-рівень поза CAMPAIGN_ORDER.
 // Перевіряє: карту lostisland.js + біом prehistoric + вулкан-ландмарк + боса rex +
 // нагороду-лазер + ГЕЙТ розблокування (лише коли звільнено всі країни кампанії).
-import { openBrowserTest, waitForPage } from './_browser.mjs';
+import { openBrowserTest, waitForPage, makeCheck } from './_browser.mjs';
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 const waitFor = (fn, ms, label) => waitForPage(page, fn, ms, label);
 
 console.log('▸ Острів Динозаврів (LOST)');

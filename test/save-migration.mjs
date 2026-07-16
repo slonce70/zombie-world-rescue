@@ -1,13 +1,14 @@
 // Гард міграції сейва: найвідповідальніший шлях (втрата прогресу дитини).
 // Перевіряємо, що historичні/биті форми сейва не кидають винятку і коректно
 // мігрують. Потрібна статика на 8741.
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
 async function loadWith(raw) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

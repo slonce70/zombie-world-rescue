@@ -1,14 +1,11 @@
 // Тести мобільного оновлення (Task 1): режим «Малюк» — лише м'яка допомога
 // прицілу, БЕЗ автовогню й гарантованого хедшоту. Десктоп не зачіпається.
-import { openBrowserTest, waitFor as waitForAsync } from './_browser.mjs';
+import { openBrowserTest, waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 412, height: 915 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 
 // ============ 🐣 Режим Малюк: без автовогню ============

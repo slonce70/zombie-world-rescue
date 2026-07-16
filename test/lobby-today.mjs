@@ -1,11 +1,12 @@
 // Денний лічильник «скільки людей сьогодні заходило грати» (Lobby DO / dev-relay).
 // Перевіряємо унікальність по cid і дедуп. node test/lobby-today.mjs
+import { makeCheck } from './_browser.mjs';
 import { spawnRelay } from './_relay.mjs';
 
 const PORT = 8756;
 const API = `http://localhost:${PORT}`;
 let failed = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 const relay = await spawnRelay(PORT);
 const ping = (cid, nick) => fetch(`${API}/lobby/ping`, {

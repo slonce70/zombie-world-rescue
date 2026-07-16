@@ -1,10 +1,10 @@
 // 🕊️ R3 (v289) «Невидиме милосердя»: 2+ смерті поспіль на одній країні кампанії → наступний
 // забіг там дістає тихі послаблення (+50% аптечок, −1 еліт у хвилі, −10% HP зомбі).
 // КЛЮЧОВЕ: жодного UI («easy mode» ображає дитину). Перемога скидає лічильник.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 

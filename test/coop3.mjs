@@ -1,10 +1,8 @@
 // 🤝 Кооп-тест 3: приєднання ПОСЕРЕД гри + реконект після розриву звʼязку
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openCoopTest } from './_browser.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdirSync } from 'fs';
-import { spawnRelay } from './_relay.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer({ port: 8761 });
 const RELAY_PORT = 8747;
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~4× повільніше, тож фіксовані очікування мають чекати пропорційно довше.
@@ -16,18 +14,13 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = {
   args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false, server: { port: 8761 } });
 const errsA = [];
 const errsB = [];
 A.on('pageerror', (e) => errsA.push(e.message));
@@ -126,10 +119,7 @@ try {
   await A.screenshot({ path: 'shots/coop3-fail-A.png' }).catch(() => {});
   await B.screenshot({ path: 'shots/coop3-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ТЕСТ 3 (mid-join + реконект) ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

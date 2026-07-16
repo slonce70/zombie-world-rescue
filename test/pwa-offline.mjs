@@ -1,12 +1,9 @@
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, ctx, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1024, height: 768 } } });
 
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, extra);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

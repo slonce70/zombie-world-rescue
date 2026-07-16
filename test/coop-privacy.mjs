@@ -1,12 +1,9 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(ok ? '  ✅' : '  ❌', msg, x); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&lang=en`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
@@ -76,6 +73,5 @@ state = await page.evaluate(() => {
 });
 check(state.saved === '1' && state.announce?.code === 'ABC123', 'opt-in announces public room', JSON.stringify(state));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

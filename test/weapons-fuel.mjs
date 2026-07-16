@@ -2,7 +2,7 @@
 // руйнування щита вогнеметом (+маркер типу «вогонь» для v47), поповнення, HUD-паливо.
 // Headless RAF буває 1-3 fps — тому дренаж і reload перевіряємо детермінованими
 // кроками _fireContinuous(), а не wall-clock очікуванням браузерного кадру.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, closeTest } = await openBrowserTest({ context: { viewport: { width: 1000, height: 700 } } });
 const errs = [];
@@ -10,7 +10,7 @@ page.on('pageerror', (e) => errs.push('PAGEERROR: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE: ' + m.text()); });
 
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });

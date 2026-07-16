@@ -1,15 +1,12 @@
 // Авто-оновлення PWA: тег версії, авто-reload на нову версію, анти-цикл.
 // Тепер із перевірками й кодом виходу.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+import { openBrowserTest, makeCheck } from './_browser.mjs';
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
 const ignoreExpectedReloadRace = (e) => {
   if (!/Execution context was destroyed|navigation/i.test(String(e && e.message))) throw e;
@@ -62,6 +59,5 @@ const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3
 check(realErrors.length === 0, `без JS-помилок консолі (${realErrors.length})`);
 if (realErrors.length) console.log('ERRORS:\n' + realErrors.join('\n'));
 console.log(failed === 0 ? '\n🎉 ВЕРСІЮВАННЯ ОК' : `\n❌ ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 && realErrors.length === 0 ? 0 : 1);

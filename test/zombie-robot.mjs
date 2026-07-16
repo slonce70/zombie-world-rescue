@@ -1,10 +1,10 @@
 // 🤖 Зомбі-робот (мех із пілотом): 1255 HP, меч 20 зблизька + гармата 10 здаля,
 // при смерті ВИБУХАЄ й б'є гравця 157 по площі (~6м).
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 // FRA: difficulty.hp 1.8 >= 1.5 → робот дозволений (гейт важких ворогів)
 await page.goto(`${BASE}/?test&fresh&country=FRA`, { waitUntil: 'commit', timeout: 60000 });

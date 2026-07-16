@@ -1,5 +1,6 @@
 // 💾🚑 v15 «Надійний світ»: хмарний сейв, код відновлення, файл-копія,
 // аварійний екран. Сам піднімає dev-relay (у ньому — dev-SaveVault).
+import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { spawnRelay } from './_relay.mjs';
 import { ensureWebServer } from './_server.mjs';
@@ -20,7 +21,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // CI під навантаженням (SLOW=4): relay-раунд-тріпи й перезавантаження повільніші — масштабуємо чекання
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);

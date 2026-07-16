@@ -5,13 +5,13 @@
 //  (4) коли Ікс-рей згасає — привиди знову невидимі;
 //  (5) у магазині є товар xray за 1000.
 import { chromium } from 'playwright';
-import { waitForPage } from './_browser.mjs';
+import { waitForPage, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const waitFor = (page, fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

@@ -1,3 +1,4 @@
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
@@ -9,10 +10,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 let failed = 0;
-const check = (ok, label, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', label, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 try {
   console.log('▸ Бойовий імпульс: browser integration');

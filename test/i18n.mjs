@@ -1,10 +1,10 @@
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(ok ? '  ✅' : '  ❌', msg, x); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 // 1. украинский (явно: headless-браузер має navigator.language=en — автодетект дасть en)
 await page.goto(`${BASE}/?test&fresh`);

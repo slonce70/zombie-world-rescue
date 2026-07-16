@@ -1,11 +1,9 @@
 // ⛈️🤝 Кооп-тест 5: Шторм разом — дзеркало кола, масштаб хвиль,
 // «лежи і чекай підняття», фінал «всі впали»
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawn } from 'child_process';
+import { openCoopTest } from './_browser.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdirSync } from 'fs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8751;
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
@@ -14,24 +12,15 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);
 
-const relay = spawn('node', ['relay/dev-relay.mjs'], {
-  env: { ...process.env, PORT: String(RELAY_PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-await sleep(600);
 
 const LAUNCH = {
   args: ['--use-angle=swiftshader', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false });
 const errsA = [];
 const errsB = [];
 A.on('pageerror', (e) => errsA.push(e.message));
@@ -155,10 +144,7 @@ try {
   await A.screenshot({ path: 'shots/coop5-fail-A.png' }).catch(() => {});
   await B.screenshot({ path: 'shots/coop5-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП-ШТОРМ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

@@ -1,7 +1,7 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { spawn } from 'child_process';
 
 const BETWEEN_TESTS_MS = Number(process.env.QUICK_RELEASE_BETWEEN_TESTS_MS || 200);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const suite = [
   ['node', ['test/version-sync.mjs']],

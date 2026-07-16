@@ -1,9 +1,9 @@
 // 🎲 Мутатор тижня в соло-реплеях кампанії: ніч форситься, магазин закривається,
 // навала прискорює хвилі орди; перше проходження країни — без мутатора.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, captureConsole: false, pageErrorPrefix: '' });
 
 const startCountry = async (mod, countryId) => {

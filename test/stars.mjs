@@ -1,13 +1,14 @@
 // ⭐ R3 (v289) «Зірки та милосердя»: 3 зірки за країну кампанії.
 //  ⭐1 перемога · ⭐2 вторинна ціль забігу (data-driven, трекається на HUD) · ⭐3 без смертей.
 //  Реплей тримає MAX. Ретро-міграція дає 1⭐ вже звільненим країнам. Пороги 12/24/36 — раз.
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const errors = [];
 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

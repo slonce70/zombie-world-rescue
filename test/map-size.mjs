@@ -1,16 +1,10 @@
-import { chromium } from 'playwright';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 import { mkdirSync } from 'fs';
-import { ensureWebServer } from './_server.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 let failed = 0;
-const check = (ok, msg, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe');
@@ -86,6 +80,5 @@ check(runtime.mode === 'small' && Math.abs(runtime.bound - 133.3333333) < 0.001,
 check(runtime.castleEdge < runtime.bound,
 'замок повністю залишається всередині маленької карти', JSON.stringify(runtime));
 
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed ? 1 : 0);

@@ -1,12 +1,9 @@
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const SAVE_KEY = 'zr-save-v1';
 const { BASE, browser, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

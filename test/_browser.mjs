@@ -1,12 +1,14 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
+import { spawnRelay } from './_relay.mjs';
 
 export async function openBrowserTest({
   viewport = { width: 1280, height: 800 },
   launch = { args: ['--use-angle=swiftshader'] },
   context = {},
   server = {},
+  captureErrors = true,
   captureConsole = true,
   pageErrorPrefix = 'PAGEERROR: ',
 } = {}) {
@@ -15,13 +17,38 @@ export async function openBrowserTest({
   const ctx = await browser.newContext({ viewport, ...context });
   const page = await ctx.newPage();
   const errors = [];
-  if (captureConsole) page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(`${pageErrorPrefix}${e.message}`));
+  if (captureErrors && captureConsole) page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  if (captureErrors) page.on('pageerror', (e) => errors.push(`${pageErrorPrefix}${e.message}`));
   const closeTest = async () => {
     await browser.close();
     closeServer();
   };
   return { BASE, browser, ctx, page, errors, closeTest };
+}
+
+export async function openCoopTest({
+  relayPort,
+  launch = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] },
+  context = { viewport: { width: 1280, height: 800 } },
+  server = {},
+  captureErrors = true,
+} = {}) {
+  const { base: BASE, close: closeServer } = await ensureWebServer(server);
+  const relay = await spawnRelay(relayPort);
+  const [browserA, browserB] = await Promise.all([chromium.launch(launch), chromium.launch(launch)]);
+  const [ctxA, ctxB] = await Promise.all([browserA.newContext(context), browserB.newContext(context)]);
+  const [A, B] = await Promise.all([ctxA.newPage(), ctxB.newPage()]);
+  const errors = [];
+  if (captureErrors) for (const page of [A, B]) {
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('pageerror', (e) => errors.push(e.message));
+  }
+  const closeTest = async () => {
+    await Promise.allSettled([browserA.close(), browserB.close()]);
+    relay.kill();
+    closeServer();
+  };
+  return { BASE, RELAY: `ws://localhost:${relayPort}`, A, B, errors, closeTest };
 }
 
 export function makeCheck(onFailure) {

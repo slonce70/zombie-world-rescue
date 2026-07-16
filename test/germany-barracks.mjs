@@ -1,10 +1,7 @@
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base, close } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const { BASE: base, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1440, height: 900 } }, captureErrors: false });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -25,6 +22,9 @@ try {
     const g = window.__game;
     const story = g.level.missions;
     const mission = story.delegate.get('barracks');
+    const gateObjective = story.objectives.find((o) => o.id === 'deu-gate');
+    const gateMission = story._delegateMissionForObjective(gateObjective);
+    const gateSite = g.level.country.map.storySites.cityGate;
     const before = g.level.zombies.list.filter((z) => z.barracksSpawn).length;
     story.delegate.update(20, g.input, true);
     return {
@@ -35,17 +35,25 @@ try {
       collider: g.level.world.colliders.includes(mission.barracks.collider),
       occluder: g.level.world.occluders.includes(mission.barracks.occluder),
       before,
+      gateType: gateMission.type,
+      gateAtSite: gateMission.zone.x === gateSite.x && gateMission.zone.z === gateSite.z,
     };
   });
   assert(state.ids.join(',') === 'deu-workshop,deu-convoy,deu-gate,deu-barracks', 'казарма є четвертим сюжетним завданням Німеччини', JSON.stringify(state));
   assert(state.state === 'locked' && state.hp === 2500, 'казарма має 2500 HP і спочатку заблокована', JSON.stringify(state));
   assert(state.before === 0 && state.after === 0, 'заблокована казарма не випускає зомбі');
   assert(state.collider && state.occluder, 'казарма має фізичну й кульову перешкоду');
+  assert(state.gateType === 'defense' && state.gateAtSite, 'штурм брами запускає оборону саме біля міської брами', JSON.stringify(state));
 
   state = await page.evaluate(() => {
     const g = window.__game;
-    for (const id of ['deu-workshop', 'deu-convoy', 'deu-gate']) g.test.completeStoryObjective(id);
     const story = g.level.missions;
+    for (const id of ['deu-workshop', 'deu-convoy']) g.test.completeStoryObjective(id);
+    const gate = story.delegate.get('defense');
+    g.test.teleport(gate.zone.x, gate.zone.z);
+    story.update(0.01, g.input, true);
+    gate.timer = 0.01;
+    story.update(0.02, g.input, true);
     const mission = story.delegate.get('barracks');
     mission.spawnFastT = 2;
     mission.spawnGiantT = 7;
@@ -59,8 +67,10 @@ try {
       fast: spawned.filter((z) => z.type === 'runner' || z.type === 'walker').length,
       giants: spawned.filter((z) => z.type === 'tank').length,
       types: spawned.map((z) => z.type),
+      gateState: story.get('deu-gate').state,
     };
   });
+  assert(state.gateState === 'done', '45 секунд оборони завершують сюжетне завдання брами', JSON.stringify(state));
   assert(state.objectiveState === 'active' && state.missionState === 'active', 'після трьох завдань казарма стає активною', JSON.stringify(state));
   assert(state.fast === 3 && state.giants === 1, 'за 7 секунд виходять 3 бігуни/волоцюги та 1 велетень', JSON.stringify(state));
   assert(/2500/.test(state.title), 'HUD показує живі HP казарми', state.title);
@@ -113,6 +123,5 @@ try {
   assert(errors.length === 0, 'у браузері немає помилок', errors.join('\n'));
   console.log('✅ Germany barracks mission pass');
 } finally {
-  await browser.close();
-  close();
+  await closeTest();
 }

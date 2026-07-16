@@ -1,3 +1,4 @@
+import { makeCheck } from './_browser.mjs';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
@@ -7,10 +8,7 @@ const mod = await import('data:text/javascript;base64,' + Buffer.from(src).toStr
 const { MOMENTUM_TIERS, advanceMomentum, momentumProgress, momentumStats, momentumTier, tickMomentum } = mod;
 
 let failed = 0;
-const check = (ok, label, detail = '') => {
-  console.log(ok ? '  ✅' : '  ❌', label, detail);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 console.log('▸ Бойовий імпульс: pure rules');
 check(MOMENTUM_TIERS.map((x) => x.at).join(',') === '0,5,10,20', 'пороги 0/5/10/20');

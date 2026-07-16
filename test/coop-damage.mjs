@@ -3,16 +3,13 @@
 // у соло-рівні, фіксуємо падіння HP. Потім мокаємо level.players до 2 гравців
 // (coopMul() → 2) і повторюємо: падіння HP має бути ІДЕНТИЧНИМ.
 // Якщо хтось поверне `* this.coopMul()` у damage-вираз — друга доза стане ×2 і тест впаде.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 
 let failed = 0;
-const check = (cond, msg) => { console.log(cond ? '  ✅' : '  ❌', msg); if (!cond) failed++; };
+const check = makeCheck(() => failed++);
 
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1024, height: 768 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
@@ -98,8 +95,7 @@ try {
   failed++;
   console.error('❌ ТЕСТ ВПАВ:', e.message);
 } finally {
-  await browser.close();
-closeServer();
+  await closeTest();
 }
 
 console.log(failed === 0 ? '\n🎉 COOP-DAMAGE: F6 ПІДТВЕРДЖЕНО' : `\n💥 COOP-DAMAGE провалів: ${failed}`);

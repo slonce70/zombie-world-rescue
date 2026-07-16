@@ -1,11 +1,12 @@
 // 🤝 Командна ліга (coopstorm) + «топ-3 сьогодні» — HTTP-тест проти dev-relay.
 // Дзеркалить семантику League/Lobby DO з worker/relay-worker.js. node test/team-league.mjs
+import { makeCheck } from './_browser.mjs';
 import { spawnRelay } from './_relay.mjs';
 
 const PORT = 8759;
 const API = `http://localhost:${PORT}`;
 let failed = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 const submit = (body) => fetch(`${API}/league/submit`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },

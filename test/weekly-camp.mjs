@@ -2,12 +2,12 @@
 // (соло/кооп — локальні), клейм → +🥚+🍖 і claimed, БЕЗ FOMO (зміна тижня без клейму —
 // нагорода лишається; після клейму — новий квест), ретро-безпека (старий сейв без weeklyCamp).
 // Плюс перевірки hintOnce (по разу, збереження у save.hints).
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 900 } }, pageErrorPrefix: '' });
 
 let failed = 0;
-const check = (ok, msg, d = '') => { console.log(ok ? '  ✅' : '  ❌', msg, d); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

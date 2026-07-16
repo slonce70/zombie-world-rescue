@@ -1,12 +1,9 @@
 import { readFileSync } from 'fs';
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const root = new URL('..', import.meta.url);
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(ok ? '  ✅' : '  ❌', msg, extra);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 console.log('▸ Mobile a11y: static PWA and live-region semantics');
 const index = readFileSync(new URL('index.html', root), 'utf8');

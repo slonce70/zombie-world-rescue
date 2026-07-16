@@ -6,7 +6,7 @@
 //  (5) арена-бос виходить на ЧИСТУ землю Колізею (прохідність — не застряг у геометрії);
 //  (6) звільнення ITA дає ЛАЗЕР.
 import { chromium } from 'playwright';
-import { waitForPage } from './_browser.mjs';
+import { waitForPage, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -15,7 +15,7 @@ const { base: BASE, close: closeServer } = await ensureWebServer();
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '  ✅' : '  ❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const waitFor = (page, fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs * SLOW, label);
 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

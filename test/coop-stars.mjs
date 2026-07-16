@@ -6,6 +6,7 @@
 // (г) «гість падав» (свій лічильник падінь = 1) → у гостя нема ⭐3, а в хоста (0 падінь) є.
 //
 // Милосердя (mercy) лишається соло-only — у коопі його не чіпаємо (тут не перевіряємо).
+import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 import { ensureWebServer } from './_server.mjs';
 import { mkdirSync } from 'fs';
@@ -21,7 +22,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const relay = await spawnRelay(RELAY_PORT);
 

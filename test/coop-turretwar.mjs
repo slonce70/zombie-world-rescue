@@ -1,31 +1,14 @@
 // 🗼🌐 Оборона турелі в коопі: гість-mirror, HP турелей їдуть снапшотом snap.m,
 // молот гостя летить хосту подією twh (з клампом і перевіркою близькості),
 // фінал вирішує хост подією twend.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawnRelay } from './_relay.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openCoopTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8768;
-const RELAY = `ws://localhost:${RELAY_PORT}`;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const relay = await spawnRelay(RELAY_PORT);
-const LAUNCH = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, RELAY, A, B, errors, closeTest } = await openCoopTest({ relayPort: RELAY_PORT });
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (const p of [A, B]) {
-  p.on('pageerror', (e) => errors.push(e.message));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-}
+const check = makeCheck(() => failed++);
 // зомбі-хвилі йдуть на гравців — god PRE-ARM інтервалом ДО старту рівня
 const prearm = (p) => p.evaluate(() => {
   window.__prearm = setInterval(() => { try { window.__game.test.god(); } catch (e) { /* рівень ще не готовий */ } }, 250);
@@ -136,10 +119,7 @@ try {
 } finally {
   await A.evaluate(() => clearInterval(window.__prearm)).catch(() => {});
   await B.evaluate(() => clearInterval(window.__prearm)).catch(() => {});
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 const realErrs = errors.filter((e) => !e.includes('favicon'));

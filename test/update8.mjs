@@ -1,25 +1,19 @@
 // 🇹🇷🇪🇬🌙 Тести оновлення 8: Туреччина, Єгипет, цикл день/ніч, мумії, піраміда
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 import { mkdirSync } from 'fs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 // SLOW=N множить таймаути/вікна часу: на CI-ранері з софтверним рендером ігровий
 // час тече ~N× повільніше, тож фіксовані очікування мусять чекати у N× довше.
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failed = 0;
-const check = (ok, name) => {
-  console.log(`  ${ok ? '✅' : '❌'} ${name}`);
-  if (!ok) failed++;
-};
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const check = makeCheck(() => failed++);
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ===== 🇹🇷 ТУРЕЧЧИНА =====
 console.log('▸ Туреччина');
@@ -193,6 +187,5 @@ if (realErrors.length) {
   console.log('✅ Без помилок у консолі');
 }
 console.log(failed === 0 ? '🎉 УСІ ТЕСТИ ОНОВЛЕННЯ 8 ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

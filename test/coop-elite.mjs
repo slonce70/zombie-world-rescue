@@ -2,12 +2,10 @@
 // (а) у гостя існують puppet-еліти з еліт-прапорами; (б) телеграф-банер на ОБОХ;
 // (в) по зачистці нагорода (монети+кристали) нарахована ОБОМ локально;
 // (г) повний state зберігає елітний прапор для mid-join/reconnect.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openCoopTest } from './_browser.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdirSync } from 'fs';
-import { spawnRelay } from './_relay.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8769; // унікальний серед coop*-тестів (зайняті: 8743/45/47/52/63/65/67/68)
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
@@ -17,19 +15,14 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = {
   args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding'],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false });
 const errsA = [];
 const errsB = [];
 A.on('pageerror', (e) => errsA.push(e.message));
@@ -139,10 +132,7 @@ try {
   await A.screenshot({ path: 'shots/coop-elite-fail-A.png' }).catch(() => {});
   await B.screenshot({ path: 'shots/coop-elite-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 КООП «ЕЛІТИ РАЗОМ» ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

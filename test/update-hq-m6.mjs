@@ -1,13 +1,10 @@
 // Тести M6: «Зроби свого героя» — кастом-скін + кольори з save.hero (пресети не чіпаємо)
-import { openBrowserTest, waitFor as waitForAsync } from './_browser.mjs';
+import { openBrowserTest, waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 async function loadCountry(c, extra = '') {
   await page.goto(`${BASE}/?test&fresh&country=${c}${extra}`);

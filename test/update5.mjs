@@ -1,14 +1,11 @@
 // Тести оновлення 5 «Сила і Краса»: баланс, оптика, самокат-фізика,
 // гаджет-лоадаут, нові зомбі (стрілець/броньовик), магазин із вкладками, дахи
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 async function loadCountry(c) {
   await page.goto(`${BASE}/?test&fresh&country=${c}`);
   await page.waitForFunction(() => window.__game?.state === 'level' && window.__game.level, null, { timeout: 30000 });

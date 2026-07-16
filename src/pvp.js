@@ -1,6 +1,5 @@
-import * as THREE from 'three';
 import { t } from './i18n.js';
-import { clampActorToRect, clampZombieToRect } from './roomkit.js';
+import { buildRectArena, clampActorToRect, clampZombieToRect } from './roomkit.js';
 
 export const PVP_UNLOCK_COUNTRIES = 8;
 export const OVERLOADED_PVP_UNLOCK_COUNTRIES = 8;
@@ -87,28 +86,11 @@ export class PvpMode {
   }
 
   _buildRoom() {
-    const { level, cx, cz, _half: h } = this;
-    const wallM = new THREE.MeshStandardMaterial({ color: 0x3a2638, roughness: 0.85, metalness: 0.05 });
-    const railM = new THREE.MeshStandardMaterial({ color: 0xb86cff, roughness: 0.5, metalness: 0.1 });
-    const floorM = new THREE.MeshStandardMaterial({ color: 0x2d3346, roughness: 0.9 });
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(this.roomSize, 0.18, this.roomSize), floorM);
-    floor.position.set(cx, level.world.groundH(cx, cz) - 0.08, cz);
-    floor.receiveShadow = true;
-    level.scene.add(floor);
-    const mkWall = (x, z, sx, sz) => {
-      const y = level.world.groundH(x, z) + 1.4;
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.8, sz), wallM);
-      wall.position.set(x, y, z);
-      wall.castShadow = true;
-      wall.receiveShadow = true;
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.12, sz + 0.03), railM);
-      stripe.position.set(x, y + 0.25, z);
-      level.scene.add(wall, stripe);
-    };
-    mkWall(cx, cz - h, this.roomSize, 0.35);
-    mkWall(cx, cz + h, this.roomSize, 0.35);
-    mkWall(cx - h, cz, 0.35, this.roomSize);
-    mkWall(cx + h, cz, 0.35, this.roomSize);
+    buildRectArena(this.level, this.cx, this.cz, this.roomSize, {
+      wall: { color: 0x3a2638, roughness: 0.85, metalness: 0.05 },
+      rail: { color: 0xb86cff, roughness: 0.5, metalness: 0.1 },
+      floor: { color: 0x2d3346, roughness: 0.9 },
+    });
   }
 
   _spawnZombie() {

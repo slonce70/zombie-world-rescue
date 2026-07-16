@@ -1,5 +1,6 @@
 // Повний non-coop релізний гейт. Список не дублюємо: кожен новий test/*.mjs
 // автоматично стає блокуючим, якщо він не helper/runner або окремий smoke/e2e тест.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { readdirSync } from 'fs';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
@@ -34,7 +35,6 @@ const suite = all.filter((_, index) => index % SHARD_TOTAL === SHARD_INDEX);
 console.log(`Release shard ${SHARD_INDEX + 1}/${SHARD_TOTAL}: ${suite.length}/${all.length} tests`);
 for (const file of suite) console.log(`  - ${file}`);
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function run(file) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [join(TEST_DIR, file)], {

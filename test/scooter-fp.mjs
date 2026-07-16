@@ -2,17 +2,14 @@
 // Баг: від 1-ї особи камера/зброя тряслись як при бігу, бо bobAmp рахується від
 // сирої швидкості, а самокат їде швидко (rideSpeed до 12.5). Від 3-ї особи — поза 'ride', тому ок.
 // Гард: на самокаті у 1-й особі bobAmp придушено; при звичайному бігу — великий (контроль, щоб тест мав зуби).
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const SLOW = Number(process.env.SLOW || 1);
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errs = [];
 page.on('pageerror', (e) => errs.push('PAGEERROR: ' + e.message));
 let failed = 0;
-const check = (c, m) => { console.log(c ? '  ✅' : '  ❌', m); if (!c) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`);
 await page.waitForFunction(
@@ -57,7 +54,6 @@ check(!running.riding, 'зійшли з самоката');
 check(running.bobAmp > 0.5, `при звичайному бігу bobAmp великий (${running.bobAmp.toFixed(2)}) — контроль`);
 
 check(errs.length === 0, `без JS-помилок (${errs[0] || 'ok'})`);
-await browser.close();
-closeServer();
+await closeTest();
 console.log(failed === 0 ? '\n🎉 ЧЕСНЕ 1-Е ЛИЦЕ НА САМОКАТІ' : `\n❌ САМОКАТ-FP: ${failed} провалів`);
 process.exit(failed === 0 ? 0 : 1);

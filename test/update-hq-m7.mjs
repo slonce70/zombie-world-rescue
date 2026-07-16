@@ -1,15 +1,12 @@
 // Тести M7: «Світ у вогні» — зірки складності (опційні, opt-in).
 // ★1 == сьогодні (ідентичність): множник = 1 для hp/dmg/counts і боса.
 // ★>1 робить зомбі міцнішими/сильнішими; дефолт save.diffStar === 1.
-import { openBrowserTest, waitFor as waitForAsync } from './_browser.mjs';
+import { openBrowserTest, waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs, label, 300);
 async function loadCountry(c, extra = '') {
   await page.goto(`${BASE}/?test&fresh&country=${c}${extra}`);

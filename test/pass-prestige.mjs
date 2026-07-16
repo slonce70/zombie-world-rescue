@@ -1,13 +1,10 @@
 // 🎖️ Зоряний шлях: стеля 65 (v236), титул «Зоряний гравець» на фіналі,
 // престиж-ранги після стелі, catch-up нагород 41..65 для легасі-сейвів.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true }, captureErrors: false });
 let failed = 0;
-const check = (ok, msg, extra = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&lang=uk`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 25000 });
@@ -63,6 +60,5 @@ const repeat = await page.evaluate(() => {
 check(repeat === 0, 'повторний grantBacklog нічого не дублює', String(repeat));
 
 await page.screenshot({ path: 'shots/pass-prestige.png', fullPage: true });
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

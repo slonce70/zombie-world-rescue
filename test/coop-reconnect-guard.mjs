@@ -1,17 +1,11 @@
 // 🔌 Guest reconnect guard: якщо relay після resume повернув інший pid,
 // гість fail-closed, як хост, а не продовжує рівень під чужим id.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1024, height: 768 } }, captureErrors: false });
 
 let failures = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '✅' : '❌'} ${msg}${extra ? ' — ' + extra : ''}`);
-  if (!ok) failures++;
-};
+const check = makeCheck(() => failures++);
 
 try {
   await page.goto(`${BASE}/?test&fresh`);
@@ -75,8 +69,7 @@ try {
   failures++;
   console.error('❌ ТЕСТ ВПАВ:', e.message.split('\n')[0]);
 } finally {
-  await browser.close().catch(() => {});
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n✅ COOP RECONNECT GUARD ПРОЙДЕНО' : `\n❌ COOP RECONNECT GUARD провалів: ${failures}`);

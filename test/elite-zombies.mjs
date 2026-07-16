@@ -1,11 +1,11 @@
 // 👹 Елітні зомбі (v287): 🛡 щитоносець (фронтальний щит → флан/злам), 🪓 розділювач
 // (по смерті — 2 міні), 💥 підривник (телеграф → вибух у радіусі), 👑 золотий (тікає,
 // зникає за 12с, по смерті — скриня). Плюс еліт-декор (аура під ногами + іконка над головою).
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 // POL: difficulty.dmg 1.15 > 1 — типовий «складніший» контекст
 await page.goto(`${BASE}/?test&fresh&country=POL`, { waitUntil: 'commit', timeout: 60000 });

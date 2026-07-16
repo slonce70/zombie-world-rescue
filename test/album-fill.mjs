@@ -1,12 +1,12 @@
 // 📖🥚 R5 (v291) «Колекція та яйця»: наповнення альбому. Три вкладки (Скіни/Петси/Еліти)
 // рендерять реальні картки (кількість = реєстри); силует+підказка для невідкритого;
 // лічильники убитих еліт з бестіарію; «наступна ціль» підсвічена; рівень петса на картці.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 900 } }, pageErrorPrefix: '' });
 
 let failed = 0;
-const check = (ok, msg, d = '') => { console.log(ok ? '  ✅' : '  ❌', msg, d); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });

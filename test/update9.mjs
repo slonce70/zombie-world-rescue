@@ -1,19 +1,13 @@
 // 🏆 Тести оновлення 9 «Ліга Шторму»: турель, щит-50, кооп-шторм передумови,
 // нагороди, пасс-30, арена босів (блоки додаються по ходу)
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 import { mkdirSync } from 'fs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 mkdirSync(new URL('../shots', import.meta.url).pathname, { recursive: true });
 
 let failed = 0;
-const check = (ok, name) => {
-  console.log(`  ${ok ? '✅' : '❌'} ${name}`);
-  if (!ok) failed++;
-};
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const check = makeCheck(() => failed++);
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
@@ -267,6 +261,5 @@ if (realErrors.length) {
   console.log('✅ Без помилок у консолі');
 }
 console.log(failed === 0 ? '🎉 БЛОК ТУРЕЛЬ/ЩИТ ПРОЙДЕНО' : `💥 ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

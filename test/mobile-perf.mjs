@@ -1,3 +1,4 @@
+import { makeCheck } from './_browser.mjs';
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
@@ -6,10 +7,7 @@ import { ensureWebServer } from './_server.mjs';
 const { base: BASE, close: closeServer } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
 let failed = 0;
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 function pngSkySample(path) {
   const png = readFileSync(path);

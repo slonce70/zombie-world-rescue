@@ -2,12 +2,10 @@
 // UX: нік одразу → панель з онлайном/кімнатами; публічна кімната видна другому
 // гравцю і відкривається кнопкою «Зайти» без кода; закриття прибирає її зі списку.
 // Транспорт: повідомлення летять пачками (~10 ws-send/с замість 25+).
-import { chromium } from 'playwright';
+import { openCoopTest } from './_browser.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { mkdirSync } from 'fs';
-import { spawnRelay } from './_relay.mjs';
-import { ensureWebServer } from './_server.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8752;
 // SLOW=N множить усі таймаути/вікна: на CI-ранері з софтверним рендером ігровий
 // час тече ~N× повільніше (гостя тротлить особливо), тож фіксовані очікування мусять чекати у N× довше.
@@ -19,7 +17,6 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${extra ? ' — ' + extra : ''}`);
   if (!ok) failures++;
 };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const lobbyState = async () => (await fetch(`http://localhost:${RELAY_PORT}/lobby/state`)).json();
 // чекаємо умову на стані лобі (пінги летять раз на ~8с)
 async function waitLobby(cond, timeout = 15000) {
@@ -33,16 +30,12 @@ async function waitLobby(cond, timeout = 15000) {
   return null;
 }
 
-const relay = await spawnRelay(RELAY_PORT);
 
 const LAUNCH = {
   args: ['--use-angle=swiftshader', '--disable-dev-shm-usage', '--no-sandbox', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
 };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, A, B, closeTest } = await openCoopTest({ relayPort: RELAY_PORT, launch: LAUNCH, captureErrors: false });
 const errsA = [];
 const errsB = [];
 A.on('pageerror', (e) => errsA.push(e.message));
@@ -200,10 +193,7 @@ try {
   await A.screenshot({ path: 'shots/coop6-fail-A.png' }).catch(() => {});
   await B.screenshot({ path: 'shots/coop6-fail-B.png' }).catch(() => {});
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 console.log(failures === 0 ? '\n🎉 ЛОБІ + БАТЧИНГ ПРОЙДЕНО' : `\n💥 Провалів: ${failures}`);

@@ -1,15 +1,12 @@
 // Быстрая проверка новых типов миссий v16
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 let failed = 0;
-const check = (ok, msg) => { console.log(ok ? '  ✅' : '  ❌', msg); if (!ok) failed++; };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const check = makeCheck(() => failed++);
 
 // 1. Ролл: каждая страна получает фирменную миссию + слот D
 await page.goto(`${BASE}/?test&fresh`);
@@ -104,6 +101,5 @@ await page.screenshot({ path: 'shots/new-missions-tomb.png' });
 console.log('');
 check(errs.length === 0, `без JS-помилок (${errs.slice(0, 2).join('|')})`);
 console.log(failed === 0 ? '🎉 НОВІ МІСІЇ ПРАЦЮЮТЬ' : `❌ ПРОВАЛЕНО: ${failed}`);
-await browser.close();
-closeServer();
+await closeTest();
 process.exit(failed === 0 ? 0 : 1);

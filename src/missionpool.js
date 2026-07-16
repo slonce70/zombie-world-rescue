@@ -198,6 +198,9 @@ export class DynamicMissions {
       const dock = level.country.map.storySites.shipDock;
       const boards = level.country.map.storySites.boardsCrate;
       slotInfo = { slot: 'D', site: dock, beamAt: { x: boards.x, z: boards.z } };
+    } else if (type === 'defense' && level.countryId === 'DEU') {
+      const gate = level.country.map.storySites.cityGate;
+      slotInfo = { slot: slotInfo.slot, site: gate, beamAt: gate };
     } else if (train) {
       const depot = level.country.map.storySites.railDepot;
       slotInfo = { slot: slotInfo.slot, site: depot, beamAt: level.world.trainStartPoint };

@@ -1,9 +1,6 @@
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest } from './_browser.mjs';
 
-const { base, close } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const { BASE: base, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader', '--no-sandbox'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 
@@ -120,6 +117,5 @@ try {
   check(errors.length === 0, 'у браузері немає помилок', errors.join('\n'));
   console.log('🎉 TURKEY SHIP CO-OP ПРОЙДЕНО');
 } finally {
-  await browser.close();
-  close();
+  await closeTest();
 }

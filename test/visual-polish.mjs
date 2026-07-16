@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { waitForPage } from './_browser.mjs';
+import { waitForPage, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
 
 const { base: BASE, close: closeServer } = await ensureWebServer();
@@ -12,10 +12,7 @@ const page = await ctx.newPage();
 const errors = [];
 let failed = 0;
 
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
+const check = makeCheck(() => failed++);
 
 const waitFor = (fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 

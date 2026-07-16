@@ -2,31 +2,14 @@
 // +150🪙 (завжди) і +1💎 (раз на день, за coopBonusDay). Лічильник coopWins росте
 // щоразу. Друга перемога того ж дня — лише монети, без кристала. Плюс: у бою чип
 // кімнати містить кнопку «поділитись» 📤. Wire-протокол не чіпаємо.
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
-import { spawnRelay } from './_relay.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { openCoopTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
 const RELAY_PORT = 8767;
-const RELAY = `ws://localhost:${RELAY_PORT}`;
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
-const relay = await spawnRelay(RELAY_PORT);
-const LAUNCH = { args: ['--use-angle=swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] };
-const browserA = await chromium.launch(LAUNCH);
-const browserB = await chromium.launch(LAUNCH);
-const A = await (await browserA.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-const B = await (await browserB.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const { BASE, RELAY, A, B, errors, closeTest } = await openCoopTest({ relayPort: RELAY_PORT });
 let failed = 0;
-const errors = [];
-const check = (ok, msg, extra = '') => {
-  console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${extra ? ' ' + extra : ''}`);
-  if (!ok) failed++;
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (const p of [A, B]) {
-  p.on('pageerror', (e) => errors.push(e.message));
-  p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-}
+const check = makeCheck(() => failed++);
 
 // PRE-ARM god: у кооп-бою орда може вбити гравця, поки тест чекає state==='level'
 // (реальний флейк ~50% без цього — як у coop-turretwar/coop-weekly)
@@ -164,10 +147,7 @@ try {
   failed++;
   console.error('  ❌ ТЕСТ ВПАВ:', e.message.split('\n')[0]);
 } finally {
-  await browserA.close().catch(() => {});
-  await browserB.close().catch(() => {});
-  relay.kill();
-  closeServer();
+  await closeTest();
 }
 
 const realErrs = errors.filter((e) => !e.includes('favicon'));

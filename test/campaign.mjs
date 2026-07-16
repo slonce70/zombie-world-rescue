@@ -1,14 +1,11 @@
 // Повне проходження кампанії від початку до кінця: усі країни поспіль
 // на одному сейві — місії, орди, боси, нагороди, прогресія.
-import { openBrowserTest, waitForPage } from './_browser.mjs';
+import { openBrowserTest, waitForPage, makeCheck } from './_browser.mjs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } } });
 
 let failed = 0;
-const check = (cond, msg) => {
-  console.log(cond ? '  ✅' : '  ❌', msg);
-  if (!cond) failed++;
-};
+const check = makeCheck(() => failed++);
 const waitFor = (fn, timeoutMs, label) => waitForPage(page, fn, timeoutMs, label);
 
 await page.goto(`${BASE}/?test&fresh`);

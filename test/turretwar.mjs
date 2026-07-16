@@ -1,10 +1,10 @@
 // 🗼 «Оборона турелі» (дизайн Влада): анлок 12 країн, кімната 200×50, дві турелі
 // по 500 HP, ворожий робот 1000 HP на старті, союзник на 30с, хвилі 5 зомбі/10с,
 // турелі б'ють 50 по площі 50×50 раз/с, єдина зброя — молот 35/1с.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 let fail = 0;
-const check = (c, m, x = '') => { console.log((c ? '✅' : '❌') + ' ' + m, x); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 const { BASE, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1280, height: 800 } }, captureConsole: false, pageErrorPrefix: '' });
 
 await page.goto(`${BASE}/?test&fresh&seed=1`, { waitUntil: 'commit', timeout: 60000 });

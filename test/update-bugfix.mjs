@@ -1,16 +1,12 @@
 // Регресія-тести для фіксів v45:
 //  Task 2 — тултип країни «звільнено…» не протікає з глобуса в рівень.
 //  Task 7 — зомбі не завмирають на нерівному терені (slope-guard дає ковзання, не стоп).
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader'] });
+const { BASE, ctx, page, closeTest } = await openBrowserTest({ launch: { args: ['--use-angle=swiftshader'] }, context: { viewport: { width: 1280, height: 800 } }, captureErrors: false });
 let fail = 0;
-const check = (c, m) => { console.log((c ? '✅' : '❌') + ' ' + m); if (!c) fail++; };
+const check = makeCheck(() => fail++);
 
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
@@ -72,8 +68,6 @@ check(after.avg < before.avg0 - 0.8, `зомбі наблизились до г�
 check(after.frozenFar === 0, `жоден зомбі не завмер далеко від гравця (завмерлих=${after.frozenFar})`);
 
 check(errors.length === 0, `без JS-помилок (${errors.length})`);
-await ctx.close();
-await browser.close();
-closeServer();
+await closeTest();
 if (fail) { console.log(`\n❌ ${fail} перевірок впало`); process.exit(1); }
 console.log('\n🎉 BUGFIX v45 (тултип + застрягання зомбі) ПРОЙДЕНО');

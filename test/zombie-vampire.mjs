@@ -1,10 +1,10 @@
 // 🧛 Зомбі-вампір: 150 HP, швидкий НІЧНИЙ хижак (speed 1.7 / chase 4.0, dmg 14),
 // БЕЗ дальнього бою і БЕЗ щита. Зʼявляється лише вночі (nightK>0.5): нічний спавнер
 // у zombies.update() підсипає вампірів навколо гравця, доки живих < cap. Удень — пауза.
-import { openBrowserTest } from './_browser.mjs';
+import { openBrowserTest, makeCheck } from './_browser.mjs';
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
-const check = (ok, msg, x = '') => { console.log(`${ok ? '  ✅' : '  ❌'} ${msg}${x ? ' ' + x : ''}`); if (!ok) failed++; };
+const check = makeCheck(() => failed++);
 
 // FRA: ніч універсальна — вампір дозволений у будь-якій країні (гейт _allowVampire=true для всіх).
 await page.goto(`${BASE}/?test&fresh&country=FRA`, { waitUntil: 'commit', timeout: 60000 });
