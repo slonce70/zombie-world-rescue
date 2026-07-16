@@ -60,6 +60,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'expedition',
   // 🛰️ v500: дошка Живого фронту, активна операція, проєкти та id вже виданих нагород
   'front', 'frontCoopClaims',
+  // 🌙 відновлені реле й одноразова нагорода живої місячної бази
+  'moonRescue',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -78,6 +80,7 @@ export function saveHasProgress(s) {
     || Object.keys(s.missionRuns || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
     || Object.keys(s.worldBosses || {}).length > 0
+    || !!(s.moonRescue && (s.moonRescue.done || (s.moonRescue.relays || []).length > 0))
     || Object.keys(s.modeBest || {}).length > 0             // рекорди соло-режимів
     || Object.keys(s.modeWins || {}).length > 0             // перемоги/віхи соло-режимів (modeRewards похідні)
     || Object.keys(s.weekly || {}).length > 0               // недільні нагороди (weekly-випробування/бос тижня)

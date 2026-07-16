@@ -51,7 +51,7 @@ const ukr = getCountryStory('UKR');
 assert.equal(ukr.id, 'UKR');
 assert.equal(ukr.npc.kind, 'medic');
 assert.deepEqual(ukr.objectives.map((o) => o.id), [
-  'ukr-rescue', 'ukr-signal', 'ukr-defense', 'ukr-rebuild', 'ukr-bases', 'ukr-moon',
+  'ukr-rescue', 'ukr-signal', 'ukr-defense', 'ukr-rebuild',
 ]);
 
 const pol = getCountryStory('POL');
@@ -76,7 +76,7 @@ assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGu
 assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGuest: false, isCoop: true, isPlayground: false }), false);
 assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGuest: false, isCoop: false, isPlayground: true }), false);
 
-assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️', '🏗️', '🏚️', '🌙']);
+assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️', '🏗️']);
 const preview = storyPreview('POL');
 assert.equal(preview.join(''), '🔥🚂🏰');
 assert.deepEqual(storyPreview('LOST'), null);
@@ -85,7 +85,7 @@ assert.deepEqual(storyPreview('LAB'), null);
 // 📖 Кампанія 2.0 (v282): усі 12 кампанійних країн мають історію з 3 цілями та НПС
 const EXPECTED_STORY_SHAPE = {
   DEU: { npcKind: 'granny', npcSite: 'cityGate', ids: ['deu-workshop', 'deu-convoy', 'deu-gate', 'deu-barracks'], icons: '🔧🚚🛡️🏚️' },
-  FRA: { npcKind: 'kid', npcSite: 'cafe', ids: ['fra-kitchen', 'fra-balloon', 'fra-cellar'], icons: '🥐🎈🍇' },
+  FRA: { npcKind: 'kid', npcSite: 'cafe', ids: ['fra-kitchen', 'fra-balloon', 'fra-cellar', 'fra-bases'], icons: '🥐🎈🍇🏚️' },
   ESP: { npcKind: 'granny', npcSite: 'fiestaSquare', ids: ['esp-band', 'esp-bells', 'esp-fireworks'], icons: '🎺🔔🎆' },
   PRT: { npcKind: 'kid', npcSite: 'harborSquare', ids: ['prt-fishers', 'prt-lighthouse', 'prt-docks'], icons: '⛵🚨⚓' },
   ITA: { npcKind: 'granny', npcSite: 'fountainSquare', ids: ['ita-trattoria', 'ita-aqueduct', 'ita-legion'], icons: '🍕⛲🏛️' },

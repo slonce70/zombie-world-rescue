@@ -41,7 +41,6 @@ export const MISSION_TYPES = {
   shiprescue: { icon: '🚢', slots: ['D'], reward: 260, horde: 0, kind: 'shiprescue' },
   rebuild: { icon: '🏗️', slots: ['D'], reward: 240, horde: 0, kind: 'rebuild' },
   bases: { icon: '🏚️', slots: ['D'], reward: 180, horde: 0, kind: 'bases' },
-  moonrescue: { icon: '🌙', slots: ['D'], reward: 260, horde: 0, kind: 'fetch' },
 };
 
 // конфіги двигунів: activate — N точок, біля кожної тримай E
@@ -87,15 +86,6 @@ const FETCH_CFG = {
     title: t('Відкрий гробницю: 2 печатки'), prompt: t('Натисни {k} — візьми печатку ({n}/{total})', { k: interactKey() }),
     deliverPrompt: t('Тримай {k} — відкрий гробницю', { k: interactKey() }), stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
     foundToast: t('⚱️ Печатки зібрано — до дверей гробниці!'), doneToast: t('⚱️ Гробниця відкрита! Скарб твій!'),
-  },
-  moonrescue: {
-    n: 3, hold: 10, color: 0xbcd0ff, emoji: '🌕', deliver: 'moonBeacon', deliverEmoji: '🌙',
-    title: t('Порятунок Місяця: знайди 3 уламки світла'),
-    prompt: t('Натисни {k} — взяти уламок Місяця ({n}/{total})', { k: interactKey() }),
-    deliverPrompt: t('Тримай {k} — відновлюй Місяць 10 секунд', { k: interactKey() }),
-    stepToast: t('🌕 Уламок знайдено ({n}/{total})!'),
-    foundToast: t('🌙 Усі уламки зібрано — неси їх до вежі!'),
-    doneToast: t('🌙 Місяць урятовано — він знову сяє!'),
   },
 };
 
@@ -214,8 +204,8 @@ export class DynamicMissions {
       slotInfo = { slot: 'D', site: this.L.village, beamAt: this.L.village };
     } else if (type === 'bases') {
       slotInfo = { slot: 'D', site: this.L.warehouse, beamAt: this.L.warehouse };
-    } else if (type === 'moonrescue') {
-      slotInfo = { slot: 'D', site: this.L.tower, beamAt: this.L.tower };
+    } else if (type === 'defense' && level.countryId === 'UKR') {
+      slotInfo = { slot: 'C', site: this.L.village, beamAt: this.L.village };
     } else if (type === 'defense' && level.countryId === 'DEU') {
       const gate = level.country.map.storySites.cityGate;
       slotInfo = { slot: slotInfo.slot, site: gate, beamAt: gate };
@@ -249,7 +239,7 @@ export class DynamicMissions {
       m.crates = this._spawnSupplyCrates(m);
     } else if (type === 'defense') {
       m.title = t('Оборона: протримайся в зоні');
-      m.timer = 45;
+      m.timer = level.countryId === 'UKR' ? 22 : 45;
       m.started = false;
       m.waveT = 0;
       m.zone = this._makeDefenseZone(m);
@@ -311,7 +301,7 @@ export class DynamicMissions {
       this._makeRebuildMission(m);
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
-    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases', 'moonrescue'].includes(type)) {
+    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases'].includes(type)) {
       m.optional = true;
       m.reward = Math.round(m.reward * 1.5);
       m.horde = Math.round(m.horde * 0.5);
@@ -1292,7 +1282,7 @@ export class DynamicMissions {
     if (!m.started) {
       if (inZone) {
         m.started = true;
-        level.bus.emit('toast', t('🛡️ ОБОРОНА! Протримайся в зоні 45 секунд!'));
+        level.bus.emit('toast', t('🛡️ ОБОРОНА! Протримайся в зоні {n} секунд!', { n: Math.ceil(m.timer) }));
         level.audio.horde();
         m.waveT = 1.5;
       }
@@ -1304,7 +1294,8 @@ export class DynamicMissions {
       m.waveT -= dt;
       if (m.waveT <= 0) {
         m.waveT = 9;
-        this._towerWave(3 + Math.round(2 * (1 - m.timer / 45)), m.timer > 25, m.site);
+        const total = level.countryId === 'UKR' ? 22 : 45;
+        this._towerWave(3 + Math.round(2 * (1 - m.timer / total)), m.timer > total * 0.55, m.site);
       }
       if (m.timer <= 0) {
         this._complete(m.id);
@@ -1615,17 +1606,6 @@ export class DynamicMissions {
   _up_balloon(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.balloon, dt, input, allowControl); }
   _up_bazaar(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.bazaar, dt, input, allowControl); }
   _up_tomb(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.tomb, dt, input, allowControl); }
-  _up_moonrescue(m, dt, input, allowControl) {
-    const active = m.state === 'active';
-    this._upFetch(m, FETCH_CFG.moonrescue, dt, input, allowControl);
-    if (active && m.state === 'done') {
-      this.level.world.time = Math.max(this.level.world.time || 0, 180);
-      this.level.nightK = 1;
-      this.level.world.setNight(1);
-      if (this.level.player.setLamp) this.level.player.setLamp(1);
-    }
-  }
-
   _makeTurkeyRescueShip(m) {
     const level = this.level;
     const sites = level.country.map.storySites;

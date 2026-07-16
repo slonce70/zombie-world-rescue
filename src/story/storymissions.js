@@ -15,10 +15,8 @@ const LEGACY_SLOT_IDS = ['rescue', 'tower', 'warehouse'];
 export const STORY_DELEGATE_MATCHES = {
   'ukr-rescue': { preferred: ['rescue'] },
   'ukr-signal': { preferred: ['repair'] },
-  'ukr-defense': { preferred: ['clear'], compatible: ['defense'] },
+  'ukr-defense': { preferred: ['defense'] },
   'ukr-rebuild': { preferred: ['rebuild'] },
-  'ukr-bases': { preferred: ['bases'] },
-  'ukr-moon': { preferred: ['moonrescue'] },
   // 🪤 АНТИ-СОФТЛОК: у країнах із фірмовою місією (bonfire B/C, tomb B/C) фірма може
   // зайняти слот сусідньої цілі. Тоді слот-фолбек тієї цілі впирається у РЕЗЕРВ
   // (місія у preferred іншої цілі) і ціль лишається без делегата — бос не відкриється.
@@ -39,6 +37,7 @@ export const STORY_DELEGATE_MATCHES = {
   'fra-kitchen': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort', 'repair', 'defense', 'nests', 'lights', 'clear'] },
   'fra-balloon': { preferred: ['balloon'] },
   'fra-cellar': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'lights', 'collect', 'repair'] },
+  'fra-bases': { preferred: ['bases'] },
   'esp-band': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
   'esp-bells': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
   'esp-fireworks': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },

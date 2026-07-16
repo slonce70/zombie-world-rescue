@@ -126,7 +126,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 522;
+const APP_VERSION = 523;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -442,6 +442,7 @@ class Game {
     const campChip = document.getElementById('camp-quest-chip');
     if (campChip) campChip.addEventListener('click', () => { this.audio.click(); this._openCampQuest(); });
     document.getElementById('btn-hqbase').addEventListener('click', () => this.enterHQBase());
+    document.getElementById('btn-moonbase').addEventListener('click', () => this.enterHQBase('moon'));
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
       this.renderSoloMenu();
@@ -661,6 +662,8 @@ class Game {
       // Кооп-нагороди гостя мають окремий ledger: host snapshot ніколи не
       // підміняє особисті board/projects/restored.
       frontCoopClaims: [],
+      // 🌙 окрема жива сцена порятунку Місяця: три відновлені реле й одноразово запущене ядро
+      moonRescue: { relays: [], done: false },
     };
   }
 
@@ -767,6 +770,12 @@ class Game {
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
           .filter((id) => typeof id === 'string' && /^front:[A-Za-z0-9_:-]{1,90}$/.test(id)))].slice(-128);
+        const moon = out.moonRescue && typeof out.moonRescue === 'object' && !Array.isArray(out.moonRescue) ? out.moonRescue : {};
+        const moonRelays = [...new Set((Array.isArray(moon.relays) ? moon.relays : []).filter((id) => ['solar', 'comms', 'oxygen'].includes(id)))];
+        out.moonRescue = {
+          relays: moonRelays,
+          done: !!moon.done && moonRelays.length === 3,
+        };
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
         if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
@@ -1261,7 +1270,7 @@ class Game {
   }
 
   // ---------- 🏠 Живий Штаб ----------
-  enterHQBase() {
+  enterHQBase(mode = 'base') {
     this.audio.click();
     if (this.save.front) this._applyFrontTransition({ type: 'INIT', baseVisited: true });
     this._hideOverlay('overlay-hq');
@@ -1269,7 +1278,7 @@ class Game {
     this._showGlobeUI(false);
     document.body.classList.remove('in-level'); // це не рівень — ховаємо бойовий HUD (амуніція/мінікарта/тач)
     this.state = 'hqbase';
-    this.hqbase.enter();
+    this.hqbase.enter(mode);
     this.clock.getDelta(); // не накопичуємо dt за час на меню
   }
 
