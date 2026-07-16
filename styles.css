@@ -1755,7 +1755,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .shop-item.goal { outline: 2px solid #f5c542; }
 
 /* 🏠 База */
-.hqbase-row { display: flex; justify-content: center; margin: 8px 0 14px; }
+.hqbase-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 8px 0 14px; }
 .hqbase-enter { width: min(100%, 360px); }
 #hqbase-ui {
   position: fixed;

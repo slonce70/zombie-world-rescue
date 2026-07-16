@@ -25,6 +25,7 @@ export class LivingHQ {
     this.camera.position.set(0, 7, 14);
     this.camera.lookAt(0, 2, 0);
     this.hitCount = 0;
+    this.mode = 'base';
     this.ready = false;
     this.targets = [];
     this.dummies = [];
@@ -45,7 +46,8 @@ export class LivingHQ {
     this._onPointerDown = (e) => this._pickTarget(e);
   }
 
-  enter() {
+  enter(mode = 'base') {
+    this.mode = mode === 'moon' ? 'moon' : 'base';
     this.ready = true;
     this.hitCount = 0;
     this.damageTotal = 0;
@@ -66,6 +68,10 @@ export class LivingHQ {
 
   build() {
     this.dispose();
+    if (this.mode === 'moon') {
+      this._buildMoonRescue();
+      return;
+    }
     this.scene.background = new THREE.Color(0x78bdf2);
 
     const hemi = new THREE.HemisphereLight(0xffffff, 0x6fb060, 1.1);
@@ -107,6 +113,132 @@ export class LivingHQ {
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
     });
+  }
+
+  _moonState() {
+    const moon = this.game.save.moonRescue;
+    if (moon && Array.isArray(moon.relays)) return moon;
+    return (this.game.save.moonRescue = { relays: [], done: false });
+  }
+
+  _buildMoonRescue() {
+    this.scene.background = new THREE.Color(0x050817);
+    this.scene.add(new THREE.HemisphereLight(0xaac8ff, 0x15172b, 1.5));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(-8, 12, 7);
+    this.scene.add(sun);
+
+    const stars = new THREE.BufferGeometry();
+    const points = [];
+    for (let i = 0; i < 90; i++) points.push((Math.random() - 0.5) * 70, 5 + Math.random() * 30, -18 - Math.random() * 35);
+    stars.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    this.scene.add(new THREE.Points(stars, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16 })));
+
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshLambertMaterial({ color: 0x8b8f9d }));
+    floor.rotation.x = -Math.PI / 2;
+    this.scene.add(floor);
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(2.1, 32, 20), new THREE.MeshLambertMaterial({ color: 0x3d8fe8, emissive: 0x10274d }));
+    earth.position.set(7, 7, -17);
+    this.scene.add(earth);
+
+    this._addBox(0, 1.2, -4.2, 5.4, 2.4, 2.2, 0xe7edf5);
+    this._addBox(0, 2.7, -4.2, 2.4, 0.65, 1.5, 0x77aee8);
+    this._addBox(-4.8, 0.7, -1.7, 2.8, 0.18, 2.8, 0xb8c2d2);
+    this._addBox(4.8, 0.7, -1.7, 2.8, 0.18, 2.8, 0xb8c2d2);
+
+    const state = this._moonState();
+    const relayDefs = [
+      ['solar', -4, 2.6, 0xffd45a],
+      ['comms', 0, 3.8, 0x65b8ff],
+      ['oxygen', 4, 2.6, 0x62e59a],
+    ];
+    this.targets = relayDefs.map(([id, x, z, color]) => {
+      const active = state.relays.includes(id);
+      const relay = this._addBox(x, 1.15, z, 1.7, 2.1, 0.45, active ? color : 0x485164, {
+        isHqTarget: true, moonRelay: id, moonColor: color,
+      });
+      this._addBox(x, 0.25, z, 0.18, 0.5, 0.18, 0xd8dde8);
+      return relay;
+    });
+
+    const coreReady = state.relays.length === 3;
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(1.05, 28, 18),
+      new THREE.MeshLambertMaterial({
+        color: state.done ? 0xfff3b0 : coreReady ? 0xbcd0ff : 0x43495c,
+        emissive: state.done ? 0xffd45a : coreReady ? 0x6688cc : 0x000000,
+        emissiveIntensity: state.done ? 1.2 : 0.5,
+      })
+    );
+    core.position.set(0, 1.7, -1.1);
+    core.userData = { isHqTarget: true, moonCore: true };
+    this.scene.add(core);
+    this.targets.push(core);
+
+    this.friends = [];
+    ['medic', 'kid', 'granny'].forEach((kind, i) => {
+      const rig = makeCivilian(kind, campRng());
+      const x = -3 + i * 3, z = -0.2 + (i % 2) * 0.8;
+      rig.group.position.set(x, 0, z);
+      rig.group.userData.isHqFriend = true;
+      rig.group.userData.friendId = '';
+      setAnim(rig, i === 1 ? 'cheer' : 'walk');
+      this.scene.add(rig.group);
+      this.friends.push({ cid: '', rig, home: { x, z }, wp: { x: x + 1, z: z + 1 }, waveT: 1 + i, moving: true });
+    });
+    this.scene.traverse((obj) => {
+      if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
+    });
+    this._refreshMoonUi();
+  }
+
+  _activateMoonTarget(target) {
+    const state = this._moonState();
+    const relay = target.userData.moonRelay;
+    if (relay) {
+      if (state.relays.includes(relay)) {
+        this.game.hud.toast(t('🌙 Це реле вже працює.'));
+        return;
+      }
+      state.relays.push(relay);
+      target.material.color.setHex(target.userData.moonColor);
+      this.game.saveGame();
+      this.game.audio.checkpoint();
+      this.game.hud.toast(t('📡 Місячне реле запущено ({n}/3)!', { n: state.relays.length }));
+      if (state.relays.length === 3) this.game.hud.toast(t('🌕 Усі реле працюють — активуй ядро Місяця!'));
+      this._refreshMoonUi();
+      return;
+    }
+    if (!target.userData.moonCore) return;
+    if (state.done) {
+      this.game.hud.toast(t('🌕 Місяць уже врятовано. База працює!'));
+      return;
+    }
+    if (state.relays.length < 3) {
+      this.game.hud.toast(t('🔒 Спочатку запусти три місячні реле.'));
+      return;
+    }
+    state.done = true;
+    this.game.save.crystals = (this.game.save.crystals || 0) + 3;
+    this.game.progress.addXp(500);
+    this.game.saveGame();
+    target.material.color.setHex(0xfff3b0);
+    target.material.emissive.setHex(0xffd45a);
+    target.material.emissiveIntensity = 1.2;
+    this.game.audio.levelUp();
+    this.game.hud.toast(t('🌕 Місяць урятовано! +500 XP і +3 кристали.'));
+    this._refreshMoonUi();
+  }
+
+  _refreshMoonUi() {
+    if (this.mode !== 'moon') return;
+    const ui = document.getElementById('moonbase-status');
+    if (!ui) return;
+    const state = this._moonState();
+    ui.innerHTML = `<div class="hqbase-mini-row ${state.done ? 'done' : ''}">
+      <span>${state.done ? t('🌕 Місячна база врятована й населена') : t('🌙 Запусти 3 реле, потім активуй ядро')}</span>
+      <b>${state.relays.length}/3</b>
+    </div>`;
   }
 
   _hintText(data = {}) {
@@ -532,6 +664,10 @@ export class LivingHQ {
   }
 
   _hitTarget(target) {
+    if (target.userData.moonRelay || target.userData.moonCore) {
+      this._activateMoonTarget(target);
+      return;
+    }
     if (target.userData.isHqDummy) {
       this._hitDummy(target);
       return;
@@ -634,6 +770,7 @@ export class LivingHQ {
   debugState() {
     return {
       ready: this.ready,
+      mode: this.mode,
       hitCount: this.hitCount,
       damageTotal: this.damageTotal,
       children: this.scene.children.length,
@@ -650,6 +787,9 @@ export class LivingHQ {
       campProps: this.campProps || 0,
       campQuestBoard: this.campQuestBoard || 0,
       hasHero: !!this.hero,
+      moonRelays: this._moonState().relays.length,
+      moonDone: this._moonState().done,
+      moonCrew: this.mode === 'moon' ? (this.friends || []).length : 0,
     };
   }
 
@@ -671,7 +811,7 @@ export class LivingHQ {
         <span>🏆 ${t('Зал')}: <b id="hqbase-hall-count">0</b></span>
         <span>🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b></span>
         <span>💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b></span>
-      </div><div id="hqbase-mega-list" class="hqbase-mini"></div>`;
+      </div><div id="hqbase-mega-list" class="hqbase-mini"></div><div id="moonbase-status" class="hqbase-mini"></div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
       document.getElementById('btn-hqbase-panel').addEventListener('click', () => {
@@ -691,6 +831,13 @@ export class LivingHQ {
       });
     }
     ui.style.display = '';
+    const baseCounter = ui.querySelector('.hqbase-counter');
+    const mini = document.getElementById('hqbase-mega-list');
+    const moonStatus = document.getElementById('moonbase-status');
+    if (baseCounter) baseCounter.style.display = this.mode === 'moon' ? 'none' : '';
+    if (mini) mini.style.display = this.mode === 'moon' ? 'none' : '';
+    if (moonStatus) moonStatus.style.display = this.mode === 'moon' ? '' : 'none';
+    if (this.mode === 'moon') this._refreshMoonUi();
     const hit = document.getElementById('hqbase-hit-count');
     if (hit) hit.textContent = '0';
     const dmg = document.getElementById('hqbase-damage-count');
@@ -713,7 +860,6 @@ export class LivingHQ {
     if (hc) hc.textContent = '4';
 
     this.game.quests.ensureMegaQuests();
-    const mini = document.getElementById('hqbase-mega-list');
     if (mini) {
       if (!this.game.quests.megaUnlocked) {
         mini.innerHTML = `<div class="hqbase-mini-row">🔒 ${t('Мега-квести з {n} рівня Зоряного шляху', { n: this.game.quests.megaUnlockLevel })}</div>`;
