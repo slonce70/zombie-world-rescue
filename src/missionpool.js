@@ -114,15 +114,16 @@ export function rollMissionSet(countryId, seed, runIndex) {
     const slot = slots[rng.int(0, slots.length - 1)];
     out['ABC'.indexOf(slot)] = special;
   }
-  // 🎁 четвертий слот — ДОДАТКОВА місія: не блокує боса, дає бонус
+  // 🎁 четвертий слот — турецький корабель або звичайна бонусна місія
   const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((t) => !out.includes(t));
-  out.push(dPool[rng.int(0, dPool.length - 1)]);
+  out.push(countryId === 'TUR' ? 'shiprescue' : dPool[rng.int(0, dPool.length - 1)]);
   return out;
 }
 
 // аліаси старих ID — щоб тести і збережені посилання працювали
 const SLOT_ALIASES = { rescue: 0, tower: 1, warehouse: 2 };
 const CASTLE_PHASES = ['find', 'carry', 'plant', 'fight', 'dungeon', 'rescue', 'done'];
+const SHIP_PHASES = ['find', 'carry', 'repair', 'board', 'sailing', 'rescue', 'return-board', 'returning', 'unload'];
 
 export class DynamicMissions {
   // storyTypes — примусовий набір для сюжетного рівня (StoryMissions передає
@@ -1519,7 +1520,7 @@ export class DynamicMissions {
     });
     Object.assign(m, {
       phase: 'find', repairProgress: 0, rescueProgress: 0, unloadProgress: 0, sailT: 0,
-      dock, shore, boards, waterY, water, ship, crate, people, title: t('Знайди ящик із дошками'),
+      carrierPid: 0, riderMask: 0, dock, shore, boards, waterY, water, ship, crate, people, title: t('Знайди ящик із дошками'),
     });
   }
 
@@ -1529,16 +1530,63 @@ export class DynamicMissions {
     return m.dock;
   }
 
-  _setShipPosition(m, t, returning = false) {
+  _shipRiderMask(point) {
+    const level = this.level;
+    let mask = level.player.health > 0 && Math.hypot(level.player.pos.x - point.x, level.player.pos.z - point.z) < 5 ? (1 << 1) : 0;
+    for (const player of level.players || []) {
+      if (player.pid !== 1 && player.health > 0 && Math.hypot(player.pos.x - point.x, player.pos.z - point.z) < 5) mask |= 1 << player.pid;
+    }
+    return mask;
+  }
+
+  _setShipPosition(m, t, returning = false, movePlayer = true) {
     const a = returning ? m.shore : m.dock;
     const b = returning ? m.dock : m.shore;
     const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
     m.ship.position.set(x, m.waterY + 0.25, z);
     m.ship.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
     const player = this.level.player;
-    player.pos.set(x, m.waterY + 1.55, z);
-    if (player.vel) player.vel.set(0, 0, 0);
+    if (movePlayer) {
+      player.pos.set(x, m.waterY + 1.55, z);
+      if (player.vel) player.vel.set(0, 0, 0);
+    }
     if (m.phase === 'returning') m.people.forEach((rig, i) => rig.group.position.set(x - 1.2 + i * 1.2, m.waterY + 1.48, z + 0.6));
+  }
+
+  _syncShipVisual(m, movePlayer = false) {
+    const level = this.level;
+    if (SHIP_PHASES.indexOf(m.phase) >= SHIP_PHASES.indexOf('board')) {
+      if (m.crate.parent) m.crate.removeFromParent();
+    } else if (!m.crate.parent) level.scene.add(m.crate);
+
+    if (m.phase === 'find') {
+      m.crate.position.set(m.boards.x, level.world.groundH(m.boards.x, m.boards.z) + 0.65, m.boards.z);
+    } else if (m.phase === 'carry') {
+      let carrier = null;
+      if (this.mirror && level.net) {
+        carrier = m.carrierPid === level.net.myPid() ? level.player : level.net.remotes?.get(m.carrierPid);
+      } else carrier = m.carrierPid === 1 ? level.player : level.players?.find((pl) => pl.pid === m.carrierPid);
+      if (carrier) m.crate.position.set(carrier.pos.x, carrier.pos.y + 0.7, carrier.pos.z - 0.8);
+    } else if (m.phase === 'repair') {
+      m.crate.position.set(m.dock.x + 3, m.waterY + 0.7, m.dock.z);
+    }
+
+    if (m.phase === 'sailing') this._setShipPosition(m, m.sailT, false, movePlayer);
+    else if (m.phase === 'returning') this._setShipPosition(m, m.sailT, true, movePlayer);
+    else {
+      const point = m.phase === 'rescue' || m.phase === 'return-board' ? m.shore : m.dock;
+      m.ship.position.set(point.x, m.waterY + 0.25, point.z);
+    }
+
+    if (m.phase !== 'returning') {
+      const unloaded = m.phase === 'unload' || m.state === 'done';
+      m.people.forEach((rig, i) => {
+        const x = unloaded ? m.dock.x + 4 + i * 1.4 : m.shore.x - 2 + i * 2;
+        const z = unloaded ? m.dock.z + 3 : m.shore.z - 2;
+        rig.group.position.set(x, level.world.groundH(x, z), z);
+        if (unloaded) setAnim(rig, 'cheer');
+      });
+    }
   }
 
   _up_shiprescue(m, dt, input, allowControl) {
@@ -1548,14 +1596,20 @@ export class DynamicMissions {
       m.crate.rotation.y += dt * 0.7;
       if (near(m.boards, 3.5)) this.prompt = { text: t('Натисни {k} — підібрати ящик із дошками', { k: interactKey() }), hold: false };
       if (near(m.boards, 3.5) && allowControl && input.pressed('KeyE')) {
-        input.justPressed.delete('KeyE'); m.phase = 'carry'; m.title = t('Віднеси дошки до корабля');
+        input.justPressed.delete('KeyE'); m.phase = 'carry'; m.carrierPid = 1; m.title = t('Віднеси дошки до корабля');
         level.audio.pickup(); level.bus.emit('toast', t('🪵 Дошки у тебе — неси їх до корабля!'));
       }
       return;
     }
     if (m.phase === 'carry') {
-      m.crate.position.set(player.pos.x, player.pos.y + 0.7, player.pos.z - 0.8);
-      if (near(m.dock, 4)) {
+      const carrier = m.carrierPid === 1 ? player : level.players?.find((pl) => pl.pid === m.carrierPid);
+      if (!carrier || carrier.health <= 0) {
+        m.phase = 'find'; m.carrierPid = 0; m.title = t('Знайди ящик із дошками');
+        this._syncShipVisual(m);
+        return;
+      }
+      m.crate.position.set(carrier.pos.x, carrier.pos.y + 0.7, carrier.pos.z - 0.8);
+      if (Math.hypot(carrier.pos.x - m.dock.x, carrier.pos.z - m.dock.z) < 4) {
         m.phase = 'repair'; m.title = t('Ремонтуй корабель 30 секунд');
         m.crate.position.set(m.dock.x + 3, m.waterY + 0.7, m.dock.z);
       }
@@ -1563,9 +1617,14 @@ export class DynamicMissions {
     }
     if (m.phase === 'repair') {
       m.title = t('Ремонтуй корабель: {n} с', { n: Math.max(0, Math.ceil(30 * (1 - m.repairProgress))) });
+      let holders = near(m.dock, 4) && allowControl && input.down('KeyE') ? 1 : 0;
+      for (const pl of level.players || []) {
+        if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+        if (Math.hypot(pl.pos.x - m.dock.x, pl.pos.z - m.dock.z) < 4) holders++;
+      }
       if (near(m.dock, 4)) this.prompt = { text: t('Тримай {k} — ремонтуй корабель', { k: interactKey() }), hold: true, progress: m.repairProgress };
-      if (near(m.dock, 4) && allowControl && input.down('KeyE')) {
-        m.repairProgress = Math.min(1, m.repairProgress + dt / 30);
+      if (holders > 0) {
+        m.repairProgress = Math.min(1, m.repairProgress + (dt * holders) / 30);
         if (m.repairProgress >= 1) {
           level.scene.remove(m.crate); m.phase = 'board'; m.title = t('Залізь на корабель');
           level.bus.emit('toast', t('🚢 Корабель відремонтовано — час плисти по людей!'));
@@ -1578,36 +1637,48 @@ export class DynamicMissions {
       if (near(point, 5)) this.prompt = { text: t('Натисни {k} — сісти на корабель', { k: interactKey() }), hold: false };
       if (near(point, 5) && allowControl && input.pressed('KeyE')) {
         input.justPressed.delete('KeyE'); m.phase = m.phase === 'board' ? 'sailing' : 'returning'; m.sailT = 0;
+        m.riderMask = this._shipRiderMask(point);
         m.title = m.phase === 'sailing' ? t('Пливи до людей') : t('Поверни людей на сушу');
       }
       return;
     }
     if (m.phase === 'sailing' || m.phase === 'returning') {
       m.sailT = Math.min(1, m.sailT + dt / 8);
-      this._setShipPosition(m, m.sailT, m.phase === 'returning');
+      const hostRides = !!(m.riderMask & (1 << 1));
+      this._setShipPosition(m, m.sailT, m.phase === 'returning', hostRides);
       if (m.sailT >= 1) {
         if (m.phase === 'sailing') {
           m.phase = 'rescue'; m.title = t('Забери людей із берега');
-          player.pos.set(m.shore.x + 5, level.world.groundH(m.shore.x + 5, m.shore.z), m.shore.z);
+          if (hostRides) player.pos.set(m.shore.x + 5, level.world.groundH(m.shore.x + 5, m.shore.z), m.shore.z);
         } else {
           m.phase = 'unload'; m.title = t('Висади людей на сушу');
-          player.pos.set(m.dock.x + 5, level.world.groundH(m.dock.x + 5, m.dock.z), m.dock.z);
+          if (hostRides) player.pos.set(m.dock.x + 5, level.world.groundH(m.dock.x + 5, m.dock.z), m.dock.z);
         }
       }
       return;
     }
     if (m.phase === 'rescue') {
+      let holders = near(m.shore, 6) && allowControl && input.down('KeyE') ? 1 : 0;
+      for (const pl of level.players || []) {
+        if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+        if (Math.hypot(pl.pos.x - m.shore.x, pl.pos.z - m.shore.z) < 6) holders++;
+      }
       if (near(m.shore, 6)) this.prompt = { text: t('Тримай {k} — забрати людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
-      if (near(m.shore, 6) && allowControl && input.down('KeyE')) {
-        m.rescueProgress = Math.min(1, m.rescueProgress + dt / 2);
+      if (holders > 0) {
+        m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 2);
         if (m.rescueProgress >= 1) { m.phase = 'return-board'; m.title = t('Повернись на корабель із людьми'); }
       }
       return;
     }
     if (m.phase === 'unload') {
+      let holders = near(m.dock, 6) && allowControl && input.down('KeyE') ? 1 : 0;
+      for (const pl of level.players || []) {
+        if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+        if (Math.hypot(pl.pos.x - m.dock.x, pl.pos.z - m.dock.z) < 6) holders++;
+      }
       if (near(m.dock, 6)) this.prompt = { text: t('Тримай {k} — висадити людей', { k: interactKey() }), hold: true, progress: m.unloadProgress };
-      if (near(m.dock, 6) && allowControl && input.down('KeyE')) {
-        m.unloadProgress = Math.min(1, m.unloadProgress + dt / 2);
+      if (holders > 0) {
+        m.unloadProgress = Math.min(1, m.unloadProgress + (dt * holders) / 2);
         if (m.unloadProgress >= 1) {
           m.people.forEach((rig, i) => {
             rig.group.position.set(m.dock.x + 4 + i * 1.4, level.world.groundH(m.dock.x + 4, m.dock.z + 3), m.dock.z + 3);
@@ -2103,6 +2174,25 @@ export class DynamicMissions {
     // ескорт синхронізується снапшотом (m.started → гість спавнить мандрівника); окрема подія не потрібна
   }
 
+  useShip(pid, action, near) {
+    const m = this.missions.find((mission) => mission.type === 'shiprescue');
+    if (!m || m.state !== 'active') return;
+    if (action === 'pickup' && m.phase === 'find' && near(m.boards.x, m.boards.z, 3.5)) {
+      m.phase = 'carry';
+      m.carrierPid = pid;
+      m.title = t('Віднеси дошки до корабля');
+      this.level.audio.pickup();
+      return;
+    }
+    if (action === 'board' && m.phase === 'board' && near(m.dock.x, m.dock.z, 5)) {
+      m.phase = 'sailing'; m.sailT = 0; m.riderMask = this._shipRiderMask(m.dock); m.title = t('Пливи до людей');
+      return;
+    }
+    if (action === 'return' && m.phase === 'return-board' && near(m.shore.x, m.shore.z, 5)) {
+      m.phase = 'returning'; m.sailT = 0; m.riderMask = this._shipRiderMask(m.shore); m.title = t('Поверни людей на сушу');
+    }
+  }
+
   _removeTraveler(m) {
     if (!m || !m.traveler) return;
     this.level.scene.remove(m.traveler.rig.group);
@@ -2144,6 +2234,16 @@ export class DynamicMissions {
           Math.round(m.rescueProgress * 100) / 100,
           25 - regularLeft, 5 - knightLeft, dungeonLeft,
           Math.round(target.x * 10) / 10, Math.round(target.z * 10) / 10,
+        );
+      } else if (m.type === 'shiprescue') {
+        a.push(
+          Math.max(0, SHIP_PHASES.indexOf(m.phase)),
+          Math.round(m.repairProgress * 100) / 100,
+          Math.round(m.rescueProgress * 100) / 100,
+          Math.round(m.unloadProgress * 100) / 100,
+          Math.round(m.sailT * 100) / 100,
+          m.carrierPid || 0,
+          m.riderMask || 0,
         );
       } else if (m.type === 'escort') a.push(m.started ? 1 : 0);
       else if (m.points) {
@@ -2230,6 +2330,25 @@ export class DynamicMissions {
             m.beam = level.effects.makeBeam(dungeon.x, dungeon.z, 0x4cff7a, '🆘');
           }
         }
+      } else if (m.type === 'shiprescue') {
+        const phaseIndex = Math.max(0, Math.min(SHIP_PHASES.length - 1, Number(a[1]) || 0));
+        m.phase = SHIP_PHASES[phaseIndex];
+        m.repairProgress = Number(a[2]) || 0;
+        m.rescueProgress = Number(a[3]) || 0;
+        m.unloadProgress = Number(a[4]) || 0;
+        m.sailT = Number(a[5]) || 0;
+        m.carrierPid = Number(a[6]) || 0;
+        m.riderMask = Number(a[7]) || 0;
+        if (m.phase === 'find') m.title = t('Знайди ящик із дошками');
+        else if (m.phase === 'carry') m.title = t('Віднеси дошки до корабля');
+        else if (m.phase === 'repair') m.title = t('Ремонтуй корабель: {n} с', { n: Math.max(0, Math.ceil(30 * (1 - m.repairProgress))) });
+        else if (m.phase === 'board') m.title = t('Залізь на корабель');
+        else if (m.phase === 'sailing') m.title = t('Пливи до людей');
+        else if (m.phase === 'rescue') m.title = t('Забери людей із берега');
+        else if (m.phase === 'return-board') m.title = t('Повернись на корабель із людьми');
+        else if (m.phase === 'returning') m.title = t('Поверни людей на сушу');
+        else m.title = t('Висади людей на сушу');
+        this._syncShipVisual(m);
       } else if (m.type === 'escort') {
         if (a[1] && !m.started) { m.started = true; if (!m.traveler) this._spawnTraveler(m); }
         else if (!a[1]) { m.started = false; this._removeTraveler(m); }
@@ -2460,6 +2579,31 @@ export class DynamicMissions {
         if (near(m.site.x, m.site.z + 2, 5)) {
           this.prompt = { text: t('🧳 Натисни {k} — забери мандрівника', { k: interactKey() }), hold: false };
           if (pressE) { net.sendUse('escort'); input.justPressed.delete('KeyE'); pressE = false; }
+        }
+      } else if (m.type === 'shiprescue') {
+        const rides = !!(m.riderMask & (1 << net.myPid()));
+        this._syncShipVisual(m, rides && (m.phase === 'sailing' || m.phase === 'returning'));
+        if (m.phase === 'find') {
+          m.crate.rotation.y += dt * 0.7;
+          if (near(m.boards.x, m.boards.z, 3.5)) {
+            this.prompt = { text: t('Натисни {k} — підібрати ящик із дошками', { k: interactKey() }), hold: false };
+            if (pressE) { net.sendUse('ship', { a: 'pickup' }); input.justPressed.delete('KeyE'); pressE = false; }
+          }
+        } else if (m.phase === 'repair' && near(m.dock.x, m.dock.z, 4)) {
+          this.prompt = { text: t('Тримай {k} — ремонтуй корабель', { k: interactKey() }), hold: true, progress: m.repairProgress };
+          net.holdE = true;
+        } else if (m.phase === 'board' && near(m.dock.x, m.dock.z, 5)) {
+          this.prompt = { text: t('Натисни {k} — сісти на корабель', { k: interactKey() }), hold: false };
+          if (pressE) { net.sendUse('ship', { a: 'board' }); input.justPressed.delete('KeyE'); pressE = false; }
+        } else if (m.phase === 'rescue' && near(m.shore.x, m.shore.z, 6)) {
+          this.prompt = { text: t('Тримай {k} — забрати людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+          net.holdE = true;
+        } else if (m.phase === 'return-board' && near(m.shore.x, m.shore.z, 5)) {
+          this.prompt = { text: t('Натисни {k} — сісти на корабель', { k: interactKey() }), hold: false };
+          if (pressE) { net.sendUse('ship', { a: 'return' }); input.justPressed.delete('KeyE'); pressE = false; }
+        } else if (m.phase === 'unload' && near(m.dock.x, m.dock.z, 6)) {
+          this.prompt = { text: t('Тримай {k} — висадити людей', { k: interactKey() }), hold: true, progress: m.unloadProgress };
+          net.holdE = true;
         }
       } else if (m.type === 'castle') {
         const dungeon = level.world.castleDungeon || m.site;

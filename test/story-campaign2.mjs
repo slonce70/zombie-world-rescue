@@ -87,7 +87,7 @@ const EXPECTED_STORY_SHAPE = {
   ESP: { npcKind: 'granny', npcSite: 'fiestaSquare', ids: ['esp-band', 'esp-bells', 'esp-fireworks'], icons: '🎺🔔🎆' },
   PRT: { npcKind: 'kid', npcSite: 'harborSquare', ids: ['prt-fishers', 'prt-lighthouse', 'prt-docks'], icons: '⛵🚨⚓' },
   ITA: { npcKind: 'granny', npcSite: 'fountainSquare', ids: ['ita-trattoria', 'ita-aqueduct', 'ita-legion'], icons: '🍕⛲🏛️' },
-  TUR: { npcKind: 'granny', npcSite: 'teaGarden', ids: ['tur-bazaar', 'tur-lighthouse', 'tur-spices'], icons: '🧿🗼🌶️' },
+  TUR: { npcKind: 'granny', npcSite: 'teaGarden', ids: ['tur-bazaar', 'tur-lighthouse', 'tur-spices', 'tur-rescue-ship'], icons: '🧿🗼🌶️🚢' },
   SWE: { npcKind: 'kid', npcSite: 'townSquare', ids: ['swe-longhouse', 'swe-aurora', 'swe-jarl'], icons: '🛶🌌❄️' },
   JPN: { npcKind: 'kid', npcSite: 'toriiGate', ids: ['jpn-teahouse', 'jpn-lanterns', 'jpn-dojo'], icons: '🌸🏮🥋' },
   CHN: { npcKind: 'granny', npcSite: 'teaMarket', ids: ['chn-scrolls', 'chn-beacon', 'chn-pit'], icons: '📜🔥🏺' },
