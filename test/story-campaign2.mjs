@@ -50,7 +50,9 @@ assert.deepEqual(STORY_COUNTRY_IDS, ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', '
 const ukr = getCountryStory('UKR');
 assert.equal(ukr.id, 'UKR');
 assert.equal(ukr.npc.kind, 'medic');
-assert.deepEqual(ukr.objectives.map((o) => o.id), ['ukr-rescue', 'ukr-signal', 'ukr-defense']);
+assert.deepEqual(ukr.objectives.map((o) => o.id), [
+  'ukr-rescue', 'ukr-signal', 'ukr-defense', 'ukr-rebuild', 'ukr-bases', 'ukr-moon',
+]);
 
 const pol = getCountryStory('POL');
 assert.equal(pol.objectives[0].kind, 'activate');
@@ -74,7 +76,7 @@ assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGu
 assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGuest: false, isCoop: true, isPlayground: false }), false);
 assert.equal(shouldUseStoryMissions({ countryId: 'UKR', modeId: 'campaign', isGuest: false, isCoop: false, isPlayground: true }), false);
 
-assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️']);
+assert.deepEqual(storyPreview('UKR'), ['🆘', '📡', '🛡️', '🏗️', '🏚️', '🌙']);
 const preview = storyPreview('POL');
 assert.equal(preview.join(''), '🔥🚂🏰');
 assert.deepEqual(storyPreview('LOST'), null);

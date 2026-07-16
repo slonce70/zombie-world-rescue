@@ -45,7 +45,7 @@ const staticRes = await page.evaluate(async () => {
         const first3 = set.slice(0, 3);
         for (const p of required) {
           const bonus = MISSION_TYPES[p].slots.includes('D');
-          if ((bonus && set[3] !== p) || (!bonus && !first3.includes(p))) {
+          if ((bonus && !set.includes(p)) || (!bonus && !first3.includes(p))) {
             fails.push(`${cid} ri${runIndex} seed${seed}: missing ${p} in ${JSON.stringify(set)}`);
           }
         }

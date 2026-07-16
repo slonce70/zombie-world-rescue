@@ -12,7 +12,7 @@ import {
   canonicalFrontRewards, expandFrontSpec, FRONT_GUEST_FORBIDDEN, frontSpecFromState,
   sanitizeFrontSnapshot, sanitizeFrontSpec,
 } from './frontsync.js';
-import { sanitizeMapSize } from '../mapsize.js';
+import { sanitizeMapSize, sanitizeMapStyle } from '../mapsize.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -314,7 +314,7 @@ export class CoopSession {
     // (не шторм/арена/нокаут/оборона/радіація/турель/світовий бос). Той самий сід-патерн, що соло.
     const isPlainCampaign = !storm && !arena && !knockout && !defense && !radiation && !turretwar && !wb;
     const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3) : null;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, ms: sanitizeMapSize(game.save.mapSize) };
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle) };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
@@ -332,6 +332,7 @@ export class CoopSession {
       defense: opts.defense || null, radiation: !!opts.radiation, turretwar: !!opts.turretwar,
       wb: opts.worldBoss || null, portal: !!opts.portal, ex: run,
       ms: sanitizeMapSize(this.game.save.mapSize),
+      mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
@@ -359,6 +360,7 @@ export class CoopSession {
       portal: !!opts.portal,
       fr,
       ms: sanitizeMapSize(this.game.save.mapSize),
+      mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
     this.syncFront(run);
     this.transport.broadcast({ t: 'start', ...spec }, true);

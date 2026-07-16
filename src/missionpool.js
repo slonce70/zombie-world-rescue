@@ -39,6 +39,9 @@ export const MISSION_TYPES = {
   castle: { icon: '🏰', slots: ['C'], reward: 250, horde: 0, kind: 'castle' },
   barracks: { icon: '🏚️', slots: ['D'], reward: 220, horde: 0, kind: 'barracks' },
   shiprescue: { icon: '🚢', slots: ['D'], reward: 260, horde: 0, kind: 'shiprescue' },
+  rebuild: { icon: '🏗️', slots: ['D'], reward: 240, horde: 0, kind: 'rebuild' },
+  bases: { icon: '🏚️', slots: ['D'], reward: 180, horde: 0, kind: 'bases' },
+  moonrescue: { icon: '🌙', slots: ['D'], reward: 260, horde: 0, kind: 'fetch' },
 };
 
 // конфіги двигунів: activate — N точок, біля кожної тримай E
@@ -84,6 +87,15 @@ const FETCH_CFG = {
     title: t('Відкрий гробницю: 2 печатки'), prompt: t('Натисни {k} — візьми печатку ({n}/{total})', { k: interactKey() }),
     deliverPrompt: t('Тримай {k} — відкрий гробницю', { k: interactKey() }), stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
     foundToast: t('⚱️ Печатки зібрано — до дверей гробниці!'), doneToast: t('⚱️ Гробниця відкрита! Скарб твій!'),
+  },
+  moonrescue: {
+    n: 3, hold: 10, color: 0xbcd0ff, emoji: '🌕', deliver: 'moonBeacon', deliverEmoji: '🌙',
+    title: t('Порятунок Місяця: знайди 3 уламки світла'),
+    prompt: t('Натисни {k} — взяти уламок Місяця ({n}/{total})', { k: interactKey() }),
+    deliverPrompt: t('Тримай {k} — відновлюй Місяць 10 секунд', { k: interactKey() }),
+    stepToast: t('🌕 Уламок знайдено ({n}/{total})!'),
+    foundToast: t('🌙 Усі уламки зібрано — неси їх до вежі!'),
+    doneToast: t('🌙 Місяць урятовано — він знову сяє!'),
   },
 };
 
@@ -198,6 +210,12 @@ export class DynamicMissions {
       const dock = level.country.map.storySites.shipDock;
       const boards = level.country.map.storySites.boardsCrate;
       slotInfo = { slot: 'D', site: dock, beamAt: { x: boards.x, z: boards.z } };
+    } else if (type === 'rebuild') {
+      slotInfo = { slot: 'D', site: this.L.village, beamAt: this.L.village };
+    } else if (type === 'bases') {
+      slotInfo = { slot: 'D', site: this.L.warehouse, beamAt: this.L.warehouse };
+    } else if (type === 'moonrescue') {
+      slotInfo = { slot: 'D', site: this.L.tower, beamAt: this.L.tower };
     } else if (type === 'defense' && level.countryId === 'DEU') {
       const gate = level.country.map.storySites.cityGate;
       slotInfo = { slot: slotInfo.slot, site: gate, beamAt: gate };
@@ -239,8 +257,8 @@ export class DynamicMissions {
       m.title = t('Перемож 3 елітних зомбі');
       m.killed = 0;
       m.elites = this._spawnElites(m);
-    } else if (type === 'nests') {
-      m.title = t('Знешкодь 3 зомбі-гнізда');
+    } else if (type === 'nests' || type === 'bases') {
+      m.title = type === 'bases' ? t('Зачисть 3 зомбі-бази') : t('Знешкодь 3 зомбі-гнізда');
       m.cleared = 0;
       m.nestList = this._spawnNests(m);
     } else if (type === 'escort') {
@@ -289,9 +307,11 @@ export class DynamicMissions {
       m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: m.hp });
     } else if (type === 'shiprescue') {
       this._makeTurkeyRescueShip(m);
+    } else if (type === 'rebuild') {
+      this._makeRebuildMission(m);
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
-    if (idx === 3 && type !== 'barracks' && type !== 'shiprescue') {
+    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases', 'moonrescue'].includes(type)) {
       m.optional = true;
       m.reward = Math.round(m.reward * 1.5);
       m.horde = Math.round(m.horde * 0.5);
@@ -345,7 +365,7 @@ export class DynamicMissions {
   _spawnActPoints(m, cfg) {
     const level = this.level;
     const world = level.world;
-    const rng = new RNG(level.country.seed + 333 + this.runIndex + m.slotIndex * 17);
+    const rng = new RNG(level.country.seed + 333 + this.runIndex + m.slotIndex * 17 + (cfg.seedOffset || 0));
     const points = [];
     for (let i = 0; i < cfg.n; i++) {
       let x = m.site.x, z = m.site.z;
@@ -384,7 +404,7 @@ export class DynamicMissions {
   _spawnFetchItems(m, cfg) {
     const level = this.level;
     const world = level.world;
-    const rng = new RNG(level.country.seed + 444 + this.runIndex + m.slotIndex * 17);
+    const rng = new RNG(level.country.seed + 444 + this.runIndex + m.slotIndex * 17 + (cfg.seedOffset || 0));
     const items = [];
     for (let i = 0; i < cfg.n; i++) {
       let x = m.site.x, z = m.site.z;
@@ -453,6 +473,29 @@ export class DynamicMissions {
     level.scene.add(ring);
     level.scene.add(icon);
     return { x, z, y, r: 5, ring, icon };
+  }
+
+  _makeRebuildMission(m) {
+    const axeCfg = { n: 1, color: 0xd28b3c, emoji: '🪓', seedOffset: 101 };
+    const pickCfg = { n: 1, color: 0x8fa3b8, emoji: '⛏️', seedOffset: 202 };
+    m.tools = [
+      { ...this._spawnFetchItems(m, axeCfg)[0], kind: 'axe', cfg: axeCfg },
+      { ...this._spawnFetchItems(m, pickCfg)[0], kind: 'pickaxe', cfg: pickCfg },
+    ];
+    m.wood = 0;
+    m.stone = 0;
+    m.buildProgress = 0;
+    m.phase = 'tools';
+    m.title = t('Знайди сокиру й кірку');
+    m.woodNodes = this._spawnActPoints(m, { n: 3, emoji: '🌲', color: 0x4f9a4b, spread: 'map', seedOffset: 303 })
+      .map((p) => ({ ...p, kind: 'wood', amount: 40 }));
+    m.stoneNodes = this._spawnActPoints(m, { n: 2, emoji: '🪨', color: 0x9299a3, spread: 'map', seedOffset: 404 })
+      .map((p) => ({ ...p, kind: 'stone', amount: 25 }));
+    m.points = [...m.woodNodes, ...m.stoneNodes];
+    for (const p of m.points) p.mesh.visible = false;
+    m.dest = this._makeDeliverPoint(m, { color: 0xffc857, deliver: 'cityCenter', deliverEmoji: '🏗️' });
+    m.dest.ring.visible = false;
+    m.dest.icon.visible = false;
   }
 
   // ---------- допоміжні споруди місій ----------
@@ -595,10 +638,10 @@ export class DynamicMissions {
         }
         if (m.type === 'collect') extra = ` (${m.found}/4)`;
         if (m.type === 'hunt') extra = ` (${m.killed}/3)`;
-        if (m.type === 'nests') extra = ` (${m.cleared}/3)`;
+        if (m.type === 'nests' || m.type === 'bases') extra = ` (${m.cleared}/3)`;
         if (m.type === 'defense' && m.started) extra = ` (${Math.ceil(m.timer)}${t('с')})`;
         if (m.type === 'escort' && m.started) extra = t(' — веди до вежі!');
-        if (m.points) extra = ` (${m.activated}/${m.points.length})`;
+        if (m.points && m.type !== 'rebuild') extra = ` (${m.activated}/${m.points.length})`;
         if (m.items) {
           extra = m.found < m.items.length ? ` (${m.found}/${m.items.length})` : t(' — неси до цілі!');
         }
@@ -1042,11 +1085,16 @@ export class DynamicMissions {
   // куди має стояти маяк місії просто зараз
   _beamTarget(m) {
     if (m.state !== 'active') return null;
+    if (m.type === 'rebuild') {
+      if (m.phase === 'tools') return m.tools.find((it) => !it.taken) || null;
+      if (m.phase === 'resources') return m.points.find((p) => !p.done) || null;
+      return m.dest;
+    }
     if (m.type === 'collect') {
       const next = m.crates.find((c) => !c.taken);
       return next ? { x: next.x, z: next.z } : null;
     }
-    if (m.type === 'nests') {
+    if (m.type === 'nests' || m.type === 'bases') {
       const next = m.nestList.find((n) => !n.cleared);
       return next ? { x: next.x, z: next.z } : null;
     }
@@ -1287,6 +1335,7 @@ export class DynamicMissions {
   _up_nests(m, dt, input, allowControl) {
     const level = this.level;
     const player = level.player;
+    const bases = m.type === 'bases';
     for (const n of m.nestList) {
       if (n.cleared) continue;
       n.pod.scale.y = 1.25 + Math.sin(performance.now() / 350 + n.x) * 0.07;
@@ -1300,7 +1349,9 @@ export class DynamicMissions {
         }
       }
       if (d < 3.8) {
-        this.prompt = { text: t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), hold: true, progress: n.progress };
+        this.prompt = { text: bases
+          ? t('🏚️ Тримай {k} — знищ зомбі-базу', { k: interactKey() })
+          : t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), hold: true, progress: n.progress };
       }
       if (d < 3.8 || holders > 0) {
         if (holders > 0) {
@@ -1315,7 +1366,9 @@ export class DynamicMissions {
             level.netEv('nest', m.slotIndex, m.nestList.indexOf(n));
             level.audio.shieldBreak();
             level.effects.burst(new THREE.Vector3(n.x, n.y + 1, n.z), 0x8d3bbd, 16, { speed: 4, up: 4, life: 0.8, size: 1.2 });
-            level.bus.emit('toast', m.cleared < 3 ? t('🟣 Гніздо знищено ({n}/3)!', { n: m.cleared }) : t('🟣 Усі гнізда знищено!'));
+            level.bus.emit('toast', bases
+              ? (m.cleared < 3 ? t('🏚️ Базу знищено ({n}/3)!', { n: m.cleared }) : t('🏚️ Усі зомбі-бази знищено!'))
+              : (m.cleared < 3 ? t('🟣 Гніздо знищено ({n}/3)!', { n: m.cleared }) : t('🟣 Усі гнізда знищено!')));
             if (m.cleared >= 3) this._complete(m.id);
           }
         } else {
@@ -1324,6 +1377,86 @@ export class DynamicMissions {
         break;
       } else if (n.progress > 0) {
         n.progress = Math.max(0, n.progress - dt * 0.5);
+      }
+    }
+  }
+
+  _up_bases(m, dt, input, allowControl) { this._up_nests(m, dt, input, allowControl); }
+
+  _up_rebuild(m, dt, input, allowControl) {
+    const level = this.level;
+    const player = level.player;
+    if (m.phase === 'tools') {
+      for (const tool of m.tools) {
+        if (tool.taken) continue;
+        tool.mesh.position.y = tool.y + Math.abs(Math.sin(performance.now() / 400 + tool.x)) * 0.14;
+        if (Math.hypot(player.pos.x - tool.x, player.pos.z - tool.z) >= 3.4) continue;
+        this.prompt = { text: tool.kind === 'axe'
+          ? t('Натисни {k} — взяти сокиру', { k: interactKey() })
+          : t('Натисни {k} — взяти кірку', { k: interactKey() }), hold: false };
+        if (allowControl && input.pressed('KeyE')) {
+          input.justPressed.delete('KeyE');
+          tool.taken = true;
+          level.scene.remove(tool.mesh);
+          level.audio.pickup();
+          level.bus.emit('toast', tool.kind === 'axe' ? t('🪓 Сокиру знайдено!') : t('⛏️ Кірку знайдено!'));
+          if (m.tools.every((it) => it.taken)) {
+            m.phase = 'resources';
+            for (const p of m.points) p.mesh.visible = true;
+            level.bus.emit('toast', t('⛏️ Інструменти готові — добудь 120 дерева і 50 каменю!'));
+          }
+        }
+        break;
+      }
+      return;
+    }
+    if (m.phase === 'resources') {
+      m.title = t('Добудь ресурси: дерево {wood}/120 · камінь {stone}/50', { wood: m.wood, stone: m.stone });
+      for (const p of m.points) {
+        if (p.done) continue;
+        const d = Math.hypot(player.pos.x - p.x, player.pos.z - p.z);
+        if (d >= 3.6) continue;
+        this.prompt = { text: p.kind === 'wood'
+          ? t('Тримай {k} — рубай дерево', { k: interactKey() })
+          : t('Тримай {k} — добувай камінь', { k: interactKey() }), hold: true, progress: p.progress };
+        if (allowControl && input.down('KeyE')) {
+          p.progress = Math.min(1, p.progress + dt / 1.2);
+          if (p.progress >= 1) {
+            p.done = true;
+            m[p.kind] += p.amount;
+            level.scene.remove(p.mesh);
+            level.audio.checkpoint();
+          }
+        }
+        break;
+      }
+      if (m.points.every((p) => p.done)) {
+        m.phase = 'build';
+        m.dest.ring.visible = true;
+        m.dest.icon.visible = true;
+        level.bus.emit('toast', t('🏗️ Ресурси зібрано — відновлюй центр міста 30 секунд!'));
+      }
+      return;
+    }
+    m.dest.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.18;
+    const d = Math.hypot(player.pos.x - m.dest.x, player.pos.z - m.dest.z);
+    const seconds = Math.ceil((1 - m.buildProgress) * 30);
+    m.title = t('Віднови центр міста: {n} с', { n: seconds });
+    if (d < m.dest.r) this.prompt = { text: t('Тримай {k} — відновлюй центр міста', { k: interactKey() }), hold: true, progress: m.buildProgress };
+    if (d < m.dest.r && allowControl && input.down('KeyE')) {
+      m.buildProgress = Math.min(1, m.buildProgress + dt / 30);
+      if (m.buildProgress >= 1) {
+        const monument = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 6), toonMat(0xc9b37c));
+        const column = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.1, 4, 10), toonMat(0xe0d2ae));
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.4, 4), toonMat(0x4f76a8));
+        base.position.y = 0.25; column.position.y = 2.5; roof.position.y = 5.2; roof.rotation.y = Math.PI / 4;
+        monument.add(base, column, roof);
+        monument.position.set(m.dest.x, m.dest.y, m.dest.z);
+        level.scene.add(monument);
+        m.rebuilt = monument;
+        level.bus.emit('toast', t('🏗️ Центр міста відновлено!'));
+        this._complete(m.id);
       }
     }
   }
@@ -1482,6 +1615,16 @@ export class DynamicMissions {
   _up_balloon(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.balloon, dt, input, allowControl); }
   _up_bazaar(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.bazaar, dt, input, allowControl); }
   _up_tomb(m, dt, input, allowControl) { this._upFetch(m, FETCH_CFG.tomb, dt, input, allowControl); }
+  _up_moonrescue(m, dt, input, allowControl) {
+    const active = m.state === 'active';
+    this._upFetch(m, FETCH_CFG.moonrescue, dt, input, allowControl);
+    if (active && m.state === 'done') {
+      this.level.world.time = Math.max(this.level.world.time || 0, 180);
+      this.level.nightK = 1;
+      this.level.world.setNight(1);
+      if (this.level.player.setLamp) this.level.player.setLamp(1);
+    }
+  }
 
   _makeTurkeyRescueShip(m) {
     const level = this.level;

@@ -61,6 +61,7 @@ export class World {
     this._buildTerrain();
     this._buildRoads();
     this._buildVegetation();
+    this._buildMapStyle();
     this._buildVillage();
     this._buildBarn();
     this._buildTower();
@@ -2345,7 +2346,7 @@ export class World {
       });
       bushes.castShadow = true;
       this.scene.add(bushes);
-      const rockPts = this._scatterPoints(90, 6, (x, z) =>
+      const rockPts = this._scatterPoints(this.map.mapStyle === 'stone' ? 230 : 90, this.map.mapStyle === 'stone' ? 3.5 : 6, (x, z) =>
         Math.hypot(x, z) < this.layout.BOUND + 8 && this.roadDist(x, z) > 5 && this._farFromSites(x, z, 5));
       const rockGeo = new THREE.IcosahedronGeometry(1, 0);
       const rockMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap, flatShading: true });
@@ -2362,23 +2363,32 @@ export class World {
       });
       rocks.castShadow = true;
       this.scene.add(rocks);
-      return;
+      if (this.map.mapStyle !== 'forest') return;
     }
     const isForest = (x, z) => this.fbmLow(x * 0.016 + 200, z * 0.016 + 200) > 0.12;
+    const B = this.layout.BOUND;
+    const forestCenters = [
+      { x: -B * 0.52, z: -B * 0.28 },
+      { x: B * 0.46, z: -B * 0.48 },
+      { x: B * 0.38, z: B * 0.45 },
+    ];
+    const styleForest = this.map.mapStyle === 'forest';
     const acceptTree = (x, z) => {
       const d = Math.hypot(x, z);
       if (d > this.layout.BOUND + 16) return false;
       if (this.roadDist(x, z) < 7) return false;
       if (!this._farFromSites(x, z, 10)) return false;
       if (Math.hypot(x - this.layout.village.x, z - this.layout.village.z) < 42 && !rng.chance(0.12)) return false;
+      if (styleForest) return forestCenters.some((c) => Math.hypot(x - c.x, z - c.z) < B * 0.15);
       // густий ліс у "лісових" зонах і по краю мапи
       if (d > this.layout.BOUND - 14) return true;
       return isForest(x, z) || rng.chance(0.22);
     };
 
     const pr = this.biome.pineRatio;
-    const oaks = this._scatterPoints(Math.round(340 * (1 - pr)), 4.5, acceptTree);
-    const pines = this._scatterPoints(Math.round(340 * pr), 4.5, (x, z) => acceptTree(x, z) && this.fbmHi(x * 0.02, z * 0.02) > -0.3);
+    const treeCount = styleForest ? 430 : 340;
+    const oaks = this._scatterPoints(Math.round(treeCount * (1 - pr)), 4.5, acceptTree);
+    const pines = this._scatterPoints(Math.round(treeCount * pr), 4.5, (x, z) => acceptTree(x, z) && this.fbmHi(x * 0.02, z * 0.02) > -0.3);
 
     // дуби: стовбур + 3 кулі крони
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 7);
@@ -2465,7 +2475,7 @@ export class World {
     this.scene.add(bushes);
 
     // камені
-    const rockPts = this._scatterPoints(70, 6, (x, z) =>
+    const rockPts = this._scatterPoints(this.map.mapStyle === 'stone' ? 220 : 70, this.map.mapStyle === 'stone' ? 3.5 : 6, (x, z) =>
       Math.hypot(x, z) < this.layout.BOUND + 8 && this.roadDist(x, z) > 5 && this._farFromSites(x, z, 5));
     const rockGeo = new THREE.IcosahedronGeometry(1, 0);
     const rockMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: trunkMat.gradientMap, flatShading: true });
@@ -2508,6 +2518,31 @@ export class World {
       stems.setMatrixAt(i, m4);
     });
     this.scene.add(stems);
+  }
+
+  _buildMapStyle() {
+    if (this.map.mapStyle !== 'lakes') return;
+    const lakes = this._scatterPoints(5, 38, (x, z) =>
+      Math.hypot(x, z) < this.layout.BOUND - 18 && this.roadDist(x, z) > 12 && this._farFromSites(x, z, 18));
+    const water = new THREE.MeshToonMaterial({
+      color: this.biome.water || 0x3f9fd4, transparent: true, opacity: 0.82,
+      gradientMap: toonMat(0).gradientMap, side: THREE.DoubleSide,
+    });
+    for (const p of lakes) {
+      const r = this.rng.range(6, 10);
+      const geo = new THREE.CircleGeometry(r, 28);
+      geo.rotateX(-Math.PI / 2);
+      this._drapeXZGeometry(geo, p.x, p.z, 0.28);
+      const lake = new THREE.Mesh(geo, water);
+      lake.position.set(p.x, 0, p.z);
+      lake.renderOrder = 1;
+      this.scene.add(lake);
+      const shore = new THREE.Mesh(new THREE.RingGeometry(r, r + 1.3, 28), toonMat(0xd9c98f));
+      shore.rotation.x = -Math.PI / 2;
+      this._drapeXZGeometry(shore.geometry, p.x, p.z, 0.08);
+      shore.position.set(p.x, 0, p.z);
+      this.staticGroup.add(shore);
+    }
   }
 
   // ---------- будинки ----------

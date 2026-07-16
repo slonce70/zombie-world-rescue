@@ -16,6 +16,9 @@ export const STORY_DELEGATE_MATCHES = {
   'ukr-rescue': { preferred: ['rescue'] },
   'ukr-signal': { preferred: ['repair'] },
   'ukr-defense': { preferred: ['clear'], compatible: ['defense'] },
+  'ukr-rebuild': { preferred: ['rebuild'] },
+  'ukr-bases': { preferred: ['bases'] },
+  'ukr-moon': { preferred: ['moonrescue'] },
   // 🪤 АНТИ-СОФТЛОК: у країнах із фірмовою місією (bonfire B/C, tomb B/C) фірма може
   // зайняти слот сусідньої цілі. Тоді слот-фолбек тієї цілі впирається у РЕЗЕРВ
   // (місія у preferred іншої цілі) і ціль лишається без делегата — бос не відкриється.
@@ -76,11 +79,13 @@ export function storyMissionSet(countryId, seed, runIndex) {
   const story = getCountryStory(countryId);
   if (!story) return set;
   const required = [];
-  let bonusRequired = null;
+  const bonusRequired = [];
   for (const obj of story.objectives) {
     const pref = (STORY_DELEGATE_MATCHES[obj.id] && STORY_DELEGATE_MATCHES[obj.id].preferred) || [];
     if (!pref[0]) continue;
-    if (MISSION_TYPES[pref[0]].slots.includes('D')) bonusRequired = pref[0];
+    if (MISSION_TYPES[pref[0]].slots.includes('D')) {
+      if (!bonusRequired.includes(pref[0])) bonusRequired.push(pref[0]);
+    }
     else if (!required.includes(pref[0])) required.push(pref[0]);
   }
   const rng = new RNG((seed * 31 + runIndex * 7777 + 91) >>> 0); // окремий сід від rollMissionSet
@@ -117,7 +122,10 @@ export function storyMissionSet(countryId, seed, runIndex) {
     const dPool = ['collect', 'hunt', 'lights', 'defense'].filter((type) => !set.slice(0, 3).includes(type));
     if (dPool.length) set[3] = dPool[rng.int(0, dPool.length - 1)];
   }
-  if (bonusRequired) set[3] = bonusRequired;
+  if (bonusRequired.length) {
+    set[3] = bonusRequired[0];
+    for (const type of bonusRequired.slice(1)) if (!set.includes(type)) set.push(type);
+  }
   return set;
 }
 
@@ -225,7 +233,8 @@ export class StoryMissions {
         });
       } else {
         const mission = this._delegateMissionForObjective(active);
-        const targets = mission && mission.points ? mission.points.filter((point) => !point.done) : this._objectiveTargets(active);
+        const next = mission && this.delegate._beamTarget(mission);
+        const targets = next ? [next] : mission && mission.points ? mission.points.filter((point) => !point.done) : this._objectiveTargets(active);
         for (const site of targets) {
           mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
         }

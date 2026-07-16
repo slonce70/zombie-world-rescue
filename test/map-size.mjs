@@ -10,7 +10,7 @@ await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe');
 
 const profiles = await page.evaluate(async () => {
-  const { MAP_SIZE_MODES, MAP_SIZE_METERS, mapSizeScale, scaleMap } = await import('/src/mapsize.js');
+  const { MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES, mapSizeScale, sanitizeMapStyle, scaleMap } = await import('/src/mapsize.js');
   const sample = {
     bound: 200,
     spawn: { x: 0, z: 170 },
@@ -25,7 +25,7 @@ const profiles = await page.evaluate(async () => {
       castle: map.storySites.castle, road: map.roads[0][1], terrain: map.terrain(10, 20),
     }];
   }));
-  return { modes, sourceBound: sample.bound, sourceCastle: sample.storySites.castle };
+  return { modes, styles: MAP_STYLE_MODES, badStyle: sanitizeMapStyle('bad'), sourceBound: sample.bound, sourceCastle: sample.storySites.castle };
 });
 
 check(profiles.modes.small.meters === 500 && profiles.modes.standard.meters === 750
@@ -41,6 +41,8 @@ check(profiles.modes.small.castle.x < -74 && profiles.modes.small.castle.r === 2
 check(profiles.modes.small.terrain === 45, 'рельєф читає координати у масштабі карти');
 check(profiles.sourceBound === 200 && profiles.sourceCastle.x === -112,
 'початковий конфіг карти не мутується');
+check(profiles.styles.join(',') === 'classic,forest,lakes,stone' && profiles.badStyle === 'classic',
+'доступні класична, лісова, озерна й камʼяна карти');
 
 const labels = [];
 await page.locator('#btn-menu').click();
@@ -57,8 +59,36 @@ check(labels.some((s) => s.includes('500')) && labels.some((s) => s.includes('75
 'кнопка показує всі 4 розміри', JSON.stringify(labels));
 check(saved.mapSize === 'standard' && saved.raw === 'standard', 'повний цикл повертає та зберігає стандартну карту');
 
+const styleLabels = [];
+for (let i = 0; i < 4; i++) {
+  styleLabels.push(await page.locator('#btn-map-style').innerText());
+  await page.evaluate(() => document.getElementById('btn-map-style').click());
+}
+const styleSaved = await page.evaluate(() => ({ mapStyle: window.__game.save.mapStyle, raw: JSON.parse(localStorage.getItem('zr-save-v1')).mapStyle }));
+check(['Класична', 'Лісова', 'Озерна', 'Камʼяна'].every((name) => styleLabels.some((s) => s.includes(name))),
+'кнопка показує всі 4 види карти', JSON.stringify(styleLabels));
+check(styleSaved.mapStyle === 'classic' && styleSaved.raw === 'classic', 'повний цикл повертає класичну карту');
+
+const runtimeStyles = [];
+for (const style of ['forest', 'lakes', 'stone']) {
+  await page.evaluate(async (value) => {
+    window.__game.save.mapStyle = value;
+    await window.__game.startLevel('UKR');
+  }, style);
+  await page.waitForFunction(() => window.__game?.state === 'level');
+  runtimeStyles.push(await page.evaluate(() => ({
+    level: window.__game.level.mapStyle,
+    world: window.__game.level.world.map.mapStyle,
+  })));
+  await page.evaluate(() => window.__game.endLevel());
+  await page.waitForFunction(() => window.__game?.state === 'globe');
+}
+check(runtimeStyles.every((x, i) => x.level === ['forest', 'lakes', 'stone'][i] && x.world === x.level),
+'лісова, озерна й камʼяна карти запускаються без помилок', JSON.stringify(runtimeStyles));
+
 await page.evaluate(async () => {
   window.__game.save.mapSize = 'small';
+  window.__game.save.mapStyle = 'classic';
   window.__game.saveGame();
   await window.__game.startLevel('POL');
 });
