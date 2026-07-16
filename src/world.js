@@ -3301,12 +3301,15 @@ export class World {
       return mesh;
     };
     const rampLen = 10;
+    const rampSteps = 20;
+    const stepRun = rampLen / rampSteps;
+    const stepRise = dungeonDepth / (rampSteps - 1);
     const rampAngle = Math.atan2(dungeonDepth, rampLen);
-    for (let i = 0; i < rampLen; i++) {
-      const px = tunnelStartX + i + 0.5;
-      const top = dungeonSurfaceY - dungeonDepth * (i + 0.5) / rampLen;
-      addBox(1.06, 0.65, 8.2, px, top - 0.325, z, floorM);
-      for (const side of [-1, 1]) addBox(1.06, 6, 0.6, px, top + 3, z + side * 4.2, tunnelM);
+    for (let i = 0; i < rampSteps; i++) {
+      const px = tunnelStartX + (i + 0.5) * stepRun;
+      const top = dungeonSurfaceY - i * stepRise;
+      addBox(stepRun + 0.04, 0.34, 8.2, px, top - 0.17, z, floorM);
+      for (const side of [-1, 1]) addBox(stepRun + 0.04, 6, 0.6, px, top + 3, z + side * 4.2, tunnelM);
     }
     const rampCeiling = addBox(Math.hypot(rampLen, dungeonDepth), 0.45, 8.4,
       tunnelStartX + rampLen / 2, dungeonSurfaceY + 5.8 - dungeonDepth / 2, z, ceilingM);
@@ -3382,7 +3385,11 @@ export class World {
     const dungeonCollider = { x: dungeonX + 0.5, z, r: 3.3, top: dungeonSurfaceY + 5.5 };
     const floorHeightAt = (px, pz) => {
       if (px >= tunnelStartX && px <= tunnelStartX + 20 && Math.abs(pz - z) <= 4.2) {
-        return dungeonSurfaceY - dungeonDepth * Math.min(1, (px - tunnelStartX) / rampLen);
+        if (px < tunnelStartX + rampLen) {
+          const step = Math.min(rampSteps - 1, Math.floor((px - tunnelStartX) / stepRun));
+          return dungeonSurfaceY - step * stepRise;
+        }
+        return dungeonY;
       }
       if (Math.abs(px - (tunnelStartX + 20)) <= 4.2 && pz >= z && pz <= tunnelEndZ) return dungeonY;
       if (px >= tunnelStartX + 20 && px <= tunnelEndX && Math.abs(pz - tunnelEndZ) <= 4.2) return dungeonY;
@@ -3393,6 +3400,8 @@ export class World {
       group: grate, entrance: dungeonShell, tunnel, grate, collider: dungeonCollider,
       x: chamberX, z: tunnelEndZ, y: dungeonY, surfaceY: dungeonSurfaceY,
       depth: dungeonDepth, entranceX: dungeonX, entranceZ: z, tunnelStartX, floorHeightAt,
+      enemyMinX: tunnelStartX + rampLen,
+      stairCount: rampSteps,
       length: 50,
       chamberSize,
       path: [
@@ -3402,16 +3411,16 @@ export class World {
         { x: tunnelEndX, z: tunnelEndZ },
       ],
       wizardSpawns: [
-        { x: tunnelStartX + 8, z },
-        { x: tunnelStartX + 16, z },
+        { x: tunnelStartX + 12, z },
+        { x: tunnelStartX + 17, z },
         { x: tunnelStartX + 20, z: z + 6 },
         { x: chamberX - 4, z: tunnelEndZ - 4 },
         { x: chamberX + 4, z: tunnelEndZ + 4 },
       ],
       stoneSpawns: [
-        { x: tunnelStartX + 4, z: z - 2 }, { x: tunnelStartX + 7, z: z + 2 },
-        { x: tunnelStartX + 11, z: z + 1.5 }, { x: tunnelStartX + 14, z: z - 2 },
-        { x: tunnelStartX + 18, z: z + 2 }, { x: tunnelStartX + 18, z: z + 5 },
+        { x: tunnelStartX + 11, z: z - 2 }, { x: tunnelStartX + 13, z: z + 2 },
+        { x: tunnelStartX + 15, z: z + 1.5 }, { x: tunnelStartX + 17, z: z - 2 },
+        { x: tunnelStartX + 19, z: z + 2 }, { x: tunnelStartX + 18, z: z + 5 },
         { x: tunnelStartX + 22, z: z + 8 },
         { x: chamberX - 5, z: tunnelEndZ + 5 }, { x: chamberX, z: tunnelEndZ - 5 },
         { x: chamberX + 5, z: tunnelEndZ + 1 }, { x: chamberX + 2, z: tunnelEndZ + 6 },

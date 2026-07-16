@@ -507,7 +507,7 @@ export class Player {
 
     // 🏔️ чесні схили: пішки у відвісну кручу не зайти (стрибком на уступ — можна).
     // Межа ~55°; перевіряємо лише на картах із великим рельєфом
-    if (world._terrainMod && this.onGround) {
+    if (world._terrainMod && this.onGround && !this.inCastleDungeon) {
       const gh0 = world.groundH(preSlopeX, preSlopeZ);
       const allow = (ax, az) =>
         world.groundH(ax, az) - gh0 <= Math.hypot(ax - preSlopeX, az - preSlopeZ) * 1.45 + 0.3;
@@ -520,15 +520,29 @@ export class Player {
 
     const surfaceH = world.groundH(this.pos.x, this.pos.z);
     const dungeon = world.castleDungeon?.open ? world.castleDungeon : null;
-    const dungeonH = dungeon ? dungeon.floorHeightAt(this.pos.x, this.pos.z) : null;
+    let dungeonH = dungeon ? dungeon.floorHeightAt(this.pos.x, this.pos.z) : null;
     if (dungeonH !== null && dungeonH !== undefined) {
       const enteredThroughMouth = preSlopeX < dungeon.tunnelStartX
         && this.pos.x >= dungeon.tunnelStartX
         && Math.abs(this.pos.z - dungeon.entranceZ) < 3.7;
       const alreadyBelowGround = this.pos.y < surfaceH - 1.5;
       if (enteredThroughMouth || alreadyBelowGround) this.inCastleDungeon = true;
-    } else {
-      this.inCastleDungeon = false;
+    } else if (this.inCastleDungeon && dungeon) {
+      const leftThroughMouth = preSlopeX >= dungeon.tunnelStartX
+        && this.pos.x < dungeon.tunnelStartX
+        && Math.abs(this.pos.z - dungeon.entranceZ) < 3.7
+        && this.pos.y >= dungeon.surfaceY - 0.5;
+      if (leftThroughMouth) {
+        this.inCastleDungeon = false;
+      } else {
+        // Стіна не є виходом: повертаємо останню валідну підземну позицію,
+        // замість того щоб підхопити поверхневий groundH і телепортувати героя нагору.
+        this.pos.x = preSlopeX;
+        this.pos.z = preSlopeZ;
+        dungeonH = dungeon.floorHeightAt(preSlopeX, preSlopeZ);
+        this.vel.x = 0;
+        this.vel.z = 0;
+      }
     }
     const supportH = this.inCastleDungeon && dungeonH !== null && dungeonH !== undefined
       ? dungeonH
@@ -547,6 +561,13 @@ export class Player {
     const solved = world.collide(this.pos.x, this.pos.z, 0.45, this.pos.y);
     this.pos.x = solved.x;
     this.pos.z = solved.z;
+    if (this.inCastleDungeon && dungeon
+      && dungeon.floorHeightAt(this.pos.x, this.pos.z) === null) {
+      this.pos.x = preSlopeX;
+      this.pos.z = preSlopeZ;
+      this.vel.x = 0;
+      this.vel.z = 0;
+    }
     // 🛴 врізались у перешкоду — самокат різко гальмує
     if (this.riding && Math.hypot(solved.x - preX, solved.z - preZ) > 0.04) {
       this.rideSpeed *= 0.35;

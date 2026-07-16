@@ -1123,7 +1123,9 @@ export class Zombies {
         for (const pl of targets) {
           if (pl.health <= 0) continue;
           if (!pl.clone && pl.invisibleT > 0) continue;
-          const d = Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z);
+          const pp = pl.pos;
+          if (z.zone === 'castle-dungeon' && pp.y >= this.world.castleDungeon.surfaceY - 1.5) continue;
+          const d = Math.hypot(pp.x - z.x, pp.z - z.z);
           if (d < distP) { distP = d; tgt = pl; }
         }
       }
@@ -1756,6 +1758,14 @@ export class Zombies {
     const solved = this.world.collide(z.x, z.z, z.rig.radius * 0.8, z.y);
     z.x = solved.x;
     z.z = solved.z;
+    const dungeon = z.zone === 'castle-dungeon' ? this.world.castleDungeon : null;
+    if (dungeon && (z.x < dungeon.enemyMinX || dungeon.floorHeightAt(z.x, z.z) === null)) {
+      const startWasInside = startX >= dungeon.enemyMinX && dungeon.floorHeightAt(startX, startZ) !== null;
+      z.x = startWasInside ? startX : z.anchor.x;
+      z.z = startWasInside ? startZ : z.anchor.z;
+      z.kbX = 0;
+      z.kbZ = 0;
+    }
     const gh = z.zone === 'castle-dungeon' ? this.world.dungeonGroundH(z.x, z.z) : this.world.groundH(z.x, z.z);
     z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
     z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
@@ -1808,7 +1818,13 @@ export class Zombies {
           const a = this.rng.next() * 6.28;
           const r = this.rng.range(1.6, 3.2);
           const mtype = this.rng.chance(0.5) ? 'runner' : 'walker';
-          const mz = this.spawn(mtype, z.x + Math.cos(a) * r, z.z + Math.sin(a) * r, { groupId: z.groupId });
+          const spawnOpts = { groupId: z.groupId };
+          if (z.zone === 'castle-dungeon') Object.assign(spawnOpts, {
+            zone: z.zone,
+            guard: true,
+            anchor: { x: z.x, z: z.z, r: 4 },
+          });
+          const mz = this.spawn(mtype, z.x + Math.cos(a) * r, z.z + Math.sin(a) * r, spawnOpts);
           mz.aggroed = true;
           mz.state = 'chase';
           mz._summonedBy = z;
