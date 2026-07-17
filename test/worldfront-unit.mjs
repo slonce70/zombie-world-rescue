@@ -106,6 +106,25 @@ test('reducer supports retry, abandon, resume and visible deterministic stage co
   assert.equal(front.board[0].status, 'available');
 });
 
+test('evacuation becomes a country-specific rebirth operation', () => {
+  const cases = [
+    ['UKR', 'rebuild-center'],
+    ['POL', 'rescue-train'],
+    ['TUR', 'rescue-ship'],
+  ];
+  for (const [country, firstStage] of cases) {
+    let front = createFront({ seed: 900, liberated: [country] });
+    front = reduce(front, { type: 'START_OPERATION', operationId: front.board[0].id }).front;
+    assert.equal(frontStageConfig(front).missionPreset, firstStage);
+    front = reduce(reduce(front, { type: 'START_STAGE' }).front, { type: 'COMPLETE_STAGE' }).front;
+    const night = frontStageConfig(front);
+    assert.equal(night.missionPreset, 'night-evacuation');
+    assert.deepEqual(night.modeOpts, { defense: 'zone' });
+    front.projects.radio = 2;
+    assert.deepEqual(frontViewModel(front).board[0].stages, [firstStage, 'night-evacuation', 'commander-pursuer']);
+  }
+});
+
 test('operation and cycle rewards are canonical, stable and idempotent', () => {
   let front = createFront({ seed: 505, liberated: ['UKR', 'POL', 'DEU'] });
   for (let index = 0; index < 3; index++) {

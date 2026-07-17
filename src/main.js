@@ -51,7 +51,7 @@ import {
 import { RadiationMode, RADIATION_UNLOCK_COUNTRIES, RADIATION_WIN_COINS } from './radiationmode.js';
 import {
   HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
-  HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, setAnim, updateRig,
+  HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
 } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
 import { LeagueUI } from './ui/leagueui.js';
@@ -126,7 +126,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 531;
+const APP_VERSION = 532;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -151,6 +151,9 @@ const BIOME_EXPOSURE = {
 };
 const FRONT_MISSION_PRESETS = Object.freeze({
   'rescue-group': ['rescue'],
+  'rebuild-center': ['rebuild'],
+  'rescue-train': ['repair'],
+  'rescue-ship': ['shiprescue'],
   'destroy-nests': ['nests'],
   'repair-generator': ['repair'],
   'activate-beacons': ['lights'],
@@ -2482,7 +2485,10 @@ class Game {
       level.defense.towerMaxHp = Math.round(level.defense.towerMaxHp * level.operationEffects.alliedObjectHealthMultiplier);
       level.defense.towerHp = level.defense.towerMaxHp;
     }
-    this._addFrontOutpost(level, front.restored[level.countryId] || 0);
+    if (level.operation.template === 'evacuation' && level.operation.stage === 1) {
+      this._addFrontEvacuees(level);
+      if (level.defense && level.defense.zone) level.defense.timer = Math.min(level.defense.timer, 75);
+    }
     this._addFrontSupport(level);
     level.bus.on('zombieKilled', (zombie) => {
       if (!zombie || !zombie.frontCommander || this.victoryShown || level._frontFinished) return;
@@ -2501,28 +2507,95 @@ class Game {
     const tier = Math.max(0, Math.min(3, restoredLevel | 0));
     if (!tier) return;
     const village = level.world.layout.village || level.world.layout.SPAWN;
-    const x = village.x + Math.min(8, (village.r || 20) * 0.25);
-    const z = village.z + Math.min(8, (village.r || 20) * 0.25);
+    const x = village.x + Math.min(20, Math.max(12, (village.r || 20) * 0.5));
+    const z = village.z - Math.min(16, Math.max(10, (village.r || 20) * 0.4));
     const y = level.world.groundH(x, z);
     const group = new THREE.Group();
     group.name = 'front-rescue-outpost';
-    const wood = new THREE.MeshStandardMaterial({ color: 0xc58b52, roughness: 0.9 });
-    const safe = new THREE.MeshStandardMaterial({ color: 0x55d779, roughness: 0.8 });
-    const base = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.8, 1.8), wood);
-    base.position.y = 0.4;
-    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.7, 0.08), safe);
-    flag.position.set(-1.25, 1.35, 0);
-    group.add(base, flag);
-    if (tier >= 2) {
-      const tent = new THREE.Mesh(new THREE.ConeGeometry(1.35, 1.7, 4), safe);
-      tent.rotation.y = Math.PI / 4;
-      tent.position.set(0.3, 1.45, 0);
-      group.add(tent);
+    const wall = new THREE.MeshStandardMaterial({ color: tier >= 3 ? 0xe6ddd0 : 0xc89c68, roughness: 0.88 });
+    const roofM = new THREE.MeshStandardMaterial({ color: 0x784638, roughness: 0.82 });
+    const safe = new THREE.MeshStandardMaterial({ color: 0x55d779, roughness: 0.75 });
+    const glow = new THREE.MeshStandardMaterial({ color: 0xffd879, emissive: 0xffb43b, emissiveIntensity: 0.8 });
+    const width = tier >= 3 ? 13 : tier >= 2 ? 10 : 7;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(width, tier >= 3 ? 6.5 : 4.2, 7), wall);
+    body.position.y = tier >= 3 ? 3.25 : 2.1;
+    body.castShadow = body.receiveShadow = true;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(width * 0.72, 3, 4), roofM);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = tier >= 3 ? 7.5 : 5.4;
+    roof.castShadow = true;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.1, 3.2, 0.25), roofM);
+    door.position.set(0, 1.6, 3.62);
+    group.add(body, roof, door);
+    for (const sx of [-1, 1]) {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.25, 0.18), glow);
+      window.position.set(sx * width * 0.27, tier >= 3 ? 4.1 : 2.8, 3.64);
+      group.add(window);
     }
-    if (tier >= 3) base.scale.set(1.35, 1.1, 1.35);
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.2, 0.12), safe);
+    flag.position.set(-width * 0.58, 2.1, 2.5);
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1), safe);
+    cloth.position.set(-width * 0.58 + 0.9, 3.65, 2.5);
+    group.add(flag, cloth);
+    if (tier >= 2) {
+      const clinic = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.7, 4), wall);
+      clinic.position.set(width * 0.65, 1.35, -1.2);
+      clinic.castShadow = true;
+      group.add(clinic);
+    }
     group.position.set(x, y, z);
     level.scene.add(group);
     level.frontOutpostDrawCalls = group.children.length;
+    level.frontLivingCity = { x, z, tier, group, citizens: [] };
+    const kinds = ['boy', 'girl', 'granny', 'medic', 'farmer', 'mechanic'];
+    const count = 2 + tier * 2;
+    for (let i = 0; i < count; i++) {
+      const rig = makeCivilian(kinds[i % kinds.length], level.rng);
+      const angle = (i / count) * Math.PI * 2;
+      const radius = 7 + (i % 2) * 2;
+      const cx = x + Math.cos(angle) * radius;
+      const cz = z + Math.sin(angle) * radius;
+      rig.group.position.set(cx, level.world.groundH(cx, cz), cz);
+      rig.group.rotation.y = angle + Math.PI / 2;
+      setAnim(rig, i % 3 === 0 ? 'walk' : 'idle');
+      level.scene.add(rig.group);
+      level.frontLivingCity.citizens.push({ rig, angle, radius, speed: 0.08 + (i % 3) * 0.025 });
+    }
+  }
+
+  _addFrontEvacuees(level) {
+    const cx = level.defense ? level.defense.cx : level.world.layout.arena.x;
+    const cz = level.defense ? level.defense.cz : level.world.layout.arena.z;
+    level.frontEvacuees = [];
+    for (let i = 0; i < 6; i++) {
+      const rig = makeCivilian(['boy', 'girl', 'granny', 'farmer'][i % 4], level.rng);
+      const angle = i * Math.PI / 3;
+      const x = cx + Math.cos(angle) * 5;
+      const z = cz + Math.sin(angle) * 5;
+      rig.group.position.set(x, level.world.groundH(x, z), z);
+      rig.group.rotation.y = -angle;
+      setAnim(rig, 'idle');
+      level.scene.add(rig.group);
+      level.frontEvacuees.push(rig);
+    }
+  }
+
+  _updateLivingCity(level, dt) {
+    const city = level.frontLivingCity;
+    if (city) {
+      const now = level.stats.time;
+      city.citizens.forEach((citizen, index) => {
+        if (index % 3 === 0) {
+          const angle = citizen.angle + now * citizen.speed;
+          const x = city.x + Math.cos(angle) * citizen.radius;
+          const z = city.z + Math.sin(angle) * citizen.radius;
+          citizen.rig.group.position.set(x, level.world.groundH(x, z), z);
+          citizen.rig.group.rotation.y = -angle;
+        }
+        updateRig(citizen.rig, dt);
+      });
+    }
+    if (level.frontEvacuees) for (const rig of level.frontEvacuees) updateRig(rig, dt);
   }
 
   _addFrontSupport(level) {
@@ -2860,10 +2933,13 @@ class Game {
     const country = { ...baseCountry, map: { ...scaleMap(baseCountry.map, mapSize), mapStyle } };
     const coopFront = opts.operation && opts.coop && opts.coop.role === 'guest'
       ? opts.coop.session.frontRun : null;
-    const savedFront = opts.operation
-      ? sanitizeFront(coopFront || this.save.front, coopFront ? {} : this._frontContext())
+    const savedFront = sanitizeFront(
+      (opts.operation && coopFront) || this.save.front,
+      opts.operation && coopFront ? {} : this._frontContext(),
+    );
+    const savedOperation = savedFront && opts.operation
+      ? savedFront.board.find((item) => item.id === opts.operation.operationId)
       : null;
-    const savedOperation = savedFront && savedFront.board.find((item) => item.id === opts.operation.operationId);
     const derivedFrontStage = savedFront && opts.operation ? frontStageConfig(savedFront) : null;
     const operation = opts.operation && savedOperation ? {
       ...opts.operation,
@@ -3172,7 +3248,10 @@ class Game {
         isCoop: !!coop,
         isPlayground,
       }) && !this._forceMissionSet && !level.expedition && !operation;
-      const frontMissions = operation && FRONT_MISSION_PRESETS[operation.missionPreset];
+      const frontPreset = coop && operation && operation.missionPreset === 'rebuild-center'
+        ? 'rescue-group'
+        : operation && operation.missionPreset;
+      const frontMissions = frontPreset && FRONT_MISSION_PRESETS[frontPreset];
       level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, frontMissions || null, { objectiveOnly: !!operation });
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
@@ -3686,6 +3765,9 @@ class Game {
     }
 
     this.level = level;
+    if (savedFront && (level.operation || modeId === 'campaign')) {
+      this._addFrontOutpost(level, savedFront.restored[level.countryId] || 0);
+    }
     if (level.operation) this._initFrontRuntime(level, savedFront);
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {
       level.zombies.spawnEliteWave(4);
@@ -5260,6 +5342,7 @@ class Game {
         this.level.world.update(simDt, this.level.player.pos);
         this.level.effects.update(simDt);
         this.level.stats.time += timerDt;
+        this._updateLivingCity(this.level, simDt);
         this._updateDayNight();
         // 🌪️ піщана буря Єгипту: оверлей туману лягає ПІСЛЯ нічного перерахунку
         if (this.level.sandstorm) this.level.sandstorm.update(simDt);
@@ -5303,6 +5386,7 @@ class Game {
     else if (ct < 215) k = 1 - (ct - 195) / 20;
     k = k * k * (3 - 2 * k); // плавні переходи
     if (level.infected) k = Math.max(k, 0.45);
+    if (level.operation && level.operation.template === 'evacuation' && level.operation.stage === 1) k = Math.max(k, 0.9);
     if ((level.weeklyMod && level.weeklyMod.night) || (level.weeklyMutator && level.weeklyMutator.night)) k = Math.max(k, 0.75);
     level.nightK = k;
     level.world.setNight(k);

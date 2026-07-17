@@ -2518,4 +2518,10 @@ export const EN = {
 "💥 Ворота знищено! Зачисть 25 зомбі та 5 лицарів!": "💥 The gate is destroyed! Defeat 25 zombies and 5 knights!",
 "⚔️ Лицар-зомбі: тіло 150, нагрудник 500, шолом 250!": "⚔️ Zombie knight: 150 body HP, 500 chest armor, 250 helmet!",
 "🎉 Людей врятовано з підземелля!": "🎉 The people have been rescued from the dungeon!",
+"Відродження": "Rebirth",
+"Підготуй місто, переживи ніч і врятуй людей": "Prepare the city, survive the night, and rescue the people",
+"Відбудова центру міста": "Rebuild the city center",
+"Запуск рятувального поїзда": "Launch the rescue train",
+"Ремонт рятувального корабля": "Repair the rescue ship",
+"Нічна евакуація міста": "Night evacuation of the city",
 };

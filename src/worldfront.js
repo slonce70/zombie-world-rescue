@@ -38,6 +38,19 @@ export const FRONT_TEMPLATES = Object.freeze({
   }),
 });
 
+const EVACUATION_STAGES = Object.freeze({
+  UKR: Object.freeze(['rebuild-center', 'night-evacuation', 'commander-pursuer']),
+  POL: Object.freeze(['rescue-train', 'night-evacuation', 'commander-pursuer']),
+  TUR: Object.freeze(['rescue-ship', 'night-evacuation', 'commander-pursuer']),
+});
+
+function operationStages(operation) {
+  if (operation.template === 'evacuation' && EVACUATION_STAGES[operation.country]) {
+    return EVACUATION_STAGES[operation.country];
+  }
+  return FRONT_TEMPLATES[operation.template].stages;
+}
+
 const TEMPLATE_IDS = Object.freeze(Object.keys(FRONT_TEMPLATES));
 const PROJECT_SET = new Set(FRONT_PROJECTS);
 const COUNTRY_SET = new Set(CAMPAIGN_COUNTRIES);
@@ -140,10 +153,10 @@ function specialistId(value, rescuedFriends, enforceAvailability) {
 }
 
 function stageAdapter(front, operation, stage) {
-  const preset = FRONT_TEMPLATES[operation.template].stages[stage];
+  const preset = operationStages(operation)[stage];
   let modeId = 'campaign';
   let modeOpts = {};
-  if (preset === 'evacuation-zone') {
+  if (preset === 'evacuation-zone' || preset === 'night-evacuation') {
     modeId = 'defense';
     modeOpts = { defense: 'zone' };
   } else if (preset === 'close-portals') {
@@ -474,7 +487,7 @@ export function frontViewModel(value, save = {}, { previewSpecialist = null } = 
       recommended: operation.id === recommended,
       countryState: frontCountryState(front, operation.country),
       commander: radio >= 1 || scoutIntel ? template.commander : null,
-      stages: radio >= 2 ? template.stages.slice() : [],
+      stages: radio >= 2 ? operationStages(operation).slice() : [],
       reward: radio >= 3 ? { coins: 200 + operation.threat * 50, crystals: 1 + operation.threat } : null,
     };
   });

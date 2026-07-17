@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { COUNTRIES } from '../countries.js';
 
 const TEMPLATE_UI = {
-  evacuation: { icon: '🚑', name: 'Евакуація', desc: 'Врятуй людей і втримай зону' },
+  evacuation: { icon: '🏘️', name: 'Відродження', desc: 'Підготуй місто, переживи ніч і врятуй людей' },
   outbreak: { icon: '🦠', name: 'Спалах', desc: 'Знищ гнізда і закрий портали' },
   siege: { icon: '🛡️', name: 'Облога', desc: 'Полагодь генератор і відбий орду' },
   hunt: { icon: '🎯', name: 'Полювання', desc: 'Знайди маяки і знешкодь командира' },
@@ -13,6 +13,10 @@ const STAGE_UI = {
   'rescue-group': 'Порятунок групи',
   'evacuation-zone': 'Зона евакуації',
   'commander-pursuer': 'Командир-переслідувач',
+  'rebuild-center': 'Відбудова центру міста',
+  'rescue-train': 'Запуск рятувального поїзда',
+  'rescue-ship': 'Ремонт рятувального корабля',
+  'night-evacuation': 'Нічна евакуація міста',
   'destroy-nests': 'Знищення гнізд',
   'close-portals': 'Закриття порталів',
   'commander-queen': 'Командир-королева',
