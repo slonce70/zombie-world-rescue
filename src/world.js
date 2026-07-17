@@ -1232,7 +1232,7 @@ export class World {
     this._makeSign(x + 6, z - 4, t('СОБОР СВЯТОЇ КОРИДИ'), 0.4);
   }
 
-  // 🏛️ Іспанський зомбі-маєток: територія 350×350 м і прохідний будинок у два поверхи.
+  // 🏛️ Іспанський зомбі-маєток: сам будинок 350×350 м, два поверхи, кімнати й коридори.
   _lmZombieManor({ x, z, w, d }) {
     const gy = this.groundH(x, z);
     const group = new THREE.Group();
@@ -1249,84 +1249,128 @@ export class World {
       return mesh;
     };
 
-    // Кам'яна огорожа має відкриту західну браму навпроти дороги.
-    const halfW = w / 2, halfD = d / 2, gate = 12;
-    addBox(w, 1.5, 0.7, x, gy + 0.75, z - halfD, stone);
-    addBox(w, 1.5, 0.7, x, gy + 0.75, z + halfD, stone);
-    addBox(0.7, 1.5, d, x + halfW, gy + 0.75, z, stone);
-    addBox(0.7, 1.5, halfD - gate / 2, x - halfW, gy + 0.75, z - (halfD + gate / 2) / 2, stone);
-    addBox(0.7, 1.5, halfD - gate / 2, x - halfW, gy + 0.75, z + (halfD + gate / 2) / 2, stone);
-    for (const gz of [z - gate / 2, z + gate / 2]) addBox(1.8, 4.5, 1.8, x - halfW, gy + 2.25, gz, trim);
+    const bx = x, bz = z;
+    const BW = w, BD = d, H = 10, doorW = 7;
+    const halfW = BW / 2, halfD = BD / 2;
+    const entranceX = bx - halfW;
 
-    const addFenceColliders = (x1, z1, x2, z2, skipGate = false) => {
-      const len = Math.hypot(x2 - x1, z2 - z1);
-      const n = Math.ceil(len / 3);
+    // Дорога на карті веде прямо до західного парадного входу.
+    addBox(18, 0.08, 9, entranceX - 8, gy + 0.08, bz, toonMat(0xb7a58d));
+
+    // ponytail: локальний генератор сегментованої стіни; двері — просто розриви,
+    // цього досить для геометрії, куль і навігації без окремої системи кімнат.
+    const solidWall = (x1, z1, x2, z2) => {
+      const dx = x2 - x1, dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.5) return;
+      const mesh = addBox(len, H, 0.45, (x1 + x2) / 2, gy + H / 2, (z1 + z2) / 2);
+      mesh.rotation.y = -Math.atan2(dz, dx);
+      const n = Math.ceil(len / 1.1);
       for (let i = 0; i <= n; i++) {
         const k = i / n;
-        const px = x1 + (x2 - x1) * k, pz = z1 + (z2 - z1) * k;
-        if (skipGate && Math.abs(pz - z) < gate / 2) continue;
-        this._addCollider(px, pz, 1.55, gy + 1.5, 0.6);
+        this._addCollider(x1 + dx * k, z1 + dz * k, 0.62, gy + H, 0.45);
       }
     };
-    addFenceColliders(x - halfW, z - halfD, x + halfW, z - halfD);
-    addFenceColliders(x - halfW, z + halfD, x + halfW, z + halfD);
-    addFenceColliders(x + halfW, z - halfD, x + halfW, z + halfD);
-    addFenceColliders(x - halfW, z - halfD, x - halfW, z + halfD, true);
+    const wallWithDoors = (x1, z1, x2, z2, doors = []) => {
+      const dx = x2 - x1, dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
+      const ux = dx / len, uz = dz / len;
+      let from = 0;
+      for (const center of [...doors].sort((a, b) => a - b)) {
+        const left = Math.max(from, center - doorW / 2);
+        solidWall(x1 + ux * from, z1 + uz * from, x1 + ux * left, z1 + uz * left);
+        from = Math.min(len, center + doorW / 2);
+      }
+      solidWall(x1 + ux * from, z1 + uz * from, x2, z2);
+    };
 
-    // Під'їзна алея від брами до парадного входу.
-    const bx = x + 18, bz = z + 27;
-    const entranceZ = bz - 19;
-    const dx = bx - (x - halfW), dz = entranceZ - z;
-    const drive = addBox(Math.hypot(dx, dz), 0.08, 8, (bx + x - halfW) / 2, gy + 0.08, (entranceZ + z) / 2, toonMat(0xb7a58d));
-    drive.rotation.y = -Math.atan2(dz, dx);
+    // Зовнішні стіни: західна має головний вхід, інші — суцільні.
+    wallWithDoors(bx - halfW, bz - halfD, bx - halfW, bz + halfD, [halfD]);
+    solidWall(bx + halfW, bz - halfD, bx + halfW, bz + halfD);
+    solidWall(bx - halfW, bz - halfD, bx + halfW, bz - halfD);
+    solidWall(bx - halfW, bz + halfD, bx + halfW, bz + halfD);
 
-    // Сам маєток: 52×38 і два справжні прохідні поверхи по 5 м.
-    const BW = 52, BD = 38, H = 10, doorW = 5;
+    // Великий центральний коридор і по чотири кімнати з кожного боку на кожному поверсі.
+    const corridorHalf = 7;
+    const roomCuts = [-45, 0, 45];
+    const doorXs = [-69, -22.5, 22.5, 69].map((v) => halfW + Math.max(-halfW + 8, Math.min(halfW - 8, v)));
+    wallWithDoors(bx - halfW, bz - corridorHalf, bx + halfW, bz - corridorHalf, doorXs);
+    wallWithDoors(bx - halfW, bz + corridorHalf, bx + halfW, bz + corridorHalf, doorXs);
+    for (const cut of roomCuts) {
+      const lx = bx + Math.max(-halfW + 12, Math.min(halfW - 12, cut));
+      wallWithDoors(lx, bz - halfD, lx, bz - corridorHalf, [halfD - corridorHalf - 5]);
+      wallWithDoors(lx, bz + corridorHalf, lx, bz + halfD, [5]);
+    }
+
+    // Два справжні прохідні поверхи.
     addBox(BW, 0.35, BD, bx, gy + 0.18, bz, floorMat);
     addBox(BW, 0.3, BD, bx, gy + 5, bz, floorMat);
-    const sideW = (BW - doorW) / 2;
-    addBox(sideW, H, 0.45, bx - (doorW + sideW) / 2, gy + H / 2, bz - BD / 2);
-    addBox(sideW, H, 0.45, bx + (doorW + sideW) / 2, gy + H / 2, bz - BD / 2);
-    addBox(BW, H, 0.45, bx, gy + H / 2, bz + BD / 2);
-    addBox(0.45, H, BD, bx - BW / 2, gy + H / 2, bz);
-    addBox(0.45, H, BD, bx + BW / 2, gy + H / 2, bz);
     addBox(BW + 2, 0.8, BD + 2, bx, gy + H + 0.4, bz, roof);
-    for (const sx of [-1, 1]) addBox(4, 1, 1.1, bx + sx * 16, gy + H + 1.2, bz, trim);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      addBox(5, 2.2, 5, bx + sx * (halfW - 5), gy + H + 1.1, bz + sz * (halfD - 5), trim);
+    }
 
-    // Широкі сходи: кожна сходинка є реальною поверхнею для руху гравця.
-    const steps = 12, stairX = bx - 17, stairStartZ = bz - 11;
+    // Сходи йдуть уздовж центрального коридору від входу на другий поверх.
+    const steps = 16, stairStartX = entranceX + 18, stairZ = bz;
     for (let i = 0; i < steps; i++) {
       const top = gy + ((i + 1) * 5) / steps;
-      const pz = stairStartZ + i * 1.25;
-      addBox(5.5, top - gy, 1.35, stairX, gy + (top - gy) / 2, pz, stone);
-      this.floors.push({ x: stairX, z: pz, ry: 0, w: 5.6, d: 1.45, top });
+      const px = stairStartX + i * 1.4;
+      addBox(1.5, top - gy, 5.5, px, gy + (top - gy) / 2, stairZ, stone);
+      this.floors.push({ x: px, z: stairZ, ry: 0, w: 1.6, d: 5.6, top });
     }
     this.floors.push({ x: bx, z: bz, ry: 0, w: BW - 0.8, d: BD - 0.8, top: gy + 0.35 });
     this.floors.push({ x: bx, z: bz, ry: 0, w: BW - 0.8, d: BD - 0.8, top: gy + 5.15 });
 
-    // Вікна двох поверхів і камера із заручниками нагорі.
-    const glass = toonMat(0x78bce8, 0x3d80b8, 0.35);
-    for (const sy of [2.5, 7.5]) for (const sx of [-19, -10, 10, 19]) {
-      addBox(3.2, 2.1, 0.12, bx + sx, gy + sy, bz - BD / 2 - 0.25, glass);
-      addBox(3.2, 2.1, 0.12, bx + sx, gy + sy, bz + BD / 2 + 0.25, glass);
+    // Парадний портик: високі колони, балкон і герб одразу відрізняють маєток від паркану.
+    for (const pz of [bz - 5.3, bz + 5.3]) {
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 8, 10), stone);
+      column.position.set(entranceX - 2.2, gy + 4, pz);
+      column.castShadow = true;
+      group.add(column);
     }
-    const hostage = { x: bx + 15, z: bz + 9, y: gy + 5.15 };
-    for (let i = -2; i <= 2; i++) addBox(0.18, 3.2, 0.18, hostage.x + i * 0.8, hostage.y + 1.6, hostage.z, trim);
+    addBox(5.5, 0.55, 14, entranceX - 1.7, gy + 8.1, bz, trim);
+    addBox(2.8, 0.35, 10, entranceX - 2.8, gy + 5.15, bz, stone);
+    const crest = new THREE.Mesh(new THREE.OctahedronGeometry(1.25, 0), toonMat(0xe2b849, 0xa86b20, 0.35));
+    crest.position.set(entranceX - 2.05, gy + 9.15, bz);
+    group.add(crest);
 
-    this._addWallColliders(bx, bz, 0, -BW / 2, -BD / 2, BW / 2, -BD / 2, gy + H, BW / 2, doorW);
-    this._addWallColliders(bx, bz, 0, -BW / 2, BD / 2, BW / 2, BD / 2, gy + H);
-    this._addWallColliders(bx, bz, 0, -BW / 2, -BD / 2, -BW / 2, BD / 2, gy + H);
-    this._addWallColliders(bx, bz, 0, BW / 2, -BD / 2, BW / 2, BD / 2, gy + H);
+    // Вікна, освітлення та прості меблі роблять усі 16 кімнат упізнаваними.
+    const glass = toonMat(0x78bce8, 0x3d80b8, 0.35);
+    for (const sy of [2.5, 7.5]) for (const k of [-0.36, -0.12, 0.12, 0.36]) {
+      addBox(5, 2.1, 0.12, bx + BW * k, gy + sy, bz - halfD - 0.25, glass);
+      addBox(5, 2.1, 0.12, bx + BW * k, gy + sy, bz + halfD + 0.25, glass);
+      addBox(0.12, 2.1, 5, bx - halfW - 0.25, gy + sy, bz + BD * k, glass);
+      addBox(0.12, 2.1, 5, bx + halfW + 0.25, gy + sy, bz + BD * k, glass);
+    }
+    const light = new THREE.MeshStandardMaterial({ color: 0xffe6a0, emissive: 0xffc34d, emissiveIntensity: 0.8 });
+    const furniture = [toonMat(0x74452c), toonMat(0x405b72), toonMat(0x6f315d), toonMat(0x426a43)];
+    const roomBounds = [-halfW + 4, ...roomCuts, halfW - 4];
+    for (const fy of [gy + 4.75, gy + 9.75]) for (let i = 0; i < roomBounds.length - 1; i++) {
+      const rx = bx + (roomBounds[i] + roomBounds[i + 1]) / 2;
+      for (const rz of [bz - (halfD + corridorHalf) / 2, bz + (halfD + corridorHalf) / 2]) {
+        addBox(3.5, 0.12, 1.2, rx, fy, rz, light);
+        const baseY = fy - 4.62;
+        if (i % 2) {
+          addBox(6.5, 0.8, 2.8, rx, baseY + 0.4, rz, furniture[i]);
+          addBox(1.2, 1.5, 1.2, rx - 4.2, baseY + 0.75, rz, stone);
+        } else {
+          addBox(3.8, 1.1, 2.4, rx, baseY + 0.55, rz, furniture[i]);
+          addBox(0.35, 2.8, 5.5, rx + 5, baseY + 1.4, rz, furniture[(i + 1) % furniture.length]);
+        }
+      }
+    }
+    const hostage = { x: bx + halfW * 0.72, z: bz + halfD * 0.55, y: gy + 5.15 };
+    for (let i = -2; i <= 2; i++) addBox(0.18, 3.2, 0.18, hostage.x + i * 0.8, hostage.y + 1.6, hostage.z, trim);
 
     this.staticGroup.add(group);
     this.zombieManor = {
       x, z, w, d, estateMeters: { w: 350, d: 350 },
-      building: { x: bx, z: bz, w: BW, d: BD, floors: 2 },
-      entrance: { x: bx, z: entranceZ },
-      stairs: { x: stairX, startZ: stairStartZ, steps, stepD: 1.25 },
+      building: { x: bx, z: bz, w: BW, d: BD, meters: { w: 350, d: 350 }, floors: 2, rooms: 16, corridors: 2 },
+      entrance: { x: entranceX, z: bz },
+      stairs: { startX: stairStartX, z: stairZ, steps, stepD: 1.4, axis: 'x' },
       hostage,
     };
-    this._makeSign(x - halfW + 7, z - 9, t('ЗОМБІ-МАЄТОК 350×350 м'), Math.PI / 2);
+    this._makeSign(entranceX + 7, bz - 9, t('ЗОМБІ-МАЄТОК 350×350 м'), Math.PI / 2);
   }
 
   // 🏛 КОЛІЗЕЙ: велика овальна арена з двома ярусами арок навколо. Усередині —

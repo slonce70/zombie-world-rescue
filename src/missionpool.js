@@ -1497,19 +1497,18 @@ export class DynamicMissions {
     if (this.mirror || !manor) return;
 
     const points = [];
-    // 96 ворогів охороняють три кільця території.
-    for (let i = 0; i < 96; i++) {
-      const ring = Math.floor(i / 32);
-      const a = ((i % 32) / 32) * Math.PI * 2 + ring * 0.11;
-      const r = [manor.w * 0.43, manor.w * 0.32, manor.w * 0.23][ring];
-      points.push({ x: manor.x + Math.cos(a) * r, z: manor.z + Math.sin(a) * r });
-    }
-    // Ще 24 — всередині першого поверху двоповерхового будинку.
-    for (let i = 0; i < 24; i++) {
-      points.push({
-        x: manor.building.x - 18 + (i % 6) * 7.2,
-        z: manor.building.z - 12 + Math.floor(i / 6) * 7.5,
-      });
+    // 80 ворогів на першому поверсі, 40 — у кімнатах другого.
+    for (let i = 0; i < 120; i++) {
+      const floor = i >= 80 ? 1 : 0;
+      const j = floor ? i - 80 : i;
+      const rows = floor ? 4 : 8;
+      let px = manor.building.x - manor.building.w / 2 + 12
+        + ((j % 10) + 0.5) * (manor.building.w - 24) / 10;
+      let pz = manor.building.z - manor.building.d / 2 + 12
+        + (Math.floor(j / 10) + 0.5) * (manor.building.d - 24) / rows;
+      for (const wallX of [-45, 0, 45]) if (Math.abs(px - (manor.building.x + wallX)) < 3) px += 5;
+      if (Math.abs(Math.abs(pz - manor.building.z) - 7) < 3) pz += pz < manor.building.z ? -5 : 5;
+      points.push({ x: px, z: pz, floor });
     }
     points.forEach((point, i) => {
       const type = i % 20 === 0 ? 'tank' : i % 5 === 0 ? 'runner' : 'walker';
@@ -1517,6 +1516,11 @@ export class DynamicMissions {
         horde: false, anchor: { x: manor.x, z: manor.z, r: manor.w * 0.48 },
       });
       zombie.manorZombie = true;
+      zombie.manorFloor = point.floor;
+      if (point.floor === 1) {
+        zombie.y = manor.hostage.y;
+        zombie.rig.group.position.y = zombie.y;
+      }
       m.manorZombies.push(zombie);
     });
   }

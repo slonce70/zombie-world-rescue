@@ -869,7 +869,7 @@ export class Zombies {
         || [{ pid: 1, pos: level.player.pos, get health() { return level.player.health; } }];
       for (const pl of pls) {
         if (pl.health <= 0) continue;
-        if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, EXPLODER_DMG, z.x, z.z);
+        if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, EXPLODER_DMG, z.x, z.z, 0, z.y);
       }
       // 🎯 винагорода за кайтинг: вибух добиває інших зомбі поряд (не рекурсивно — direct hp)
       for (const o of this.list) {
@@ -966,7 +966,7 @@ export class Zombies {
           || [{ pid: 1, pos: level.player.pos, get health() { return level.player.health; } }];
         for (const pl of pls) {
           if (pl.health <= 0) continue;
-          if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, 157, z.x, z.z);
+          if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, 157, z.x, z.z, 0, z.y);
         }
         // реплікація ВІЗУАЛУ гостям наявним каналом 'bm' → client.netExplosion()
         level.netEv('bm', Math.round(boomPos.x * 10) / 10, Math.round(boomPos.y * 10) / 10,
@@ -1139,6 +1139,7 @@ export class Zombies {
       const tp = tgt ? tgt.pos : player.pos;
       if (!playerAlive) distP = Math.hypot(tp.x - z.x, tp.z - z.z);
       const dxP = tp.x - z.x, dzP = tp.z - z.z;
+      const dyP = Math.abs((tp.y ?? z.y) - z.y);
       const st = z.stats;
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
@@ -1222,7 +1223,7 @@ export class Zombies {
         if (!playerAlive) {
           z.state = 'wander';
           z.aggroed = z.horde;
-        } else if (distP < st.attackR && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
+        } else if (distP < st.attackR && dyP < 2.8 && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
           // мелі тільки з прямою видимістю — крізь стіни бити не можна
           this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
           this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
@@ -1279,7 +1280,7 @@ export class Zombies {
           } else if (playerAlive && distP < st.attackR * 1.35) {
             const confusedBonus = z.confusedT > 0 ? (z.confusedDmgBonus || 0) : 0;
             const damage = (z.type === 'stone' ? st.dmg : st.dmg * this.diff.dmg) + confusedBonus;
-            const hit = this._hurt(tgt, damage, z.x, z.z, st.hitStun || 0);
+            const hit = this._hurt(tgt, damage, z.x, z.z, st.hitStun || 0, z.y);
             if (hit && st.punchEvery) {
               z.punchHits = (z.punchHits || 0) + 1;
               if (z.punchHits % st.punchEvery === 0) this._punchPush(tgt, z.x, z.z, st.punchPush || 5);
@@ -1524,7 +1525,7 @@ export class Zombies {
       z.z += z.chargeDZ * cs * dt;
       if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.3 && !z.didHit) {
         z.didHit = true;
-        this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z);
+        this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z, 0, z.y);
         level.audio.slam();
       }
       if (z.charging <= 0) {
@@ -1639,7 +1640,7 @@ export class Zombies {
       z.z += z.chargeDZ * cs * dt;
       if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
         z.didHit = true;
-        this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z);
+        this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z, 0, z.y);
         level.audio.slam();
       }
       if (z.charging <= 0) {
@@ -1993,7 +1994,7 @@ export class Zombies {
   }
 
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
-  _hurt(tgt, dmg, fx, fz, stun = 0) {
+  _hurt(tgt, dmg, fx, fz, stun = 0, fy = null) {
     if (!tgt) return false;
     if (tgt.zombie) {
       const dir = new THREE.Vector3(tgt.zombie.x - fx, 0, tgt.zombie.z - fz).normalize();
@@ -2001,6 +2002,7 @@ export class Zombies {
       return true;
     }
     if (tgt.clone) { if (tgt.clone.takeDamage) tgt.clone.takeDamage(dmg); else tgt.clone.hp -= dmg; return true; }
+    if (Number.isFinite(fy) && Math.abs(tgt.pos.y - fy) >= 2.8) return false;
     // ponytail: мелі (звичайна атака/ривок торо/слем боса) не дістає гравця на вишці/даху —
     // зазор по висоті від землі під ним; стрибок (~1.8м) не блокує, башта (+4.25м) блокує.
     const floorY = Math.max(this.world.groundH(tgt.pos.x, tgt.pos.z), this.world.floorAt(tgt.pos.x, tgt.pos.z, tgt.pos.y));
