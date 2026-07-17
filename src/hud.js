@@ -643,9 +643,10 @@ export class HUD {
     ctx.clip();
     // фон — за біомом країни
     const winter = level.country && level.country.biome === 'winterDusk';
+    const moon = level.country && level.country.biome === 'moon';
     const grad = ctx.createRadialGradient(C, C, 10, C, C, R);
-    grad.addColorStop(0, winter ? 'rgba(190, 205, 222, 0.92)' : 'rgba(72, 128, 56, 0.92)');
-    grad.addColorStop(1, winter ? 'rgba(140, 158, 182, 0.92)' : 'rgba(48, 92, 40, 0.92)');
+    grad.addColorStop(0, moon ? 'rgba(205, 208, 214, 0.95)' : winter ? 'rgba(190, 205, 222, 0.92)' : 'rgba(72, 128, 56, 0.92)');
+    grad.addColorStop(1, moon ? 'rgba(135, 140, 150, 0.95)' : winter ? 'rgba(140, 158, 182, 0.92)' : 'rgba(48, 92, 40, 0.92)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, W);
     // межа світу
@@ -656,7 +657,7 @@ export class HUD {
     ctx.lineWidth = 3;
     ctx.stroke();
     // дороги
-    ctx.strokeStyle = 'rgba(185, 160, 120, 0.9)';
+    ctx.strokeStyle = moon ? 'rgba(235, 237, 241, 0.9)' : 'rgba(185, 160, 120, 0.9)';
     ctx.lineWidth = 4;
     for (const line of level.world.roads) {
       ctx.beginPath();

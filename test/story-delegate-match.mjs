@@ -1,7 +1,7 @@
 // 🐛 Баг (репорт з України): «Завдання пише "врятуй людей з хліва", а по факту
 // треба набрати води з колодязя; і коли набираємо 1 відро — озвучує, що квест
 // виконано, хоча ще ні.» Тут — регресійні перевірки обох частин фіксу:
-//  1) статично: для всіх 12 сюжетних країн × runIndex 0..5 набір-делегат містить
+//  1) статично: для всіх 13 сюжетних локацій × runIndex 0..5 набір-делегат містить
 //     preferred[0] КОЖНОЇ цілі у перших 3 слотах, слоти фірмових місій дотримані;
 //  2) браузер: UKR на runIndex, де БЕЗ фіксу випадав «колодязь замість хліва»,
 //     тепер делегує ukr-rescue у місію типу 'rescue';
@@ -62,7 +62,7 @@ const staticRes = await page.evaluate(async () => {
   }
   return { fails, cases, samples, countries: STORY_COUNTRY_IDS.length };
 });
-check(staticRes.countries === 12, 'story campaign covers 12 countries', String(staticRes.countries));
+check(staticRes.countries === 13, 'story campaign covers 13 locations', String(staticRes.countries));
 check(staticRes.fails.length === 0, `all story sets cover preferred[0] (${staticRes.cases} cases)`, staticRes.fails.slice(0, 3).join(' | '));
 console.log('  ℹ️ samples (runIndex 2, real seed):', JSON.stringify(staticRes.samples));
 

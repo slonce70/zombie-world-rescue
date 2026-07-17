@@ -45,7 +45,7 @@ async function loadMapModule(name) {
   }
 }
 
-assert.deepEqual(STORY_COUNTRY_IDS, ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN']);
+assert.deepEqual(STORY_COUNTRY_IDS, ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN', 'MOON']);
 
 const ukr = getCountryStory('UKR');
 assert.equal(ukr.id, 'UKR');

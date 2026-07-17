@@ -1,11 +1,21 @@
 import { openBrowserTest, makeCheck } from './_browser.mjs';
+import { mkdirSync } from 'node:fs';
 
 const { BASE, page, errors, closeTest } = await openBrowserTest();
 let failed = 0;
 const check = makeCheck(() => failed++);
+mkdirSync('test-results', { recursive: true });
 
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game?.state === 'level', null, { timeout: 30000 });
+await page.evaluate(() => {
+  const g = window.__game;
+  const point = g.level.missions.delegate.get('rebuild').woodNodes[0];
+  g.test.teleport(point.x, point.z + 8);
+  g.level.player.yaw = 0;
+});
+await page.waitForTimeout(350);
+await page.screenshot({ path: 'test-results/ukraine-resources-before-tools.png' });
 
 const ukraine = await page.evaluate(() => {
   const g = window.__game;
@@ -74,6 +84,8 @@ const ukraine = await page.evaluate(() => {
     bossUnlocked: story.bossUnlocked,
   };
 });
+await page.waitForTimeout(350);
+await page.screenshot({ path: 'test-results/ukraine-rebuild-attack.png' });
 
 check(ukraine.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense,ukr-rebuild',
   'Україна має правильний ланцюжок без французьких баз і Місяця', JSON.stringify(ukraine.ids));
@@ -125,9 +137,19 @@ await page.waitForSelector('#overlay-hq.show', { timeout: 10000 });
 check(!!await page.$('#btn-moonbase'), 'у Штабі є окремий вхід до Порятунку Місяця');
 await page.click('#btn-moonbase');
 await page.waitForFunction(() => window.__game?.state === 'level' && window.__game?.level?.countryId === 'MOON', null, { timeout: 30000 });
+await page.waitForTimeout(700);
+await page.screenshot({ path: 'test-results/moon-full-region.png' });
 const moon = await page.evaluate(() => {
   const g = window.__game;
   const story = g.level.missions;
+  const delegate = story.delegate;
+  const player = g.level.player;
+  const press = () => ({ pressed: (key) => key === 'KeyE', down: () => false, justPressed: new Set(['KeyE']) });
+  const hold = { pressed: () => false, down: (key) => key === 'KeyE', justPressed: new Set() };
+  const idle = { pressed: () => false, down: () => false, justPressed: new Set() };
+  g.hud._drawMinimap();
+  const mapC = g.hud.el.minimap.width / 2;
+  const minimapColor = [...g.hud.ctx.getImageData(mapC - 50, mapC - 50, 1, 1).data];
   const initial = {
     state: g.state,
     countryId: g.level.countryId,
@@ -140,13 +162,52 @@ const moon = await page.evaluate(() => {
     ids: story.objectives.map((o) => o.id),
     missionTypes: story.delegate.missions.map((m) => m.type),
     boss: g.level.country.boss,
+    minimapColor,
   };
-  for (const objective of story.objectives) story._completeObjective(objective.id);
+
+  const rescue = delegate.get('rescue');
+  const door = g.level.world.barnDoorCollider;
+  player.pos.set(door.x, player.pos.y, door.z - 1);
+  delegate._up_rescue(rescue, 0.1, press(), true);
+  delegate._up_rescue(rescue, 2.1, idle, true);
   story._syncObjectiveStates();
+
+  const repair = delegate.get('repair');
+  player.pos.set(repair.repairPoint.x, player.pos.y, repair.repairPoint.z);
+  delegate._up_repair(repair, 12.1, hold, true);
+  story._syncObjectiveStates();
+
+  const defense = delegate.get('defense');
+  player.pos.set(defense.zone.x, player.pos.y, defense.zone.z);
+  delegate._up_defense(defense, 0.1);
+  delegate._up_defense(defense, 45.1);
+  story._syncObjectiveStates();
+
+  const reactor = delegate.get('barracks');
+  for (let i = 0; i < 3; i++) delegate.damageBarracks(1000);
+  story._syncObjectiveStates();
+
+  delegate.pendingWaves = [];
+  delegate.pendingHorde = null;
+  g.level.zombies.hordeActive = false;
+  g.level.zombies.hordePending = 0;
+  g.level.zombies.hordeRemaining = 0;
+  story.update(0.1, idle, true);
+  player.pos.set(delegate.L.arena.x, player.pos.y, delegate.L.arena.z);
+  story.update(0.1, idle, true);
+  const boss = g.level.zombies.boss;
+  const bossHp = boss?.maxHp || 0;
+  if (boss) boss.damage(99999, null, false);
+
   return {
     initial,
     states: story.objectives.map((o) => o.state),
     bossUnlocked: story.bossUnlocked,
+    flow: {
+      rescued: rescue.state === 'done', repaired: repair.state === 'done',
+      defended: defense.state === 'done', reactorDestroyed: reactor.destroyed,
+      bossHp, bossDefeated: g.level.bossDefeated,
+    },
   };
 });
 
@@ -154,12 +215,15 @@ check(moon.initial.state === 'level' && moon.initial.countryId === 'MOON' && moo
   'Порятунок Місяця запускається як повноцінна 3D-країна з гравцем і зомбі', JSON.stringify(moon.initial));
 check(moon.initial.bound >= 240 && moon.initial.houses >= 6 && moon.initial.barren && moon.initial.clouds === 0,
   'Місяць має велику безповітряну карту зі станцією, а не малу круглу арену', JSON.stringify(moon.initial));
+check(Math.max(...moon.initial.minimapColor.slice(0, 3)) - Math.min(...moon.initial.minimapColor.slice(0, 3)) < 24,
+  'мінікарта Місяця теж сіра, а не зелена земна', JSON.stringify(moon.initial.minimapColor));
 check(moon.initial.ids.join(',') === 'moon-crew,moon-relays,moon-defense,moon-reactor'
   && ['rescue', 'repair', 'defense', 'barracks'].every((type) => moon.initial.missionTypes.includes(type)),
   'на Місяці є чотири важкі повноцінні завдання', JSON.stringify(moon.initial));
 check(moon.states.every((state) => state === 'done') && moon.bossUnlocked
-  && moon.initial.boss.style === 'mechTitan' && moon.initial.boss.hp === 10000,
-  'завдання відкривають окремого Місячного Титана', JSON.stringify(moon));
+  && moon.flow.rescued && moon.flow.repaired && moon.flow.defended && moon.flow.reactorDestroyed
+  && moon.initial.boss.style === 'mechTitan' && moon.flow.bossHp === 10000 && moon.flow.bossDefeated,
+  'повний прохід чотирьох завдань відкриває й перемагає Місячного Титана', JSON.stringify(moon));
 
 if (errors.length) {
   for (const error of errors) console.log('  ❌', error);

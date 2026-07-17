@@ -237,7 +237,9 @@ export class StoryMissions {
       } else {
         const mission = this._delegateMissionForObjective(active);
         const next = mission && this.delegate._beamTarget(mission);
-        const targets = next ? [next] : mission && mission.points ? mission.points.filter((point) => !point.done) : this._objectiveTargets(active);
+        const targets = mission && mission.points
+          ? mission.points.filter((point) => !point.done)
+          : next ? [next] : this._objectiveTargets(active);
         for (const site of targets) {
           mk.push({ x: site.x, z: site.z, color: '#4cff7a', icon: active.icon });
         }
