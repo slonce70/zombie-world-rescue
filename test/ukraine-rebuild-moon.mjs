@@ -24,6 +24,7 @@ const ukraine = await page.evaluate(() => {
   story._syncObjectiveStates();
 
   const rebuild = delegate.get('rebuild');
+  const resourcesVisibleBeforeTools = rebuild.points.every((point) => point.mesh.visible);
   for (const tool of rebuild.tools) {
     player.pos.set(tool.x, tool.y, tool.z);
     delegate._up_rebuild(rebuild, 0.1, press(), true);
@@ -64,6 +65,7 @@ const ukraine = await page.evaluate(() => {
       buildingParts: rebuild.rebuilt.children.length,
       mainBuildingWidth: rebuild.rebuilt.children[0].geometry.parameters.width,
       tools: player.weapons.filter((w) => w === 'axe' || w === 'pickaxe'), toolModels, wrongToolMisses,
+      resourcesVisibleBeforeTools,
       waves: rebuild.buildWaves,
       attackers: rebuildAttackers.length,
       leftAttackers: rebuildAttackers.filter((zombie) => zombie.x < rebuild.dest.x).length,
@@ -80,7 +82,8 @@ check(ukraine.defense.type === 'defense' && ukraine.defense.timer <= 0
   'оборона реально триває 22 секунди на сільській площі', JSON.stringify(ukraine.defense));
 check(ukraine.rebuild.wood === 120 && ukraine.rebuild.stone === 50 && ukraine.rebuild.progress === 1
   && ukraine.rebuild.tools.join(',') === 'axe,pickaxe' && ukraine.rebuild.toolModels.every((n) => n > 2)
-  && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15
+  && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.resourcesVisibleBeforeTools
+  && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15
   && ukraine.rebuild.waves === 3 && ukraine.rebuild.attackers === 24
   && ukraine.rebuild.leftAttackers === 12 && ukraine.rebuild.rightAttackers === 12,
   'реальні вибірні інструменти → правильне рубання/видобування → великий міський штаб', JSON.stringify(ukraine.rebuild));

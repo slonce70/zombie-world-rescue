@@ -496,7 +496,6 @@ export class DynamicMissions {
       this.level.scene.remove(p.mesh);
       p.mesh = this._makeResourceMesh(p.kind);
       p.mesh.position.set(p.x, p.y, p.z);
-      p.mesh.visible = false;
       this.level.scene.add(p.mesh);
     }
     m.dest = this._makeDeliverPoint(m, { color: 0xffc857, deliver: 'cityCenter', deliverEmoji: '🏗️' });
@@ -1496,7 +1495,6 @@ export class DynamicMissions {
           level.bus.emit('toast', tool.kind === 'axe' ? t('🪓 Сокиру знайдено!') : t('⛏️ Кірку знайдено!'));
           if (m.tools.every((it) => it.taken)) {
             m.phase = 'resources';
-            for (const p of m.points) p.mesh.visible = true;
             level.bus.emit('toast', t('⛏️ Інструменти готові — добудь 120 дерева і 50 каменю!'));
           }
         }
