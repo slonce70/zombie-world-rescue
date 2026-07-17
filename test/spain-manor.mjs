@@ -26,6 +26,19 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: '/tmp/zombie-world-rescue-spain-manor-interior.png' });
+await page.evaluate(() => {
+  const g = window.__game;
+  const rescue = g.level.missions.delegate.get('rescue');
+  const door = g.level.world.barnDoorCollider;
+  const press = { pressed: (key) => key === 'KeyE', down: () => false, justPressed: new Set(['KeyE']) };
+  g.level.player.pos.set(door.x, g.level.world.groundH(door.x, door.z), door.z - 1);
+  g.level.missions.delegate._up_rescue(rescue, 0.1, press, true);
+  for (const zombie of g.level.zombies.list) zombie.rig.group.visible = false;
+  g.test.teleport(door.x, door.z - 5);
+  g.level.player.yaw = Math.PI;
+});
+await page.waitForTimeout(3000);
+await page.screenshot({ path: '/tmp/zombie-world-rescue-spain-musicians.png' });
 
 const result = await page.evaluate(() => {
   const g = window.__game;
@@ -35,6 +48,10 @@ const result = await page.evaluate(() => {
   const idle = { pressed: () => false, down: () => false, justPressed: new Set() };
   const press = { pressed: (key) => key === 'KeyE', down: () => false, justPressed: new Set(['KeyE']) };
   const hold = { pressed: () => false, down: (key) => key === 'KeyE', justPressed: new Set() };
+
+  const band = story.delegate.civilians.map((civilian) => ({ kind: civilian.rig.civKind, instrument: civilian.rig.instrument }));
+  for (const civilian of story.delegate.civilians) g.level.scene.remove(civilian.rig.group);
+  story.delegate.civilians.length = 0;
 
   const initial = {
     ids: story.objectives.map((o) => o.id),
@@ -99,6 +116,7 @@ const result = await page.evaluate(() => {
 
   return {
     initial,
+    band,
     active,
     stairHeights,
     secondFloor,
@@ -118,6 +136,9 @@ const result = await page.evaluate(() => {
 
 check(result.initial.ids.join(',') === 'esp-band,esp-bells,esp-fireworks,esp-manor',
   'маєток є четвертим сюжетним завданням Іспанії', JSON.stringify(result.initial.ids));
+check(result.band.map((member) => member.instrument).join(',') === 'trumpet,guitar,drum'
+  && result.band.every((member) => member.kind.startsWith('musician-')),
+  'після порятунку з хліва виходять троє музикантів з інструментами', JSON.stringify(result.band));
 check(result.initial.building.meters.w === 350 && result.initial.building.meters.d === 350
   && result.initial.building.w === result.initial.site.w && result.initial.building.d === result.initial.site.d
   && result.initial.building.floors === 2 && result.initial.building.rooms === 16 && result.initial.building.corridors === 2,

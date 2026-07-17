@@ -3367,6 +3367,55 @@ const CIV_SHIRTS = [0xe2725b, 0x6fa8dc, 0xc99fd1, 0xf2c14e];
 const CIV_SKINS = [0xffc9a3, 0xf2b48c, 0xffd9b8];
 
 export function makeCivilian(kind, rng) {
+  if (kind.startsWith('musician-')) {
+    const instrument = kind.slice('musician-'.length);
+    const shirts = { trumpet: 0xd84735, guitar: 0xf0b52f, drum: 0x3c78b5 };
+    const rig = makeHumanoid({
+      skin: rng.pick(CIV_SKINS), shirt: shirts[instrument] || 0xd84735, pants: 0x282b35, shoes: 0x17191f,
+      mouth: 'smile', brow: -0.05,
+    });
+    const hat = new THREE.Group();
+    const hatM = toonMat(0x20232b);
+    const brim = cylinder(0.35, 0.35, 0.045, hatM, 14);
+    const crown = cylinder(0.2, 0.24, 0.18, hatM, 12);
+    crown.position.y = 0.1;
+    hat.add(brim, crown);
+    hat.position.y = 0.38;
+    rig.parts.head.add(hat);
+
+    const prop = new THREE.Group();
+    prop.name = `instrument-${instrument}`;
+    if (instrument === 'trumpet') {
+      const brass = toonMat(0xe3b83f, 0xa86b16, 0.35);
+      const pipe = cylinder(0.045, 0.045, 0.72, brass, 10);
+      pipe.rotation.x = Math.PI / 2;
+      const bell = cone(0.14, 0.28, brass, 12);
+      bell.rotation.x = Math.PI / 2;
+      bell.position.z = -0.48;
+      prop.add(pipe, bell);
+      prop.position.set(0.08, 0.35, -0.45);
+    } else if (instrument === 'guitar') {
+      const wood = toonMat(0xb7652d);
+      const body = sphere(0.25, wood, 12, 9);
+      body.scale.set(0.85, 1.25, 0.3);
+      const neck = box(0.08, 0.62, 0.06, toonMat(0x6d3d24));
+      neck.position.y = 0.4;
+      prop.add(body, neck);
+      prop.rotation.z = -0.45;
+      prop.position.set(0.08, 0.18, -0.35);
+    } else {
+      const shell = cylinder(0.3, 0.3, 0.28, toonMat(0xc83f36), 14);
+      shell.rotation.x = Math.PI / 2;
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 6, 14), toonMat(0xe0b83f));
+      prop.add(shell, rim);
+      prop.position.set(0, 0.18, -0.42);
+    }
+    rig.parts.torso.add(prop);
+    rig.civKind = kind;
+    rig.instrument = instrument;
+    bakeRig(rig);
+    return rig;
+  }
   if (kind === 'medic') {
     const rig = makeHumanoid({
       skin: rng.pick(CIV_SKINS), shirt: 0xf5f5f5, pants: 0xd84f4f, shoes: 0xffffff,

@@ -979,7 +979,9 @@ export class DynamicMissions {
   // цивільні з хліва (порятунок) — як і раніше
   spawnCivilians() {
     const { x, z } = this.L.rescue;
-    const kinds = ['medic', 'granny', 'kid'];
+    const kinds = this.level.countryId === 'ESP'
+      ? ['musician-trumpet', 'musician-guitar', 'musician-drum']
+      : ['medic', 'granny', 'kid'];
     kinds.forEach((kind, i) => {
       const rig = makeCivilian(kind, this.level.rng);
       const cx = x - 1.5 + i * 1.5, cz = z + 0.5;
@@ -1249,7 +1251,9 @@ export class DynamicMissions {
       m.openedT += dt;
       if (m.openedT > 2.0) {
         this._complete(m.id);
-        level.bus.emit('toast', t('Людей врятовано! Медик лікуватиме тебе поблизу 💚'));
+        level.bus.emit('toast', level.countryId === 'ESP'
+          ? t('Музиканти врятовані! Тепер удар у святковий дзвін.')
+          : t('Людей врятовано! Медик лікуватиме тебе поблизу 💚'));
       }
     }
   }
