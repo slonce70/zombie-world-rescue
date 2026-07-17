@@ -113,54 +113,47 @@ await page.click('#btn-hq');
 await page.waitForSelector('#overlay-hq.show', { timeout: 10000 });
 check(!!await page.$('#btn-moonbase'), 'у Штабі є окремий вхід до Порятунку Місяця');
 await page.click('#btn-moonbase');
-await page.waitForFunction(() => window.__game?.state === 'hqbase' && window.__game?.hqbase?.mode === 'moon', null, { timeout: 10000 });
+await page.waitForFunction(() => window.__game?.state === 'level' && window.__game?.level?.countryId === 'MOON', null, { timeout: 30000 });
 const moon = await page.evaluate(() => {
   const g = window.__game;
-  const before = { xp: g.save.xp, crystals: g.save.crystals };
-  const initial = g.hqbase.debugState();
-  g.input.keys.add('KeyW');
-  for (let i = 0; i < 60; i++) g.hqbase.update(1 / 60);
-  g.input.keys.delete('KeyW');
-  const walked = g.hqbase.debugState();
-  g.hqbase.moonHealth = 10000;
-  for (const relay of g.hqbase.targets.filter((target) => target.userData.moonRelay)) {
-    g.hqbase.hero.position.set(relay.position.x, 0, relay.position.z);
-    g.input.keys.add('KeyE');
-    for (let i = 0; i < 41; i++) g.hqbase.update(0.1);
-    g.input.keys.delete('KeyE');
-  }
-  const repaired = g.hqbase.debugState();
-  g.hqbase.hero.position.set(0, 0, -2);
-  for (let i = 0; i < 310; i++) g.hqbase.update(0.1);
-  const defended = g.hqbase.debugState();
-  const boss = g.hqbase.moonEnemies.find((enemy) => enemy.boss);
-  g.hqbase._pointer.set(0, 0);
-  g.hqbase._raycaster.setFromCamera(g.hqbase._pointer, g.hqbase.camera);
-  const fired = g.hqbase._shootMoon(true);
-  while (boss && boss.hp > 0) g.hqbase._hitMoonEnemy(boss);
-  const completed = g.hqbase.debugState();
-  const reward = { xp: g.save.xp - before.xp, crystals: g.save.crystals - before.crystals };
-  g.exitHQBase();
-  g.enterHQBase('moon');
-  const repeated = { xp: g.save.xp - before.xp, crystals: g.save.crystals - before.crystals };
-  return { initial, walked, repaired, defended, fired, completed, reward, repeated, status: document.getElementById('moonbase-status')?.textContent || '' };
+  const story = g.level.missions;
+  const initial = {
+    state: g.state,
+    countryId: g.level.countryId,
+    bound: g.level.country.map.bound,
+    houses: g.level.country.map.houses.length,
+    barren: g.level.country.map.barren,
+    clouds: g.level.world.clouds.length,
+    player: !!g.level.player,
+    zombies: g.level.zombies.list.length,
+    ids: story.objectives.map((o) => o.id),
+    missionTypes: story.delegate.missions.map((m) => m.type),
+    boss: g.level.country.boss,
+  };
+  for (const objective of story.objectives) story._completeObjective(objective.id);
+  story._syncObjectiveStates();
+  return {
+    initial,
+    states: story.objectives.map((o) => o.state),
+    bossUnlocked: story.bossUnlocked,
+  };
 });
 
-check(moon.initial.mode === 'moon' && moon.initial.moonCrew === 3 && moon.initial.moonHero && moon.initial.moonEnemies >= 3,
-  'Порятунок Місяця — керована жива 3D-база з екіпажем і ворогами', JSON.stringify(moon.initial));
-check(moon.walked.moonHero.z < moon.initial.moonHero.z - 4,
-  'герой ходить Місяцем за керуванням WASD', JSON.stringify({ initial: moon.initial.moonHero, walked: moon.walked.moonHero }));
-check(moon.repaired.moonRelays === 3 && moon.defended.moonDefenseDone && moon.defended.moonBossHp === 1200 && moon.fired,
-  'три реле та 30-секундна оборона відкривають Місячного титана', JSON.stringify(moon));
-check(moon.completed.moonDone && moon.completed.moonBossHp === 0 && moon.reward.xp === 500 && moon.reward.crystals === 3,
-  'перемога над титаном завершує місію й видає одноразову нагороду', JSON.stringify(moon));
-check(moon.repeated.xp === 500 && moon.repeated.crystals === 3 && /врятована|saved|спасена/i.test(moon.status),
-  'місячна база зберігається, нагорода не дублюється', JSON.stringify(moon));
+check(moon.initial.state === 'level' && moon.initial.countryId === 'MOON' && moon.initial.player && moon.initial.zombies > 0,
+  'Порятунок Місяця запускається як повноцінна 3D-країна з гравцем і зомбі', JSON.stringify(moon.initial));
+check(moon.initial.bound >= 240 && moon.initial.houses >= 6 && moon.initial.barren && moon.initial.clouds === 0,
+  'Місяць має велику безповітряну карту зі станцією, а не малу круглу арену', JSON.stringify(moon.initial));
+check(moon.initial.ids.join(',') === 'moon-crew,moon-relays,moon-defense,moon-reactor'
+  && ['rescue', 'repair', 'defense', 'barracks'].every((type) => moon.initial.missionTypes.includes(type)),
+  'на Місяці є чотири важкі повноцінні завдання', JSON.stringify(moon.initial));
+check(moon.states.every((state) => state === 'done') && moon.bossUnlocked
+  && moon.initial.boss.style === 'mechTitan' && moon.initial.boss.hp === 10000,
+  'завдання відкривають окремого Місячного Титана', JSON.stringify(moon));
 
 if (errors.length) {
   for (const error of errors) console.log('  ❌', error);
   failed += errors.length;
 }
-console.log(failed ? `💥 Провалено: ${failed}` : '✅ Україна, Франція і жива місячна база працюють');
+console.log(failed ? `💥 Провалено: ${failed}` : '✅ Україна, Франція і повноцінна 3D-країна Місяць працюють');
 await closeTest();
 process.exit(failed ? 1 : 0);

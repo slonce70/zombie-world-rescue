@@ -2386,7 +2386,7 @@ export class World {
     };
 
     const pr = this.biome.pineRatio;
-    const treeCount = styleForest ? 430 : 340;
+    const treeCount = this.map.barren ? 0 : (styleForest ? 430 : 340);
     const oaks = this._scatterPoints(Math.round(treeCount * (1 - pr)), 4.5, acceptTree);
     const pines = this._scatterPoints(Math.round(treeCount * pr), 4.5, (x, z) => acceptTree(x, z) && this.fbmHi(x * 0.02, z * 0.02) > -0.3);
 
@@ -2459,7 +2459,7 @@ export class World {
     this.scene.add(pTrunks, pCones);
 
     // кущі
-    const bushPts = this._scatterPoints(170, 3, (x, z) =>
+    const bushPts = this._scatterPoints(this.map.barren ? 0 : 170, 3, (x, z) =>
       Math.hypot(x, z) < this.layout.BOUND + 5 && this.roadDist(x, z) > 4.5 && this._farFromSites(x, z, 4));
     const bushGeo = new THREE.IcosahedronGeometry(1, 1);
     const bushes = new THREE.InstancedMesh(bushGeo, crownMat, bushPts.length);
@@ -3968,6 +3968,7 @@ export class World {
   // ---------- хмари ----------
   _buildClouds() {
     this.clouds = [];
+    if (this.biome.clouds === false) return;
     const cloudM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonMat(0).gradientMap, transparent: true, opacity: 0.92 });
     // 🌙 спільний матеріал усіх хмар: setNight темнить його, щоб хмари не світились білим уночі
     this.cloudM = cloudM;

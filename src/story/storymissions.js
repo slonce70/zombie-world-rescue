@@ -61,6 +61,10 @@ export const STORY_DELEGATE_MATCHES = {
   'chn-scrolls': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
   'chn-beacon': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
   'chn-pit': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'moon-crew': { preferred: ['rescue'] },
+  'moon-relays': { preferred: ['repair'] },
+  'moon-defense': { preferred: ['defense'] },
+  'moon-reactor': { preferred: ['barracks'] },
 };
 
 // 📖 Набір місій для СЮЖЕТНОГО рівня. Баг: HUD показує «Врятуй людей із хліва»

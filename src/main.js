@@ -126,7 +126,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 525;
+const APP_VERSION = 526;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -442,7 +442,11 @@ class Game {
     const campChip = document.getElementById('camp-quest-chip');
     if (campChip) campChip.addEventListener('click', () => { this.audio.click(); this._openCampQuest(); });
     document.getElementById('btn-hqbase').addEventListener('click', () => this.enterHQBase());
-    document.getElementById('btn-moonbase').addEventListener('click', () => this.enterHQBase('moon'));
+    document.getElementById('btn-moonbase').addEventListener('click', () => {
+      this.audio.click();
+      this._hideOverlay('overlay-hq');
+      this.startLevel('MOON');
+    });
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
       this.renderSoloMenu();

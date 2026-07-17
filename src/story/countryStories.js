@@ -1,6 +1,6 @@
 import { t } from '../i18n.js';
 
-export const STORY_COUNTRY_IDS = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
+export const STORY_COUNTRY_IDS = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN', 'MOON'];
 
 const STORIES = {
   UKR: {
@@ -634,6 +634,47 @@ const STORIES = {
         count: 8,
         reward: 190,
         horde: 0,
+      },
+    ],
+  },
+  MOON: {
+    id: 'MOON',
+    title: () => t('Операція «Порятунок Місяця»'),
+    npc: {
+      id: 'moon-commander',
+      kind: 'medic',
+      site: 'station',
+      name: () => t('Командирка Луна'),
+      intro: () => t('База «Надія» втратила зв’язок, кисень і захист. Тут велика зона — доведеться повернути кожен сектор.'),
+    },
+    objectives: [
+      {
+        id: 'moon-crew', kind: 'rescue', icon: '🧑‍🚀', site: 'crew',
+        title: () => t('Врятуй екіпаж із аварійного модуля'),
+        start: () => t('Астронавти заблоковані на дальньому краю бази. Пробийся до них.'),
+        done: () => t('Екіпаж урятовано. Тепер поверни живлення кисневим реле.'),
+        reward: 180, horde: 18,
+      },
+      {
+        id: 'moon-relays', kind: 'hold', icon: '📡', site: 'relays',
+        title: () => t('Віднови кисневі реле'),
+        start: () => t('Без реле база задихнеться. Запусти систему й утримай сектор.'),
+        done: () => t('Кисень повернувся. Орда вже штурмує командний модуль!'),
+        reward: 220, horde: 22,
+      },
+      {
+        id: 'moon-defense', kind: 'defense', icon: '🛡️', site: 'station',
+        title: () => t('Відбий штурм місячної станції'),
+        start: () => t('Не дай зомбі прорватися до живого штабу.'),
+        done: () => t('Станція встояла. Знищ заражений реактор.'),
+        seconds: 30, reward: 260, horde: 0,
+      },
+      {
+        id: 'moon-reactor', kind: 'destroy', icon: '💥', site: 'reactor',
+        title: () => t('Знищ заражений місячний реактор'),
+        start: () => t('Реактор живить зараження. Зруйнуй його, щоб виманити Титана.'),
+        done: () => t('Зараження слабшає. Місячний Титан вийшов на арену!'),
+        reward: 300, horde: 0,
       },
     ],
   },

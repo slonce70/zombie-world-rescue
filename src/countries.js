@@ -14,6 +14,7 @@ import japanMap from './maps/japan.js';
 import chinaMap from './maps/china.js';
 import lostIslandMap from './maps/lostisland.js';
 import labMap from './maps/lab.js';
+import moonMap from './maps/moon.js';
 
 export const BIOMES = {
   summer: {
@@ -261,6 +262,23 @@ export const BIOMES = {
     lampGlow: 1.6, // яскраве неонове світло
     signText: t('ЛІГВО ВІРУСУ'),
   },
+  moon: {
+    skyTop: 0x030712, skyHorizon: 0x111827, skyBottom: 0x05070d,
+    fogColor: 0x151923, fogNear: 135, fogFar: 470,
+    hemiSky: 0x8796b8, hemiGround: 0x252833, hemiIntensity: 0.7,
+    sunColor: 0xe8f0ff, sunIntensity: 2.3, sunPos: [110, 140, 50],
+    sunDisc: 0xf4f7ff, sunDiscPos: [390, 430, 210],
+    grass1: 0x777b84, grass2: 0x666a73, grass3: 0x8b8f98,
+    rock: 0x8e929b, peak: 0xb7bbc4, water: 0x293044, riverbed: 0x454952,
+    dirt: 0x686c75, plaza: 0x8a8f9a, arenaGround: 0x5b5f68,
+    roadMain: 0x9298a4, roadEdge: 0x4c515b,
+    treeGreens: [0x777b84], pineGreens: [0x686c75], pineRatio: 0,
+    snow: false, snowfall: false, flowers: false, hay: false, clouds: false,
+    housePalette: [0xd8dde7, 0xaeb7c7, 0x818b9d, 0xc8d0dd],
+    roofPalette: [0x303846, 0x455167, 0x202733],
+    lampGlow: 1.8,
+    signText: t('МІСЯЧНА БАЗА «НАДІЯ»'),
+  },
 };
 
 export const COUNTRIES = {
@@ -471,6 +489,20 @@ export const COUNTRIES = {
     boss: { name: t('🧪 МЕГА-СЛИЗНЯК'), hp: 9000, frost: false, style: 'slime' },
     banner: t('Неонова лабораторія, чани зі слизом і МЕГА-СЛИЗНЯК! Він робив зомбі, бо хотів друзів. Обійми його кулями! 🟢'),
     food: t('желейка'),
+  },
+  MOON: {
+    id: 'MOON', name: t('Місяць'), flag: '🌙', seed: 1969,
+    lat: 0, lon: 0,
+    victoryTitle: t('🌙 МІСЯЧНУ БАЗУ ВРЯТОВАНО!'),
+    biome: 'moon',
+    map: moonMap,
+    difficulty: { hp: 2.8, dmg: 1.65, counts: 1.85 },
+    coinReward: 1200,
+    extraZombie: 'shield',
+    shieldGuards: 5,
+    boss: { name: t('🤖 МІСЯЧНИЙ ТИТАН'), hp: 10000, frost: false, style: 'mechTitan' },
+    banner: t('Велика місячна зона: врятуй екіпаж, віднови системи й знищ Місячного Титана! 🚀'),
+    food: t('космічний пайок'),
   },
 };
 
