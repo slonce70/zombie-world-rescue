@@ -4,7 +4,7 @@
 import { ridge, mesa, terraces } from '../utils.js';
 
 export default {
-  bound: 200,
+  bound: 350,
   spawn: { x: 0, z: 168 },
   // 🏔️ сухі іспанські пагорби: м'які кряжі на заході й сході, тераси оливкового
   // гаю сходинками, рівне плато під ареною кориди (повний плаский core під трибунами)
@@ -26,6 +26,7 @@ export default {
     bellTower: { x: 118, z: -78, r: 10 },    // святковий дзвін = пагорб вежі (модель на 118,-86)
     fireworks: { x: -110, z: 46, r: 8 },     // перед ворітьми складу (ящики z 51..54 і ангар — точка південніше)
     fiestaSquare: { x: 5, z: 14, r: 8 },     // площа фієсти (фонтан на 0,24 і батут на 13,30 — точка збоку)
+    manor: { x: 150, z: 150, r: 93.333, w: 186.666, d: 186.666 }, // територія 350×350 м
     arena: { x: 16, z: -158, r: 32 },
   },
   roads: [
@@ -34,6 +35,7 @@ export default {
     [[10, -8], [56, -38], [92, -66], [115, -83]],        // село → вежа
     [[-8, 10], [-48, 28], [-84, 46], [-106, 56]],        // село → склад
     [[4, -16], [10, -72], [14, -126], [16, -146]],       // село → арена-корида
+    [[18, 28], [48, 62], [56, 108], [56.7, 150]],         // село → західна брама маєтку
   ],
   hills: [
     { x: 118, z: -86, h: 8, sigma: 40 },   // пагорб вежі
@@ -44,6 +46,7 @@ export default {
     { x: 16, z: -158, r: 32 },  // плато арени-кориди: повний плаский core під трибунами
     { x: -68, z: 30, r: 18 },   // оливковий гай
     { x: 0, z: 24, r: 12 },     // площа з фонтаном
+    { x: 150, z: 150, r: 132 }, // рівна територія маєтку
   ],
   houses: [
     { x: 16, z: 34, ry: Math.PI / 2, enterable: true, surprise: false },
@@ -57,12 +60,13 @@ export default {
     { x: -50, z: 36, ry: 0 },
   ],
   villageExtras: ['well', 'lamps', 'fences'],
-  landmarks: ['bullring', 'plazaFountain', 'oliveGrove', 'cathedral', 'birds'],
+  landmarks: ['bullring', 'plazaFountain', 'oliveGrove', 'cathedral', 'zombieManor', 'birds'],
   landmarkParams: {
     bullring: { x: 16, z: -158 },
     plazaFountain: { x: 0, z: 24 },
     oliveGrove: { x: -68, z: 30, w: 40, d: 30 },
     cathedral: { x: 58, z: -30 },
+    zombieManor: { x: 150, z: 150, w: 186.666, d: 186.666 },
   },
   fun: {
     barrels: [

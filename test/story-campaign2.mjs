@@ -86,7 +86,7 @@ assert.deepEqual(storyPreview('LAB'), null);
 const EXPECTED_STORY_SHAPE = {
   DEU: { npcKind: 'granny', npcSite: 'cityGate', ids: ['deu-workshop', 'deu-convoy', 'deu-gate', 'deu-barracks'], icons: '🔧🚚🛡️🏚️' },
   FRA: { npcKind: 'kid', npcSite: 'cafe', ids: ['fra-kitchen', 'fra-balloon', 'fra-cellar', 'fra-bases'], icons: '🥐🎈🍇🏚️' },
-  ESP: { npcKind: 'granny', npcSite: 'fiestaSquare', ids: ['esp-band', 'esp-bells', 'esp-fireworks'], icons: '🎺🔔🎆' },
+  ESP: { npcKind: 'granny', npcSite: 'fiestaSquare', ids: ['esp-band', 'esp-bells', 'esp-fireworks', 'esp-manor'], icons: '🎺🔔🎆🏛️' },
   PRT: { npcKind: 'kid', npcSite: 'harborSquare', ids: ['prt-fishers', 'prt-lighthouse', 'prt-docks'], icons: '⛵🚨⚓' },
   ITA: { npcKind: 'granny', npcSite: 'fountainSquare', ids: ['ita-trattoria', 'ita-aqueduct', 'ita-legion'], icons: '🍕⛲🏛️' },
   TUR: { npcKind: 'granny', npcSite: 'teaGarden', ids: ['tur-bazaar', 'tur-lighthouse', 'tur-spices', 'tur-rescue-ship'], icons: '🧿🗼🌶️🚢' },

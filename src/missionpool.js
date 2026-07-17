@@ -41,6 +41,7 @@ export const MISSION_TYPES = {
   shiprescue: { icon: '🚢', slots: ['D'], reward: 260, horde: 0, kind: 'shiprescue' },
   rebuild: { icon: '🏗️', slots: ['D'], reward: 240, horde: 0, kind: 'rebuild' },
   bases: { icon: '🏚️', slots: ['D'], reward: 180, horde: 0, kind: 'bases' },
+  manor: { icon: '🏛️', slots: ['D'], reward: 350, horde: 0, kind: 'manor' },
 };
 
 // конфіги двигунів: activate — N точок, біля кожної тримай E
@@ -204,6 +205,9 @@ export class DynamicMissions {
       slotInfo = { slot: 'D', site: this.L.village, beamAt: this.L.village };
     } else if (type === 'bases') {
       slotInfo = { slot: 'D', site: this.L.warehouse, beamAt: this.L.warehouse };
+    } else if (type === 'manor') {
+      const manor = level.country.map.storySites.manor;
+      slotInfo = { slot: 'D', site: manor, beamAt: { x: manor.x - manor.w / 2, z: manor.z } };
     } else if (type === 'defense' && level.countryId === 'UKR') {
       slotInfo = { slot: 'C', site: this.L.village, beamAt: this.L.village };
     } else if (type === 'defense' && level.countryId === 'DEU') {
@@ -299,9 +303,11 @@ export class DynamicMissions {
       this._makeTurkeyRescueShip(m);
     } else if (type === 'rebuild') {
       this._makeRebuildMission(m);
+    } else if (type === 'manor') {
+      this._makeManorMission(m);
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
-    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases'].includes(type)) {
+    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases', 'manor'].includes(type)) {
       m.optional = true;
       m.reward = Math.round(m.reward * 1.5);
       m.horde = Math.round(m.horde * 0.5);
@@ -730,6 +736,7 @@ export class DynamicMissions {
         if (m.type === 'collect') extra = ` (${m.found}/4)`;
         if (m.type === 'hunt') extra = ` (${m.killed}/3)`;
         if (m.type === 'nests' || m.type === 'bases') extra = ` (${m.cleared}/3)`;
+        if (m.type === 'manor') extra = m.phase === 'clear' ? ` (${m.killed}/120)` : t(' — люди на 2 поверсі!');
         if (m.type === 'defense' && m.started) extra = ` (${Math.ceil(m.timer)}${t('с')})`;
         if (m.type === 'escort' && m.started) extra = t(' — веди до вежі!');
         if (m.points && m.type !== 'rebuild') extra = ` (${m.activated}/${m.points.length})`;
@@ -1181,6 +1188,10 @@ export class DynamicMissions {
       if (m.phase === 'resources') return m.points.find((p) => !p.done) || null;
       return m.dest;
     }
+    if (m.type === 'manor') {
+      const manor = this.level.world.zombieManor;
+      return m.phase === 'rescue' ? manor.hostage : { x: manor.x - manor.w / 2, z: manor.z };
+    }
     if (m.type === 'collect') {
       const next = m.crates.find((c) => !c.taken);
       return next ? { x: next.x, z: next.z } : null;
@@ -1474,6 +1485,86 @@ export class DynamicMissions {
   }
 
   _up_bases(m, dt, input, allowControl) { this._up_nests(m, dt, input, allowControl); }
+
+  _makeManorMission(m) {
+    const level = this.level;
+    const manor = level.world.zombieManor;
+    m.phase = 'clear';
+    m.killed = 0;
+    m.rescueProgress = 0;
+    m.manorZombies = [];
+    m.title = t('Зачисть маєток: {n}/120 зомбі', { n: 0 });
+    if (this.mirror || !manor) return;
+
+    const points = [];
+    // 96 ворогів охороняють три кільця території.
+    for (let i = 0; i < 96; i++) {
+      const ring = Math.floor(i / 32);
+      const a = ((i % 32) / 32) * Math.PI * 2 + ring * 0.11;
+      const r = [manor.w * 0.43, manor.w * 0.32, manor.w * 0.23][ring];
+      points.push({ x: manor.x + Math.cos(a) * r, z: manor.z + Math.sin(a) * r });
+    }
+    // Ще 24 — всередині першого поверху двоповерхового будинку.
+    for (let i = 0; i < 24; i++) {
+      points.push({
+        x: manor.building.x - 18 + (i % 6) * 7.2,
+        z: manor.building.z - 12 + Math.floor(i / 6) * 7.5,
+      });
+    }
+    points.forEach((point, i) => {
+      const type = i % 20 === 0 ? 'tank' : i % 5 === 0 ? 'runner' : 'walker';
+      const zombie = level.zombies.spawn(type, point.x, point.z, {
+        horde: false, anchor: { x: manor.x, z: manor.z, r: manor.w * 0.48 },
+      });
+      zombie.manorZombie = true;
+      m.manorZombies.push(zombie);
+    });
+  }
+
+  _spawnManorCivilians(m) {
+    const level = this.level;
+    const manor = level.world.zombieManor;
+    const kinds = ['medic', 'granny', 'kid', 'granny', 'kid'];
+    kinds.forEach((kind, i) => {
+      const rig = makeCivilian(kind, level.rng);
+      const x = manor.entrance.x - 4 + i * 2, z = manor.entrance.z - 5;
+      rig.group.position.set(x, level.world.groundH(x, z), z);
+      level.scene.add(rig.group);
+      this.civilians.push({ rig, kind, x, z, state: 'follow', angle: (i / kinds.length) * Math.PI * 2, cheerT: 3 });
+      if (kind === 'medic') this.medicAlive = true;
+    });
+  }
+
+  _up_manor(m, dt, input, allowControl) {
+    const level = this.level;
+    const manor = level.world.zombieManor;
+    if (!manor) return;
+    if (m.phase === 'clear') {
+      const alive = m.manorZombies.filter((z) => z.state !== 'dead' && !z.gone).length;
+      m.killed = 120 - alive;
+      m.title = t('Зачисть маєток: {n}/120 зомбі', { n: m.killed });
+      if (alive > 0) return;
+      m.phase = 'rescue';
+      m.title = t('Піднімися на 2 поверх і врятуй людей');
+      level.bus.emit('toast', t('🏛️ Маєток зачищено! Люди замкнені на другому поверсі.'));
+    }
+
+    const target = manor.hostage;
+    const player = level.player;
+    const near = Math.hypot(player.pos.x - target.x, player.pos.z - target.z) < 4 && Math.abs(player.pos.y - target.y) < 2.5;
+    let holders = near && allowControl && input.down('KeyE') ? 1 : 0;
+    if (level.players) for (const pl of level.players) {
+      if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
+      if (Math.hypot(pl.pos.x - target.x, pl.pos.z - target.z) < 4 && Math.abs(pl.pos.y - target.y) < 2.5) holders++;
+    }
+    if (near) this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+    if (!holders) return;
+    m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 3);
+    if (m.rescueProgress < 1) return;
+    this._spawnManorCivilians(m);
+    this._complete(m.id);
+    level.bus.emit('toast', t('🏛️ Людей із маєтку врятовано!'));
+  }
 
   _up_rebuild(m, dt, input, allowControl) {
     const level = this.level;
@@ -2484,6 +2575,8 @@ export class DynamicMissions {
         for (const n of m.nestList) a.push(Math.round(n.progress * 100) / 100);
       } else if (m.type === 'barracks') {
         a.push(Math.max(0, Math.ceil(m.hp)));
+      } else if (m.type === 'manor') {
+        a.push(m.phase === 'rescue' ? 1 : 0, m.killed, Math.round(m.rescueProgress * 100) / 100);
       } else if (m.type === 'castle') {
         const regularLeft = m.guards.filter((z) => !z.castleKnight && z.state !== 'dead' && !z.gone).length;
         const knightLeft = m.guards.filter((z) => z.castleKnight && z.state !== 'dead' && !z.gone).length;
@@ -2565,6 +2658,13 @@ export class DynamicMissions {
         m.hp = Math.max(0, Number(a[1]) || 0);
         m.title = t('Зламай казарму зомбі: {hp}/2500 HP', { hp: Math.ceil(m.hp) });
         if (m.hp <= 0) { m.destroyed = true; this._destroyBarracksVisual(m); }
+      } else if (m.type === 'manor') {
+        m.phase = a[1] ? 'rescue' : 'clear';
+        m.killed = Number(a[2]) || 0;
+        m.rescueProgress = Number(a[3]) || 0;
+        m.title = m.phase === 'rescue'
+          ? t('Піднімися на 2 поверх і врятуй людей')
+          : t('Зачисть маєток: {n}/120 зомбі', { n: m.killed });
       } else if (m.type === 'castle') {
         const previousPhase = m.phase;
         const phaseIndex = Math.max(0, Math.min(CASTLE_PHASES.length - 1, Number(a[1]) || 0));
@@ -2864,6 +2964,12 @@ export class DynamicMissions {
           if (pressE) { net.sendUse('ship', { a: 'return' }); input.justPressed.delete('KeyE'); pressE = false; }
         } else if (m.phase === 'unload' && near(m.dock.x, m.dock.z, 6)) {
           this.prompt = { text: t('Тримай {k} — висадити людей', { k: interactKey() }), hold: true, progress: m.unloadProgress };
+          net.holdE = true;
+        }
+      } else if (m.type === 'manor' && m.phase === 'rescue') {
+        const target = level.world.zombieManor.hostage;
+        if (near(target.x, target.z, 4) && Math.abs(player.pos.y - target.y) < 2.5) {
+          this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
           net.holdE = true;
         }
       } else if (m.type === 'castle') {

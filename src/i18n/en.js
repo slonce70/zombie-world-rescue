@@ -1,5 +1,14 @@
 // 🌍 Словник EN: ключ — український рядок-оригінал.
 export const EN = {
+" — люди на 2 поверсі!": " — people are on the 2nd floor!",
+"Зачисть маєток: {n}/120 зомбі": "Clear the manor: {n}/120 zombies",
+"Піднімися на 2 поверх і врятуй людей": "Reach the 2nd floor and rescue the people",
+"🏛️ Маєток зачищено! Люди замкнені на другому поверсі.": "🏛️ Manor cleared! The people are locked on the second floor.",
+"🏛️ Людей із маєтку врятовано!": "🏛️ The people in the manor are safe!",
+"Зачисть маєток і врятуй людей": "Clear the manor and rescue the people",
+"У двоповерховому маєтку 120 зомбі. Зачисть територію 350×350 м і знайди заручників.": "There are 120 zombies in the two-story manor. Clear the 350×350 m estate and find the hostages.",
+"Маєток зачищено, усіх людей урятовано!": "The manor is clear and everyone is safe!",
+"ЗОМБІ-МАЄТОК 350×350 м": "ZOMBIE MANOR 350×350 m",
 "Класична": "Classic",
 "Лісова": "Forest",
 "Озерна": "Lakes",

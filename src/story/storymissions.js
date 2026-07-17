@@ -41,6 +41,7 @@ export const STORY_DELEGATE_MATCHES = {
   'esp-band': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
   'esp-bells': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
   'esp-fireworks': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
+  'esp-manor': { preferred: ['manor'] },
   'prt-fishers': { preferred: ['rescue'], compatible: ['collect', 'hunt', 'escort'] },
   'prt-lighthouse': { preferred: ['repair'], compatible: ['lights', 'defense', 'nests'] },
   'prt-docks': { preferred: ['clear'], compatible: ['defense', 'hunt', 'nests', 'collect', 'lights'] },
@@ -457,8 +458,8 @@ export class StoryMissions {
   }
 
   _objectiveTitle(obj) {
-    if ((obj.id === 'pol-castle' || obj.id === 'deu-barracks' || obj.id === 'tur-rescue-ship') && this.delegate) {
-      const type = obj.id === 'pol-castle' ? 'castle' : obj.id === 'deu-barracks' ? 'barracks' : 'shiprescue';
+    if ((obj.id === 'pol-castle' || obj.id === 'deu-barracks' || obj.id === 'tur-rescue-ship' || obj.id === 'esp-manor') && this.delegate) {
+      const type = obj.id === 'pol-castle' ? 'castle' : obj.id === 'deu-barracks' ? 'barracks' : obj.id === 'tur-rescue-ship' ? 'shiprescue' : 'manor';
       const mission = this.delegate.get(type);
       if (mission && mission.title) return mission.title;
     }
