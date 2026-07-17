@@ -1123,6 +1123,7 @@ export class DynamicMissions {
     this._updateLivingWorld(dt, input, allowControl);
 
     for (const m of this.missions) {
+      if (m.type === 'manor' && m.state === 'done' && m.started) this._updateManorChests(m, input, allowControl);
       if (m.state !== 'active') continue;
       this['_up_' + m.type](m, dt, input, allowControl);
     }
@@ -1487,13 +1488,20 @@ export class DynamicMissions {
   _up_bases(m, dt, input, allowControl) { this._up_nests(m, dt, input, allowControl); }
 
   _makeManorMission(m) {
-    const level = this.level;
-    const manor = level.world.zombieManor;
     m.phase = 'clear';
     m.killed = 0;
     m.rescueProgress = 0;
+    m.started = false;
     m.manorZombies = [];
+    m.chests = [];
     m.title = t('Зачисть маєток: {n}/120 зомбі', { n: 0 });
+  }
+
+  _activateManorMission(m) {
+    if (m.started) return;
+    m.started = true;
+    const level = this.level;
+    const manor = level.world.zombieManor;
     if (this.mirror || !manor) return;
 
     const points = [];
@@ -1523,6 +1531,68 @@ export class DynamicMissions {
       }
       m.manorZombies.push(zombie);
     });
+
+    const rng = new RNG(level.country.seed + 953 + this.runIndex);
+    const chestSpots = [
+      [-66, -35, 0], [-20, 35, 0], [30, -35, 0],
+      [66, 35, 1], [20, -35, 1],
+    ];
+    const rewards = ['coins', 'crystals', 'xp', 'buff'];
+    const wood = toonMat(0x8a542f);
+    const gold = toonMat(0xe0b83f, 0xa87418, 0.35);
+    m.chests = chestSpots.map(([ox, oz, floor]) => {
+      const mesh = new THREE.Group();
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 1.3), wood);
+      box.position.y = 0.42;
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.35, 1.4), gold);
+      lid.position.y = 1;
+      mesh.add(box, lid);
+      mesh.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      const x = manor.x + ox, z = manor.z + oz;
+      const y = level.world.groundH(x, z) + floor * 5.15;
+      mesh.position.set(x, y, z);
+      level.scene.add(mesh);
+      return { x, z, y, floor, mesh, opened: false, reward: rng.pick(rewards), buff: rng.pick(['speed', 'rage', 'bubble', 'magnet']) };
+    });
+    level.audio.horde();
+  }
+
+  _openManorChest(m, chest) {
+    if (!chest || chest.opened) return false;
+    const level = this.level;
+    chest.opened = true;
+    level.scene.remove(chest.mesh);
+    if (chest.reward === 'coins') {
+      level.addCoins(100);
+      level.bus.emit('toast', t('Нагорода: {i} {n}', { i: '💰', n: t('100 монет') }));
+    } else if (chest.reward === 'crystals') {
+      level.game.save.crystals = (level.game.save.crystals || 0) + 3;
+      level.game.saveGame();
+      level.bus.emit('toast', t('💎 +3 кристали'));
+    } else if (chest.reward === 'xp') {
+      level.game.progress.addXp(25);
+      level.bus.emit('toast', t('Нагорода: {i} {n}', { i: '⭐', n: '25 XP' }));
+    } else {
+      level.effects.onPickup(chest.buff, 0);
+    }
+    if (chest.reward !== 'buff') level.audio.pickup();
+    level.effects.burst(new THREE.Vector3(chest.x, chest.y + 0.8, chest.z), 0xffd23f, 12, { speed: 3, up: 4, life: 0.7 });
+    return true;
+  }
+
+  _updateManorChests(m, input, allowControl) {
+    const player = this.level.player;
+    for (const chest of m.chests) {
+      if (chest.opened) continue;
+      if (Math.hypot(player.pos.x - chest.x, player.pos.z - chest.z) >= 3
+        || Math.abs(player.pos.y - chest.y) >= 2.5) continue;
+      this.prompt = { text: t('Натисни {k} — відкрити скриню', { k: interactKey() }), hold: false };
+      if (allowControl && input.pressed('KeyE')) {
+        this._openManorChest(m, chest);
+        input.justPressed.delete('KeyE');
+      }
+      break;
+    }
   }
 
   _spawnManorCivilians(m) {
@@ -1543,6 +1613,8 @@ export class DynamicMissions {
     const level = this.level;
     const manor = level.world.zombieManor;
     if (!manor) return;
+    this._activateManorMission(m);
+    this._updateManorChests(m, input, allowControl);
     if (m.phase === 'clear') {
       const alive = m.manorZombies.filter((z) => z.state !== 'dead' && !z.gone).length;
       m.killed = 120 - alive;

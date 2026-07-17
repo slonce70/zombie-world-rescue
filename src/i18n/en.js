@@ -2233,6 +2233,7 @@ export const EN = {
 "Нагорода: гаджет уже є — +300 монет": "Reward: you already have the gadget — +300 coins",
 "Наслідок": "Effect",
 "Натисни {k} — відкрити заражений ящик": "Press {k} — open the infected crate",
+"Натисни {k} — відкрити скриню": "Press {k} — open the chest",
 "Натисни {k} — врятуй малого рятівника": "Press {k} — rescue the little rescuer",
 "Натисни {k} — допомогти": "Press {k} — help",
 "Невидимка": "Invisibility",

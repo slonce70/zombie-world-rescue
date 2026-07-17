@@ -33,6 +33,7 @@ const result = await page.evaluate(() => {
   const mission = story.delegate.get('manor');
   const manor = g.level.world.zombieManor;
   const idle = { pressed: () => false, down: () => false, justPressed: new Set() };
+  const press = { pressed: (key) => key === 'KeyE', down: () => false, justPressed: new Set(['KeyE']) };
   const hold = { pressed: () => false, down: (key) => key === 'KeyE', justPressed: new Set() };
 
   const initial = {
@@ -42,8 +43,9 @@ const result = await page.evaluate(() => {
     building: manor.building,
     hostageY: manor.hostage.y,
     zombies: mission.manorZombies.length,
-    floors: mission.manorZombies.reduce((out, zombie) => ({ ...out, [zombie.manorFloor]: (out[zombie.manorFloor] || 0) + 1 }), {}),
-    types: mission.manorZombies.reduce((out, z) => ({ ...out, [z.type]: (out[z.type] || 0) + 1 }), {}),
+    chests: mission.chests.length,
+    state: mission.state,
+    started: mission.started,
     phase: mission.phase,
   };
 
@@ -56,12 +58,39 @@ const result = await page.evaluate(() => {
     stairHeights.push(y);
   }
   const secondFloor = g.level.world.floorAt(manor.hostage.x, manor.hostage.z, y);
+  const openingX = (manor.ceilingOpening.x1 + manor.ceilingOpening.x2) / 2;
+  const openingZ = manor.ceilingOpening.z2 - 0.2;
+  const openingFloor = g.level.world.floorAt(openingX, openingZ, manor.hostage.y);
+
+  for (const id of ['esp-band', 'esp-bells', 'esp-fireworks']) story._completeObjective(id);
+  story.delegate._up_manor(mission, 0.1, idle, true);
+  const active = {
+    state: mission.state,
+    started: mission.started,
+    zombies: mission.manorZombies.length,
+    chests: mission.chests.length,
+    floors: mission.manorZombies.reduce((out, zombie) => ({ ...out, [zombie.manorFloor]: (out[zombie.manorFloor] || 0) + 1 }), {}),
+    types: mission.manorZombies.reduce((out, z) => ({ ...out, [z.type]: (out[z.type] || 0) + 1 }), {}),
+    rewards: mission.chests.map((chest) => chest.reward),
+  };
+
   const firstFloorZombie = mission.manorZombies.find((zombie) => zombie.manorFloor === 0);
   const hpBeforeVerticalHit = g.level.player.health;
   g.level.player.pos.set(firstFloorZombie.x, manor.hostage.y, firstFloorZombie.z);
   const verticalHit = g.level.zombies._hurt(g.level.player, 10, firstFloorZombie.x, firstFloorZombie.z, 0, firstFloorZombie.y);
 
-  for (const id of ['esp-band', 'esp-bells', 'esp-fireworks']) story._completeObjective(id);
+  const grants = [];
+  for (const chest of mission.chests) {
+    const before = { coins: g.save.coins, crystals: g.save.crystals, xp: g.save.xp, buffs: { ...g.level.player.buffs } };
+    g.level.player.pos.set(chest.x, chest.y, chest.z);
+    story.delegate._up_manor(mission, 0.1, press, true);
+    grants.push({
+      reward: chest.reward,
+      before,
+      after: { coins: g.save.coins, crystals: g.save.crystals, xp: g.save.xp, buffs: { ...g.level.player.buffs } },
+    });
+  }
+
   for (const zombie of mission.manorZombies) zombie.state = 'dead';
   story.delegate._up_manor(mission, 0.1, idle, true);
   g.level.player.pos.set(manor.hostage.x, manor.hostage.y, manor.hostage.z);
@@ -70,9 +99,12 @@ const result = await page.evaluate(() => {
 
   return {
     initial,
+    active,
     stairHeights,
     secondFloor,
+    openingFloor,
     verticalMelee: { hit: verticalHit, hpBefore: hpBeforeVerticalHit, hpAfter: g.level.player.health },
+    chests: { opened: mission.chests.filter((chest) => chest.opened).length, grants },
     final: {
       phase: mission.phase,
       state: mission.state,
@@ -90,16 +122,27 @@ check(result.initial.building.meters.w === 350 && result.initial.building.meters
   && result.initial.building.w === result.initial.site.w && result.initial.building.d === result.initial.site.d
   && result.initial.building.floors === 2 && result.initial.building.rooms === 16 && result.initial.building.corridors === 2,
   'сам маєток 350×350 м, має два поверхи, 16 кімнат і коридори', JSON.stringify(result.initial.building));
-check(result.initial.zombies === 120 && result.initial.types.walker === 96
-  && result.initial.types.runner === 18 && result.initial.types.tank === 6
-  && result.initial.floors[0] === 80 && result.initial.floors[1] === 40,
-  'у маєтку рівно 120 зомбі на двох поверхах', JSON.stringify({ types: result.initial.types, floors: result.initial.floors }));
+check(result.initial.state === 'locked' && !result.initial.started && result.initial.zombies === 0 && result.initial.chests === 0,
+  'до четвертого завдання маєток порожній', JSON.stringify(result.initial));
+check(result.active.state === 'active' && result.active.started && result.active.zombies === 120 && result.active.chests === 5
+  && result.active.types.walker === 96 && result.active.types.runner === 18 && result.active.types.tank === 6
+  && result.active.floors[0] === 80 && result.active.floors[1] === 40
+  && ['coins', 'crystals', 'xp', 'buff'].every((reward) => result.active.rewards.includes(reward)),
+  'на четвертому завданні зʼявляються 120 зомбі та 5 скринь', JSON.stringify(result.active));
 check(result.stairHeights.every((height, i, list) => i === 0 || height >= list[i - 1])
   && result.stairHeights.at(-1) - result.stairHeights[0] > 4
-  && Math.abs(result.secondFloor - result.initial.hostageY) < 0.01,
-  'сходи послідовно ведуть на другий поверх', JSON.stringify({ stairs: result.stairHeights, secondFloor: result.secondFloor }));
+  && Math.abs(result.secondFloor - result.initial.hostageY) < 0.01
+  && result.openingFloor < result.initial.hostageY - 2,
+  'сходи ведуть крізь справжній отвір у перекритті', JSON.stringify({ stairs: result.stairHeights, secondFloor: result.secondFloor, openingFloor: result.openingFloor }));
 check(!result.verticalMelee.hit && result.verticalMelee.hpAfter === result.verticalMelee.hpBefore,
   'зомбі з першого поверху не бʼє гравця на другому', JSON.stringify(result.verticalMelee));
+check(result.chests.opened === 5
+  && result.chests.grants.some((g) => g.reward === 'coins' && g.after.coins >= g.before.coins + 100)
+  && result.chests.grants.some((g) => g.reward === 'crystals' && g.after.crystals === g.before.crystals + 3)
+  && result.chests.grants.some((g) => g.reward === 'xp' && g.after.xp === g.before.xp + 25)
+  && result.chests.grants.some((g) => g.reward === 'buff'
+    && Object.keys(g.after.buffs).some((buff) => g.after.buffs[buff] > g.before.buffs[buff])),
+  'усі 5 скринь відкриваються та видають 100 монет, 3 кристали, 25 XP або баф', JSON.stringify(result.chests));
 check(result.final.killed === 120 && result.final.state === 'done' && result.final.civilians === 5
   && result.final.objectives.every((state) => state === 'done') && result.final.bossUnlocked,
   'після зачистки 120 зомбі гравець звільняє людей і завершує завдання', JSON.stringify(result.final));

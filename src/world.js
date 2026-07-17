@@ -1302,16 +1302,29 @@ export class World {
       wallWithDoors(lx, bz + corridorHalf, lx, bz + halfD, [5]);
     }
 
-    // Два справжні прохідні поверхи.
+    // Два справжні прохідні поверхи; другий складений навколо отвору над сходами.
+    const steps = 16, stairStartX = entranceX + 18, stairZ = bz;
+    const holeMinX = stairStartX - 1.2;
+    const holeMaxX = stairStartX + (steps - 1) * 1.4 + 1.2;
+    const holeHalfZ = 3.6;
     addBox(BW, 0.35, BD, bx, gy + 0.18, bz, floorMat);
-    addBox(BW, 0.3, BD, bx, gy + 5, bz, floorMat);
+    const upperSlabs = [
+      { x1: bx - halfW, x2: holeMinX, z1: bz - halfD, z2: bz + halfD },
+      { x1: holeMaxX, x2: bx + halfW, z1: bz - halfD, z2: bz + halfD },
+      { x1: holeMinX, x2: holeMaxX, z1: bz - halfD, z2: bz - holeHalfZ },
+      { x1: holeMinX, x2: holeMaxX, z1: bz + holeHalfZ, z2: bz + halfD },
+    ];
+    for (const slab of upperSlabs) {
+      const sw = slab.x2 - slab.x1, sd = slab.z2 - slab.z1;
+      addBox(sw, 0.3, sd, (slab.x1 + slab.x2) / 2, gy + 5, (slab.z1 + slab.z2) / 2, floorMat);
+      this.floors.push({ x: (slab.x1 + slab.x2) / 2, z: (slab.z1 + slab.z2) / 2, ry: 0, w: sw, d: sd, top: gy + 5.15 });
+    }
     addBox(BW + 2, 0.8, BD + 2, bx, gy + H + 0.4, bz, roof);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       addBox(5, 2.2, 5, bx + sx * (halfW - 5), gy + H + 1.1, bz + sz * (halfD - 5), trim);
     }
 
     // Сходи йдуть уздовж центрального коридору від входу на другий поверх.
-    const steps = 16, stairStartX = entranceX + 18, stairZ = bz;
     for (let i = 0; i < steps; i++) {
       const top = gy + ((i + 1) * 5) / steps;
       const px = stairStartX + i * 1.4;
@@ -1319,7 +1332,6 @@ export class World {
       this.floors.push({ x: px, z: stairZ, ry: 0, w: 1.6, d: 5.6, top });
     }
     this.floors.push({ x: bx, z: bz, ry: 0, w: BW - 0.8, d: BD - 0.8, top: gy + 0.35 });
-    this.floors.push({ x: bx, z: bz, ry: 0, w: BW - 0.8, d: BD - 0.8, top: gy + 5.15 });
 
     // Парадний портик: високі колони, балкон і герб одразу відрізняють маєток від паркану.
     for (const pz of [bz - 5.3, bz + 5.3]) {
@@ -1368,6 +1380,7 @@ export class World {
       building: { x: bx, z: bz, w: BW, d: BD, meters: { w: 350, d: 350 }, floors: 2, rooms: 16, corridors: 2 },
       entrance: { x: entranceX, z: bz },
       stairs: { startX: stairStartX, z: stairZ, steps, stepD: 1.4, axis: 'x' },
+      ceilingOpening: { x1: holeMinX, x2: holeMaxX, z1: bz - holeHalfZ, z2: bz + holeHalfZ },
       hostage,
     };
     this._makeSign(entranceX + 7, bz - 9, t('ЗОМБІ-МАЄТОК 350×350 м'), Math.PI / 2);
