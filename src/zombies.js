@@ -259,6 +259,12 @@ export class Zombies {
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,
       attackT: -1, didHit: false, attackLockT: 0,
+      // Тактична зграя: сусідні зомбі заходять із різних боків, а не шикуються в одну чергу.
+      flankLane: (nid % 3) - 1,
+      avoidSide: (nid & 1) ? 1 : -1,
+      avoidT: 0,
+      stuckT: 0,
+      avoidBlockedT: 0,
       stunT: 0,
       confusedT: 0,
       confusedDmgBonus: 0,
@@ -1674,6 +1680,16 @@ export class Zombies {
         targetX = this.L.arena.x; targetZ = this.L.arena.z;
       } else {
         targetX = tp.x; targetZ = tp.z;
+        // Відкриті зграї оббігають гравця зліва/справа. Біля дистанції удару
+        // зміщення зникає, тому мелі лишається точним і передбачуваним.
+        if (!z.guard && !z.ranged && z.type !== 'boss' && z.zone !== 'castle-dungeon' && distP > st.attackR * 1.2) {
+          const lane = Number.isFinite(z.flankLane) ? z.flankLane : ((z.nid % 3) - 1);
+          const flank = lane * Math.min(4.5, (distP - st.attackR * 1.2) * 0.32);
+          if (flank && distP > 0.01) {
+            targetX += (-dzP / distP) * flank;
+            targetZ += (dxP / distP) * flank;
+          }
+        }
       }
       spd = st.chaseSpeed * (z.enraged ? 1.5 : 1);
     } else if (z.state === 'wander') {
@@ -1692,12 +1708,23 @@ export class Zombies {
       && distP < z.ranged.hold && distP > Math.max(st.attackR * 1.2, z.ranged.min)) spd = 0;
 
     let moving = false;
+    const avoiding = z.avoidT > 0;
+    if (avoiding) z.avoidT = Math.max(0, z.avoidT - dt);
     if (spd > 0 && targetX !== null) {
       const dx = targetX - z.x, dz = targetZ - z.z;
       const d = Math.hypot(dx, dz);
       if (d > 0.4) {
-        let mx = (dx / d) * spd * dt;
-        let mz = (dz / d) * spd * dt;
+        const dirX = dx / d, dirZ = dz / d;
+        let moveX = dirX, moveZ = dirZ;
+        if (avoiding && z.state === 'chase') {
+          const side = z.avoidSide || 1;
+          moveX = dirX * 0.34 - dirZ * side * 0.94;
+          moveZ = dirZ * 0.34 + dirX * side * 0.94;
+          const ml = Math.hypot(moveX, moveZ);
+          moveX /= ml; moveZ /= ml;
+        }
+        let mx = moveX * spd * dt;
+        let mz = moveZ * spd * dt;
         // сепарація від інших зомбі (квадрати відстаней — без зайвих sqrt).
         // Кандидатів беремо з бакет-сітки: лише 3×3 сусідні комірки замість всього this.list.
         const cgx = Math.floor(z.x / SEP_CELL), cgz = Math.floor(z.z / SEP_CELL);
@@ -1770,11 +1797,40 @@ export class Zombies {
     z._ghX = z.x; z._ghZ = z.z; z._gh = gh; // кеш для slope-чеку наступного кадру
     z.y = Math.max(gh, this.world.floorAt(z.x, z.z, z.y));
     const movedX = z.x - startX, movedZ = z.z - startZ;
-    moving = spd > 0 && movedX * movedX + movedZ * movedZ > 1e-8;
+    const movedD = Math.hypot(movedX, movedZ);
+    moving = spd > 0 && movedD > 1e-4;
+
+    // Якщо прямий крок кілька кадрів поспіль не дає прогресу, не завмираємо:
+    // коротко йдемо дотично до перешкоди. Якщо й цей бік замкнений — міняємо його.
+    if (z.state === 'chase' && spd > 0 && targetX !== null && !z.charging && !z.telegraph) {
+      const tx = targetX - startX, tz = targetZ - startZ;
+      const td = Math.hypot(tx, tz);
+      const expected = spd * dt;
+      const progress = td > 0.01 ? (movedX * tx + movedZ * tz) / td : movedD;
+      if (!avoiding && expected > 0.001 && progress < expected * 0.18) z.stuckT = (z.stuckT || 0) + dt;
+      else z.stuckT = Math.max(0, (z.stuckT || 0) - dt * 2);
+      if (z.stuckT > 0.28) {
+        z.avoidT = 1.25;
+        z.stuckT = 0;
+      }
+      if (avoiding && expected > 0.001 && movedD < expected * 0.14) {
+        z.avoidBlockedT = (z.avoidBlockedT || 0) + dt;
+        if (z.avoidBlockedT > 0.24) {
+          z.avoidSide = -(z.avoidSide || 1);
+          z.avoidT = 1.25;
+          z.avoidBlockedT = 0;
+        }
+      } else {
+        z.avoidBlockedT = 0;
+      }
+    } else {
+      z.stuckT = 0;
+      z.avoidBlockedT = 0;
+    }
 
     // --- поворот і анімація ---
     let faceX = 0, faceZ = 0;
-    if (z.state === 'attack' || z.telegraph > 0) {
+    if (z.state === 'attack' || z.telegraph > 0 || (z.state === 'chase' && !z.leashed)) {
       faceX = dxP; faceZ = dzP;
     } else if (z.charging > 0) {
       faceX = z.chargeDX; faceZ = z.chargeDZ;
