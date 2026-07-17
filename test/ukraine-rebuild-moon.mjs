@@ -43,8 +43,10 @@ const ukraine = await page.evaluate(() => {
     }
   }
   player.pos.set(rebuild.dest.x, rebuild.dest.y, rebuild.dest.z);
-  delegate._up_rebuild(rebuild, 30, hold, true);
+  for (let i = 0; i < 3; i++) delegate._up_rebuild(rebuild, 10, hold, true);
   story._syncObjectiveStates();
+
+  const rebuildAttackers = g.level.zombies.list.filter((zombie) => zombie.rebuildAttack);
 
   return {
     ids: story.objectives.map((o) => o.id),
@@ -62,6 +64,10 @@ const ukraine = await page.evaluate(() => {
       buildingParts: rebuild.rebuilt.children.length,
       mainBuildingWidth: rebuild.rebuilt.children[0].geometry.parameters.width,
       tools: player.weapons.filter((w) => w === 'axe' || w === 'pickaxe'), toolModels, wrongToolMisses,
+      waves: rebuild.buildWaves,
+      attackers: rebuildAttackers.length,
+      leftAttackers: rebuildAttackers.filter((zombie) => zombie.x < rebuild.dest.x).length,
+      rightAttackers: rebuildAttackers.filter((zombie) => zombie.x > rebuild.dest.x).length,
     },
     bossUnlocked: story.bossUnlocked,
   };
@@ -74,7 +80,9 @@ check(ukraine.defense.type === 'defense' && ukraine.defense.timer <= 0
   'оборона реально триває 22 секунди на сільській площі', JSON.stringify(ukraine.defense));
 check(ukraine.rebuild.wood === 120 && ukraine.rebuild.stone === 50 && ukraine.rebuild.progress === 1
   && ukraine.rebuild.tools.join(',') === 'axe,pickaxe' && ukraine.rebuild.toolModels.every((n) => n > 2)
-  && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15,
+  && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15
+  && ukraine.rebuild.waves === 3 && ukraine.rebuild.attackers === 24
+  && ukraine.rebuild.leftAttackers === 12 && ukraine.rebuild.rightAttackers === 12,
   'реальні вибірні інструменти → правильне рубання/видобування → великий міський штаб', JSON.stringify(ukraine.rebuild));
 check(ukraine.states.every((state) => state === 'done') && ukraine.bossUnlocked,
   'після українських завдань відкривається бос', JSON.stringify(ukraine));

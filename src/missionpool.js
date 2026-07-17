@@ -483,6 +483,8 @@ export class DynamicMissions {
     m.wood = 0;
     m.stone = 0;
     m.buildProgress = 0;
+    m.buildWaveT = 0;
+    m.buildWaves = 0;
     m.phase = 'tools';
     m.title = t('Знайди сокиру й кірку');
     m.woodNodes = this._spawnActPoints(m, { n: 3, emoji: '🌲', color: 0x4f9a4b, spread: 'map', seedOffset: 303 })
@@ -1522,6 +1524,23 @@ export class DynamicMissions {
     m.title = t('Віднови центр міста: {n} с', { n: seconds });
     if (d < m.dest.r) this.prompt = { text: t('Тримай {k} — відновлюй центр міста', { k: interactKey() }), hold: true, progress: m.buildProgress };
     if (d < m.dest.r && allowControl && input.down('KeyE')) {
+      m.buildWaveT -= dt;
+      if (m.buildWaveT <= 0) {
+        m.buildWaveT += 10;
+        m.buildWaves++;
+        for (const side of [-1, 1]) {
+          for (let i = 0; i < 4; i++) {
+            const x = m.dest.x + side * (18 + i * 1.5);
+            const z = m.dest.z + (i - 1.5) * 4;
+            const zombie = level.zombies.spawn(i === 0 ? 'runner' : 'walker', x, z, { horde: false });
+            zombie.rebuildAttack = true;
+            zombie.aggroed = true;
+            zombie.state = 'chase';
+          }
+        }
+        level.audio.horde();
+        level.bus.emit('toast', t('🧟 Зомбі атакують центр з обох боків!'));
+      }
       m.buildProgress = Math.min(1, m.buildProgress + dt / 30);
       if (m.buildProgress >= 1) {
         m.rebuilt = this._makeCityCenter(m);
