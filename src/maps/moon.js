@@ -21,6 +21,7 @@ export default {
   },
   storySites: {
     station: { x: 0, z: 26 },
+    suit: { x: 68, z: 82 },
     crew: { x: -132, z: 18 },
     relays: { x: 122, z: -44 },
     reactor: { x: -104, z: -96 },

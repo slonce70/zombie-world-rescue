@@ -143,7 +143,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'activeCloneSkin',
       'bestiary', 'bestiaryGoals', 'chapter', 'cloudTs', 'coins', 'crystals', 'dances', 'diffStar', 'gadgetsOwned',
       'gadgetHypers', 'goal', 'hero', 'hints', 'infected', 'kidMode', 'strongZombies', 'toughZombies', 'mapSize', 'mapStyle', 'liberated', 'medals',
-      'megaPity', 'megaQuests', 'missionRuns', 'modeBest', 'modeRewards', 'modeWins', 'passLvl', 'pets', 'quests', 'records', 'skins', 'soulLevel',
+      'megaPity', 'megaQuests', 'missionRuns', 'moonRegions', 'modeBest', 'modeRewards', 'modeWins', 'passLvl', 'pets', 'quests', 'records', 'skins', 'soulLevel',
       'cloneSkins',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
       'weapons', 'weekly', 'worldBosses', 'xp', 'radiationCoins',
@@ -165,7 +165,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
     out.progressManifestHasCurrentCategories = [
-      'liberated', 'xp', 'missionRuns', 'stormBest', 'worldBosses', 'coins', 'crystals', 'upgrades',
+      'liberated', 'xp', 'missionRuns', 'moonRegions', 'stormBest', 'worldBosses', 'coins', 'crystals', 'upgrades',
       'bestiary', 'bestiaryGoals', 'chapter', 'infected', 'megaQuests', 'medals', 'stats', 'goal', 'hero', 'skins',
       'dances', 'tracers', 'titles', 'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',

@@ -1093,6 +1093,20 @@ function buildZombie(type, rng, variant = '') {
       glove.scale.set(1.25, 0.9, 1.1);
       arm.add(glove);
     }
+  } else if (type === 'moonbrute') {
+    rig = makeHumanoid(Object.assign(common, {
+      scale: 1.38, belly: 1.55, armsForward: 0.8, headR: 0.23,
+      skin: 0x8da08d, shirt: 0xdfe5ea, pants: 0xb9c1c8, shoes: 0x596773,
+      eyeWhite: 0xff6d5f, pupilColor: 0x46120e, hair: false,
+    }));
+    const helmet = sphere(0.3, toonMat(0xe7ebef), 14, 10);
+    helmet.position.y = 0.2;
+    const visor = sphere(0.25, toonMat(0x5fb6df, 0x1b6e98, 0.45), 12, 8);
+    visor.position.set(0, 0.17, -0.14); visor.scale.set(0.9, 0.68, 0.6);
+    const tank = box(0.34, 0.65, 0.25, toonMat(0x64717b));
+    tank.position.set(0, 0.4, 0.3);
+    rig.parts.head.add(helmet, visor);
+    rig.parts.torso.add(tank);
   } else if (type === 'tank' || type === 'stone') {
     const stone = type === 'stone';
     rig = makeHumanoid(Object.assign(common, {
@@ -2425,6 +2439,20 @@ export function makeBoss(style = 'king') {
 // Спорядження героя (видиме у виді 3-ї особи)
 // ============================================================
 export function attachHeroGear(rig, kind) {
+  if (kind === 'spacesuit') {
+    const white = toonMat(0xe9edf2, 0xaeb7c0, 0.12);
+    const pack = box(0.46, 0.58, 0.24, toonMat(0x536171));
+    pack.position.set(0, 0.35, 0.28);
+    const chest = box(0.48, 0.55, 0.08, white);
+    chest.position.set(0, 0.36, -0.25);
+    const helmet = sphere(0.31, white, 16, 12);
+    helmet.position.y = 0.2;
+    const visor = sphere(0.255, toonMat(0x77c8ef, 0x2787b5, 0.55), 14, 10);
+    visor.position.set(0, 0.18, -0.13); visor.scale.set(0.9, 0.72, 0.65);
+    rig.parts.torso.add(chest, pack);
+    rig.parts.head.add(helmet, visor);
+    return [chest, pack, helmet, visor];
+  }
   if (kind === 'vest') {
     const vestM = toonMat(0x2e4a6e);
     const front = box(0.42, 0.46, 0.1, vestM);

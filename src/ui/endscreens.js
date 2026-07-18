@@ -75,6 +75,10 @@ export function showVictory(game) {
   }
   const wasLiberated = !!game.save.liberated[country.id];
   game.save.liberated[country.id] = true;
+  if (game.level.moonRegion) {
+    game.save.moonRegions = game.save.moonRegions || {};
+    game.save.moonRegions[game.level.moonRegion.id] = true;
+  }
   const infectedFirstWin = game.level.infected && !(game.save.infected && game.save.infected.cleared && game.save.infected.cleared[country.id]);
   // 🎁 нагорода-зброя країни видається ОДРАЗУ в момент перемоги (раніше з'являлась лише
   // після наступного завантаження, якщо у наборі не випала місія «зачистка складу»)

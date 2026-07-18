@@ -13,6 +13,7 @@ const TYPE_STATS = {
   boxer: { hp: 125, speed: 1.55, chaseSpeed: 3.5, aggro: 26, dmg: 7, attackR: 1.9, coins: 16, pitch: 0.8, punchEvery: 3, punchPush: 5 },
   tank: { hp: 230, speed: 1.3, chaseSpeed: 2.6, aggro: 18, dmg: 22, attackR: 2.3, coins: 15, pitch: 0.55 },
   stone: { hp: 500, speed: 0.9, chaseSpeed: 1.8, aggro: 24, dmg: 10, attackR: 2.1, coins: 25, pitch: 0.5, hitStun: 0.5 },
+  moonbrute: { hp: 1000, speed: 0.6, chaseSpeed: 1.2, aggro: 26, dmg: 3, attackR: 2.5, coins: 45, pitch: 0.42 },
   // 🛡 щитоносець: тіло слабке (20 hp), але щит дуже міцний (1000) — НЕ ламай у лоб, ОБІЙДИ збоку/ззаду!
   // фронтальний конус щита (v42) лишається: збоку та ззаду тіло вразливе.
   shield: { hp: 20, speed: 1.0, chaseSpeed: 2.0, aggro: 24, dmg: 16, attackR: 2.0, coins: 40, pitch: 0.7, shieldHp: 1000 },
@@ -242,7 +243,7 @@ export class Zombies {
     // тож додатково множити HP кожного = потрійний стек (count×HP×шкода ≈ ×6.6 для трьох) — несправедливо важко
     const coopScale = (opts.mirror || opts.noCoopScale) ? 1 : this.coopMul();
     const hpScale = finalType === 'boss' ? 1 : this.diff.hp * coopScale;
-    const maxHp = castleKnight ? 150 : castleArcher ? 120 : finalType === 'stone' ? 500 : this.hpWithSettings(stats.hp * hpScale, opts);
+    const maxHp = castleKnight ? 150 : castleArcher ? 120 : finalType === 'stone' ? 500 : finalType === 'moonbrute' ? 1000 : this.hpWithSettings(stats.hp * hpScale, opts);
     stats.hp = maxHp;
     const z_ = {
       nid, rig, type: finalType, stats,
@@ -453,6 +454,11 @@ export class Zombies {
         });
       }
     });
+    if (this.level.countryId === 'MOON') {
+      for (const [x, z] of [[74, 76], [-90, -82], [18, -146]]) {
+        this.spawn('moonbrute', x, z, { anchor: { x, z, r: 12 }, groupId: 90 });
+      }
+    }
     // 🤖 рівно 3 зомбі-роботи на рівень (де дозволено), рознесені по карті
     if (this._allowRobot) {
       for (const [rx, rz] of [[56, -44], [-44, 56], [24, 80]]) {
@@ -1279,7 +1285,7 @@ export class Zombies {
             }
           } else if (playerAlive && distP < st.attackR * 1.35) {
             const confusedBonus = z.confusedT > 0 ? (z.confusedDmgBonus || 0) : 0;
-            const damage = (z.type === 'stone' ? st.dmg : st.dmg * this.diff.dmg) + confusedBonus;
+            const damage = (z.type === 'stone' || z.type === 'moonbrute' ? st.dmg : st.dmg * this.diff.dmg) + confusedBonus;
             const hit = this._hurt(tgt, damage, z.x, z.z, st.hitStun || 0, z.y);
             if (hit && st.punchEvery) {
               z.punchHits = (z.punchHits || 0) + 1;

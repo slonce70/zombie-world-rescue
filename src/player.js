@@ -58,6 +58,7 @@ export class Player {
     this.moon = level.countryId === 'MOON';
     this.gravity = this.moon ? 8.2 : 21;
     this.oxygen = this.moon ? 100 : null;
+    this.spacesuit = false;
     this._oxygenDamageT = 0;
 
     this.maxHealth = 100;
@@ -587,6 +588,7 @@ export class Player {
 
   _updateMoonLifeSupport(dt) {
     if (!this.moon || this.health <= 0) return;
+    if (this.spacesuit) { this.oxygen = 100; this._oxygenDamageT = 0; return; }
     const station = this.level.country.map.storySites.station;
     const inside = Math.hypot(this.pos.x - station.x, this.pos.z - station.z) < 48;
     const relay = this.level.missions?.objectives?.find((objective) => objective.id === 'moon-relays');
@@ -598,6 +600,14 @@ export class Player {
       this._oxygenDamageT = 1;
       this.takeDamage(8, this.pos.x, this.pos.z);
     }
+  }
+
+  equipSpacesuit() {
+    if (this.spacesuit) return false;
+    this.spacesuit = true;
+    this.oxygen = 100;
+    this.gearAttached.spacesuit = attachHeroGear(this.rig, 'spacesuit');
+    return true;
   }
 
   // 🦘 батути: торкання активної площадки підкидає гравця вгору (з кулдауном).

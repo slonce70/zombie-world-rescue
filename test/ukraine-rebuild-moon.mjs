@@ -147,6 +147,24 @@ await page.click('#btn-hq');
 await page.waitForSelector('#overlay-hq.show', { timeout: 10000 });
 check(!!await page.$('#btn-moonbase'), 'у Штабі є окремий вхід до Порятунку Місяця');
 await page.click('#btn-moonbase');
+await page.waitForFunction(() => window.__game?.state === 'globe' && window.__game?.globe?.mode === 'moon', null, { timeout: 10000 });
+const moonGlobe = await page.evaluate(async () => {
+  const { MOON_REGION_LIST } = await import('/src/moonregions.js');
+  return {
+    mode: window.__game.globe.mode,
+    regions: window.__game.globe.features.map((feature) => feature.properties.name),
+    missions: MOON_REGION_LIST.map((region) => region.missions.join(',')),
+    atmosphere: window.__game.globe.atmo.visible,
+    earthUiHidden: getComputedStyle(document.querySelector('.globe-play-row')).display === 'none',
+  };
+});
+check(moonGlobe.mode === 'moon' && moonGlobe.regions.length === 4 && !moonGlobe.atmosphere
+  && moonGlobe.earthUiHidden && new Set(moonGlobe.missions).size === 4
+  && moonGlobe.regions.every((name) => !['Україна', 'Франція', 'Німеччина'].includes(name)),
+  'Місяць відкривається як сірий глобус із чотирма власними країнами', JSON.stringify(moonGlobe));
+await page.waitForTimeout(800);
+await page.screenshot({ path: 'test-results/moon-globe.png' });
+await page.evaluate(() => window.__game.startLevel('MOON', { moonRegion: 'MARE' }));
 await page.waitForFunction(() => window.__game?.state === 'level' && window.__game?.level?.countryId === 'MOON', null, { timeout: 30000 });
 await page.waitForTimeout(700);
 await page.screenshot({ path: 'test-results/moon-full-region.png' });
@@ -170,6 +188,13 @@ const moon = await page.evaluate(() => {
     clouds: g.level.world.clouds.length,
     player: !!g.level.player,
     zombies: g.level.zombies.list.length,
+    moonRegion: g.level.moonRegion?.id,
+    moonBrutes: g.level.zombies.list.filter((zombie) => zombie.type === 'moonbrute').map((zombie) => ({ hp: zombie.maxHp, damage: zombie.stats.dmg, speed: zombie.stats.chaseSpeed })),
+    meteors: ['small', 'medium', 'large'].map((type, i) => {
+      const meteor = g.level.moonHazards.spawn(type, 150 + i * 20, 150);
+      return { type, size: meteor.size, damage: meteor.damage };
+    }),
+    suitVisible: g.level.effects.coins.some((item) => item.type === 'spacesuit'),
     ids: story.objectives.map((o) => o.id),
     missionTypes: story.delegate.missions.map((m) => m.type),
     missionTitles: story.delegate.missions.map((m) => m.title),
@@ -188,6 +213,19 @@ const moon = await page.evaluate(() => {
     },
     minimapColor,
   };
+  player.health = 100;
+  player.armor = 0;
+  player.respawnProtect = 0;
+  const impact = g.level.moonHazards.spawn('small', player.pos.x, player.pos.z);
+  impact.t = 0;
+  impact.mesh.position.y = impact.y;
+  g.level.moonHazards.update(0.01);
+  initial.meteorImpactHealth = player.health;
+  g.level.effects.onPickup('spacesuit', 1);
+  player.oxygen = 40;
+  player._updateMoonLifeSupport(20);
+  initial.suitEquipped = player.spacesuit;
+  initial.oxygenAfterSuit = player.oxygen;
 
   const rescue = delegate.get('rescue');
   const door = g.level.world.barnDoorCollider;
@@ -244,6 +282,17 @@ const moon = await page.evaluate(() => {
 
 check(moon.initial.state === 'level' && moon.initial.countryId === 'MOON' && moon.initial.player && moon.initial.zombies > 0,
   'Порятунок Місяця запускається як повноцінна 3D-країна з гравцем і зомбі', JSON.stringify(moon.initial));
+check(moon.initial.moonRegion === 'MARE'
+  && moon.initial.moonBrutes.length === 3
+  && moon.initial.moonBrutes.every((zombie) => zombie.hp === 1000 && zombie.damage === 3 && zombie.speed <= 1.2),
+  'на Місяці є три повільні нові зомбі з 1000 HP і шкодою 3', JSON.stringify(moon.initial.moonBrutes));
+check(JSON.stringify(moon.initial.meteors) === JSON.stringify([
+  { type: 'small', size: 5, damage: 35 }, { type: 'medium', size: 10, damage: 55 }, { type: 'large', size: 19, damage: 75 },
+]), 'метеорити мають точні розміри 5/10/19 м і шкоду 35/55/75', JSON.stringify(moon.initial.meteors));
+check(moon.initial.meteorImpactHealth === 65,
+  'малий метеорит при падінні реально наносить 35 шкоди', String(moon.initial.meteorImpactHealth));
+check(moon.initial.suitVisible && moon.initial.suitEquipped && moon.initial.oxygenAfterSuit === 100,
+  'скафандр лежить на карті, підбирається і назавжди стабілізує кисень у забігу', JSON.stringify(moon.initial));
 check(moon.initial.bound >= 240 && moon.initial.houses >= 6 && moon.initial.barren && moon.initial.clouds === 0,
   'Місяць має велику безповітряну карту зі станцією, а не малу круглу арену', JSON.stringify(moon.initial));
 check(moon.initial.moonSystems.gravity < 10 && moon.initial.moonSystems.jumpPower > 9

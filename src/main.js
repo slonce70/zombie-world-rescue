@@ -24,6 +24,8 @@ import {
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
+import { getMoonRegion } from './moonregions.js';
+import { MoonHazards } from './moonhazards.js';
 import { Bus, RNG, disposeObject } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
 import { TouchControls, isTouchDevice } from './touch.js';
@@ -126,7 +128,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 537;
+const APP_VERSION = 538;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -448,7 +450,11 @@ class Game {
     document.getElementById('btn-moonbase').addEventListener('click', () => {
       this.audio.click();
       this._hideOverlay('overlay-hq');
-      this.startLevel('MOON');
+      this.globe.setMode('moon');
+    });
+    document.getElementById('btn-moon-globe').addEventListener('click', () => {
+      this.audio.click();
+      this.globe.setMode(this.globe.mode === 'moon' ? 'earth' : 'moon');
     });
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
@@ -626,7 +632,7 @@ class Game {
       modeBest: {}, modeWins: {}, modeRewards: {}, weekly: {},
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
-      missionRuns: {}, kidMode: null, strongZombies: false, toughZombies: false,
+      missionRuns: {}, moonRegions: {}, kidMode: null, strongZombies: false, toughZombies: false,
       mapSize: 'standard', mapStyle: 'classic', cloudTs: 0, goal: null,
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
       coopRole: null,
@@ -711,6 +717,8 @@ class Game {
         }
         if (out.activeGadget && (!GADGETS[out.activeGadget] || !out.gadgetsOwned.includes(out.activeGadget))) out.activeGadget = null;
         out.missionRuns = out.missionRuns || {};
+        if (!out.moonRegions || typeof out.moonRegions !== 'object' || Array.isArray(out.moonRegions)) out.moonRegions = {};
+        out.moonRegions = Object.fromEntries(Object.entries(out.moonRegions).filter(([id, done]) => ['MARE', 'TYCHO', 'COPERNICUS', 'POLARIS'].includes(id) && done === true));
         if (!out.activeGadget && out.gadgetsOwned.length) out.activeGadget = out.gadgetsOwned[0];
         // улюбленці: легасі-собака (upgrades.dog) → у список pets; узгодити activePet
         if (!Array.isArray(out.pets)) out.pets = [];
@@ -2938,7 +2946,9 @@ class Game {
     if (victoryGlobe) victoryGlobe.style.display = '';
     const victoryNext = document.getElementById('btn-victory-next');
     if (victoryNext) victoryNext.textContent = t('▶️ Далі');
-    const baseCountry = COUNTRIES[countryId] || COUNTRIES.UKR;
+    const moonRegion = countryId === 'MOON' ? getMoonRegion(opts.moonRegion) : null;
+    const rawCountry = COUNTRIES[countryId] || COUNTRIES.UKR;
+    const baseCountry = moonRegion ? { ...rawCountry, name: moonRegion.name, seed: moonRegion.seed } : rawCountry;
     const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
     const mapStyle = sanitizeMapStyle((opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
     const country = { ...baseCountry, map: { ...scaleMap(baseCountry.map, mapSize), mapStyle } };
@@ -3079,6 +3089,7 @@ class Game {
       countryId,
       modeId,
       country,
+      moonRegion,
       mapSize,
       mapStyle,
       scene: new THREE.Scene(),
@@ -3258,12 +3269,12 @@ class Game {
         isGuest,
         isCoop: !!coop,
         isPlayground,
-      }) && !this._forceMissionSet && !level.expedition && !operation;
+      }) && (!moonRegion || moonRegion.story) && !this._forceMissionSet && !level.expedition && !operation;
       const frontPreset = coop && operation && operation.missionPreset === 'rebuild-center'
         ? 'rescue-group'
         : operation && operation.missionPreset;
       const frontMissions = frontPreset && FRONT_MISSION_PRESETS[frontPreset];
-      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, frontMissions || null, { objectiveOnly: !!operation });
+      level.missions = useStory ? new StoryMissions(level) : new DynamicMissions(level, (moonRegion && moonRegion.missions) || frontMissions || null, { objectiveOnly: !!operation });
       // 🤝 R4 «Врятовані друзі»: схований НПС у клітці — ЛИШЕ соло-кампанія (useStory вже
       // означає campaign + !guest + !coop + !playground). У коопі клітка просто не спавниться.
       if (useStory) level.rescueCage = new HiddenRescue(level);
@@ -3389,7 +3400,11 @@ class Game {
         return;
       }
       if (!level.playground && type !== 'coin') this.quests.onEvent('pickup');
-      if (type === 'coin') {
+      if (type === 'spacesuit') {
+        level.player.equipSpacesuit();
+        this.audio.powerup();
+        this.hud.banner(t('🧑‍🚀 СКАФАНДР ЗНАЙДЕНО!'), t('Тепер ти можеш дихати на поверхні Місяця.'));
+      } else if (type === 'coin') {
         level.addCoins(value);
         this.audio.coin();
       } else if (type === 'medkit') {
@@ -3436,6 +3451,12 @@ class Game {
         this.hud.toast(t('🔋 +30 набоїв'));
       }
     };
+    if (countryId === 'MOON' && !isGuest) {
+      const suit = country.map.storySites.suit;
+      level.moonSuitPoint = { ...suit };
+      level.effects.spawnPickup(suit.x, suit.z, 'spacesuit', 9999);
+      if (!coop) level.moonHazards = new MoonHazards(level);
+    }
     // вибух (граната/бочка 135 за замовч., ракета базуки 220 — передається явно): шкода зомбі по радіусу.
     // ownerPid — хто підірвав (для чесного кіл-кредиту/комбо/квестів у коопі); 1 = локальний гравець/хост
     level.effects.onExplosion = (x, y, z, r, baseDmg = 135, ownerPid = 1, meta = null) => {
@@ -3932,6 +3953,7 @@ class Game {
       // standalone-ресурси Effects (оригінал tracerMat, гео монет/снарядів/гранат) обхід сцени
       // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
       if (this.level.worldBoss && this.level.worldBoss.dispose) this.level.worldBoss.dispose();
+      if (this.level.moonHazards) this.level.moonHazards.dispose();
       if (this.level.rescueCage && this.level.rescueCage.dispose) this.level.rescueCage.dispose();
       // 🌪️ буря чіпає сесійно-кешований coinMat — форс-відновлюємо, поки рівень цілий (до обходу сцени)
       if (this.level.sandstorm && this.level.sandstorm.dispose) this.level.sandstorm.dispose();
@@ -5333,6 +5355,7 @@ class Game {
           && !(isCoop && (this.paused || this.shop.isOpen));
         this.level.player.update(simDt, this.input, allowControl);
         this.level.zombies.update(simDt);
+        if (this.level.moonHazards) this.level.moonHazards.update(simDt);
         if (this.level.operation) this._updateFrontDirector(this.level, simDt);
         this.level.missions.update(simDt, this.input, allowControl);
         // 🤝 схований друг у клітці (соло-кампанія): підхід + звільнення 2с + летить у табір

@@ -1074,6 +1074,23 @@ export class Effects {
     const L = this.levelRef;
     if (L && L.mirror && nid === null) return;
     const y0 = yOverride !== null ? yOverride : this.world.groundH(x, z);
+    if (type === 'spacesuit') {
+      const g = new THREE.Group();
+      const white = toonMat(0xe9edf2, 0xaeb7c0, 0.15);
+      const dark = toonMat(0x3b4855);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.72, 0.3), white);
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), white);
+      helmet.position.y = 0.62;
+      const visor = new THREE.Mesh(new THREE.SphereGeometry(0.255, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), toonMat(0x74bce8, 0x2c89bd, 0.55));
+      visor.position.set(0, 0.59, -0.12); visor.rotation.x = 0.25;
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.58, 0.24), dark);
+      pack.position.set(0, 0.02, 0.28);
+      g.add(body, helmet, visor, pack);
+      g.position.set(x, y0 + 0.62, z);
+      this.scene.add(g);
+      this._finishItem({ mesh: g, type, value: 1, t: Math.random() * 6, vy: 0, baseY: y0 + 0.57, life }, x, z, yOverride, nid);
+      return;
+    }
     if (type === 'grenade') {
       const gm = new THREE.Mesh(this.grenadeGeo, this.grenadeMat);
       gm.scale.setScalar(1.5);

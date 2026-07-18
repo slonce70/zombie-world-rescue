@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
 import { countryStars, STARS_PER_COUNTRY } from './stars.js';
 import { frontCountryState } from './worldfront.js';
+import { MOON_REGION_LIST, getMoonRegion, moonRegionFeatures } from './moonregions.js';
 
 const FRONT_GLOBE_COLORS = Object.freeze({
   threat: ['#c93455', '#ff7b6d'],
@@ -34,6 +35,9 @@ export class Globe {
     this.scene.add(this.group);
     this.R = 1;
     this.features = [];
+    this.earthFeatures = [];
+    this.moonFeatures = moonRegionFeatures();
+    this.mode = 'earth';
     this.ready = false;
     this.dragging = false;
     this.dragMoved = 0;
@@ -71,6 +75,7 @@ export class Globe {
       })
     );
     this.scene.add(atmo);
+    this.atmo = atmo;
 
     // полотна текстур
     this.texCanvas = document.createElement('canvas');
@@ -103,7 +108,7 @@ export class Globe {
   }
 
   _rotateToCountry(id, instant = false) {
-    const c = COUNTRIES[id] || COUNTRIES.UKR;
+    const c = this.mode === 'moon' ? getMoonRegion(id) : (COUNTRIES[id] || COUNTRIES.UKR);
     const up = latLonToVec3(c.lat, c.lon, 1);
     this.targetRotY = -Math.atan2(up.x, up.z);
     if (instant) this.group.rotation.y = this.targetRotY;
@@ -163,6 +168,14 @@ export class Globe {
   }
 
   _aimBeaconAt(id) {
+    if (this.mode === 'moon') {
+      const region = getMoonRegion(id);
+      this._placeBeacon(latLonToVec3(region.lat, region.lon, this.R));
+      this.beamMesh.material.color.setHex(0xd8ecff);
+      this.ringMesh.material.color.setHex(0xd8ecff);
+      this._drawBeaconLabel(region.name.toUpperCase(), t('натисни — почни місію!'), '#d8ecff');
+      return;
+    }
     // 🦖 фінал відкрито: світ вільний, але острів динозаврів чекає — червоний маяк-заклик
     if (this.allDone && !(this.game.save.liberated || {}).LOST && COUNTRIES.LOST) {
       const isl = COUNTRIES.LOST;
@@ -202,9 +215,42 @@ export class Globe {
   async load() {
     const res = await fetch('./assets/countries.geo.json');
     const data = await res.json();
-    this.features = data.features;
+    this.earthFeatures = data.features;
+    this.features = this.earthFeatures;
     this.repaint();
     this.ready = true;
+  }
+
+  setMode(mode) {
+    this.mode = mode === 'moon' ? 'moon' : 'earth';
+    this.features = this.mode === 'moon' ? this.moonFeatures : this.earthFeatures;
+    this.atmo.visible = this.mode !== 'moon';
+    this.beacon.visible = this.mode !== 'moon';
+    if (this.mode === 'moon') {
+      const done = this.game.save.moonRegions || {};
+      this.targetId = (MOON_REGION_LIST.find((region) => !done[region.id]) || MOON_REGION_LIST[0]).id;
+      this.allDone = false;
+    } else {
+      this.targetId = nextTarget(this.game.save.liberated || {}) || 'UKR';
+      this.allDone = nextTarget(this.game.save.liberated || {}) === null;
+    }
+    const title = document.querySelector('.globe-top h1');
+    const sub = document.querySelector('.globe-sub');
+    const hint = document.querySelector('.globe-hint');
+    const toggle = document.getElementById('btn-moon-globe');
+    if (title) title.innerHTML = this.mode === 'moon' ? '🌙 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК МІСЯЦЯ</span>' : '🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span>';
+    if (sub) sub.textContent = this.mode === 'moon' ? 'Обирай вигадану місячну країну — у кожної свої завдання.' : 'Зомбі захопили планету! Рятуй країни — сам або з друзями.';
+    if (hint) hint.textContent = this.mode === 'moon' ? '🖱️ Обертай Місяць · натисни на країну, щоб почати операцію!' : '🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!';
+    if (toggle) toggle.textContent = this.mode === 'moon' ? '🌍 Земля' : '🌙 Місяць';
+    for (const selector of ['#gift-chip', '#camp-quest-chip', '#globe-compass', '.globe-play-row', '#globe-progress', '#weekly-goal']) {
+      const el = document.querySelector(selector);
+      if (el) el.style.display = this.mode === 'moon' ? 'none' : '';
+    }
+    const tooltip = document.getElementById('globe-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+    this._aimBeaconAt(this.targetId);
+    this._rotateToCountry(this.targetId);
+    this.repaint();
   }
 
   _eachRing(feature, cb) {
@@ -266,6 +312,30 @@ export class Globe {
   repaint() {
     const ctx = this.texCanvas.getContext('2d');
     const w = this.texCanvas.width, h = this.texCanvas.height;
+    if (this.mode === 'moon') {
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, '#d7d9dc'); grad.addColorStop(0.5, '#989da3'); grad.addColorStop(1, '#c4c7ca');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+      const rng = (n) => ((Math.sin(n * 91.17) + 1) * 0.5);
+      for (let i = 0; i < 95; i++) {
+        const x = rng(i + 2) * w, y = rng(i + 31) * h, r = 5 + rng(i + 71) * 34;
+        ctx.fillStyle = 'rgba(55,58,63,0.16)'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 3; ctx.stroke();
+      }
+      const done = this.game.save.moonRegions || {};
+      this.features.forEach((f, index) => {
+        const id = f.id;
+        const base = ['#758696', '#8b819a', '#727d73', '#6d7f8f'][index];
+        this._paintCountry(ctx, f, done[id] ? '#a9c9bd' : (this.hoverId === id ? '#c7d9e8' : base), '#e8edf2', w, h);
+      });
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f5f7fa';
+      ctx.strokeStyle = 'rgba(20,24,30,0.8)'; ctx.lineWidth = 7; ctx.font = 'bold 34px Arial';
+      MOON_REGION_LIST.forEach((region) => {
+        const x = ((region.lon + 180) / 360) * w;
+        const y = ((90 - region.lat) / 180) * h;
+        ctx.strokeText(region.name, x, y); ctx.fillText(region.name, x, y);
+      });
+    } else {
     // океан
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#2e7fc9');
@@ -295,6 +365,7 @@ export class Globe {
         if (this.hoverId === id) fill = stroke;
       }
       this._paintCountry(ctx, f, fill, stroke, w, h);
+    }
     }
     this._paintedFront = this.game.save.front;
     this.texture.needsUpdate = true;
@@ -386,6 +457,13 @@ export class Globe {
       tooltip.style.display = 'block';
       tooltip.style.left = (e.clientX + 14) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
+      if (this.mode === 'moon') {
+        const region = getMoonRegion(c.id);
+        const done = (this.game.save.moonRegions || {})[c.id];
+        tooltip.innerHTML = `${done ? '✅' : '🌙'} <b>${region.name}</b><br>${region.story ? 'Важка сюжетна операція' : `Місії: ${region.missions.join(' · ')}`}`;
+        tooltip.classList.add('available');
+        document.body.style.cursor = 'pointer';
+      } else {
       const known = COUNTRIES[c.id];
       if ((this.game.save.liberated || {})[c.id]) {
         // ⭐ R3: для країн кампанії показуємо зірки (X/3) у тултипі звільненої країни
@@ -400,6 +478,7 @@ export class Globe {
       } else {
         tooltip.innerHTML = t('🔒 <b>{n}</b> — спочатку звільни Україну', { n: c.name });
         tooltip.classList.remove('available');
+      }
       }
       document.body.style.cursor = 'pointer';
     } else {
@@ -419,6 +498,13 @@ export class Globe {
     const c = this.pickCountry(hit.uv);
     if (!c) return;
     this.game.audio.ensure();
+    if (this.mode === 'moon') {
+      this.game.audio.click();
+      document.getElementById('globe-tooltip').style.display = 'none';
+      document.body.style.cursor = 'default';
+      this.game.startLevel('MOON', { moonRegion: c.id });
+      return;
+    }
     const playable = (this.game.save.liberated || {})[c.id] || isCountryOpen(this.game.save.liberated, c.id);
     if (playable && COUNTRIES[c.id]) {
       this.game.audio.click();
@@ -432,6 +518,7 @@ export class Globe {
   }
 
   setLiberated() {
+    if (this.mode === 'moon') { this.setMode('moon'); return; }
     const lastTarget = this.targetId;
     const nt = nextTarget(this.game.save.liberated || {});
     this.allDone = nt === null;

@@ -37,7 +37,7 @@ export const hasLiberated = (liberated = {}, id) => !!(liberated && liberated[id
 // _newSave() should either be added here if it can protect real progress, or be
 // explicitly listed as non-progress in the focused cloudsave test.
 export const SAVE_PROGRESS_KEYS = Object.freeze([
-  'liberated', 'xp', 'passLvl', 'missionRuns', 'stormBest', 'worldBosses',
+  'liberated', 'xp', 'passLvl', 'missionRuns', 'moonRegions', 'stormBest', 'worldBosses',
   'modeBest', 'modeWins', 'modeRewards', 'weekly',
   'coins', 'crystals', 'upgrades', 'bestiary', 'bestiaryGoals',
   'chapter', 'infected', 'megaQuests', 'medals', 'stats',
@@ -79,6 +79,7 @@ export function saveHasProgress(s) {
   return liberatedCount(s.liberated) > 0
     || (s.xp | 0) > 0
     || Object.keys(s.missionRuns || {}).length > 0
+    || Object.keys(s.moonRegions || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
     || Object.keys(s.worldBosses || {}).length > 0
     || !!(s.moonRescue && (s.moonRescue.done || (s.moonRescue.relays || []).length > 0))
