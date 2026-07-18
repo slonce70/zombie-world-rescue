@@ -172,7 +172,13 @@ const moon = await page.evaluate(() => {
     zombies: g.level.zombies.list.length,
     ids: story.objectives.map((o) => o.id),
     missionTypes: story.delegate.missions.map((m) => m.type),
+    missionTitles: story.delegate.missions.map((m) => m.title),
     boss: g.level.country.boss,
+    moonMissionModels: {
+      rescue: g.level.world.barnGroup?.userData.kind,
+      relay: g.level.world.towerGroup?.userData.kind,
+      relayHeight: g.level.world.oxygenRelayHeight,
+    },
     moonSystems: {
       gravity: player.gravity,
       jumpPower: player.jumpPower,
@@ -186,7 +192,14 @@ const moon = await page.evaluate(() => {
   const rescue = delegate.get('rescue');
   const door = g.level.world.barnDoorCollider;
   player.pos.set(door.x, player.pos.y, door.z - 1);
+  delegate._up_rescue(rescue, 0.1, idle, true);
+  const rescuePrompt = delegate.prompt?.text || '';
   delegate._up_rescue(rescue, 0.1, press(), true);
+  const rescuedCrew = delegate.civilians.map((civilian) => ({
+    kind: civilian.kind,
+    astronaut: civilian.rig.astronaut,
+    role: civilian.rig.astronautRole,
+  }));
   delegate._up_rescue(rescue, 2.1, idle, true);
   story._syncObjectiveStates();
 
@@ -224,7 +237,7 @@ const moon = await page.evaluate(() => {
     flow: {
       rescued: rescue.state === 'done', repaired: repair.state === 'done',
       defended: defense.state === 'done', reactorDestroyed: reactor.destroyed,
-      bossHp, bossDefeated: g.level.bossDefeated,
+      bossHp, bossDefeated: g.level.bossDefeated, rescuePrompt, rescuedCrew,
     },
   };
 });
@@ -242,6 +255,16 @@ check(Math.max(...moon.initial.minimapColor.slice(0, 3)) - Math.min(...moon.init
 check(moon.initial.ids.join(',') === 'moon-crew,moon-relays,moon-defense,moon-reactor'
   && ['rescue', 'repair', 'defense', 'barracks'].every((type) => moon.initial.missionTypes.includes(type)),
   'на Місяці є чотири важкі повноцінні завдання', JSON.stringify(moon.initial));
+check(moon.initial.moonMissionModels.rescue === 'moon-rescue-module'
+  && moon.initial.moonMissionModels.relay === 'moon-oxygen-relay'
+  && moon.initial.moonMissionModels.relayHeight < 6,
+  'аварійний модуль і низьке кисневе реле мають окремі місячні 3D-моделі', JSON.stringify(moon.initial.moonMissionModels));
+check(moon.initial.missionTitles.some((title) => /космонавт|модул/i.test(title))
+  && moon.initial.missionTitles.every((title) => !/хлів/i.test(title))
+  && /аварійний модуль/i.test(moon.flow.rescuePrompt)
+  && moon.flow.rescuedCrew.length === 3
+  && moon.flow.rescuedCrew.every((crew) => crew.astronaut && crew.kind.startsWith('astronaut-')),
+  'місія говорить про модуль і рятує трьох космонавтів у скафандрах, а не людей із хліва', JSON.stringify({ titles: moon.initial.missionTitles, prompt: moon.flow.rescuePrompt, crew: moon.flow.rescuedCrew }));
 check(moon.states.every((state) => state === 'done') && moon.bossUnlocked
   && moon.flow.rescued && moon.flow.repaired && moon.flow.defended && moon.flow.reactorDestroyed
   && moon.initial.boss.style === 'mechTitan' && moon.flow.bossHp === 10000 && moon.flow.bossDefeated,

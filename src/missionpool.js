@@ -10,7 +10,7 @@ import { livingWorldReward, pickLivingWorldEvent, shouldOfferLivingWorld } from 
 // назви «пристрою для ремонту» за країною — смак без зміни механіки
 const REPAIR_NAMES = {
   UKR: t('радіовежу'), DEU: t('насосну станцію'), FRA: t('антену зв\'язку'),
-  TUR: t('маяк Босфору'), EGY: t('сонячну станцію'),
+  TUR: t('маяк Босфору'), EGY: t('сонячну станцію'), MOON: t('кисневі реле'),
 };
 
 // ---------- описи типів місій ----------
@@ -224,7 +224,9 @@ export class DynamicMissions {
     m.beam = level.effects.makeBeam(slotInfo.beamAt.x, slotInfo.beamAt.z, 0x4cff7a, mt.icon);
 
     if (type === 'rescue') {
-      m.title = t('Врятуй людей у хліві');
+      m.title = level.countryId === 'MOON'
+        ? t('Врятуй космонавтів з аварійного модуля')
+        : t('Врятуй людей у хліві');
       m.opened = false;
       m.openedT = -1;
     } else if (type === 'repair') {
@@ -997,9 +999,11 @@ export class DynamicMissions {
   // цивільні з хліва (порятунок) — як і раніше
   spawnCivilians() {
     const { x, z } = this.L.rescue;
-    const kinds = this.level.countryId === 'ESP'
-      ? ['musician-trumpet', 'musician-guitar', 'musician-drum']
-      : ['medic', 'granny', 'kid'];
+    const kinds = this.level.countryId === 'MOON'
+      ? ['astronaut-commander', 'astronaut-engineer', 'astronaut-medic']
+      : (this.level.countryId === 'ESP'
+        ? ['musician-trumpet', 'musician-guitar', 'musician-drum']
+        : ['medic', 'granny', 'kid']);
     kinds.forEach((kind, i) => {
       const rig = makeCivilian(kind, this.level.rng);
       const cx = x - 1.5 + i * 1.5, cz = z + 0.5;
@@ -1254,7 +1258,9 @@ export class DynamicMissions {
       const door = level.world.barnDoorCollider;
       const d = Math.hypot(player.pos.x - door.x, player.pos.z - (door.z - 1));
       if (d < 3.2) {
-        this.prompt = { text: t('Натисни {k} — відчини хлів', { k: interactKey() }), hold: false };
+        this.prompt = { text: level.countryId === 'MOON'
+          ? t('Натисни {k} — відкрий аварійний модуль', { k: interactKey() })
+          : t('Натисни {k} — відчини хлів', { k: interactKey() }), hold: false };
         if (allowControl && input.pressed('KeyE')) {
           m.opened = true;
           m.openedT = 0;
@@ -1269,9 +1275,11 @@ export class DynamicMissions {
       m.openedT += dt;
       if (m.openedT > 2.0) {
         this._complete(m.id);
-        level.bus.emit('toast', level.countryId === 'ESP'
-          ? t('Музиканти врятовані! Тепер удар у святковий дзвін.')
-          : t('Людей врятовано! Медик лікуватиме тебе поблизу 💚'));
+        level.bus.emit('toast', level.countryId === 'MOON'
+          ? t('Космонавтів врятовано! Екіпаж слідуватиме за тобою. 🚀')
+          : (level.countryId === 'ESP'
+            ? t('Музиканти врятовані! Тепер удар у святковий дзвін.')
+            : t('Людей врятовано! Медик лікуватиме тебе поблизу 💚')));
       }
     }
   }
@@ -1292,7 +1300,9 @@ export class DynamicMissions {
     }
     if (d < 3.6) {
       this.prompt = {
-        text: m.train
+        text: level.countryId === 'MOON'
+          ? (m.progress > 0 ? t('Тримай {k} — відновлюй кисневе реле', { k: interactKey() }) : t('Тримай {k} — запусти кисневе реле', { k: interactKey() }))
+          : m.train
           ? t('Тримай {k} — заведи поїзд', { k: interactKey() })
           : (m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() })),
         hold: true, progress: m.progress,

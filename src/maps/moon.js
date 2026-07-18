@@ -3,6 +3,7 @@
 import { basin, mesa } from '../utils.js';
 
 export default {
+  moon: true,
   bound: 240,
   spawn: { x: 0, z: 214 },
   barren: true,

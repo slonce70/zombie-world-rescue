@@ -3367,6 +3367,45 @@ const CIV_SHIRTS = [0xe2725b, 0x6fa8dc, 0xc99fd1, 0xf2c14e];
 const CIV_SKINS = [0xffc9a3, 0xf2b48c, 0xffd9b8];
 
 export function makeCivilian(kind, rng) {
+  if (kind.startsWith('astronaut-')) {
+    const role = kind.slice('astronaut-'.length);
+    const accents = { commander: 0xd84b43, engineer: 0x3c78c5, medic: 0x45a66b };
+    const accentM = toonMat(accents[role] || 0x3c78c5);
+    const suitM = toonMat(0xf1f3f6);
+    const darkM = toonMat(0x303846);
+    const rig = makeHumanoid({
+      skin: rng.pick(CIV_SKINS), shirt: 0xf1f3f6, pants: 0xe1e5ea, shoes: 0x596273,
+      mouth: 'smile', brow: -0.05,
+    });
+
+    // Великий герметичний шолом: темна оболонка, синій візор і білий обід.
+    const helmet = sphere(0.36, darkM, 16, 12);
+    helmet.position.y = 0.04;
+    const visor = sphere(0.29, toonMat(0x63b8e8, 0x246f9f, 0.55), 14, 10);
+    visor.scale.set(1, 0.72, 0.22);
+    visor.position.set(0, 0.06, -0.29);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.035, 7, 16), suitM);
+    rim.scale.y = 0.72;
+    rim.position.set(0, 0.06, -0.34);
+    rig.parts.head.add(helmet, visor, rim);
+
+    // Система життєзабезпечення і кольорова смуга спеціальності.
+    const pack = box(0.42, 0.58, 0.22, darkM);
+    pack.position.set(0, 0.35, 0.34);
+    const tankL = cylinder(0.08, 0.08, 0.48, suitM, 10);
+    tankL.position.set(-0.14, 0.35, 0.48);
+    const tankR = tankL.clone(); tankR.position.x = 0.14;
+    const stripe = box(0.34, 0.08, 0.03, accentM);
+    stripe.position.set(0, 0.45, -0.27);
+    const badge = box(0.08, 0.1, 0.025, accentM);
+    badge.position.set(0.12, 0.31, -0.275);
+    rig.parts.torso.add(pack, tankL, tankR, stripe, badge);
+    rig.civKind = kind;
+    rig.astronaut = true;
+    rig.astronautRole = role;
+    bakeRig(rig, true);
+    return rig;
+  }
   if (kind.startsWith('musician-')) {
     const instrument = kind.slice('musician-'.length);
     const shirts = { trumpet: 0xd84735, guitar: 0xf0b52f, drum: 0x3c78b5 };

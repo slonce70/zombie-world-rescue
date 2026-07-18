@@ -3812,6 +3812,7 @@ export class World {
 
   // ---------- хлів із людьми (місія 1) ----------
   _buildBarn() {
+    if (this.map.moon) return this._buildMoonRescueModule();
     const { x, z } = this.layout.rescue;
     const gy = this.groundH(x, z);
     const g = new THREE.Group(); // динаміка — двері
@@ -3878,6 +3879,85 @@ export class World {
     this.staticGroup.add(fireG);
   }
 
+  _buildMoonRescueModule() {
+    const { x, z } = this.layout.rescue;
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const gs = new THREE.Group();
+    const shellM = toonMat(0xe9edf2);
+    const trimM = toonMat(0x687384);
+    const darkM = toonMat(0x252d39);
+    const glassM = toonMat(0x4da3d4, 0x1d6188, 0.45);
+
+    // Низький герметичний житловий модуль на опорах, а не земний хлів.
+    const cabin = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.25, 9.5, 16), shellM);
+    cabin.rotation.z = Math.PI / 2;
+    cabin.position.y = 2.65;
+    gs.add(cabin);
+    for (const sx of [-3.2, 0, 3.2]) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(2.28, 0.1, 7, 16), trimM);
+      rib.rotation.y = Math.PI / 2;
+      rib.position.set(sx, 2.65, 0);
+      gs.add(rib);
+    }
+    for (const sx of [-3.2, 3.2]) {
+      const window = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 14), glassM);
+      window.rotation.x = Math.PI / 2;
+      window.position.set(sx, 2.85, -2.24);
+      gs.add(window);
+    }
+
+    // Посадкові ноги й дві сонячні панелі роблять силует схожим на справжній модуль.
+    for (const sx of [-3.6, 3.6]) {
+      for (const sz of [-1.25, 1.25]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.18, 1.3, 8), trimM);
+        leg.position.set(sx, 0.65, sz);
+        gs.add(leg);
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.12, 10), darkM);
+        foot.position.set(sx, 0.08, sz);
+        gs.add(foot);
+      }
+    }
+    for (const sx of [-6.4, 6.4]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.12, 0.16), trimM);
+      arm.position.set(sx > 0 ? 5.05 : -5.05, 1.45, 0.8);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 2.0), toonMat(0x244d78, 0x15395e, 0.25));
+      panel.position.set(sx, 1.45, 0.8);
+      gs.add(arm, panel);
+    }
+
+    // Двостулковий шлюз лишає старий надійний API openBarn(), але має місячний вигляд.
+    this.barnDoors = [];
+    for (const side of [-1, 1]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.78, 0, -2.29);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.55, 2.55, 0.14), shellM);
+      panel.position.set(-side * 0.775, 1.7, 0);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.18, 0.04), toonMat(0xd65a4a));
+      stripe.position.set(-side * 0.775, 1.7, -0.09);
+      pivot.add(panel, stripe);
+      g.add(pivot);
+      this.barnDoors.push({ pivot, side, open: 0 });
+    }
+    const hatchFrame = new THREE.Mesh(new THREE.TorusGeometry(1.62, 0.14, 8, 4), trimM);
+    hatchFrame.scale.y = 0.82;
+    hatchFrame.rotation.z = Math.PI / 4;
+    hatchFrame.position.set(0, 1.7, -2.38);
+    gs.add(hatchFrame);
+
+    g.position.set(x, gy, z);
+    gs.position.set(x, gy, z);
+    g.userData.kind = 'moon-rescue-module';
+    this.scene.add(g);
+    this.staticGroup.add(gs);
+    this.barnGroup = g;
+    this.barnDoorCollider = { x, z: z - 2.3, r: 1.55 };
+    this._addCollider(x - 3.7, z, 2.2, gy + 4.9, 2.0);
+    this._addCollider(x + 3.7, z, 2.2, gy + 4.9, 2.0);
+    this._addCollider(x, z + 1.4, 2.0, gy + 4.9, 1.9);
+    this.colliders.push(this.barnDoorCollider);
+  }
+
   openBarn() {
     if (this.barnOpened) return;
     this.barnOpened = true;
@@ -3889,6 +3969,7 @@ export class World {
 
   // ---------- радіовежа (місія 2) ----------
   _buildTower() {
+    if (this.map.moon) return this._buildMoonOxygenRelay();
     const { x, z } = this.layout.tower;
     const gy = this.groundH(x, z);
     const g = new THREE.Group(); // динаміка: тарілка, вогник, промінь, екран
@@ -3964,8 +4045,98 @@ export class World {
     this.repairPoint = { x: x + 2.6, z: z + 1.3 };
   }
 
+  _buildMoonOxygenRelay() {
+    const { x, z } = this.layout.tower;
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const gs = new THREE.Group();
+    const shellM = toonMat(0xdfe5ec);
+    const metalM = toonMat(0x667282);
+    const pipeM = toonMat(0x58a6c7);
+    const darkM = toonMat(0x2d3541);
+
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.35, 12), darkM);
+    pad.position.y = 0.18;
+    gs.add(pad);
+    this.oxygenIndicators = [];
+    for (const sx of [-2.1, 0, 2.1]) {
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 3.4, 14), shellM);
+      tank.position.set(sx, 2.05, 0.5);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.81, 14, 8), shellM);
+      cap.scale.y = 0.52;
+      cap.position.set(sx, 3.72, 0.5);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.09, 6, 14), pipeM);
+      band.rotation.x = Math.PI / 2;
+      band.position.set(sx, 2.35, 0.5);
+      gs.add(tank, cap, band);
+      this._addCollider(x + sx, z + 0.5, 0.85, gy + 4.2, 0.8);
+
+      const indicator = new THREE.Mesh(new THREE.SphereGeometry(0.13, 9, 7),
+        new THREE.MeshToonMaterial({ color: 0xff5544, gradientMap: toonMat(0).gradientMap, emissive: 0xff2211, emissiveIntensity: 0.8 }));
+      indicator.position.set(sx, 3.08, -0.33);
+      g.add(indicator);
+      this.oxygenIndicators.push(indicator);
+    }
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4.3, 10), pipeM);
+    pipe.rotation.z = Math.PI / 2;
+    pipe.position.set(0, 0.85, 0.5);
+    gs.add(pipe);
+
+    // Низький пульт і вентиль — точка взаємодії замість ноги радіовежі.
+    const consoleBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.3, 0.8), metalM);
+    consoleBox.position.set(0, 0.83, -2.5);
+    consoleBox.rotation.x = -0.12;
+    gs.add(consoleBox);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.06), toonMat(0xff5544, 0xff2211, 0.65));
+    screen.position.set(0, 1.05, -2.94);
+    g.add(screen);
+    this.towerScreen = screen;
+    const valve = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 7, 12), pipeM);
+    valve.position.set(0, 0.5, -2.95);
+    g.add(valve);
+    this.towerDish = valve;
+    const light = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8),
+      new THREE.MeshToonMaterial({ color: 0xff5544, gradientMap: toonMat(0).gradientMap, emissive: 0xff2211, emissiveIntensity: 1 }));
+    light.position.set(0, 1.65, -2.55);
+    g.add(light);
+    this.towerLight = light;
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.5, 8, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x73dcff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    beam.position.set(0, 4.3, -2.5);
+    g.add(beam);
+    this.towerBeam = beam;
+
+    g.position.set(x, gy, z);
+    gs.position.set(x, gy, z);
+    g.userData.kind = 'moon-oxygen-relay';
+    this.scene.add(g);
+    this.staticGroup.add(gs);
+    this.towerGroup = g;
+    this.towerFixed = false;
+    this.moonOxygenRelay = true;
+    this.oxygenRelayHeight = 4.2;
+    this.repairPoint = { x, z: z - 3.2 };
+    this._addCollider(x, z - 2.5, 0.9, gy + 1.7, 0.75);
+  }
+
   setTowerFixed() {
     this.towerFixed = true;
+    if (this.moonOxygenRelay) {
+      this.towerDish.rotation.z = Math.PI / 2;
+      for (const indicator of this.oxygenIndicators) {
+        indicator.material = new THREE.MeshToonMaterial({
+          color: 0x55ff88, gradientMap: toonMat(0).gradientMap, emissive: 0x22ff66, emissiveIntensity: 1.2,
+        });
+      }
+      this.towerLight.material = new THREE.MeshToonMaterial({
+        color: 0x55ff88, gradientMap: toonMat(0).gradientMap, emissive: 0x22ff66, emissiveIntensity: 1.2,
+      });
+      this.towerScreen.material = toonMat(0x55ff88, 0x22ff66, 0.8);
+      this.towerBeam.material.opacity = 0.22;
+      return;
+    }
     this.towerDish.rotation.x = Math.PI / 2 - 0.5; // дивиться вгору
     this.towerLight.material = new THREE.MeshToonMaterial({
       color: 0x55ff88, gradientMap: toonMat(0).gradientMap, emissive: 0x22ff66, emissiveIntensity: 1.2,
