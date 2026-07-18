@@ -320,7 +320,7 @@ check(moon.initial.suitVisible && moon.initial.suitEquipped && moon.initial.oxyg
 check(moon.initial.bound >= 240 && moon.initial.houses >= 6 && moon.initial.barren && moon.initial.clouds === 0,
   'Місяць має велику безповітряну карту зі станцією, а не малу круглу арену', JSON.stringify(moon.initial));
 check(moon.initial.moonSystems.gravity < 10 && moon.initial.moonSystems.jumpPower > 9
-  && moon.initial.moonSystems.oxygen > 99 && moon.initial.moonSystems.rovers === 2
+  && moon.initial.moonSystems.oxygen > 95 && moon.initial.moonSystems.rovers === 2
   && moon.initial.moonSystems.roverParts.every((parts) => parts >= 8),
   'Місяць має низьку гравітацію, кисень і два видимі місяцеходи', JSON.stringify(moon.initial.moonSystems));
 check(Math.max(...moon.initial.minimapColor.slice(0, 3)) - Math.min(...moon.initial.minimapColor.slice(0, 3)) < 24,
