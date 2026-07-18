@@ -271,8 +271,7 @@ export class CustomMapMode {
 
   _targetPoint() {
     const player = this.level.player;
-    const dir = player.forwardVec(new THREE.Vector3());
-    return { x: player.pos.x + dir.x * 18, z: player.pos.z + dir.z * 18 };
+    return { x: player.pos.x - Math.sin(player.yaw) * 18, z: player.pos.z - Math.cos(player.yaw) * 18 };
   }
 
   _placementError(type, x, z) {
@@ -374,7 +373,7 @@ export class CustomMapMode {
       if (event.target.closest('#map-editor-undo')) this.undo();
       if (event.target.closest('#map-editor-save')) this.save();
       if (event.target.closest('#map-editor-exit')) this.exit();
-      if (type || event.target.closest('#map-editor-place')) setTimeout(() => this.level && this.level.game.input.request(), 0);
+      if (type || event.target.closest('#map-editor-place')) this.level.game.input.request();
     };
     for (const button of el.querySelectorAll('[data-map-fly]')) {
       const set = (value) => { this.flyY = value; };

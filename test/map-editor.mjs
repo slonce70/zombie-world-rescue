@@ -41,7 +41,16 @@ const editor = await page.evaluate(() => {
   const g = window.__game;
   const mode = g.level.customMap;
   const player = g.level.player;
+  const request = g.input.request;
+  let lockRequested = 0;
+  g.input.request = () => { lockRequested++; };
+  document.querySelector('[data-map-object="tree"]').click();
+  g.input.request = request;
   player.yaw = 0;
+  player.pitch = 1.45;
+  const highLookTarget = mode._targetPoint();
+  const highLookDistance = Math.hypot(highLookTarget.x - player.pos.x, highLookTarget.z - player.pos.z);
+  player.pitch = 0;
   const move = (code, shift = false) => {
     player.pos.set(0, 14, 55);
     g.input.keys.add(code);
@@ -92,6 +101,8 @@ const editor = await page.evaluate(() => {
     blankWorld: g.level.world.colliders.length,
     moves,
     selectedOnly,
+    lockRequested,
+    highLookDistance,
     selectedButton: document.querySelector('[data-map-object="house"]').classList.contains('on'),
     preview: mode.preview.visible,
     toolbar: document.getElementById('map-editor-tools').classList.contains('show'),
@@ -104,6 +115,7 @@ const editor = await page.evaluate(() => {
 });
 await page.waitForTimeout(700);
 check(editor.countryId === 'CUSTOM' && editor.toolbar && editor.selectedOnly && editor.selectedButton && editor.preview
+  && editor.lockRequested === 1 && Math.abs(editor.highLookDistance - 18) < 0.01
   && editor.moves.w.z < 55 && editor.moves.s.z > 55 && editor.moves.a.x < 0 && editor.moves.d.x > 0
   && editor.moves.up.y > 14 && editor.moves.down.y < 14 && Math.abs(editor.moves.fast.z - 55) > Math.abs(editor.moves.w.z - 55)
   && editor.types.join(',') === 'house,lake,rock,task,task,task,tree,zombie'
