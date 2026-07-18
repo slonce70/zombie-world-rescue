@@ -6,6 +6,15 @@ import { toonMat } from './renderkit.js';
 export const CUSTOM_MAP_TYPES = Object.freeze(['house', 'tree', 'lake', 'zombie', 'rock', 'task']);
 const TYPE_SET = new Set(CUSTOM_MAP_TYPES);
 const MAX_OBJECTS = 120;
+const TYPE_INFO = Object.freeze({
+  house: { icon: '🏠', name: 'Дім', radius: 4.5 },
+  tree: { icon: '🌲', name: 'Дерево', radius: 0.8 },
+  lake: { icon: '💧', name: 'Озеро', radius: 6.5 },
+  zombie: { icon: '🧟', name: 'Зомбі', radius: 1 },
+  rock: { icon: '🪨', name: 'Камінь', radius: 1.5 },
+  task: { icon: '⭐', name: 'Завдання', radius: 0.8 },
+});
+const SPAWN_CLEAR_RADIUS = 10;
 
 export const CUSTOM_COUNTRY = Object.freeze({
   id: 'CUSTOM', name: t('Моя карта'), flag: '🧱', seed: 73421, biome: 'summer',
@@ -46,11 +55,19 @@ export class CustomMapMode {
     this.crateReady = false;
     this.done = false;
     this.flyY = 0;
+    this.selected = null;
     this.spawned = Object.fromEntries(CUSTOM_MAP_TYPES.map((type) => [type, 0]));
     for (const item of this.data.objects) this._spawn(item);
     if (editor) {
       level.player.pos.set(0, 14, 55);
       level.player.camera.position.copy(level.player.pos);
+      this.preview = new THREE.Mesh(
+        new THREE.RingGeometry(1.05, 1.35, 24),
+        new THREE.MeshBasicMaterial({ color: 0x5ad465, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+      );
+      this.preview.rotation.x = -Math.PI / 2;
+      this.preview.visible = false;
+      level.scene.add(this.preview);
       this._openTools();
     }
   }
@@ -92,20 +109,80 @@ export class CustomMapMode {
     return object;
   }
 
+  select(type) {
+    if (!this.editor || !TYPE_SET.has(type)) return false;
+    this.selected = type;
+    this._renderTools();
+    this._syncPreview();
+    this.level.game.audio.click();
+    return true;
+  }
+
+  _targetPoint() {
+    const player = this.level.player;
+    const dir = player.forwardVec(new THREE.Vector3());
+    return { x: player.pos.x + dir.x * 18, z: player.pos.z + dir.z * 18 };
+  }
+
+  _placementError(type, x, z) {
+    if (Math.abs(x) > 170 || Math.abs(z) > 170) return t('Тут край карти');
+    const spawn = CUSTOM_COUNTRY.map.spawn;
+    const radius = TYPE_INFO[type].radius;
+    if (Math.hypot(x - spawn.x, z - spawn.z) < SPAWN_CLEAR_RADIUS + radius) return t('Залиш місце для появи гравця');
+    for (const item of this.data.objects) {
+      if (Math.hypot(x - item.x, z - item.z) < radius + TYPE_INFO[item.type].radius + 0.5) return t('Тут уже стоїть інший обʼєкт');
+    }
+    return '';
+  }
+
+  _syncPreview() {
+    if (!this.preview) return;
+    this.preview.visible = !!this.selected;
+    if (!this.selected) return;
+    const point = this._targetPoint();
+    const y = this.level.world.groundH(point.x, point.z);
+    const radius = TYPE_INFO[this.selected].radius;
+    this.preview.position.set(point.x, y + 0.08, point.z);
+    this.preview.scale.setScalar(Math.max(0.8, radius / 1.35));
+    this.preview.material.color.setHex(this._placementError(this.selected, point.x, point.z) ? 0xff5d5d : 0x5ad465);
+  }
+
+  placeSelected() {
+    if (!this.selected) {
+      this.level.game.hud.toast(t('Спочатку вибери предмет'));
+      return false;
+    }
+    return this.place(this.selected);
+  }
+
   place(type, point = null) {
     if (!this.editor || !TYPE_SET.has(type) || this.data.objects.length >= MAX_OBJECTS) {
       if (this.data.objects.length >= MAX_OBJECTS) this.level.game.hud.toast(t('Ліміт карти: 120 обʼєктів'));
       return false;
     }
     const player = this.level.player;
-    const dir = player.forwardVec(new THREE.Vector3());
-    const x = point ? point.x : player.pos.x + dir.x * 12;
-    const z = point ? point.z : player.pos.z + dir.z * 12;
-    const item = { type, x: clamp(x, -170, 170), z: clamp(z, -170, 170), ry: player.yaw };
+    const target = point || this._targetPoint();
+    const error = this._placementError(type, target.x, target.z);
+    if (error) {
+      this.level.game.audio.denied();
+      this.level.game.hud.toast(error);
+      return false;
+    }
+    const item = { type, x: target.x, z: target.z, ry: player.yaw };
     this.data.objects.push(item);
     this._spawn(item);
-    this._renderCount();
+    this._renderTools();
+    this._syncPreview();
     this.level.game.audio.click();
+    return true;
+  }
+
+  undo() {
+    if (!this.editor || !this.data.objects.length) return false;
+    const draft = sanitizeCustomMap({ objects: this.data.objects.slice(0, -1) });
+    this._closeTools();
+    this.level.game.endLevel();
+    this.level.game.startLevel('CUSTOM', { customMap: 'edit', customMapData: draft });
     return true;
   }
 
@@ -113,12 +190,15 @@ export class CustomMapMode {
     this.level.game.save.customMap = sanitizeCustomMap(this.data);
     this.level.game.saveGame();
     this.level.game.hud.toast(t('💾 Власну карту збережено!'));
-    this._renderCount();
+    this._renderTools();
   }
 
   exit() {
+    if (JSON.stringify(sanitizeCustomMap(this.data)) !== JSON.stringify(sanitizeCustomMap(this.level.game.save.customMap))
+      && !confirm(t('Вийти без збереження змін?'))) return false;
     this._closeTools();
     this.level.game.endLevel();
+    return true;
   }
 
   _openTools() {
@@ -127,17 +207,23 @@ export class CustomMapMode {
     el.classList.add('show');
     el.onclick = (event) => {
       const type = event.target.closest('[data-map-object]')?.dataset.mapObject;
-      if (type) this.place(type);
+      if (type) this.select(type);
+      if (event.target.closest('#map-editor-place')) this.placeSelected();
+      if (event.target.closest('#map-editor-undo')) this.undo();
       if (event.target.closest('#map-editor-save')) this.save();
       if (event.target.closest('#map-editor-exit')) this.exit();
-      if (type) setTimeout(() => this.level && this.level.game.input.request(), 0);
+      if (type || event.target.closest('#map-editor-place')) setTimeout(() => this.level && this.level.game.input.request(), 0);
     };
     for (const button of el.querySelectorAll('[data-map-fly]')) {
       const set = (value) => { this.flyY = value; };
       button.onpointerdown = () => set(button.dataset.mapFly === 'up' ? 1 : -1);
       button.onpointerup = button.onpointercancel = () => set(0);
     }
-    this._renderCount();
+    for (const [i, type] of CUSTOM_MAP_TYPES.entries()) {
+      const button = el.querySelector(`[data-map-object="${type}"]`);
+      if (button) button.textContent = `${i + 1} ${TYPE_INFO[type].icon} ${t(TYPE_INFO[type].name)}`;
+    }
+    this._renderTools();
   }
 
   _closeTools() {
@@ -145,9 +231,16 @@ export class CustomMapMode {
     if (el) el.classList.remove('show');
   }
 
-  _renderCount() {
-    const el = document.getElementById('map-editor-count');
-    if (el) el.textContent = `${this.data.objects.length}/${MAX_OBJECTS}`;
+  _renderTools() {
+    const count = document.getElementById('map-editor-count');
+    if (count) count.textContent = `${this.data.objects.length}/${MAX_OBJECTS}`;
+    const selected = document.getElementById('map-editor-selected');
+    if (selected) selected.textContent = this.selected ? `${TYPE_INFO[this.selected].icon} ${t(TYPE_INFO[this.selected].name)}` : t('нічого');
+    const undo = document.getElementById('map-editor-undo');
+    if (undo) undo.disabled = !this.data.objects.length;
+    for (const button of document.querySelectorAll('[data-map-object]')) {
+      button.classList.toggle('on', button.dataset.mapObject === this.selected);
+    }
   }
 
   _fly(dt, input) {
@@ -172,7 +265,10 @@ export class CustomMapMode {
   update(dt, input, allowControl) {
     this.prompt = null;
     if (this.editor) {
+      for (const [i, type] of CUSTOM_MAP_TYPES.entries()) if (input.pressed(`Digit${i + 1}`)) this.select(type);
+      if (allowControl && input.pressed('KeyE')) this.placeSelected();
       if (allowControl || input.touchMode) this._fly(dt, input);
+      this._syncPreview();
       return;
     }
     for (const task of this.tasks) {

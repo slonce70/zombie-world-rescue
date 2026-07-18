@@ -374,6 +374,9 @@ export class Shop {
         player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1);
         break;
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
+      case 'mapeditor':
+        game.hud.toast(t('🧱 Створювач карт відкрито! Повернися на глобус → Меню.'));
+        break;
       case 'radiationturretpack':
         game.hud.toast(t('☢️🤖 Радіаційна турель: +5 шкоди і зелені кулі'));
         break;

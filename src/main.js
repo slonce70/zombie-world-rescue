@@ -129,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 540;
+const APP_VERSION = 541;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -401,6 +401,7 @@ class Game {
     });
     // тап по пункту ☰-меню закриває саме меню, щоб його панель не перекривала відкриту (v36)
     document.getElementById('overlay-menu').addEventListener('click', (e) => {
+      if (e.target.closest('#btn-map-editor') && !(this.save.upgrades.mapeditor > 0)) return;
       if (e.target.closest('.globe-act')) this._hideOverlay('overlay-menu');
     });
     document.getElementById('btn-pass').addEventListener('click', () => {
@@ -438,7 +439,7 @@ class Game {
     document.getElementById('btn-map-editor').addEventListener('click', () => {
       if (!(this.save.upgrades.mapeditor > 0)) {
         this.audio.denied();
-        this.hud.toast(t('🔒 Купи Створювач карт у магазині за 10 000 монет'));
+        this.hud.toast(t('🔒 Зайди в країну → відкрий магазин {k} → Режими → Створювач карт', { k: keyHint('🛒', 'B') }), 6);
         return;
       }
       this.audio.click();
@@ -3245,7 +3246,7 @@ class Game {
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isCustom) {
-      level.customMap = new CustomMapMode(level, this.save.customMap, isCustomEditor);
+      level.customMap = new CustomMapMode(level, opts.customMapData || this.save.customMap, isCustomEditor);
       level.missions = level.customMap;
       document.body.classList.toggle('map-editor-mode', isCustomEditor);
     } else if (isKnockout) {

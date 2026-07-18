@@ -130,15 +130,32 @@ body.in-level #hud { display: block; }
 }
 #map-editor-tools.show { display: block; }
 .map-editor-title { color: #ffd23f; font-weight: 900; text-align: center; margin-bottom: 8px; }
-.map-editor-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.map-editor-buttons .btn { padding: 8px 11px; font-size: 14px; }
+.map-editor-palette, .map-editor-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.map-editor-actions { margin-top: 6px; }
+.map-editor-palette .btn, .map-editor-actions .btn { min-height: 40px; padding: 8px 11px; font-size: 14px; }
+.map-editor-palette .btn.on { color: #2b2100; background: #ffd23f; border-color: #fff1a8; box-shadow: 0 0 0 2px rgba(255,210,63,.35); }
+.map-editor-actions .btn:disabled { opacity: .45; cursor: default; }
 .map-editor-hint { margin-top: 7px; color: #b9d0e8; font-size: 12px; font-weight: 700; text-align: center; }
 body.map-editor-mode #mission-panel, body.map-editor-mode #ammo, body.map-editor-mode #health { display: none; }
+body.map-editor-mode.touch-mode #touch-right,
+body.map-editor-mode.touch-mode #touch-util,
+body.map-editor-mode.touch-mode #tb-scope { display: none; }
 
 @media (max-width: 700px) {
   #map-editor-tools { bottom: 6px; padding: 7px; }
-  .map-editor-buttons .btn { padding: 7px 8px; font-size: 12px; }
+  .map-editor-palette .btn, .map-editor-actions .btn { min-height: 44px; padding: 7px 9px; font-size: 12px; }
   .map-editor-hint { display: none; }
+}
+
+@media (max-height: 520px) {
+  #map-editor-tools { bottom: 5px; padding: 6px; width: calc(100vw - 20px); }
+  .map-editor-title, .map-editor-hint { display: none; }
+  .map-editor-palette, .map-editor-actions {
+    flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none;
+  }
+  .map-editor-palette::-webkit-scrollbar, .map-editor-actions::-webkit-scrollbar { display: none; }
+  .map-editor-actions { margin-top: 5px; }
+  .map-editor-palette .btn, .map-editor-actions .btn { flex: 0 0 auto; min-height: 44px; padding: 6px 10px; margin: 0; font-size: 12px; }
 }
 
 /* приціл */
@@ -1442,6 +1459,11 @@ body.touch-mode #touch-coach.show { display: block; }
 
 @media (min-width: 901px) {
   .globe-top { max-width: calc(100vw - 360px); }
+}
+
+@media (min-width: 1150px) {
+  .globe-top { max-width: calc(100vw - 260px); }
+  #globe-ui h1 { font-size: clamp(38px, 4vw, 50px); white-space: nowrap; }
 }
 
 @media (orientation: portrait) and (max-width: 640px) {

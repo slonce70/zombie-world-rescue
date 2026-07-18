@@ -713,20 +713,24 @@
 
   <!-- Магазин -->
   <div id="map-editor-tools" aria-label="Створювач карт">
-    <div class="map-editor-title">🧱 СТВОРЮВАЧ КАРТ · <span id="map-editor-count">0/120</span></div>
-    <div class="map-editor-buttons">
+    <div class="map-editor-title">🧱 СТВОРЮВАЧ КАРТ · <span id="map-editor-count">0/120</span> · ОБРАНО: <span id="map-editor-selected">нічого</span></div>
+    <div class="map-editor-palette">
       <button class="btn" data-map-object="house">🏠 Дім</button>
       <button class="btn" data-map-object="tree">🌲 Дерево</button>
       <button class="btn" data-map-object="lake">💧 Озеро</button>
       <button class="btn" data-map-object="zombie">🧟 Зомбі</button>
       <button class="btn" data-map-object="rock">🪨 Камінь</button>
       <button class="btn" data-map-object="task">⭐ Завдання</button>
+    </div>
+    <div class="map-editor-actions">
+      <button id="map-editor-place" class="btn btn-primary">✋ Поставити</button>
       <button class="btn map-fly" data-map-fly="up">⬆️ Вгору</button>
       <button class="btn map-fly" data-map-fly="down">⬇️ Вниз</button>
+      <button id="map-editor-undo" class="btn">↩️ Скасувати останнє</button>
       <button id="map-editor-save" class="btn btn-primary">💾 Зберегти</button>
       <button id="map-editor-exit" class="btn">🚪 Вийти</button>
     </div>
-    <div class="map-editor-hint">WASD — летіти · Space/Ctrl — вгору/вниз · Shift — швидше · обʼєкт стає перед прицілом</div>
+    <div class="map-editor-hint">W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–6 — предмет · E — поставити</div>
   </div>
 
   <div id="shop" class="overlay">

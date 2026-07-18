@@ -137,6 +137,19 @@ check(!knockoutTitlesEn.some((s) => cyr.test(s)), 'en: HUD Нокауту без
 
 await page.goto(`${BASE}/?test&fresh&lang=en`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__game.state === 'globe', null, { timeout: 30000 });
+await page.evaluate(() => window.__game.startLevel('CUSTOM', { customMap: 'edit' }));
+await page.waitForFunction(() => window.__game?.level?.customMap?.editor, null, { timeout: 30000 });
+const editorEn = await page.evaluate(() => ({
+  place: document.getElementById('map-editor-place').textContent.trim(),
+  undo: document.getElementById('map-editor-undo').textContent.trim(),
+  selected: document.getElementById('map-editor-selected').textContent.trim(),
+  palette: [...document.querySelectorAll('[data-map-object]')].map((button) => button.textContent.trim()),
+}));
+check(editorEn.place === '✋ Place' && editorEn.undo === '↩️ Undo Last' && editorEn.selected === 'nothing'
+  && editorEn.palette.some((label) => /House/.test(label)) && !editorEn.palette.some((label) => cyr.test(label)),
+  'en: map creator controls translated', JSON.stringify(editorEn));
+await page.evaluate(() => window.__game.endLevel());
+await page.waitForFunction(() => window.__game.state === 'globe');
 await page.evaluate(() => {
   const g = window.__game;
   g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
@@ -163,6 +176,19 @@ txt = await page.evaluate(() => ({
 check(txt.play.includes('ИГРАТЬ'), 'ru: ИГРАТЬ', txt.play);
 check(txt.play !== uk.play, 'ru: play відрізняється від uk', txt.play);
 check(txt.prog.toLowerCase().includes('прогресс') || txt.prog.toLowerCase().includes('прогрес'), 'ru: Прогресс', txt.prog);
+await page.evaluate(() => window.__game.startLevel('CUSTOM', { customMap: 'edit' }));
+await page.waitForFunction(() => window.__game?.level?.customMap?.editor, null, { timeout: 30000 });
+const editorRu = await page.evaluate(() => ({
+  place: document.getElementById('map-editor-place').textContent.trim(),
+  undo: document.getElementById('map-editor-undo').textContent.trim(),
+  selected: document.getElementById('map-editor-selected').textContent.trim(),
+  palette: [...document.querySelectorAll('[data-map-object]')].map((button) => button.textContent.trim()),
+}));
+check(editorRu.place === '✋ Поставить' && editorRu.undo === '↩️ Отменить последнее' && editorRu.selected === 'ничего'
+  && editorRu.palette.some((label) => /Дом/.test(label)),
+  'ru: элементы создателя карт переведены', JSON.stringify(editorRu));
+await page.evaluate(() => window.__game.endLevel());
+await page.waitForFunction(() => window.__game.state === 'globe');
 const heroRu = await page.evaluate(() => {
   const g = window.__game;
   g.save.activeSkin = 'custom';
