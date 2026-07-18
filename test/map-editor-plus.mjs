@@ -42,17 +42,19 @@ const built = await page.evaluate(() => {
   mode.place('zombie', { x: -45, z: 0 });
   const drops = [mode.place('airdrop', { x: -20, z: 0 }), mode.place('airdrop', { x: 0, z: 0 }), mode.place('airdrop', { x: 20, z: 28 })];
   const churches = [mode.place('church', { x: 35, z: 0 }), mode.place('church', { x: -45, z: -30 })];
+  const largehouses = [-100, -70, -40, -10, 20, 50].map((x) => mode.place('largehouse', { x, z: -105 }));
   mode.select('task');
   for (let i = 0; i < 6; i++) mode.select('task');
   const task = mode.place('task', { x: 0, z: -35 });
   mode.save();
   return {
     max: mode.maxObjects, plusButtons: ['airdrop', 'church'].every((type) => !document.querySelector(`[data-map-object="${type}"]`).hidden),
-    drops, churches, task, objects: g.save.customMap2.objects,
+    drops, churches, largehouses, task, objects: g.save.customMap2.objects,
   };
 });
 check(built.max === 140 && built.plusButtons && built.drops.join(',') === 'true,true,false'
   && built.churches.join(',') === 'true,false' && built.task
+  && built.largehouses.join(',') === 'true,true,true,true,true,false'
   && built.objects.find((item) => item.type === 'zombie')?.zombieType === 'runner'
   && built.objects.find((item) => item.type === 'task')?.quest === 'rebuild',
   'Plus дає 140 місць, різних зомбі, максимум 2 аірдропи, 1 церкву та завдання відбудови', JSON.stringify(built));
@@ -69,12 +71,16 @@ const finale = await page.evaluate(() => {
   }
   g.level.player.pos.set(task.action.x, g.level.player.pos.y, task.action.z);
   g.input.keys.add('KeyE'); mode.update(12.1, g.input, true); g.input.keys.delete('KeyE');
-  const boss = { started: mode.bossStarted, hp: mode.boss?.hp, maxHp: mode.boss?.maxHp, mapDoneBeforeKill: mode.done };
+  const before = Math.hypot(mode.boss.x - g.level.player.pos.x, mode.boss.z - g.level.player.pos.z);
+  for (let i = 0; i < 20; i++) g.level.zombies.update(0.1);
+  const after = Math.hypot(mode.boss.x - g.level.player.pos.x, mode.boss.z - g.level.player.pos.z);
+  const boss = { started: mode.bossStarted, hp: mode.boss?.hp, maxHp: mode.boss?.maxHp, aggroed: mode.boss?.aggroed, noLeash: mode.boss?.noLeash, before, after, mapDoneBeforeKill: mode.done };
   mode.boss.state = 'dead'; mode.update(0.1, g.input, true);
   return { taskDone: task.done, tools: task.tools.map((tool) => tool.done), boss, mapDone: mode.done };
 });
 check(finale.taskDone && finale.tools.every(Boolean) && finale.boss.started && finale.boss.hp === 5500
-  && finale.boss.maxHp === 5500 && !finale.boss.mapDoneBeforeKill && finale.mapDone,
+  && finale.boss.maxHp === 5500 && finale.boss.aggroed && finale.boss.noLeash && finale.boss.after < finale.boss.before
+  && !finale.boss.mapDoneBeforeKill && finale.mapDone,
   'інструменти й відбудова запускають фінального боса рівно з 5500 HP', JSON.stringify(finale));
 
 await page.evaluate(() => { window.__game.endLevel(); window.confirm = () => true; });

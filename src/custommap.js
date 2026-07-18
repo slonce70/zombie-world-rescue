@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { t, interactKey } from './i18n.js';
 import { clamp } from './utils.js';
 import { toonMat } from './renderkit.js';
-import { makeGunMesh } from './characters.js';
+import { makeCivilian, makeGunMesh } from './characters.js';
 
-export const CUSTOM_MAP_TYPES = Object.freeze(['house', 'tree', 'lake', 'zombie', 'rock', 'task', 'airdrop', 'church']);
+export const CUSTOM_MAP_TYPES = Object.freeze(['house', 'tree', 'lake', 'zombie', 'rock', 'task', 'airdrop', 'church', 'largehouse']);
 const TYPE_SET = new Set(CUSTOM_MAP_TYPES);
 const BASE_MAX_OBJECTS = 120;
 const PLUS_MAX_OBJECTS = 140;
@@ -17,6 +17,7 @@ const TYPE_INFO = Object.freeze({
   task: { icon: '⭐', name: 'Завдання', radius: 8 },
   airdrop: { icon: '🪂', name: 'Аірдроп', radius: 2.5, plus: true, max: 2 },
   church: { icon: '⛪', name: 'Церква', radius: 7, plus: true, max: 1 },
+  largehouse: { icon: '🏘️', name: 'Велика хата', radius: 8, max: 5 },
 });
 const SPAWN_CLEAR_RADIUS = 10;
 const MAX_TASKS = 3;
@@ -121,6 +122,8 @@ export class CustomMapMode {
     let object = null;
     if (item.type === 'house') {
       object = world._makeHouse(item.x, item.z, item.ry, { w: 7, d: 5.5, h: 3.2 });
+    } else if (item.type === 'largehouse') {
+      object = world._makeHouse(item.x, item.z, item.ry, { w: 14, d: 11, h: 6 });
     } else if (item.type === 'tree') {
       object = new THREE.Group();
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 3.5, 8), toonMat(0x76502c));
@@ -201,11 +204,9 @@ export class CustomMapMode {
       if (quest === 'rescue') {
         task.prop = level.world._makeHouse(item.x, item.z, item.ry, { w: 8, d: 6, h: 3.4 });
         task.action = { x: item.x, z: item.z + 5 };
-        task.people = [-1.2, 0, 1.2].map((ox) => {
-          const person = new THREE.Group();
-          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.36, 1.1, 8), toonMat(0x4ea7df));
-          const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), toonMat(0xf0c49b));
-          body.position.y = 0.55; head.position.y = 1.35; person.add(body, head);
+        task.people = ['medic', 'granny', 'kid'].map((kind, i) => {
+          const person = makeCivilian(kind, level.rng).group;
+          const ox = i * 1.2 - 1.2;
           person.position.set(task.action.x + ox, level.world.groundH(task.action.x + ox, task.action.z + 1.5), task.action.z + 1.5);
           person.visible = false; level.scene.add(person); return person;
         });
@@ -281,7 +282,8 @@ export class CustomMapMode {
     if (type === 'task' && this.data.objects.filter((item) => item.type === 'task').length >= MAX_TASKS) return t('На карті може бути максимум 3 завдання');
     const typeMax = TYPE_INFO[type].max;
     if (typeMax && this.data.objects.filter((item) => item.type === type).length >= typeMax) {
-      return t(type === 'airdrop' ? 'На карті може бути максимум 2 аірдропи' : 'На карті може бути максимум 1 церква');
+      return t(type === 'airdrop' ? 'На карті може бути максимум 2 аірдропи'
+        : type === 'church' ? 'На карті може бути максимум 1 церква' : 'На карті може бути максимум 5 великих хат');
     }
     const spawn = CUSTOM_COUNTRY.map.spawn;
     if (Math.hypot(x - spawn.x, z - spawn.z) < SPAWN_CLEAR_RADIUS + radius) return t('Залиш місце для появи гравця');
@@ -549,6 +551,7 @@ export class CustomMapMode {
         this.bossStarted = true;
         this.boss = this.level.zombies.spawnBoss(5500);
         this.boss.hp = this.boss.maxHp = 5500;
+        this.boss.noLeash = true;
         this.level.audio.bossRoar();
         this.level.game.hud.banner(t('👑 ФІНАЛЬНИЙ БОС!'), t('Переможи володаря карти — 5500 HP'));
       } else this._completeMap();

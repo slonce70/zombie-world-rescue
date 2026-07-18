@@ -120,7 +120,7 @@ check(editor.countryId === 'CUSTOM' && editor.toolbar && editor.selectedOnly && 
   && editor.moves.up.y > 14 && editor.moves.down.y < 14 && Math.abs(editor.moves.fast.z - 55) > Math.abs(editor.moves.w.z - 55)
   && editor.types.join(',') === 'house,lake,rock,task,task,task,tree,zombie'
   && editor.quests.join(',') === 'rescue,collect,repair'
-  && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => !['task', 'airdrop', 'church'].includes(type)).every(([, count]) => count === 1)
+  && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => !['task', 'airdrop', 'church', 'largehouse'].includes(type)).every(([, count]) => count === 1)
   && editor.solid.house > 3 && editor.solid.tree > 1 && editor.solid.rock > 1.6
   && Object.values(editor.rejected).every((value) => value === false),
   'W/S/A/D рухають правильно, будинки/дерева/каміння тверді, небезпечні точки відхиляються', JSON.stringify(editor));
@@ -170,6 +170,7 @@ const played = await page.evaluate(() => {
   g.input.keys.delete('KeyE');
   return {
     zombies: g.level.zombies.list.filter((zombie) => zombie.customPlaced).length,
+    realPeopleParts: rescue.people.map((person) => { let count = 0; person.traverse(() => count++); return count; }),
     taskDone: mode.tasks.every((task) => task.done),
     quests: mode.tasks.map((task) => task.quest),
     mapDone: mode.done,
@@ -177,7 +178,8 @@ const played = await page.evaluate(() => {
     savedObjects: g.save.customMap.objects.length,
   };
 });
-check(played.zombies === 1 && played.taskDone && played.mapDone && played.hud.every((task) => task.done) && played.savedObjects === 8
+check(played.zombies === 1 && played.realPeopleParts.every((count) => count > 10)
+  && played.taskDone && played.mapDone && played.hud.every((task) => task.done) && played.savedObjects === 8
   && played.quests.join(',') === 'rescue,collect,repair',
   'збережена карта запускається, її зомбі живі, а поставлене завдання виконується', JSON.stringify(played));
 

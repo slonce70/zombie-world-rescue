@@ -2612,4 +2612,8 @@ export const EN = {
 "Зомбі-щитоносець": "Shield zombie",
 "Місячний громила": "Moon brute",
 "W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–8 — предмет · E — поставити · повторний вибір змінює завдання/зомбі": "W — forward · S — back · A — left · D — right · Space/Ctrl — up/down · 1–8 — object · E — place · select again to change task/zombie",
+"Велика хата": "Large house",
+"🏘️ Велика хата": "🏘️ Large house",
+"На карті може бути максимум 5 великих хат": "A map can have at most 5 large houses",
+"W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–9 — предмет · E — поставити · повторний вибір змінює завдання/зомбі": "W — forward · S — back · A — left · D — right · Space/Ctrl — up/down · 1–9 — object · E — place · select again to change task/zombie",
 };
