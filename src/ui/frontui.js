@@ -292,7 +292,7 @@ export class FrontUI {
       return `<div class="front-status-icon">▶️</div><div><strong>${esc(t('{flag} Операція триває', { flag: country.flag }))}</strong><span>${esc(t('Етап {n}/3 · прогрес збережено', { n: stage }))}</span></div>`;
     }
     const done = clamp(vm.completedOperations, 0, vm.totalOperations);
-    return `<div class="front-status-icon">${vm.guided ? '🎓' : '🛰️'}</div><div><strong>${esc(vm.guided ? t('Навчальна операція') : t('Покоління фронту {n}', { n: vm.generation + 1 }))}</strong><span>${esc(t('Завершено: {done}/{all} · країни не втрачаються', { done, all: vm.totalOperations }))}</span></div>`;
+    return `<div class="front-status-icon">${vm.guided ? '🎓' : '🛰️'}</div><div><strong>${esc(vm.guided ? t('Навчальна операція') : t('Покоління фронту {n}', { n: vm.generation + 1 }))}</strong><span>${esc(t('Завершено: {done}/{all} · незахищена країна може втратити район', { done, all: vm.totalOperations }))}</span></div>`;
   }
 
   _operationHtml(op, vm) {
@@ -316,13 +316,14 @@ export class FrontUI {
     const restoring = op.countryState && op.countryState.state === 'restoring';
     const countryState = restoring ? 'rebuilding'
       : (op.countryState && ['threat', 'safe'].includes(op.countryState.state) ? op.countryState.state : 'threat');
-    const statusLabel = restoring ? 'Відбудова' : STATUS_LABEL[op.status];
+    const statusLabel = op.counterattack ? 'Контратака' : restoring ? 'Відбудова' : STATUS_LABEL[op.status];
+    const districts = clamp(op.countryState && op.countryState.restored, 0, 3);
     return `<button class="front-operation ${selected ? 'selected' : ''} ${op.recommended ? 'recommended' : ''} status-${esc(op.status)} ${restoring ? 'state-restoring' : ''}" type="button"
       data-operation-id="${esc(op.id)}" aria-pressed="${selected}" ${disabled ? 'disabled' : ''}>
       <span class="front-op-flag">${country.flag}</span>
       <span class="front-op-main">
         <span class="front-op-top"><strong>${template.icon} ${esc(t(template.name))}</strong>${op.recommended ? `<b>${esc(t('РЕКОМЕНОВАНО'))}</b>` : ''}</span>
-        <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))}</span>
+        <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))} · 🏘️ ${districts}/3</span>
         <span class="front-op-desc">${esc(t(template.desc))}</span>
         ${commander}
         ${stageIntel}

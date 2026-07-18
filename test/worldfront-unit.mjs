@@ -197,3 +197,19 @@ test('active scout reveals commander intel without a Radio Tower level', () => {
   const view = frontViewModel(front, { friends: { POL: true } });
   assert.ok(view.board.find((operation) => operation.id === operationId).commander);
 });
+
+test('an unprotected rebuilt country loses one district and receives a counterattack', () => {
+  let front = createFront({ seed: 509, liberated: ['UKR', 'POL', 'DEU', 'FRA'] });
+  front.restored = { UKR: 2, POL: 2, DEU: 2, FRA: 2 };
+  const protectedCountries = new Set(front.board.map((operation) => operation.country));
+  const exposedCountry = ['UKR', 'POL', 'DEU', 'FRA'].find((country) => !protectedCountries.has(country));
+  for (const operation of front.board.slice()) front = winAndClaim(front, operation.id).front;
+  const before = front.restored[exposedCountry];
+  const result = reduce(front, { type: 'ADVANCE_GENERATION', liberated: ['UKR', 'POL', 'DEU', 'FRA'] });
+  const emergency = result.front.board.find((operation) => operation.country === exposedCountry);
+  assert.equal(result.front.restored[exposedCountry], before - 1);
+  assert.equal(emergency.counterattack, true);
+  assert.equal(emergency.template, 'siege');
+  assert.equal(emergency.threat, 3);
+  assert.ok(result.effects.some((effect) => effect.key === 'front.counterattack'));
+});

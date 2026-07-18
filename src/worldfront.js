@@ -97,23 +97,30 @@ const operationRewardId = (front, operation) => `front:${front.seed}:${operation
 const cycleRewardId = (front) => `front:${front.seed}:g${front.generation}:cycle`;
 const maxProjectRewardId = (front) => `front:${front.seed}:g${front.generation}:projects-max`;
 
-function makeBoard(seed, generation, liberated) {
+function makeBoard(seed, generation, liberated, counterattackCountry = null) {
   const countries = cleanCountries(liberated);
   if (!countries.length) return [];
   const guided = countries.length < 3;
-  const selected = guided
+  let selected = guided
     ? [countries.includes('UKR') ? 'UKR' : countries[0]]
     : countries
       .map((country, index) => ({ country, score: hash(seed, generation, index, 0x51ed270b) }))
       .sort((a, b) => a.score - b.score || a.country.localeCompare(b.country))
       .slice(0, 3)
       .map((entry) => entry.country);
+  if (!guided && countries.includes(counterattackCountry)) {
+    selected = [counterattackCountry, ...selected.filter((country) => country !== counterattackCountry),
+      ...countries.filter((country) => country !== counterattackCountry && !selected.includes(country))].slice(0, 3);
+  }
   return selected.map((country, index) => {
-    const template = guided ? 'evacuation' : TEMPLATE_IDS[hash(seed, generation, index, 0xa341316c) % TEMPLATE_IDS.length];
-    const threat = guided ? 1 : 1 + (hash(seed, generation, index, 0xc8013ea4) % 3);
-    return { id: operationId(generation, country, template), country, template, threat, status: 'available' };
+    const counterattack = country === counterattackCountry;
+    const template = guided ? 'evacuation' : counterattack ? 'siege' : TEMPLATE_IDS[hash(seed, generation, index, 0xa341316c) % TEMPLATE_IDS.length];
+    const threat = guided ? 1 : counterattack ? 3 : 1 + (hash(seed, generation, index, 0xc8013ea4) % 3);
+    return { id: operationId(generation, country, template), country, template, threat, counterattack, status: 'available' };
   });
 }
+
+const operationCoins = (operation) => 200 + operation.threat * 50 + (operation.counterattack ? 100 : 0);
 
 function cleanStats(value) {
   const stats = value && typeof value === 'object' ? value : {};
@@ -217,6 +224,7 @@ export function sanitizeFront(value, context = {}) {
       country,
       template,
       threat: clamp(raw.threat, 1, 3, 1),
+      counterattack: !!raw.counterattack,
       status: OP_STATUSES.has(raw.status) ? raw.status : 'available',
     });
   }
@@ -381,7 +389,7 @@ export function applyFrontEvent(value, event = {}) {
     const rewardId = operationRewardId(front, operation);
     if (!front.claims.includes(rewardId)) {
       front.claims.push(rewardId);
-      effects.push({ type: 'grant', rewardId, coins: 200 + operation.threat * 50, crystals: 1 + operation.threat, eggs: 0 });
+      effects.push({ type: 'grant', rewardId, coins: operationCoins(operation), crystals: 1 + operation.threat, eggs: 0 });
     }
     const allProjectsMax = FRONT_PROJECTS.every((id) => front.projects[id] >= 3);
     if (!allProjectsMax) {
@@ -417,11 +425,21 @@ export function applyFrontEvent(value, event = {}) {
   if (event.type === 'ADVANCE_GENERATION') {
     if (front.active || !front.board.every((operation) => operation.status === 'claimed')) return unchanged(sanitized);
     const liberated = cleanCountries(event.liberated);
-    const nextBoard = makeBoard(front.seed, front.generation + 1, liberated.length ? liberated : front.board.map((operation) => operation.country));
+    const protectedCountries = new Set(front.board.map((operation) => operation.country));
+    const exposed = Object.keys(front.restored).filter((country) => front.restored[country] > 0 && !protectedCountries.has(country));
+    const counterattackCountry = exposed
+      .map((country, index) => ({ country, score: hash(front.seed, front.generation + 1, index, 0x71c4a11d) }))
+      .sort((a, b) => a.score - b.score || a.country.localeCompare(b.country))[0]?.country || null;
+    if (counterattackCountry) {
+      front.restored[counterattackCountry]--;
+      if (!front.restored[counterattackCountry]) delete front.restored[counterattackCountry];
+    }
+    const nextBoard = makeBoard(front.seed, front.generation + 1,
+      liberated.length ? liberated : front.board.map((operation) => operation.country), counterattackCountry);
     if (!nextBoard.length) return unchanged(sanitized);
     front.generation++;
     front.board = nextBoard;
-    return changed(front, [], 'front.generationAdvanced');
+    return changed(front, [], counterattackCountry ? 'front.counterattack' : 'front.generationAdvanced');
   }
 
   return unchanged(sanitized);
@@ -488,7 +506,7 @@ export function frontViewModel(value, save = {}, { previewSpecialist = null } = 
       countryState: frontCountryState(front, operation.country),
       commander: radio >= 1 || scoutIntel ? template.commander : null,
       stages: radio >= 2 ? operationStages(operation).slice() : [],
-      reward: radio >= 3 ? { coins: 200 + operation.threat * 50, crystals: 1 + operation.threat } : null,
+      reward: radio >= 3 ? { coins: operationCoins(operation), crystals: 1 + operation.threat } : null,
     };
   });
   const activeOperation = front.active ? board.find((operation) => operation.id === front.active.operationId) || null : null;

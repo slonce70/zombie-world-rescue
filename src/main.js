@@ -2327,6 +2327,7 @@ class Game {
       'front.rewardClaimed': '🏗️ Країна відбудовується, а проєкт Бази просунувся.',
       'front.cycleComplete': '🥚 Покоління фронту завершено!',
       'front.generationAdvanced': '🛰️ Нові операції вже на карті.',
+      'front.counterattack': '🚨 Зомбі захопили район незахищеної країни — контратака вже на карті!',
     };
     return messages[effect.key] || effect.key;
   }
