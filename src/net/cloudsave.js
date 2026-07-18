@@ -64,6 +64,8 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'moonRescue',
   'settlement',
   'customMap',
+  'customMap2',
+  'customMapSlot',
 ]);
 
 // ЄДИНА функція-джерело «чи в цьому сейві є що втрачати». Її бачать і захист
@@ -128,6 +130,7 @@ export function saveHasProgress(s) {
     || !!s.expedition                                      // 🧭 активний/завершений маршрут і нагорода
     || !!s.front                                           // 🛰️ операції, проєкти Бази та незабраний прогрес Front
     || !!(s.customMap && Array.isArray(s.customMap.objects) && s.customMap.objects.length)
+    || !!(s.customMap2 && Array.isArray(s.customMap2.objects) && s.customMap2.objects.length)
     || (Array.isArray(s.frontCoopClaims) && s.frontCoopClaims.length > 0) // 🤝 канонічні нагороди Front, отримані гостем
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }

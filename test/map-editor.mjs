@@ -108,7 +108,7 @@ check(editor.countryId === 'CUSTOM' && editor.toolbar && editor.selectedOnly && 
   && editor.moves.up.y > 14 && editor.moves.down.y < 14 && Math.abs(editor.moves.fast.z - 55) > Math.abs(editor.moves.w.z - 55)
   && editor.types.join(',') === 'house,lake,rock,task,task,task,tree,zombie'
   && editor.quests.join(',') === 'rescue,collect,repair'
-  && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => type !== 'task').every(([, count]) => count === 1)
+  && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => !['task', 'airdrop', 'church'].includes(type)).every(([, count]) => count === 1)
   && editor.solid.house > 3 && editor.solid.tree > 1 && editor.solid.rock > 1.6
   && Object.values(editor.rejected).every((value) => value === false),
   'W/S/A/D рухають правильно, будинки/дерева/каміння тверді, небезпечні точки відхиляються', JSON.stringify(editor));

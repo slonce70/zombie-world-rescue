@@ -129,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 543;
+const APP_VERSION = 544;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -443,12 +443,32 @@ class Game {
         return;
       }
       this.audio.click();
-      this.startLevel('CUSTOM', { customMap: 'edit' });
+      this.startLevel('CUSTOM', { customMap: 'edit', customMapSlot: this.save.customMapSlot || 0 });
     });
     document.getElementById('btn-custom-play').addEventListener('click', () => {
-      if (!(this.save.customMap && this.save.customMap.objects.length)) return;
+      const slot = this.save.customMapSlot === 1 ? 1 : 0;
+      const map = slot ? this.save.customMap2 : this.save.customMap;
+      if (!(map && map.objects.length)) return;
       this.audio.click();
-      this.startLevel('CUSTOM', { customMap: 'play' });
+      this.startLevel('CUSTOM', { customMap: 'play', customMapSlot: slot });
+    });
+    document.getElementById('btn-custom-slot').addEventListener('click', () => {
+      if (!(this.save.upgrades.mapeditorplus > 0)) return;
+      this.save.customMapSlot = this.save.customMapSlot === 1 ? 0 : 1;
+      this.audio.click(); this.saveGame(); this._showGlobeUI(true);
+    });
+    document.getElementById('btn-custom-biome').addEventListener('click', () => {
+      if (!(this.save.upgrades.mapeditorplus > 0)) return;
+      const key = this.save.customMapSlot === 1 ? 'customMap2' : 'customMap';
+      this.save[key].biome = this.save[key].biome === 'snow' ? 'summer' : 'snow';
+      this.audio.click(); this.saveGame(); this._showGlobeUI(true);
+    });
+    document.getElementById('btn-custom-delete').addEventListener('click', () => {
+      const key = this.save.customMapSlot === 1 ? 'customMap2' : 'customMap';
+      if (!this.save[key].objects.length || !confirm(t('Видалити цю власну карту назавжди?'))) return;
+      this.save[key] = sanitizeCustomMap({ biome: this.save[key].biome, objects: [] });
+      this.audio.click(); this.saveGame(); this._showGlobeUI(true);
+      this.hud.toast(t('🗑️ Власну карту видалено'));
     });
     // 📖 R4 «Альбом»: колекція друзів (жива) + заглушки скінів/петсів/еліт (наповнення R5)
     const albumBtn = document.getElementById('btn-album');
@@ -650,7 +670,7 @@ class Game {
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, moonRegions: {}, kidMode: null, strongZombies: false, toughZombies: false,
       mapSize: 'standard', mapStyle: 'classic', cloudTs: 0, goal: null,
-      customMap: { objects: [] },
+      customMap: { biome: 'summer', objects: [] }, customMap2: { biome: 'summer', objects: [] }, customMapSlot: 0,
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
       coopRole: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
@@ -710,6 +730,8 @@ class Game {
         const nestedDefaults = { stats: defaults.stats, hero: defaults.hero, chapter: defaults.chapter, infected: defaults.infected };
         out = Object.assign(defaults, s);
         out.customMap = sanitizeCustomMap(out.customMap);
+        out.customMap2 = sanitizeCustomMap(out.customMap2);
+        out.customMapSlot = out.upgrades.mapeditorplus > 0 && out.customMapSlot === 1 ? 1 : 0;
         // F26: глибокий merge дефолтів для вкладених об'єктів (stats/hero/chapter…).
         // Поверхневий Object.assign замінює весь вкладений об'єкт цілком — тож якщо
         // старий сейв має stats БЕЗ нового під-поля, воно лишилось би undefined → NaN.
@@ -1315,12 +1337,21 @@ class Game {
       if (this.frontui) this.frontui.render(this.getFrontViewModel());
       const editorBtn = document.getElementById('btn-map-editor');
       const playBtn = document.getElementById('btn-custom-play');
+      const slotBtn = document.getElementById('btn-custom-slot');
+      const biomeBtn = document.getElementById('btn-custom-biome');
+      const deleteBtn = document.getElementById('btn-custom-delete');
       const editorOwned = this.save.upgrades.mapeditor > 0;
+      const plusOwned = this.save.upgrades.mapeditorplus > 0;
+      const customSlot = plusOwned && this.save.customMapSlot === 1 ? 1 : 0;
+      const customMap = customSlot ? this.save.customMap2 : this.save.customMap;
       if (editorBtn) {
         editorBtn.textContent = editorOwned ? t('🧱 Створювач карт') : t('🔒 Створювач карт');
         editorBtn.classList.toggle('locked', !editorOwned);
       }
-      if (playBtn) playBtn.hidden = !editorOwned || !(this.save.customMap && this.save.customMap.objects.length);
+      if (slotBtn) { slotBtn.hidden = !plusOwned; slotBtn.textContent = t('🗺️ Карта {n}', { n: customSlot + 1 }); }
+      if (biomeBtn) { biomeBtn.hidden = !plusOwned; biomeBtn.textContent = customMap.biome === 'snow' ? t('❄️ Снігова карта') : t('☀️ Літня карта'); }
+      if (playBtn) playBtn.hidden = !editorOwned || !customMap.objects.length;
+      if (deleteBtn) deleteBtn.hidden = !editorOwned || !customMap.objects.length;
     }
     if (this.coop) this.coop.updateRoomChip();
   }
@@ -2976,6 +3007,8 @@ class Game {
     const isCustomEditor = opts.customMap === 'edit';
     const isCustomPlay = opts.customMap === 'play';
     const isCustom = isCustomEditor || isCustomPlay;
+    const customMapSlot = this.save.upgrades.mapeditorplus > 0 && opts.customMapSlot === 1 ? 1 : 0;
+    const customMapData = opts.customMapData || (customMapSlot ? this.save.customMap2 : this.save.customMap);
     const rawCountry = isCustom ? CUSTOM_COUNTRY : (COUNTRIES[countryId] || COUNTRIES.UKR);
     const baseCountry = moonRegion ? { ...rawCountry, name: moonRegion.name, seed: moonRegion.seed } : rawCountry;
     const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
@@ -3165,7 +3198,7 @@ class Game {
     const soloReplay = !operation && !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
-    level.world = new World(level.scene, country.seed, getBiome(isCustom ? 'UKR' : countryId), country.map, this._qualityWorldOpts());
+    level.world = new World(level.scene, country.seed, getBiome(isCustom ? (customMapData.biome === 'snow' ? 'POL' : 'UKR') : countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
     // 💸 R3 «Поразка теж платить»: знімок XP на старті — щоб показати ЗДОБУТЕ за забіг на екрані смерті
@@ -3246,7 +3279,7 @@ class Game {
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isCustom) {
-      level.customMap = new CustomMapMode(level, opts.customMapData || this.save.customMap, isCustomEditor);
+      level.customMap = new CustomMapMode(level, customMapData, isCustomEditor, customMapSlot);
       level.missions = level.customMap;
       document.body.classList.toggle('map-editor-mode', isCustomEditor);
     } else if (isKnockout) {

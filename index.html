@@ -515,7 +515,10 @@
         <button id="btn-hq" class="btn globe-act">🏠 База</button>
         <button id="btn-league" class="btn globe-act league-btn">🏆 Ліга</button>
         <button id="btn-map-editor" class="btn globe-act">🔒 Створювач карт</button>
+        <button id="btn-custom-slot" class="btn globe-act" hidden>🗺️ Карта 1</button>
+        <button id="btn-custom-biome" class="btn globe-act" hidden>☀️ Літня карта</button>
         <button id="btn-custom-play" class="btn globe-act" hidden>▶️ Грати власну карту</button>
+        <button id="btn-custom-delete" class="btn globe-act" hidden>🗑️ Видалити власну карту</button>
         <div class="menu-group-title">НАЛАШТУВАННЯ</div>
         <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
         <button id="btn-map-size" class="btn globe-act">🗺️ Карта: Стандартна · 750 м</button>
@@ -721,6 +724,8 @@
       <button class="btn" data-map-object="zombie">🧟 Зомбі</button>
       <button class="btn" data-map-object="rock">🪨 Камінь</button>
       <button class="btn" data-map-object="task">⭐ Завдання</button>
+      <button class="btn" data-map-object="airdrop">🪂 Аірдроп</button>
+      <button class="btn" data-map-object="church">⛪ Церква</button>
     </div>
     <div class="map-editor-actions">
       <button id="map-editor-place" class="btn btn-primary">✋ Поставити</button>
@@ -730,7 +735,7 @@
       <button id="map-editor-save" class="btn btn-primary">💾 Зберегти</button>
       <button id="map-editor-exit" class="btn">🚪 Вийти</button>
     </div>
-    <div class="map-editor-hint">W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–6 — предмет · E — поставити</div>
+    <div class="map-editor-hint">W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–8 — предмет · E — поставити · повторний вибір змінює завдання/зомбі</div>
   </div>
 
   <div id="shop" class="overlay">

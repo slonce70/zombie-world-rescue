@@ -15,6 +15,7 @@ export const SHOP_ITEMS = [
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   { id: 'passxp1000', icon: '⭐', name: t('1000 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 100, passXp: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'mapeditor', icon: '🧱', name: t('Створювач карт'), desc: t('Політ, будинки, дерева, озера, каміння, зомбі й власні завдання'), price: 10000, max: 1, cat: t('Режими') },
+  { id: 'mapeditorplus', icon: '🏗️', name: t('Створювач карт+'), desc: t('+1 карта, сніг або літо, різні зомбі, +20 обʼєктів, аірдропи, церква, відбудова міста й бос 5500 HP'), price: 15000, max: 1, cat: t('Режими'), needsUpgrade: 'mapeditor' },
   // 🌟 повторюваний стік монет: віддай монети рятівникам → отримай престиж-зірку. Ціна росте геометрично (×1.5)
   //    до стелі 25000: без стелі 25-та пожертва коштувала б ~34 млн монет і титул «Легенда фонду» був би недосяжним.
   { id: 'donate', icon: '🌟', name: t('Пожертва рятівника'), desc: t('Віддай монети рятівникам — і отримай зірку Рятівника! Що більше даруєш, то дорожча наступна.'), price: (save) => Math.min(25000, Math.round(2000 * Math.pow(1.5, (save && save.donations) || 0))), max: Infinity, cat: t('Ресурси'), donate: true },
@@ -236,6 +237,7 @@ export class Shop {
       const locked = item.needsBazooka && !hasBazooka;
       const lockedGadget = item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget);
       const lockedSkin = item.needsSkin && !save.skins.includes(item.needsSkin);
+      const lockedUpgrade = item.needsUpgrade && !(save.upgrades[item.needsUpgrade] > 0);
       const chain = offerChain(item);
       const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
       const price = this.priceOf(item);
@@ -243,7 +245,7 @@ export class Shop {
         && (!item.radiationPrice || (save.radiationCoins || 0) >= item.radiationPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > this.basePriceOf(item) ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = (locked || lockedGadget || lockedSkin || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
+      const priceLabel = (locked || lockedGadget || lockedSkin || lockedUpgrade || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.crystalPrice && item.radiationPrice ? `${item.crystalPrice} 💎 + ${item.radiationPrice} ☢️`
         : item.radiationPrice ? `${item.radiationPrice} ☢️`
@@ -251,14 +253,15 @@ export class Shop {
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
         : lockedSkin ? t('Спершу купи скін Радіаційний')
+        : lockedUpgrade ? t('Спершу купи звичайний Створювач карт')
         : lockedChain ? t('Спершу купи попередню акцію')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedSkin && !lockedChain;
+      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedSkin && !lockedUpgrade && !lockedChain;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
-        <div class="shop-item ${maxed || locked || lockedGadget || lockedChain ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
+        <div class="shop-item ${maxed || locked || lockedGadget || lockedUpgrade || lockedChain ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
           ${goalBtn}
           <div class="shop-icon">${item.icon}</div>
           <div class="shop-name">${item.name}${lvl}</div>
@@ -309,6 +312,7 @@ export class Shop {
       || (item.radiationPrice && (save.radiationCoins || 0) < item.radiationPrice)
       || (item.needsBazooka && !save.weapons.includes('bazooka'))
       || (item.needsGadget && !save.gadgetsOwned.includes(item.needsGadget))
+      || (item.needsUpgrade && !(save.upgrades[item.needsUpgrade] > 0))
       || lockedSkin
       || lockedChain) {
       game.audio.denied();
@@ -376,6 +380,9 @@ export class Shop {
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
       case 'mapeditor':
         game.hud.toast(t('🧱 Створювач карт відкрито! Повернися на глобус → Меню.'));
+        break;
+      case 'mapeditorplus':
+        game.hud.toast(t('🏗️ Створювач карт+ відкрито: друга карта, нові обʼєкти, біоми й бос!'));
         break;
       case 'radiationturretpack':
         game.hud.toast(t('☢️🤖 Радіаційна турель: +5 шкоди і зелені кулі'));
