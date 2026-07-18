@@ -46,6 +46,7 @@ export class LivingHQ {
     this.hallPlaques = 0;
     this.hintDisplays = 0;
     this.frontProjectProps = 0;
+    this.settlementProps = 0;
     this._raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
     this._cameraTarget = new THREE.Vector3();
@@ -122,6 +123,7 @@ export class LivingHQ {
     this._addLivingCamp();
     this._addCampQuestBoard();
     this._addFrontProjects();
+    this._addSettlement();
     this._refreshHints();
     this.scene.traverse((obj) => {
       if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
@@ -462,6 +464,7 @@ export class LivingHQ {
     if (data.kind === 'beast') return t('📖 Бестіарій: тут живуть відкриті записи про зомбі.');
     if (data.kind === 'front-map') return t('🛰️ Карта показує активні операції Живого фронту.');
     if (data.kind === 'front-project') return t('🏗️ Проєкт Бази: рівень {n}/3.', { n: data.level || 0 });
+    if (data.kind === 'settlement') return t('🏘️ Поселення: рівень {n}/3 · дерево {wood} · камінь {stone} · мешканці {survivors}.', data);
     return '';
   }
 
@@ -487,6 +490,21 @@ export class LivingHQ {
         });
         this.frontProjectProps++;
       }
+    }
+  }
+
+  _addSettlement() {
+    this.settlementProps = 0;
+    const state = this.game.save.settlement || {};
+    const level = Math.max(0, Math.min(3, state.level | 0));
+    if (!level) return;
+    const data = { kind: 'settlement', level, wood: state.wood | 0, stone: state.stone | 0, survivors: state.survivors | 0 };
+    this._addBox(-4.25, 0.45, -4.15, 2.4, 0.9, 1.8, 0xe4d4b7, data);
+    this._addBox(-4.25, 1.15, -4.15, 2.7, 0.5, 2.1, 0x376fa8, data);
+    this.settlementProps += 2;
+    for (let tier = 1; tier < level; tier++) {
+      this._addBox(-5.3 + tier * 2.1, 0.35, -3.1, 0.8, 0.7 + tier * 0.3, 0.8, 0xaeb6bf, data);
+      this.settlementProps++;
     }
   }
 
@@ -1004,6 +1022,7 @@ export class LivingHQ {
       friendRigs: (this.friends || []).length,
       campProps: this.campProps || 0,
       campQuestBoard: this.campQuestBoard || 0,
+      settlementProps: this.settlementProps || 0,
       hasHero: !!this.hero,
       moonRelays: this._moonState().relays.length,
       moonDone: this._moonState().done,

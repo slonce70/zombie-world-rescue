@@ -671,6 +671,8 @@ class Game {
       frontCoopClaims: [],
       // 🌙 жива місячна місія: реле, оборона, бос і одноразова нагорода
       moonRescue: { relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false },
+      // 🏘️ постійний результат української відбудови
+      settlement: { level: 0, wood: 0, stone: 0, survivors: 0 },
     };
   }
 
@@ -787,6 +789,14 @@ class Game {
           bossDefeated: moonBossDefeated,
           rewarded: !!moon.rewarded || !!moon.done,
           done: moonRelays.length === 3 && moonDefenseDone && moonBossDefeated,
+        };
+        const settlement = out.settlement && typeof out.settlement === 'object' && !Array.isArray(out.settlement) ? out.settlement : {};
+        const settlementInt = (value, max) => Math.max(0, Math.min(max, Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0));
+        out.settlement = {
+          level: settlementInt(settlement.level, 3),
+          wood: settlementInt(settlement.wood, 999999),
+          stone: settlementInt(settlement.stone, 999999),
+          survivors: settlementInt(settlement.survivors, 9999),
         };
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
         // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1

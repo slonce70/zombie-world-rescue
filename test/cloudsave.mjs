@@ -160,7 +160,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'weeklyCamp',
       // 🌍 v303 «Світ врятовано»
       'worldSaved',
-      'expedition', 'front', 'frontCoopClaims', 'moonRescue',
+      'expedition', 'front', 'frontCoopClaims', 'moonRescue', 'settlement',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -171,7 +171,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
-      'weeklyCamp', 'worldSaved', 'expedition', 'front', 'frontCoopClaims', 'moonRescue',
+      'weeklyCamp', 'worldSaved', 'expedition', 'front', 'frontCoopClaims', 'moonRescue', 'settlement',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -224,6 +224,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     // 🌍 v303: фінал кампанії пройдено — теж прогрес (зміна пристрою не має його обнуляти)
     out.worldSaved = saveHasProgress({ ...fresh, worldSaved: 1 }) === true;
     out.moonRescue = saveHasProgress({ ...fresh, moonRescue: { relays: ['solar'], done: false } }) === true;
+    out.settlement = saveHasProgress({ ...fresh, settlement: { level: 1, wood: 120, stone: 50, survivors: 3 } }) === true;
     out.zeroEggsNotProgress = saveHasProgress({ ...fresh, eggs: 0, petFood: 0, petLevels: { dog: 1 } }) === false;
     return out;
   });
@@ -259,6 +260,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('🥚 видані пороги-яйця → прогрес=true', res.eggClaims);
   check('🌍 світ врятовано → прогрес=true', res.worldSaved);
   check('🌙 порятунок Місяця → прогрес=true', res.moonRescue);
+  check('🏘️ поселення → прогрес=true', res.settlement);
   check('🥚 порожні яйця/корм/Рів.1 ≠ прогрес', res.zeroEggsNotProgress);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);

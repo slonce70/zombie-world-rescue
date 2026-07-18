@@ -58,6 +58,9 @@ const ukraine = await page.evaluate(() => {
   story._syncObjectiveStates();
 
   const rebuildAttackers = g.level.zombies.list.filter((zombie) => zombie.rebuildAttack);
+  const settlementSnapshot = { ...g.save.settlement };
+  g.save.settlement.level = 3;
+  const upgradedCenter = delegate._makeCityCenter(rebuild);
 
   return {
     ids: story.objectives.map((o) => o.id),
@@ -80,6 +83,10 @@ const ukraine = await page.evaluate(() => {
       attackers: rebuildAttackers.length,
       leftAttackers: rebuildAttackers.filter((zombie) => zombie.x < rebuild.dest.x).length,
       rightAttackers: rebuildAttackers.filter((zombie) => zombie.x > rebuild.dest.x).length,
+      settlement: settlementSnapshot,
+      settlementTier: rebuild.rebuilt.userData.settlementTier,
+      upgradedTier: upgradedCenter.userData.settlementTier,
+      upgradedParts: upgradedCenter.children.length,
     },
     bossUnlocked: story.bossUnlocked,
   };
@@ -97,7 +104,11 @@ check(ukraine.rebuild.wood === 120 && ukraine.rebuild.stone === 50 && ukraine.re
   && ukraine.rebuild.wrongToolMisses && ukraine.rebuild.resourcesVisibleBeforeTools
   && ukraine.rebuild.mainBuildingWidth === 16 && ukraine.rebuild.buildingParts > 15
   && ukraine.rebuild.waves === 3 && ukraine.rebuild.attackers === 24
-  && ukraine.rebuild.leftAttackers === 12 && ukraine.rebuild.rightAttackers === 12,
+  && ukraine.rebuild.leftAttackers === 12 && ukraine.rebuild.rightAttackers === 12
+  && ukraine.rebuild.settlement.level === 1 && ukraine.rebuild.settlement.wood === 120
+  && ukraine.rebuild.settlement.stone === 50 && ukraine.rebuild.settlement.survivors === 3
+  && ukraine.rebuild.settlementTier === 1 && ukraine.rebuild.upgradedTier === 3
+  && ukraine.rebuild.upgradedParts > ukraine.rebuild.buildingParts,
   'реальні вибірні інструменти → правильне рубання/видобування → великий міський штаб', JSON.stringify(ukraine.rebuild));
 check(ukraine.states.every((state) => state === 'done') && ukraine.bossUnlocked,
   'після українських завдань відкривається бос', JSON.stringify(ukraine));

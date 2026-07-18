@@ -35,6 +35,7 @@ await page.evaluate(async () => {
     kills500: { progress: 250, done: false },
     headshots150: { progress: 15, done: false },
   };
+  g.save.settlement = { level: 3, wood: 360, stone: 150, survivors: 9 };
   g.quests.ensureMegaQuests();
   g.saveGame();
 });
@@ -75,6 +76,7 @@ check(st.hallPlaques >= 4, `показано зал слави (${st.hallPlaques
 check(st.hallTrophies >= 4, `зал слави має trophy-моделі, не box-заглушки (${st.hallTrophies})`);
 check(st.hasHero === true, 'манекен героя створено з поточного скіна');
 check(st.hintDisplays >= 4, `HQ має клікабельні підказки-експонати (${st.hintDisplays})`);
+check(st.settlementProps === 4, `HQ показує постійне поселення рівня 3 (${st.settlementProps} частини)`);
 const initialHintDisplays = st.hintDisplays;
 const canvasOk = await page.evaluate(() => { const c = document.getElementById('game-canvas'); return !!c && c.width > 0 && c.height > 0; });
 check(canvasOk, 'canvas живий після входу');

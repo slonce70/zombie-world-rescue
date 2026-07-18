@@ -540,6 +540,8 @@ export class DynamicMissions {
   _makeCityCenter(m) {
     const level = this.level;
     const g = new THREE.Group();
+    const tier = Math.max(1, Math.min(3, level.game.save.settlement?.level | 0));
+    g.userData.settlementTier = tier;
     const wallM = toonMat(0xe4d4b7);
     const roofM = toonMat(0x376fa8);
     const stoneM = toonMat(0xaeb6bf);
@@ -587,6 +589,22 @@ export class DynamicMissions {
     blue.position.set(1.15, 13.8, 0); yellow.position.set(1.15, 13.25, 0);
     flag.add(blue, yellow);
     g.add(pole, flag);
+    if (tier >= 2) {
+      for (const side of [-1, 1]) {
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 7.5, 10), stoneM);
+        tower.position.set(side * 13, 3.75, -2.5);
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0x62e59a }));
+        beacon.position.set(side * 13, 7.8, -2.5);
+        g.add(tower, beacon);
+      }
+    }
+    if (tier >= 3) {
+      for (const [x, z, sx, sz] of [[0, -7, 28, 0.6], [-14, 0, 0.6, 14], [14, 0, 0.6, 14]]) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, 2.8, sz), stoneM);
+        wall.position.set(x, 1.4, z);
+        g.add(wall);
+      }
+    }
     g.position.set(m.buildingAt.x, m.buildingAt.y, m.buildingAt.z);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     level.scene.add(g);
@@ -1712,8 +1730,14 @@ export class DynamicMissions {
       }
       m.buildProgress = Math.min(1, m.buildProgress + dt / 30);
       if (m.buildProgress >= 1) {
+        const settlement = level.game.save.settlement || (level.game.save.settlement = { level: 0, wood: 0, stone: 0, survivors: 0 });
+        settlement.level = Math.min(3, (settlement.level | 0) + 1);
+        settlement.wood = Math.min(999999, (settlement.wood | 0) + m.wood);
+        settlement.stone = Math.min(999999, (settlement.stone | 0) + m.stone);
+        settlement.survivors = Math.min(9999, (settlement.survivors | 0) + 3);
+        level.game.saveGame();
         m.rebuilt = this._makeCityCenter(m);
-        level.bus.emit('toast', t('🏗️ Центр міста відновлено!'));
+        level.bus.emit('toast', t('🏗️ Поселення покращено до рівня {n}/3!', { n: settlement.level }));
         this._complete(m.id);
       }
     }
