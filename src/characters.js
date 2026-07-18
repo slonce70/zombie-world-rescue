@@ -4378,6 +4378,32 @@ export function makeScooter(color = 0x4fd8ff) {
   return { group: g, wheels };
 }
 
+export function makeMoonRover(color = 0xe8edf4) {
+  const g = new THREE.Group();
+  const bodyM = toonMat(color), darkM = toonMat(0x303844), glassM = toonMat(0x6fb5e8, 0x2b6d9f, 0.2);
+  const chassis = box(1.55, 0.32, 2.15, bodyM);
+  chassis.position.y = 0.62;
+  chassis.castShadow = true;
+  const cabin = box(1.25, 0.72, 1.05, glassM);
+  cabin.position.set(0, 1.12, 0.15);
+  const mast = cylinder(0.045, 0.045, 1.05, darkM, 8);
+  mast.position.set(0, 1.7, 0.25);
+  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), bodyM);
+  dish.scale.y = 0.35;
+  dish.rotation.x = -0.55;
+  dish.position.set(0, 2.2, 0.05);
+  g.add(chassis, cabin, mast, dish);
+  const wheels = [];
+  for (const side of [-1, 1]) for (const z of [-0.78, 0.78]) {
+    const wheel = cylinder(0.34, 0.34, 0.22, darkM, 14);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(side * 0.92, 0.42, z);
+    g.add(wheel);
+    wheels.push(wheel);
+  }
+  return { group: g, wheels };
+}
+
 // ============================================================
 // 🦙 Мегабокс — святкова скриня з сюрпризом
 // ============================================================

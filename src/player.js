@@ -55,6 +55,10 @@ export class Player {
     this.pitch = 0;
     this.onGround = true;
     this.inCastleDungeon = false;
+    this.moon = level.countryId === 'MOON';
+    this.gravity = this.moon ? 8.2 : 21;
+    this.oxygen = this.moon ? 100 : null;
+    this._oxygenDamageT = 0;
 
     this.maxHealth = 100;
     this.health = 100;
@@ -67,7 +71,7 @@ export class Player {
     this.armor = 0;
     this.maxArmor = 50;
     this.helmetMult = 1; // шолом: множник вхідної шкоди
-    this.jumpPower = 7.6;
+    this.jumpPower = this.moon ? 9.4 : 7.6;
     this.gearAttached = {};
     // тимчасові бафи (секунди, що лишились)
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
@@ -243,7 +247,7 @@ export class Player {
     const vest = upgrades.vest || 0;
     this.maxArmor = 50 + vest * 50;
     this.helmetMult = upgrades.helmet ? 0.85 : 1;
-    this.jumpPower = upgrades.sneakers ? 8.6 : 7.6;
+    this.jumpPower = (upgrades.sneakers ? 8.6 : 7.6) + (this.moon ? 1.8 : 0);
     for (const kind of ['vest', 'helmet', 'sneakers']) {
       if ((upgrades[kind] || 0) > 0 && !this.gearAttached[kind]) {
         attachHeroGear(this.rig, kind);
@@ -347,6 +351,7 @@ export class Player {
       }
     }
     this._updateBuffTimers(dt);
+    this._updateMoonLifeSupport(dt);
 
     const moving = (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05);
     const sprint = !this.riding && moving && (input.down('ShiftLeft') || input.down('ShiftRight') || input.touchSprint);
@@ -458,7 +463,8 @@ export class Player {
       // 🛴 фізика самоката: W — газ, S — гальмо/назад, A/D — кермо. Вбік не ковзає!
       const gas = -mz;       // W = вперед
       const steer = -mx;     // A = ліворуч
-      if (gas > 0.05) this.rideSpeed = Math.min(12.5, this.rideSpeed + 9.5 * dt);
+      const rover = this.riding && this.riding.rover;
+      if (gas > 0.05) this.rideSpeed = Math.min(rover ? 17 : 12.5, this.rideSpeed + (rover ? 7.5 : 9.5) * dt);
       else if (gas < -0.05) this.rideSpeed = Math.max(-3.5, this.rideSpeed - 13 * dt);
       else this.rideSpeed = Math.abs(this.rideSpeed) < 0.25 ? 0 : this.rideSpeed - Math.sign(this.rideSpeed) * 5.5 * dt;
       // кермо працює тільки в русі (як справжнє), на задньому ході — навпаки
@@ -504,7 +510,7 @@ export class Player {
       this.vel.y = this.jumpPower;
       this.onGround = false;
     }
-    this.vel.y -= 21 * dt;
+    this.vel.y -= this.gravity * dt;
     const preSlopeX = this.pos.x, preSlopeZ = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.y += this.vel.y * dt;
@@ -576,6 +582,21 @@ export class Player {
     // 🛴 врізались у перешкоду — самокат різко гальмує
     if (this.riding && Math.hypot(solved.x - preX, solved.z - preZ) > 0.04) {
       this.rideSpeed *= 0.35;
+    }
+  }
+
+  _updateMoonLifeSupport(dt) {
+    if (!this.moon || this.health <= 0) return;
+    const station = this.level.country.map.storySites.station;
+    const inside = Math.hypot(this.pos.x - station.x, this.pos.z - station.z) < 48;
+    const relay = this.level.missions?.objectives?.find((objective) => objective.id === 'moon-relays');
+    if (inside) this.oxygen = Math.min(100, this.oxygen + 22 * dt);
+    else this.oxygen = Math.max(0, this.oxygen - (relay?.state === 'done' ? 0.35 : 0.9) * dt);
+    if (this.oxygen > 0) { this._oxygenDamageT = 0; return; }
+    this._oxygenDamageT -= dt;
+    if (this._oxygenDamageT <= 0) {
+      this._oxygenDamageT = 1;
+      this.takeDamage(8, this.pos.x, this.pos.z);
     }
   }
 

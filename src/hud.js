@@ -114,6 +114,9 @@ export class HUD {
     bus.on('scooterRide', () => this.hintOnce('scooter',
       t('🛴 ЦЕ САМОКАТ!'),
       t('Газуй джойстиком уперед, кермуй ліворуч/праворуч. ✋ — зійти. На ньому швидко! 💨')));
+    bus.on('moonRoverRide', () => this.hintOnce('moon-rover',
+      t('🚙 МІСЯЦЕХІД ЗАПУЩЕНО!'),
+      t('Він швидко долає великі місячні відстані. Стеж за запасом кисню.')));
     bus.on('gadgetUsed', (id) => { if (id !== 'watchtower') this.hintOnce('gadget',
       t('🧰 ТИ ВЖИВ ГАДЖЕТ!'),
       t('Гаджети мають перезарядку ⏳. Обирай інший у Гардеробі на глобусі!')); });
@@ -312,6 +315,10 @@ export class HUD {
     if (p.superPower && p.superPower.t > 0) {
       const sIcon = p.superPower.type === 'shkval' ? '🔥' : '🧲';
       buffHtml += `<div class="buff buff-super"><span class="buff-icon">${sIcon}</span><span class="buff-t">${Math.ceil(p.superPower.t)}</span></div>`;
+    }
+    if (p.oxygen != null) {
+      const oxygen = Math.ceil(p.oxygen);
+      buffHtml += `<div class="buff ${oxygen < 25 ? 'buff-super' : ''}"><span class="buff-icon">🫧</span><span class="buff-t">${oxygen}%</span></div>`;
     }
     // 🌪️ піщана буря Єгипту — чип із відліком, поки буря активна
     if (level && level.sandstorm && level.sandstorm.active) {

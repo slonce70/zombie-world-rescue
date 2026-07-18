@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { t, keyHint, interactKey } from './i18n.js';
 import {
-  makeMegaboxMesh, makeScooter, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
+  makeMegaboxMesh, makeScooter, makeMoonRover, makeTrampolineMesh, makeBarricadeMesh, makeTurretMesh,
   makeHero, updateRig, setAnim, PETS,
 } from './characters.js';
 import { petLevel, PET_LEVEL_SCALE } from './eggs.js';
@@ -391,6 +391,7 @@ export class Vehicles {
     this.level = level;
     this.list = [];
     const L = level.world.layout;
+    const moon = level.countryId === 'MOON';
     const spots = [
       { x: L.SPAWN.x + 4, z: L.SPAWN.z - 3 },
       { x: L.village.x + 6, z: L.village.z + 5 },
@@ -398,13 +399,13 @@ export class Vehicles {
     const colors = [0x4fd8ff, 0xff8c42];
     spots.forEach((sp, i) => {
       const solved = level.world.collide(sp.x, sp.z, 0.8);
-      const sc = makeScooter(colors[i % 2]);
+      const sc = moon ? makeMoonRover(colors[i % 2]) : makeScooter(colors[i % 2]);
       const y = level.world.groundH(solved.x, solved.z);
       sc.group.position.set(solved.x, y, solved.z);
       sc.group.rotation.z = 0.09; // на підніжці
       sc.group.rotation.y = Math.random() * 6.28;
       level.scene.add(sc.group);
-      this.list.push({ sc, x: solved.x, z: solved.z, y, taken: false });
+      this.list.push({ sc, x: solved.x, z: solved.z, y, taken: false, rover: moon });
     });
     this.riding = null;
     this._wasFP = true;
@@ -447,7 +448,9 @@ export class Vehicles {
       const d = Math.hypot(p.pos.x - r.x, p.pos.z - r.z);
       if (d < 2.4) {
         if (!level.missions.prompt) {
-          level.missions.prompt = { text: t('🛴 Натисни {k} — поїхали!', { k: interactKey() }), hold: false };
+          level.missions.prompt = { text: r.rover
+            ? t('🚙 Натисни {k} — сісти в місяцехід', { k: interactKey() })
+            : t('🛴 Натисни {k} — поїхали!', { k: interactKey() }), hold: false };
         }
         if (allowControl && input.pressed('KeyE')) {
           input.justPressed.delete('KeyE');
@@ -498,8 +501,10 @@ export class Vehicles {
     p._applyView();
     r.sc.group.rotation.z = 0;
     this.level.audio.bell();
-    this.level.bus.emit('toast', keyHint('🛴 Кермуй джойстиком, ✋ — зійти', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
-    this.level.bus.emit('scooterRide'); // 🎓 HUD покаже разове знайомство (раз назавжди)
+    this.level.bus.emit('toast', r.rover
+      ? keyHint('🚙 Кермуй місяцеходом, ✋ — вийти', '🚙 W — газ, S — гальмо, A/D — кермо. E — вийти')
+      : keyHint('🛴 Кермуй джойстиком, ✋ — зійти', '🛴 W — газ, S — гальмо, A/D — кермо. E — зійти'));
+    this.level.bus.emit(r.rover ? 'moonRoverRide' : 'scooterRide');
   }
 
   dismountLocal(x, z) {
