@@ -40,6 +40,7 @@ export const MISSION_TYPES = {
   barracks: { icon: '🏚️', slots: ['D'], reward: 220, horde: 0, kind: 'barracks' },
   shiprescue: { icon: '🚢', slots: ['D'], reward: 260, horde: 0, kind: 'shiprescue' },
   rebuild: { icon: '🏗️', slots: ['D'], reward: 240, horde: 0, kind: 'rebuild' },
+  stationrepair: { icon: '🛰️', slots: ['D'], reward: 300, horde: 0, kind: 'stationrepair' },
   bases: { icon: '🏚️', slots: ['D'], reward: 180, horde: 0, kind: 'bases' },
   manor: { icon: '🏛️', slots: ['D'], reward: 350, horde: 0, kind: 'manor' },
 };
@@ -203,6 +204,9 @@ export class DynamicMissions {
       slotInfo = { slot: 'D', site: dock, beamAt: { x: boards.x, z: boards.z } };
     } else if (type === 'rebuild') {
       slotInfo = { slot: 'D', site: this.L.village, beamAt: this.L.village };
+    } else if (type === 'stationrepair') {
+      const station = level.country.map.storySites.stationWreck;
+      slotInfo = { slot: 'D', site: station, beamAt: station };
     } else if (type === 'bases') {
       slotInfo = { slot: 'D', site: this.L.warehouse, beamAt: this.L.warehouse };
     } else if (type === 'manor') {
@@ -305,11 +309,13 @@ export class DynamicMissions {
       this._makeTurkeyRescueShip(m);
     } else if (type === 'rebuild') {
       this._makeRebuildMission(m);
+    } else if (type === 'stationrepair') {
+      this._makeStationRepairMission(m);
     } else if (type === 'manor') {
       this._makeManorMission(m);
     }
     // 🎁 четвертий слот — додаткова місія: позначка і бонусна винагорода
-    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'bases', 'manor'].includes(type)) {
+    if (idx === 3 && !['barracks', 'shiprescue', 'rebuild', 'stationrepair', 'bases', 'manor'].includes(type)) {
       m.optional = true;
       m.reward = Math.round(m.reward * 1.5);
       m.horde = Math.round(m.horde * 0.5);
@@ -515,6 +521,31 @@ export class DynamicMissions {
     m.dest.icon.position.set(m.dest.x, m.dest.y + 3.2, m.dest.z);
     m.dest.ring.visible = false;
     m.dest.icon.visible = false;
+  }
+
+  _makeStationRepairMission(m) {
+    const level = this.level;
+    const metal = toonMat(0xaeb9c7, 0x6fc8ff, 0.25);
+    m.fragments = level.country.map.storySites.stationFragments.map((point, i) => {
+      const mesh = new THREE.Group();
+      const core = new THREE.Mesh(i % 2
+        ? new THREE.CylinderGeometry(0.35, 0.55, 1.5, 8)
+        : new THREE.BoxGeometry(1.3, 0.35, 0.9), metal);
+      core.rotation.set(i * 0.3, i * 0.7, i * 0.2);
+      const wire = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 6, 12), toonMat(0x56d7ff, 0x1b8eb8, 0.65));
+      wire.rotation.x = Math.PI / 2;
+      mesh.add(core, wire);
+      const y = level.world.groundH(point.x, point.z);
+      mesh.position.set(point.x, y + 0.8, point.z);
+      level.scene.add(mesh);
+      return { ...point, y, mesh, taken: false };
+    });
+    m.found = 0;
+    m.phase = 'fragments';
+    m.repairProgress = 0;
+    m.waveT = 0;
+    m.waves = 0;
+    m.title = t('Знайди уламки станції: 0/5');
   }
 
   _makeResourceMesh(kind) {
@@ -759,6 +790,7 @@ export class DynamicMissions {
         if (m.type === 'manor') extra = m.phase === 'clear' ? ` (${m.killed}/120)` : t(' — люди на 2 поверсі!');
         if (m.type === 'defense' && m.started) extra = ` (${Math.ceil(m.timer)}${t('с')})`;
         if (m.type === 'escort' && m.started) extra = t(' — веди до вежі!');
+        if (m.type === 'stationrepair' && m.phase === 'fragments') extra = ` (${m.found}/5)`;
         if (m.points && m.type !== 'rebuild') extra = ` (${m.activated}/${m.points.length})`;
         if (m.items) {
           extra = m.found < m.items.length ? ` (${m.found}/${m.items.length})` : t(' — неси до цілі!');
@@ -1212,6 +1244,9 @@ export class DynamicMissions {
       if (m.phase === 'tools') return m.tools.find((it) => !it.taken) || null;
       if (m.phase === 'resources') return m.points.find((p) => !p.done) || null;
       return m.dest;
+    }
+    if (m.type === 'stationrepair') {
+      return m.phase === 'fragments' ? m.fragments.find((fragment) => !fragment.taken) : m.site;
     }
     if (m.type === 'manor') {
       const manor = this.level.world.zombieManor;
@@ -1750,6 +1785,66 @@ export class DynamicMissions {
         level.bus.emit('toast', t('🏗️ Поселення покращено до рівня {n}/3!', { n: settlement.level }));
         this._complete(m.id);
       }
+    }
+  }
+
+  _up_stationrepair(m, dt, input, allowControl) {
+    const level = this.level;
+    const player = level.player;
+    if (m.phase === 'fragments') {
+      for (const fragment of m.fragments) {
+        if (fragment.taken) continue;
+        fragment.mesh.rotation.y += dt;
+        fragment.mesh.position.y = fragment.y + 0.8 + Math.sin(performance.now() / 350 + fragment.x) * 0.15;
+        if (Math.hypot(player.pos.x - fragment.x, player.pos.z - fragment.z) >= 3.4) continue;
+        this.prompt = { text: t('Натисни {k} — взяти уламок станції', { k: interactKey() }), hold: false };
+        if (allowControl && input.pressed('KeyE')) {
+          input.justPressed.delete('KeyE');
+          fragment.taken = true;
+          m.found++;
+          level.scene.remove(fragment.mesh);
+          level.audio.pickup();
+          level.effects.burst(new THREE.Vector3(fragment.x, fragment.y + 0.8, fragment.z), 0x6fc8ff, 10);
+          m.title = t('Знайди уламки станції: {n}/5', { n: m.found });
+          if (m.found === 5) {
+            m.phase = 'repair';
+            level.bus.emit('toast', t('🛰️ Усі уламки знайдено — повертайся до космічної станції!'));
+          }
+        }
+        break;
+      }
+      return;
+    }
+    const d = Math.hypot(player.pos.x - m.site.x, player.pos.z - m.site.z);
+    const seconds = Math.ceil((1 - m.repairProgress) * 30);
+    m.title = t('Відбудуй космічну станцію: {n} с', { n: seconds });
+    if (d < 7) this.prompt = { text: t('Тримай {k} — відбудовуй космічну станцію', { k: interactKey() }), hold: true, progress: m.repairProgress };
+    if (d >= 7 || !allowControl || !input.down('KeyE')) return;
+    m.waveT -= dt;
+    if (m.waveT <= 0) {
+      m.waveT += 8;
+      m.waves++;
+      for (let side = 0; side < 4; side++) {
+        const a = side * Math.PI / 2;
+        for (let i = 0; i < 3; i++) {
+          const x = m.site.x + Math.cos(a) * (24 + i * 2);
+          const z = m.site.z + Math.sin(a) * (24 + i * 2);
+          const zombie = level.zombies.spawn(i === 0 ? 'runner' : 'walker', x, z, { horde: false });
+          zombie.aggroed = true;
+          zombie.state = 'chase';
+          zombie.stationAttack = true;
+          zombie.stationSide = side;
+        }
+      }
+      level.audio.horde();
+      level.bus.emit('toast', t('🧟 Зомбі атакують космічну станцію з усіх сторін!'));
+    }
+    m.repairProgress = Math.min(1, m.repairProgress + dt / 30);
+    level.world.setMoonStationRepair(m.repairProgress);
+    if (m.repairProgress >= 1) {
+      m.phase = 'launched';
+      level.world.launchMoonStation();
+      this._complete(m.id);
     }
   }
 

@@ -26,6 +26,11 @@ export default {
     relays: { x: 122, z: -44 },
     reactor: { x: -104, z: -96 },
     barracks: { x: -104, z: -96 },
+    stationWreck: { x: -104, z: -96 },
+    stationFragments: [
+      { x: -166, z: -52 }, { x: -148, z: -138 }, { x: -74, z: -152 },
+      { x: -42, z: -76 }, { x: -118, z: -28 },
+    ],
     arena: { x: 0, z: -188 },
   },
   roads: [

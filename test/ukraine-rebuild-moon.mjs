@@ -166,6 +166,11 @@ await page.waitForTimeout(800);
 await page.screenshot({ path: 'test-results/moon-globe.png' });
 await page.evaluate(() => window.__game.startLevel('MOON', { moonRegion: 'MARE' }));
 await page.waitForFunction(() => window.__game?.state === 'level' && window.__game?.level?.countryId === 'MOON', null, { timeout: 30000 });
+await page.evaluate(() => {
+  const station = window.__game.level.world.moonStation;
+  window.__game.test.teleport(station.x, station.z + 24);
+  window.__game.level.player.yaw = 0;
+});
 await page.waitForTimeout(700);
 await page.screenshot({ path: 'test-results/moon-full-region.png' });
 const moon = await page.evaluate(() => {
@@ -203,6 +208,12 @@ const moon = await page.evaluate(() => {
       rescue: g.level.world.barnGroup?.userData.kind,
       relay: g.level.world.towerGroup?.userData.kind,
       relayHeight: g.level.world.oxygenRelayHeight,
+      station: g.level.world.moonStation?.group.userData.kind,
+      stationParts: g.level.world.moonStation?.repairs.length,
+      habitats: (g.level.world.moonHabitats || []).map((habitat) => ({
+        kind: habitat.userData.kind,
+        color: habitat.userData.shellColor,
+      })),
     },
     moonSystems: {
       gravity: player.gravity,
@@ -252,8 +263,15 @@ const moon = await page.evaluate(() => {
   delegate._up_defense(defense, 45.1);
   story._syncObjectiveStates();
 
-  const reactor = delegate.get('barracks');
-  for (let i = 0; i < 3; i++) delegate.damageBarracks(1000);
+  const station = delegate.get('stationrepair');
+  for (const fragment of station.fragments) {
+    player.pos.set(fragment.x, player.pos.y, fragment.z);
+    delegate._up_stationrepair(station, 0.1, press(), true);
+  }
+  player.pos.set(station.site.x, player.pos.y, station.site.z);
+  delegate._up_stationrepair(station, 30.1, hold, true);
+  const launchY = g.level.world.moonStation.group.position.y;
+  g.level.world.update(2, player.pos);
   story._syncObjectiveStates();
 
   delegate.pendingWaves = [];
@@ -274,7 +292,13 @@ const moon = await page.evaluate(() => {
     bossUnlocked: story.bossUnlocked,
     flow: {
       rescued: rescue.state === 'done', repaired: repair.state === 'done',
-      defended: defense.state === 'done', reactorDestroyed: reactor.destroyed,
+      defended: defense.state === 'done', fragmentsFound: station.found,
+      stationRepaired: station.repairProgress,
+      stationLaunched: g.level.world.moonStation.launching,
+      stationFlight: g.level.world.moonStation.group.position.y - launchY,
+      stationWaves: station.waves,
+      stationAttackers: g.level.zombies.list.filter((zombie) => zombie.stationAttack).length,
+      stationAttackSides: new Set(g.level.zombies.list.filter((zombie) => zombie.stationAttack).map((zombie) => zombie.stationSide)).size,
       bossHp, bossDefeated: g.level.bossDefeated, rescuePrompt, rescuedCrew,
     },
   };
@@ -301,13 +325,20 @@ check(moon.initial.moonSystems.gravity < 10 && moon.initial.moonSystems.jumpPowe
   'Місяць має низьку гравітацію, кисень і два видимі місяцеходи', JSON.stringify(moon.initial.moonSystems));
 check(Math.max(...moon.initial.minimapColor.slice(0, 3)) - Math.min(...moon.initial.minimapColor.slice(0, 3)) < 24,
   'мінікарта Місяця теж сіра, а не зелена земна', JSON.stringify(moon.initial.minimapColor));
-check(moon.initial.ids.join(',') === 'moon-crew,moon-relays,moon-defense,moon-reactor'
-  && ['rescue', 'repair', 'defense', 'barracks'].every((type) => moon.initial.missionTypes.includes(type)),
+check(moon.initial.ids.join(',') === 'moon-crew,moon-relays,moon-defense,moon-station'
+  && ['rescue', 'repair', 'defense', 'stationrepair'].every((type) => moon.initial.missionTypes.includes(type)),
   'на Місяці є чотири важкі повноцінні завдання', JSON.stringify(moon.initial));
 check(moon.initial.moonMissionModels.rescue === 'moon-rescue-module'
   && moon.initial.moonMissionModels.relay === 'moon-oxygen-relay'
-  && moon.initial.moonMissionModels.relayHeight < 6,
-  'аварійний модуль і низьке кисневе реле мають окремі місячні 3D-моделі', JSON.stringify(moon.initial.moonMissionModels));
+  && moon.initial.moonMissionModels.relayHeight < 6
+  && moon.initial.moonMissionModels.station === 'moon-space-station'
+  && moon.initial.moonMissionModels.stationParts === 5
+  && moon.initial.moonMissionModels.habitats.length >= 6
+  && moon.initial.moonMissionModels.habitats.every((habitat) => {
+    const r = habitat.color >> 16, g = (habitat.color >> 8) & 255, b = habitat.color & 255;
+    return habitat.kind === 'moon-habitat' && Math.max(r, g, b) - Math.min(r, g, b) > 30;
+  }),
+  'модуль, реле, кольорові космічні будинки й справжня станція мають окремі 3D-моделі', JSON.stringify(moon.initial.moonMissionModels));
 check(moon.initial.missionTitles.some((title) => /космонавт|модул/i.test(title))
   && moon.initial.missionTitles.every((title) => !/хлів/i.test(title))
   && /аварійний модуль/i.test(moon.flow.rescuePrompt)
@@ -315,9 +346,12 @@ check(moon.initial.missionTitles.some((title) => /космонавт|модул/
   && moon.flow.rescuedCrew.every((crew) => crew.astronaut && crew.kind.startsWith('astronaut-')),
   'місія говорить про модуль і рятує трьох космонавтів у скафандрах, а не людей із хліва', JSON.stringify({ titles: moon.initial.missionTitles, prompt: moon.flow.rescuePrompt, crew: moon.flow.rescuedCrew }));
 check(moon.states.every((state) => state === 'done') && moon.bossUnlocked
-  && moon.flow.rescued && moon.flow.repaired && moon.flow.defended && moon.flow.reactorDestroyed
+  && moon.flow.rescued && moon.flow.repaired && moon.flow.defended
+  && moon.flow.fragmentsFound === 5 && moon.flow.stationRepaired === 1
+  && moon.flow.stationLaunched && moon.flow.stationFlight > 20
+  && moon.flow.stationWaves >= 1 && moon.flow.stationAttackers === 12 && moon.flow.stationAttackSides === 4
   && moon.initial.boss.style === 'mechTitan' && moon.flow.bossHp === 10000 && moon.flow.bossDefeated,
-  'повний прохід чотирьох завдань відкриває й перемагає Місячного Титана', JSON.stringify(moon));
+  '5 уламків → 30 секунд оборони з чотирьох сторін → зліт станції → Місячний Титан', JSON.stringify(moon));
 
 if (errors.length) {
   for (const error of errors) console.log('  ❌', error);

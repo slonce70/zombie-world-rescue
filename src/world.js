@@ -2750,6 +2750,7 @@ export class World {
   }
 
   _makeEnterableHouse(x, z, ry, opts = {}) {
+    if (this.map.moon) return this._makeMoonHabitat(x, z, ry, opts);
     const rng = this.rng;
     const w = opts.w || rng.range(6.2, 7.6);
     const d = opts.d || rng.range(5.2, 6.2);
@@ -2917,6 +2918,70 @@ export class World {
       const sz = z - (w / 2 - 1.6) * sinR + 0.8 * cosR;
       this.surpriseSpots.push({ x: sx, z: sz });
     }
+    return g;
+  }
+
+  _makeMoonHabitat(x, z, ry, opts = {}) {
+    const w = opts.tall ? 8.4 : 7.2, d = opts.tall ? 6.8 : 6.0, h = opts.tall ? 4.6 : 3.8;
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const shell = toonMat(this.rng.pick([0xe56b5d, 0x4fa8d8, 0xe2b84f, 0x69b978]), 0x30475b, 0.18);
+    const trim = toonMat(0xd8e2ec);
+    const dark = toonMat(0x263544);
+    const glass = toonMat(0x67d5ff, 0x1b83ad, 0.65);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.62, w * 0.68, 0.45, 12), dark);
+    floor.position.y = 0.22;
+    const wallT = 0.22, doorW = 1.8;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, wallT), shell);
+    back.position.set(0, 0.45 + h / 2, d / 2);
+    const left = new THREE.Mesh(new THREE.BoxGeometry(wallT, h, d), shell);
+    left.position.set(-w / 2, 0.45 + h / 2, 0);
+    const right = left.clone(); right.position.x = w / 2;
+    const frontW = (w - doorW) / 2;
+    const frontL = new THREE.Mesh(new THREE.BoxGeometry(frontW, h, wallT), shell);
+    frontL.position.set(-(doorW + frontW) / 2, 0.45 + h / 2, -d / 2);
+    const frontR = frontL.clone(); frontR.position.x *= -1;
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorW, h - 2.5, wallT), shell);
+    lintel.position.set(0, 0.45 + 2.5 + (h - 2.5) / 2, -d / 2);
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.58, w * 0.68, 0.7, 12), trim);
+    roof.position.y = h + 0.8;
+    g.add(floor, back, left, right, frontL, frontR, lintel, roof);
+    // Герметичний шлюз і кольорові ілюмінатори замість земних дверей/вікон.
+    const airlock = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 1.0, 12), dark);
+    airlock.rotation.x = Math.PI / 2;
+    airlock.position.set(0, 1.75, -d / 2 - 0.45);
+    const hatch = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.08, 12), glass);
+    hatch.rotation.x = Math.PI / 2;
+    hatch.position.set(1.45, 1.75, -d / 2 - 0.75);
+    hatch.rotation.y = 1.25;
+    g.add(airlock, hatch);
+    for (const side of [-1, 1]) {
+      const port = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.08, 12), glass);
+      port.rotation.z = Math.PI / 2;
+      port.position.set(side * (w / 2 + 0.05), 2.35, 0);
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.5, 10), trim);
+      tank.position.set(side * (w / 2 + 0.55), 1.55, d * 0.25);
+      g.add(port, tank);
+    }
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, 1.8), toonMat(0x24558a, 0x123a64, 0.3));
+    panel.position.set(0, h + 1.25, 0.3);
+    panel.rotation.x = -0.15;
+    g.add(panel);
+    g.position.set(x, gy, z); g.rotation.y = ry;
+    g.userData.kind = 'moon-habitat';
+    g.userData.shellColor = shell.color.getHex();
+    (this.moonHabitats ||= []).push(g);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.staticGroup.add(g);
+    this.floors.push({ x, z, ry, w: w + 0.4, d: d + 0.4, top: gy + h + 0.45 });
+    const top = gy + h + 1;
+    this._addWallColliders(x, z, ry, -w / 2, -d / 2, w / 2, -d / 2, top, w / 2, doorW + 0.5);
+    this._addWallColliders(x, z, ry, -w / 2, d / 2, w / 2, d / 2, top);
+    this._addWallColliders(x, z, ry, -w / 2, -d / 2, -w / 2, d / 2, top);
+    this._addWallColliders(x, z, ry, w / 2, -d / 2, w / 2, d / 2, top);
+    this.floors.push({ x, z, ry, w: w - 0.2, d: d - 0.2, top: gy + 0.48 });
+    this.lootSpots.push({ x: x + 1, z, y: gy + 0.55, type: opts.surprise ? 'coins' : 'ammo' });
+    if (opts.surprise) this.surpriseSpots.push({ x: x - 1, z });
     return g;
   }
 
@@ -4147,6 +4212,7 @@ export class World {
 
   // ---------- склад зброї (місія 3) ----------
   _buildWarehouse() {
+    if (this.map.moon) return this._buildMoonLaunchStation();
     const { x, z } = this.layout.warehouse;
     const gy = this.groundH(x, z);
     const g = new THREE.Group();
@@ -4224,6 +4290,74 @@ export class World {
     this.scene.add(wg);
     this.weaponCrate = { group: wg, lid, open: 0, opening: false, x: cx, z: cz };
     this._addCollider(cx, cz, 1.1, this.groundH(cx, cz) + 0.9, 0.9);
+  }
+
+  _buildMoonLaunchStation() {
+    const { x, z } = this.layout.warehouse;
+    const gy = this.groundH(x, z);
+    const g = new THREE.Group();
+    const shell = toonMat(0xdce4eb);
+    const trim = toonMat(0x546575);
+    const glass = toonMat(0x59c5ed, 0x177ba5, 0.65);
+    const solar = toonMat(0x214f86, 0x123761, 0.3);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 10, 18), shell);
+    core.position.y = 7;
+    const command = new THREE.Mesh(new THREE.SphereGeometry(3.1, 18, 12), glass);
+    command.scale.y = 0.68;
+    command.position.y = 12.2;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.35, 8, 24), trim);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 7.5;
+    g.add(core, command, ring);
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 0.7), trim);
+      arm.position.set(side * 6.5, 8.2, 0);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(7, 0.18, 4.2), solar);
+      panel.position.set(side * 13, 8.2, 0);
+      const engine = new THREE.Mesh(new THREE.ConeGeometry(1.25, 2.5, 12), trim);
+      engine.position.set(side * 2, 0.8, 0); engine.rotation.x = Math.PI;
+      g.add(arm, panel, engine);
+    }
+    const repairs = [];
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const part = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 1.0), toonMat(0x69d2ff, 0x248db8, 0.45));
+      part.position.set(Math.cos(a) * 3.6, 4 + i * 1.6, Math.sin(a) * 3.6);
+      part.visible = false;
+      g.add(part); repairs.push(part);
+    }
+    const flames = [];
+    for (const sx of [-2, 2]) {
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.9, 6, 12), new THREE.MeshBasicMaterial({ color: 0x65cfff, transparent: true, opacity: 0.85 }));
+      flame.position.set(sx, -3.3, 0); flame.rotation.x = Math.PI; flame.visible = false;
+      g.add(flame); flames.push(flame);
+    }
+    g.position.set(x, gy, z);
+    g.userData.kind = 'moon-space-station';
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.scene.add(g);
+    const colliders = [-2.2, 2.2].map((ox) => ({ x: x + ox, z, r: 3.2, top: gy + 14 }));
+    this.colliders.push(...colliders);
+    this.occluders.push({ x, z, r: 5.5, h: gy + 14 });
+    this.moonStation = { group: g, repairs, flames, colliders, x, z, y: gy, repair: 0, launching: false, speed: 0 };
+  }
+
+  setMoonStationRepair(progress) {
+    const station = this.moonStation;
+    if (!station) return;
+    station.repair = Math.max(station.repair, progress);
+    station.repairs.forEach((part, i) => { part.visible = progress >= (i + 1) / 5; });
+  }
+
+  launchMoonStation() {
+    const station = this.moonStation;
+    if (!station || station.launching) return;
+    this.setMoonStationRepair(1);
+    station.launching = true;
+    station.flames.forEach((flame) => { flame.visible = true; });
+    this.colliders = this.colliders.filter((collider) => !station.colliders.includes(collider));
+    this.occluders = this.occluders.filter((occluder) => Math.hypot(occluder.x - station.x, occluder.z - station.z) > 1);
+    this._buildGrid();
   }
 
   openCrate() {
@@ -4512,6 +4646,13 @@ export class World {
 
   update(dt, playerPos) {
     this.time += dt;
+    if (this.moonStation && this.moonStation.launching) {
+      const station = this.moonStation;
+      station.speed = Math.min(42, station.speed + dt * 9);
+      station.group.position.y += station.speed * dt;
+      station.group.rotation.y += dt * 0.18;
+      station.flames.forEach((flame, i) => { flame.scale.y = 0.8 + Math.abs(Math.sin(this.time * 18 + i)) * 0.45; });
+    }
     if (this.skyGroup && playerPos) this.skyGroup.position.set(playerPos.x, 0, playerPos.z);
     // хмари
     for (const c of this.clouds) {

@@ -65,7 +65,7 @@ export const STORY_DELEGATE_MATCHES = {
   'moon-crew': { preferred: ['rescue'] },
   'moon-relays': { preferred: ['repair'] },
   'moon-defense': { preferred: ['defense'] },
-  'moon-reactor': { preferred: ['barracks'] },
+  'moon-station': { preferred: ['stationrepair'] },
 };
 
 // 📖 Набір місій для СЮЖЕТНОГО рівня. Баг: HUD показує «Врятуй людей із хліва»
@@ -458,8 +458,8 @@ export class StoryMissions {
   }
 
   _objectiveTitle(obj) {
-    if ((obj.id === 'pol-castle' || obj.id === 'deu-barracks' || obj.id === 'tur-rescue-ship' || obj.id === 'esp-manor') && this.delegate) {
-      const type = obj.id === 'pol-castle' ? 'castle' : obj.id === 'deu-barracks' ? 'barracks' : obj.id === 'tur-rescue-ship' ? 'shiprescue' : 'manor';
+    if ((obj.id === 'pol-castle' || obj.id === 'deu-barracks' || obj.id === 'tur-rescue-ship' || obj.id === 'esp-manor' || obj.id === 'moon-station') && this.delegate) {
+      const type = obj.id === 'pol-castle' ? 'castle' : obj.id === 'deu-barracks' ? 'barracks' : obj.id === 'tur-rescue-ship' ? 'shiprescue' : obj.id === 'moon-station' ? 'stationrepair' : 'manor';
       const mission = this.delegate.get(type);
       if (mission && mission.title) return mission.title;
     }
