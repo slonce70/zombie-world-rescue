@@ -12,9 +12,20 @@ const TYPE_INFO = Object.freeze({
   lake: { icon: '💧', name: 'Озеро', radius: 6.5 },
   zombie: { icon: '🧟', name: 'Зомбі', radius: 1 },
   rock: { icon: '🪨', name: 'Камінь', radius: 1.5 },
-  task: { icon: '⭐', name: 'Завдання', radius: 0.8 },
+  task: { icon: '⭐', name: 'Завдання', radius: 8 },
 });
 const SPAWN_CLEAR_RADIUS = 10;
+const MAX_TASKS = 3;
+const QUEST_TYPES = Object.freeze(['rescue', 'collect', 'repair', 'lights', 'elites', 'warehouse']);
+const QUEST_INFO = Object.freeze({
+  rescue: { icon: '🆘', title: 'Врятуй людей у хліві', total: 1 },
+  collect: { icon: '📦', title: 'Збери 4 ящики припасів', total: 4 },
+  repair: { icon: '📡', title: 'Полагодь радіовежу', total: 1 },
+  lights: { icon: '🔦', title: 'Засвіти 3 ліхтарі', total: 3 },
+  elites: { icon: '👹', title: 'Перемож 3 елітних зомбі', total: 3 },
+  warehouse: { icon: '🏭', title: 'Зачисть склад від зомбі', total: 8 },
+});
+const QUEST_SET = new Set(QUEST_TYPES);
 
 export const CUSTOM_COUNTRY = Object.freeze({
   id: 'CUSTOM', name: t('Моя карта'), flag: '🧱', seed: 73421, biome: 'summer',
@@ -34,12 +45,19 @@ export const CUSTOM_COUNTRY = Object.freeze({
 
 export function sanitizeCustomMap(raw) {
   const objects = Array.isArray(raw && raw.objects) ? raw.objects : [];
+  let taskCount = 0;
   return {
     objects: objects.slice(0, MAX_OBJECTS).flatMap((item) => {
       if (!item || !TYPE_SET.has(item.type)) return [];
+      if (item.type === 'task' && taskCount >= MAX_TASKS) return [];
       const x = Number(item.x), z = Number(item.z), ry = Number(item.ry) || 0;
       if (!Number.isFinite(x) || !Number.isFinite(z)) return [];
-      return [{ type: item.type, x: clamp(x, -170, 170), z: clamp(z, -170, 170), ry: clamp(ry, -Math.PI, Math.PI) }];
+      const clean = { type: item.type, x: clamp(x, -170, 170), z: clamp(z, -170, 170), ry: clamp(ry, -Math.PI, Math.PI) };
+      if (item.type === 'task') {
+        clean.quest = QUEST_SET.has(item.quest) ? item.quest : QUEST_TYPES[taskCount % QUEST_TYPES.length];
+        taskCount++;
+      }
+      return [clean];
     }),
   };
 }
@@ -56,6 +74,7 @@ export class CustomMapMode {
     this.done = false;
     this.flyY = 0;
     this.selected = null;
+    this.questIndex = this.data.objects.filter((item) => item.type === 'task').length % QUEST_TYPES.length;
     this.spawned = Object.fromEntries(CUSTOM_MAP_TYPES.map((type) => [type, 0]));
     for (const item of this.data.objects) this._spawn(item);
     if (editor) {
@@ -101,16 +120,78 @@ export class CustomMapMode {
       object = level.zombies.spawn('walker', item.x, item.z, { horde: false });
       object.customPlaced = true;
     } else if (item.type === 'task') {
-      const beam = level.effects.makeBeam(item.x, item.z, 0xffd23f, '⭐');
-      object = { ...item, beam, done: false };
+      object = this._spawnTask(item, y);
       this.tasks.push(object);
     }
     this.spawned[item.type]++;
     return object;
   }
 
+  _spawnTask(item, y) {
+    const { level } = this;
+    const quest = QUEST_SET.has(item.quest) ? item.quest : 'rescue';
+    const task = { ...item, quest, done: false, progress: 0, targets: [], enemies: [] };
+    if (!this.editor) {
+      const addBox = (x, z, color = 0xb08a5a) => {
+        const mesh = new THREE.Group();
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.9), toonMat(color));
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.16, 0.96), toonMat(0xffd23f));
+        box.position.y = band.position.y = 0.36;
+        mesh.add(box, band); mesh.position.set(x, level.world.groundH(x, z), z); level.scene.add(mesh);
+        return { x, z, y: mesh.position.y, mesh, done: false };
+      };
+      if (quest === 'rescue') {
+        task.prop = level.world._makeHouse(item.x, item.z, item.ry, { w: 8, d: 6, h: 3.4 });
+        task.action = { x: item.x, z: item.z + 5 };
+        task.people = [-1.2, 0, 1.2].map((ox) => {
+          const person = new THREE.Group();
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.36, 1.1, 8), toonMat(0x4ea7df));
+          const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), toonMat(0xf0c49b));
+          body.position.y = 0.55; head.position.y = 1.35; person.add(body, head);
+          person.position.set(task.action.x + ox, level.world.groundH(task.action.x + ox, task.action.z + 1.5), task.action.z + 1.5);
+          person.visible = false; level.scene.add(person); return person;
+        });
+      } else if (quest === 'collect') {
+        task.targets = [[-5, -3], [5, -3], [-5, 4], [5, 4]].map(([x, z]) => addBox(item.x + x, item.z + z));
+      } else if (quest === 'repair') {
+        const tower = new THREE.Group();
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 7, 8), toonMat(0x8b949f));
+        const dish = new THREE.Mesh(new THREE.SphereGeometry(1.2, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), toonMat(0x63b7de));
+        mast.position.y = 3.5; dish.position.set(0, 6.3, 0); dish.rotation.x = Math.PI / 2;
+        tower.add(mast, dish); tower.position.set(item.x, y, item.z); level.scene.add(tower);
+        task.prop = tower; task.action = { x: item.x, z: item.z + 2.5 };
+      } else if (quest === 'lights') {
+        task.targets = [[-4, 3], [0, -4], [4, 3]].map(([ox, oz]) => {
+          const mesh = new THREE.Group();
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 2.5, 8), toonMat(0x6f7780));
+          const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), new THREE.MeshBasicMaterial({ color: 0x30363d }));
+          pole.position.y = 1.25; lamp.position.y = 2.65; mesh.add(pole, lamp);
+          const x = item.x + ox, z = item.z + oz; mesh.position.set(x, level.world.groundH(x, z), z); level.scene.add(mesh);
+          return { x, z, mesh, lamp, done: false };
+        });
+      } else if (quest === 'elites') {
+        task.enemies = [0, 1, 2].map((i) => {
+          const a = i * Math.PI * 2 / 3;
+          const zombie = level.zombies.spawn(i === 1 ? 'tank' : 'walker', item.x + Math.cos(a) * 9, item.z + Math.sin(a) * 9, { elite: true, horde: false });
+          zombie.hp = zombie.maxHp = Math.round(zombie.maxHp * 2.2); zombie.customTask = true; return zombie;
+        });
+      } else if (quest === 'warehouse') {
+        task.prop = level.world._makeHouse(item.x, item.z, item.ry, { w: 12, d: 9, h: 4.2 });
+        task.enemies = Array.from({ length: 8 }, (_, i) => {
+          const a = i * Math.PI / 4;
+          const zombie = level.zombies.spawn(i % 4 === 0 ? 'runner' : 'walker', item.x + Math.cos(a) * 10, item.z + Math.sin(a) * 10, { horde: false });
+          zombie.customTask = true; return zombie;
+        });
+      }
+    }
+    const target = this._taskTarget(task) || item;
+    task.beam = level.effects.makeBeam(target.x, target.z, 0xffd23f, QUEST_INFO[quest].icon);
+    return task;
+  }
+
   select(type) {
     if (!this.editor || !TYPE_SET.has(type)) return false;
+    if (type === 'task' && this.selected === 'task') this.questIndex = (this.questIndex + 1) % QUEST_TYPES.length;
     this.selected = type;
     this._renderTools();
     this._syncPreview();
@@ -125,9 +206,10 @@ export class CustomMapMode {
   }
 
   _placementError(type, x, z) {
-    if (Math.abs(x) > 170 || Math.abs(z) > 170) return t('Тут край карти');
-    const spawn = CUSTOM_COUNTRY.map.spawn;
     const radius = TYPE_INFO[type].radius;
+    if (Math.abs(x) > 170 - radius || Math.abs(z) > 170 - radius) return t('Тут край карти');
+    if (type === 'task' && this.data.objects.filter((item) => item.type === 'task').length >= MAX_TASKS) return t('На карті може бути максимум 3 завдання');
+    const spawn = CUSTOM_COUNTRY.map.spawn;
     if (Math.hypot(x - spawn.x, z - spawn.z) < SPAWN_CLEAR_RADIUS + radius) return t('Залиш місце для появи гравця');
     for (const item of this.data.objects) {
       if (Math.hypot(x - item.x, z - item.z) < radius + TYPE_INFO[item.type].radius + 0.5) return t('Тут уже стоїть інший обʼєкт');
@@ -169,8 +251,10 @@ export class CustomMapMode {
       return false;
     }
     const item = { type, x: target.x, z: target.z, ry: player.yaw };
+    if (type === 'task') item.quest = QUEST_TYPES[this.questIndex];
     this.data.objects.push(item);
     this._spawn(item);
+    if (type === 'task') this.questIndex = (this.questIndex + 1) % QUEST_TYPES.length;
     this._renderTools();
     this._syncPreview();
     this.level.game.audio.click();
@@ -235,11 +319,14 @@ export class CustomMapMode {
     const count = document.getElementById('map-editor-count');
     if (count) count.textContent = `${this.data.objects.length}/${MAX_OBJECTS}`;
     const selected = document.getElementById('map-editor-selected');
-    if (selected) selected.textContent = this.selected ? `${TYPE_INFO[this.selected].icon} ${t(TYPE_INFO[this.selected].name)}` : t('нічого');
+    if (selected) selected.textContent = this.selected === 'task'
+      ? `${QUEST_INFO[QUEST_TYPES[this.questIndex]].icon} ${t(QUEST_INFO[QUEST_TYPES[this.questIndex]].title)}`
+      : (this.selected ? `${TYPE_INFO[this.selected].icon} ${t(TYPE_INFO[this.selected].name)}` : t('нічого'));
     const undo = document.getElementById('map-editor-undo');
     if (undo) undo.disabled = !this.data.objects.length;
     for (const button of document.querySelectorAll('[data-map-object]')) {
       button.classList.toggle('on', button.dataset.mapObject === this.selected);
+      if (button.dataset.mapObject === 'task') button.textContent = `6 ${QUEST_INFO[QUEST_TYPES[this.questIndex]].icon} ${t(QUEST_INFO[QUEST_TYPES[this.questIndex]].title)}`;
     }
   }
 
@@ -262,6 +349,73 @@ export class CustomMapMode {
     player.rig.group.visible = false;
   }
 
+  _taskTarget(task) {
+    if (task.done) return null;
+    if (task.quest === 'collect' || task.quest === 'lights') return task.targets.find((target) => !target.done) || null;
+    if (task.quest === 'elites' || task.quest === 'warehouse') {
+      const enemy = task.enemies.find((zombie) => zombie.state !== 'dead' && !zombie.gone);
+      return enemy ? { x: enemy.x, z: enemy.z } : null;
+    }
+    return task.action || task;
+  }
+
+  _finishTask(task, message) {
+    if (task.done) return;
+    task.done = true;
+    task.progress = QUEST_INFO[task.quest].total;
+    task.beam.remove();
+    this.level.audio.mission();
+    this.level.game.hud.toast(t(message || '⭐ Завдання виконано!'));
+  }
+
+  _updateTask(task, dt, input, allowControl) {
+    const { level } = this;
+    const player = level.player;
+    const near = (target, radius = 3.5) => target && Math.hypot(player.pos.x - target.x, player.pos.z - target.z) < radius;
+    if (task.quest === 'rescue' && near(task.action)) {
+      this.prompt = { text: t('Натисни {k} — врятувати людей', { k: interactKey() }), hold: false };
+      if (allowControl && input.pressed('KeyE')) {
+        task.people.forEach((person) => { person.visible = true; });
+        this._finishTask(task, '🆘 Людей врятовано!');
+        input.justPressed.delete('KeyE');
+      }
+    } else if (task.quest === 'collect') {
+      const target = task.targets.find((crate) => !crate.done && near(crate));
+      if (target) {
+        this.prompt = { text: t('Натисни {k} — підібрати ящик', { k: interactKey() }), hold: false };
+        if (allowControl && input.pressed('KeyE')) {
+          target.done = true; task.progress++; level.scene.remove(target.mesh); level.audio.pickup();
+          if (task.progress >= 4) this._finishTask(task, '📦 Усі 4 ящики зібрано!');
+          input.justPressed.delete('KeyE');
+        }
+      }
+    } else if (task.quest === 'repair' && near(task.action)) {
+      this.prompt = { text: t('Тримай {k} — полагодити радіовежу', { k: interactKey() }), hold: true, progress: task.progress };
+      if (allowControl && input.down('KeyE')) {
+        task.progress = Math.min(1, task.progress + dt / 6);
+        if (task.progress >= 1) this._finishTask(task, '📡 Радіовежу полагоджено!');
+      }
+    } else if (task.quest === 'lights') {
+      const target = task.targets.find((lamp) => !lamp.done && near(lamp));
+      if (target) {
+        this.prompt = { text: t('Натисни {k} — засвітити ліхтар', { k: interactKey() }), hold: false };
+        if (allowControl && input.pressed('KeyE')) {
+          target.done = true; task.progress++; target.lamp.material.color.setHex(0xffe066); level.audio.click();
+          if (task.progress >= 3) this._finishTask(task, '🔦 Усі 3 ліхтарі світять!');
+          input.justPressed.delete('KeyE');
+        }
+      }
+    } else if (task.quest === 'elites' || task.quest === 'warehouse') {
+      task.progress = task.enemies.filter((zombie) => zombie.state === 'dead' || zombie.gone).length;
+      if (task.progress >= QUEST_INFO[task.quest].total) this._finishTask(task, task.quest === 'elites' ? '👹 Елітних зомбі переможено!' : '🏭 Склад зачищено!');
+    }
+    const target = this._taskTarget(task);
+    if (target && task.beam.group) {
+      task.beam.group.position.x += (target.x - task.beam.group.position.x) * Math.min(1, dt * 6);
+      task.beam.group.position.z += (target.z - task.beam.group.position.z) * Math.min(1, dt * 6);
+    }
+  }
+
   update(dt, input, allowControl) {
     this.prompt = null;
     if (this.editor) {
@@ -272,16 +426,9 @@ export class CustomMapMode {
       return;
     }
     for (const task of this.tasks) {
+      if (task.done) continue;
       task.beam.update(dt);
-      if (task.done || Math.hypot(this.level.player.pos.x - task.x, this.level.player.pos.z - task.z) >= 4) continue;
-      this.prompt = { text: t('Натисни {k} — виконати завдання', { k: interactKey() }), hold: false };
-      if (allowControl && input.pressed('KeyE')) {
-        task.done = true;
-        task.beam.remove();
-        this.level.audio.mission();
-        this.level.game.hud.toast(t('⭐ Завдання виконано!'));
-      }
-      break;
+      this._updateTask(task, dt, input, allowControl);
     }
     if (!this.done && this.tasks.length && this.tasks.every((task) => task.done)) {
       this.done = true;
@@ -292,12 +439,19 @@ export class CustomMapMode {
   getHudList() {
     if (this.editor) return [{ icon: '🧱', title: t('Літай і став обʼєкти кнопками редактора'), done: false }];
     if (!this.tasks.length) return [{ icon: '🗺️', title: t('Досліджуй власну карту'), done: false }];
-    return this.tasks.map((task, i) => ({ icon: '⭐', title: t('Завдання {n}', { n: i + 1 }), done: task.done }));
+    return this.tasks.map((task) => {
+      const info = QUEST_INFO[task.quest];
+      const progress = info.total > 1 ? ` ${Math.min(info.total, task.progress | 0)}/${info.total}` : '';
+      return { icon: info.icon, title: `${t(info.title)}${progress}`, done: task.done };
+    });
   }
 
   get() { return null; }
 
   getMarkers() {
-    return this.tasks.filter((task) => !task.done).map((task) => ({ x: task.x, z: task.z, icon: '⭐' }));
+    return this.tasks.filter((task) => !task.done).map((task) => {
+      const target = this._taskTarget(task) || task;
+      return { x: target.x, z: target.z, icon: QUEST_INFO[task.quest].icon };
+    });
   }
 }

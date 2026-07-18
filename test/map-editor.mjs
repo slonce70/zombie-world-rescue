@@ -66,13 +66,15 @@ const editor = await page.evaluate(() => {
   g.input.justPressed.clear();
   const points = {
     tree: { x: -24, z: 0 }, lake: { x: -10, z: 0 },
-    zombie: { x: 12, z: 0 }, rock: { x: 24, z: 0 }, task: { x: 0, z: -18 },
+    zombie: { x: 12, z: 0 }, rock: { x: 24, z: 0 },
   };
   for (const [type, point] of Object.entries(points)) mode.place(type, point);
+  for (const point of [{ x: 0, z: -20 }, { x: 45, z: -25 }, { x: -45, z: -25 }]) mode.place('task', point);
   const rejected = {
     spawn: mode.place('rock', { x: 0, z: 55 }),
     overlap: mode.place('tree', { x: -24, z: 0 }),
     edge: mode.place('task', { x: 171, z: 0 }),
+    taskLimit: mode.place('task', { x: 0, z: -55 }),
   };
   mode.save();
   return {
@@ -84,6 +86,7 @@ const editor = await page.evaluate(() => {
     preview: mode.preview.visible,
     toolbar: document.getElementById('map-editor-tools').classList.contains('show'),
     types: g.save.customMap.objects.map((item) => item.type).sort(),
+    quests: g.save.customMap.objects.filter((item) => item.type === 'task').map((item) => item.quest),
     spawned: mode.spawned,
     rejected,
   };
@@ -92,8 +95,9 @@ await page.waitForTimeout(700);
 check(editor.countryId === 'CUSTOM' && editor.toolbar && editor.selectedOnly && editor.selectedButton && editor.preview
   && editor.moves.w.z < 55 && editor.moves.s.z > 55 && editor.moves.a.x < 0 && editor.moves.d.x > 0
   && editor.moves.up.y > 14 && editor.moves.down.y < 14 && Math.abs(editor.moves.fast.z - 55) > Math.abs(editor.moves.w.z - 55)
-  && editor.types.join(',') === 'house,lake,rock,task,tree,zombie'
-  && Object.values(editor.spawned).every((count) => count === 1)
+  && editor.types.join(',') === 'house,lake,rock,task,task,task,tree,zombie'
+  && editor.quests.join(',') === 'rescue,collect,repair'
+  && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => type !== 'task').every(([, count]) => count === 1)
   && Object.values(editor.rejected).every((value) => value === false),
   'W/S/A/D рухають правильно, 1–6/E обирають і ставлять, небезпечні точки відхиляються', JSON.stringify(editor));
 
@@ -102,9 +106,9 @@ await page.evaluate(() => {
   mode.place('tree', { x: 40, z: 40 });
   mode.undo();
 });
-await page.waitForFunction(() => window.__game?.level?.customMap?.editor && window.__game.level.customMap.data.objects.length === 6, null, { timeout: 30000 });
+await page.waitForFunction(() => window.__game?.level?.customMap?.editor && window.__game.level.customMap.data.objects.length === 8, null, { timeout: 30000 });
 const undo = await page.evaluate(() => ({ draft: window.__game.level.customMap.data.objects.length, saved: window.__game.save.customMap.objects.length }));
-check(undo.draft === 6 && undo.saved === 6, '«Скасувати останнє» перебудовує чернетку й не псує збережену карту', JSON.stringify(undo));
+check(undo.draft === 8 && undo.saved === 8, '«Скасувати останнє» перебудовує чернетку й не псує збережену карту', JSON.stringify(undo));
 
 const exitGuard = await page.evaluate(() => {
   const g = window.__game;
@@ -125,20 +129,69 @@ await page.waitForFunction(() => window.__game?.level?.customMap && !window.__ga
 const played = await page.evaluate(() => {
   const g = window.__game;
   const mode = g.level.customMap;
-  const task = mode.tasks[0];
-  g.level.player.pos.set(task.x, g.level.player.pos.y, task.z);
+  const [rescue, collect, repair] = mode.tasks;
+  g.level.player.pos.set(rescue.action.x, g.level.player.pos.y, rescue.action.z);
   g.input.justPressed.add('KeyE');
   mode.update(0.1, g.input, true);
+  g.input.justPressed.clear();
+  for (const crate of collect.targets) {
+    g.level.player.pos.set(crate.x, g.level.player.pos.y, crate.z);
+    g.input.justPressed.add('KeyE');
+    mode.update(0.1, g.input, true);
+    g.input.justPressed.clear();
+  }
+  g.level.player.pos.set(repair.action.x, g.level.player.pos.y, repair.action.z);
+  g.input.keys.add('KeyE');
+  mode.update(6.1, g.input, true);
+  g.input.keys.delete('KeyE');
   return {
     zombies: g.level.zombies.list.filter((zombie) => zombie.customPlaced).length,
-    taskDone: task.done,
+    taskDone: mode.tasks.every((task) => task.done),
+    quests: mode.tasks.map((task) => task.quest),
     mapDone: mode.done,
     hud: mode.getHudList(),
     savedObjects: g.save.customMap.objects.length,
   };
 });
-check(played.zombies === 1 && played.taskDone && played.mapDone && played.hud[0].done && played.savedObjects === 6,
+check(played.zombies === 1 && played.taskDone && played.mapDone && played.hud.every((task) => task.done) && played.savedObjects === 8
+  && played.quests.join(',') === 'rescue,collect,repair',
   'збережена карта запускається, її зомбі живі, а поставлене завдання виконується', JSON.stringify(played));
+
+await page.evaluate(() => {
+  const g = window.__game;
+  g.endLevel();
+  g.save.customMap = { objects: [
+    { type: 'task', quest: 'lights', x: -45, z: -25, ry: 0 },
+    { type: 'task', quest: 'elites', x: 0, z: -25, ry: 0 },
+    { type: 'task', quest: 'warehouse', x: 45, z: -25, ry: 0 },
+  ] };
+  g.startLevel('CUSTOM', { customMap: 'play' });
+});
+await page.waitForFunction(() => window.__game?.level?.customMap?.tasks?.length === 3, null, { timeout: 30000 });
+const combatTasks = await page.evaluate(() => {
+  const g = window.__game;
+  const mode = g.level.customMap;
+  const [lights, elites, warehouse] = mode.tasks;
+  for (const lamp of lights.targets) {
+    g.level.player.pos.set(lamp.x, g.level.player.pos.y, lamp.z);
+    g.input.justPressed.add('KeyE');
+    mode.update(0.1, g.input, true);
+    g.input.justPressed.clear();
+  }
+  for (const zombie of [...elites.enemies, ...warehouse.enemies]) zombie.state = 'dead';
+  mode.update(0.1, g.input, true);
+  return {
+    quests: mode.tasks.map((task) => task.quest),
+    done: mode.tasks.map((task) => task.done),
+    lights: lights.targets.filter((lamp) => lamp.done).length,
+    elites: elites.enemies.length,
+    warehouse: warehouse.enemies.length,
+    mapDone: mode.done,
+  };
+});
+check(combatTasks.quests.join(',') === 'lights,elites,warehouse' && combatTasks.done.every(Boolean)
+  && combatTasks.lights === 3 && combatTasks.elites === 3 && combatTasks.warehouse === 8 && combatTasks.mapDone,
+  'ліхтарі, елітні зомбі та зачистка складу мають окрему робочу логіку', JSON.stringify(combatTasks));
 
 if (errors.length) {
   for (const error of errors) console.log('  ❌', error);
