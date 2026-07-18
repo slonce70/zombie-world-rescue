@@ -76,6 +76,16 @@ const editor = await page.evaluate(() => {
     edge: mode.place('task', { x: 171, z: 0 }),
     taskLimit: mode.place('task', { x: 0, z: -55 }),
   };
+  const solid = {};
+  for (const [type, start, dt] of [['house', 6, 0.4], ['tree', 3, 0.2], ['rock', 3, 0.2]]) {
+    const item = mode.data.objects.find((object) => object.type === type);
+    player.pos.set(item.x, 3, item.z + start);
+    player.yaw = 0;
+    g.input.keys.add('KeyW');
+    mode.update(dt, g.input, true);
+    g.input.keys.delete('KeyW');
+    solid[type] = Math.hypot(player.pos.x - item.x, player.pos.z - item.z);
+  }
   mode.save();
   return {
     countryId: g.level.countryId,
@@ -89,6 +99,7 @@ const editor = await page.evaluate(() => {
     quests: g.save.customMap.objects.filter((item) => item.type === 'task').map((item) => item.quest),
     spawned: mode.spawned,
     rejected,
+    solid,
   };
 });
 await page.waitForTimeout(700);
@@ -98,8 +109,9 @@ check(editor.countryId === 'CUSTOM' && editor.toolbar && editor.selectedOnly && 
   && editor.types.join(',') === 'house,lake,rock,task,task,task,tree,zombie'
   && editor.quests.join(',') === 'rescue,collect,repair'
   && editor.spawned.task === 3 && Object.entries(editor.spawned).filter(([type]) => type !== 'task').every(([, count]) => count === 1)
+  && editor.solid.house > 3 && editor.solid.tree > 1 && editor.solid.rock > 1.6
   && Object.values(editor.rejected).every((value) => value === false),
-  'W/S/A/D рухають правильно, 1–6/E обирають і ставлять, небезпечні точки відхиляються', JSON.stringify(editor));
+  'W/S/A/D рухають правильно, будинки/дерева/каміння тверді, небезпечні точки відхиляються', JSON.stringify(editor));
 
 await page.evaluate(() => {
   const mode = window.__game.level.customMap;

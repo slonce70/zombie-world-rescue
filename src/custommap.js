@@ -77,6 +77,7 @@ export class CustomMapMode {
     this.questIndex = this.data.objects.filter((item) => item.type === 'task').length % QUEST_TYPES.length;
     this.spawned = Object.fromEntries(CUSTOM_MAP_TYPES.map((type) => [type, 0]));
     for (const item of this.data.objects) this._spawn(item);
+    level.world._buildGrid();
     if (editor) {
       level.player.pos.set(0, 14, 55);
       level.player.camera.position.copy(level.player.pos);
@@ -254,6 +255,7 @@ export class CustomMapMode {
     if (type === 'task') item.quest = QUEST_TYPES[this.questIndex];
     this.data.objects.push(item);
     this._spawn(item);
+    this.level.world._buildGrid();
     if (type === 'task') this.questIndex = (this.questIndex + 1) % QUEST_TYPES.length;
     this._renderTools();
     this._syncPreview();
@@ -341,9 +343,11 @@ export class CustomMapMode {
     const speed = (input.down('ShiftLeft') ? 28 : 15) * dt;
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
     const rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
-    player.pos.x = clamp(player.pos.x + (fx * forward + rx * side) * speed, -175, 175);
-    player.pos.z = clamp(player.pos.z + (fz * forward + rz * side) * speed, -175, 175);
-    player.pos.y = clamp(player.pos.y + vertical * speed, 3, 80);
+    const y = clamp(player.pos.y + vertical * speed, 3, 80);
+    const x = clamp(player.pos.x + (fx * forward + rx * side) * speed, -175, 175);
+    const z = clamp(player.pos.z + (fz * forward + rz * side) * speed, -175, 175);
+    const solved = this.level.world.collide(x, z, 0.45, y - 1.6);
+    player.pos.set(solved.x, y, solved.z);
     player.camera.position.copy(player.pos);
     player.camera.rotation.set(player.pitch, player.yaw, 0);
     player.rig.group.visible = false;
