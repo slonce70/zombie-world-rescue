@@ -59,14 +59,16 @@ export class World {
     this._buildLights();
     this._buildSky();
     this._buildTerrain();
-    this._buildRoads();
-    this._buildVegetation();
+    if (!map.custom) this._buildRoads();
+    if (!map.custom) this._buildVegetation();
     this._buildMapStyle();
-    this._buildVillage();
-    this._buildBarn();
-    this._buildTower();
-    this._buildWarehouse();
-    this._buildArena();
+    if (!map.custom) this._buildVillage();
+    if (!map.custom) {
+      this._buildBarn();
+      this._buildTower();
+      this._buildWarehouse();
+      this._buildArena();
+    }
     this._buildLandmarks();
     this._buildFun();
     this._buildClouds();

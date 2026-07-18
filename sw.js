@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v539';
+const CACHE = 'zr-cache-v540';
 
 const SHELL = [
   './',
@@ -14,6 +14,7 @@ const SHELL = [
   './assets/icon-192.png',
   './assets/icon-512.png',
   './src/main.js',
+  './src/custommap.js',
   './src/input.js',
   './src/audio.js',
   './src/world.js',

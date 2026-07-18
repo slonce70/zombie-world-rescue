@@ -122,6 +122,25 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 body.in-level #hud { height: 100dvh; }
 body.in-level #hud { display: block; }
 
+#map-editor-tools {
+  display: none; position: fixed; left: 50%; bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 35; width: min(920px, calc(100vw - 20px));
+  padding: 10px; border: 2px solid rgba(255,210,63,.65); border-radius: 16px;
+  background: rgba(10,18,28,.92); box-shadow: 0 12px 32px rgba(0,0,0,.4); pointer-events: auto;
+}
+#map-editor-tools.show { display: block; }
+.map-editor-title { color: #ffd23f; font-weight: 900; text-align: center; margin-bottom: 8px; }
+.map-editor-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.map-editor-buttons .btn { padding: 8px 11px; font-size: 14px; }
+.map-editor-hint { margin-top: 7px; color: #b9d0e8; font-size: 12px; font-weight: 700; text-align: center; }
+body.map-editor-mode #mission-panel, body.map-editor-mode #ammo, body.map-editor-mode #health { display: none; }
+
+@media (max-width: 700px) {
+  #map-editor-tools { bottom: 6px; padding: 7px; }
+  .map-editor-buttons .btn { padding: 7px 8px; font-size: 12px; }
+  .map-editor-hint { display: none; }
+}
+
 /* приціл */
 #crosshair {
   --gap: 6px;

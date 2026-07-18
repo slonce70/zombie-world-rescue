@@ -514,6 +514,8 @@
         <button id="btn-album" class="btn globe-act">📖 Альбом</button>
         <button id="btn-hq" class="btn globe-act">🏠 База</button>
         <button id="btn-league" class="btn globe-act league-btn">🏆 Ліга</button>
+        <button id="btn-map-editor" class="btn globe-act">🔒 Створювач карт</button>
+        <button id="btn-custom-play" class="btn globe-act" hidden>▶️ Грати власну карту</button>
         <div class="menu-group-title">НАЛАШТУВАННЯ</div>
         <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
         <button id="btn-map-size" class="btn globe-act">🗺️ Карта: Стандартна · 750 м</button>
@@ -710,6 +712,23 @@
   </div>
 
   <!-- Магазин -->
+  <div id="map-editor-tools" aria-label="Створювач карт">
+    <div class="map-editor-title">🧱 СТВОРЮВАЧ КАРТ · <span id="map-editor-count">0/120</span></div>
+    <div class="map-editor-buttons">
+      <button class="btn" data-map-object="house">🏠 Дім</button>
+      <button class="btn" data-map-object="tree">🌲 Дерево</button>
+      <button class="btn" data-map-object="lake">💧 Озеро</button>
+      <button class="btn" data-map-object="zombie">🧟 Зомбі</button>
+      <button class="btn" data-map-object="rock">🪨 Камінь</button>
+      <button class="btn" data-map-object="task">⭐ Завдання</button>
+      <button class="btn map-fly" data-map-fly="up">⬆️ Вгору</button>
+      <button class="btn map-fly" data-map-fly="down">⬇️ Вниз</button>
+      <button id="map-editor-save" class="btn btn-primary">💾 Зберегти</button>
+      <button id="map-editor-exit" class="btn">🚪 Вийти</button>
+    </div>
+    <div class="map-editor-hint">WASD — летіти · Space/Ctrl — вгору/вниз · Shift — швидше · обʼєкт стає перед прицілом</div>
+  </div>
+
   <div id="shop" class="overlay">
     <div class="overlay-card shop-card">
       <div class="shop-header">

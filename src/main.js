@@ -100,6 +100,7 @@ import {
   awardStars, claimStarThresholds, renderVictoryStars,
 } from './ui/endscreens.js';
 import { buildTestApi } from './testapi.js';
+import { CUSTOM_COUNTRY, CustomMapMode, sanitizeCustomMap } from './custommap.js';
 
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
 translateHtml(document.body);
@@ -128,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 539;
+const APP_VERSION = 540;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -434,6 +435,20 @@ class Game {
       this.hq.render();
       this._showOverlay('overlay-hq');
     });
+    document.getElementById('btn-map-editor').addEventListener('click', () => {
+      if (!(this.save.upgrades.mapeditor > 0)) {
+        this.audio.denied();
+        this.hud.toast(t('🔒 Купи Створювач карт у магазині за 10 000 монет'));
+        return;
+      }
+      this.audio.click();
+      this.startLevel('CUSTOM', { customMap: 'edit' });
+    });
+    document.getElementById('btn-custom-play').addEventListener('click', () => {
+      if (!(this.save.customMap && this.save.customMap.objects.length)) return;
+      this.audio.click();
+      this.startLevel('CUSTOM', { customMap: 'play' });
+    });
     // 📖 R4 «Альбом»: колекція друзів (жива) + заглушки скінів/петсів/еліт (наповнення R5)
     const albumBtn = document.getElementById('btn-album');
     if (albumBtn) albumBtn.addEventListener('click', () => {
@@ -634,6 +649,7 @@ class Game {
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, moonRegions: {}, kidMode: null, strongZombies: false, toughZombies: false,
       mapSize: 'standard', mapStyle: 'classic', cloudTs: 0, goal: null,
+      customMap: { objects: [] },
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
       coopRole: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
@@ -692,6 +708,7 @@ class Game {
         // defaults.* посиланнями зі сейва, і дефолти стали б недоступні для merge нижче.
         const nestedDefaults = { stats: defaults.stats, hero: defaults.hero, chapter: defaults.chapter, infected: defaults.infected };
         out = Object.assign(defaults, s);
+        out.customMap = sanitizeCustomMap(out.customMap);
         // F26: глибокий merge дефолтів для вкладених об'єктів (stats/hero/chapter…).
         // Поверхневий Object.assign замінює весь вкладений об'єкт цілком — тож якщо
         // старий сейв має stats БЕЗ нового під-поля, воно лишилось би undefined → NaN.
@@ -1263,7 +1280,7 @@ class Game {
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
-    if (show) document.body.classList.remove('storm-mode', 'no-shop-mode', 'banner-active');
+    if (show) document.body.classList.remove('storm-mode', 'no-shop-mode', 'banner-active', 'map-editor-mode');
     // ховаємо тултип країни при виході з глобуса, щоб «звільнено…» не лишався над рівнем
     if (!show) { const tt = document.getElementById('globe-tooltip'); if (tt) tt.style.display = 'none'; }
     if (show) {
@@ -1295,6 +1312,14 @@ class Game {
       this._refreshWeeklyGoalUI();
       if (this._newVersion) this._onNewVersion(this._newVersion);
       if (this.frontui) this.frontui.render(this.getFrontViewModel());
+      const editorBtn = document.getElementById('btn-map-editor');
+      const playBtn = document.getElementById('btn-custom-play');
+      const editorOwned = this.save.upgrades.mapeditor > 0;
+      if (editorBtn) {
+        editorBtn.textContent = editorOwned ? t('🧱 Створювач карт') : t('🔒 Створювач карт');
+        editorBtn.classList.toggle('locked', !editorOwned);
+      }
+      if (playBtn) playBtn.hidden = !editorOwned || !(this.save.customMap && this.save.customMap.objects.length);
     }
     if (this.coop) this.coop.updateRoomChip();
   }
@@ -2947,7 +2972,10 @@ class Game {
     const victoryNext = document.getElementById('btn-victory-next');
     if (victoryNext) victoryNext.textContent = t('▶️ Далі');
     const moonRegion = countryId === 'MOON' ? getMoonRegion(opts.moonRegion) : null;
-    const rawCountry = COUNTRIES[countryId] || COUNTRIES.UKR;
+    const isCustomEditor = opts.customMap === 'edit';
+    const isCustomPlay = opts.customMap === 'play';
+    const isCustom = isCustomEditor || isCustomPlay;
+    const rawCountry = isCustom ? CUSTOM_COUNTRY : (COUNTRIES[countryId] || COUNTRIES.UKR);
     const baseCountry = moonRegion ? { ...rawCountry, name: moonRegion.name, seed: moonRegion.seed } : rawCountry;
     const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
     const mapStyle = sanitizeMapStyle((opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
@@ -3040,6 +3068,10 @@ class Game {
       ? t('🗼 ОБОРОНА ТУРЕЛІ')
       : isRadiation
       ? t('☢️ РАДІАЦІЯ')
+      : isCustomEditor
+      ? t('🧱 СТВОРЮВАЧ КАРТ')
+      : isCustomPlay
+      ? t('🗺️ МОЯ КАРТА')
       : isDefense
       ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
@@ -3115,13 +3147,15 @@ class Game {
       expedition: sanitizeExpedition(opts.expedition || (coop && coop.spec && coop.spec.ex)),
       operation,
       encounterPlan: operation ? (opts.encounterPlan || null) : null,
-      noGadgets: !!modeRules.noGadgets,
+      noGadgets: isCustomEditor || !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
-      noShop: !!modeRules.noShop,
+      noShop: isCustomEditor || !!modeRules.noShop,
       noBuffs: !!modeRules.noBuffs,
       noPickups: !!modeRules.noPickups,
       noZombiePickups: !!modeRules.noZombiePickups,
       noCoinDrops: !!modeRules.noCoinDrops,
+      customEditor: isCustomEditor,
+      customPlay: isCustomPlay,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
@@ -3130,7 +3164,7 @@ class Game {
     const soloReplay = !operation && !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
-    level.world = new World(level.scene, country.seed, getBiome(countryId), country.map, this._qualityWorldOpts());
+    level.world = new World(level.scene, country.seed, getBiome(isCustom ? 'UKR' : countryId), country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
     // 💸 R3 «Поразка теж платить»: знімок XP на старті — щоб показати ЗДОБУТЕ за забіг на екрані смерті
@@ -3210,7 +3244,11 @@ class Game {
     }
 
     level.zombies = new Zombies(level, this.seed + 2);
-    if (isKnockout) {
+    if (isCustom) {
+      level.customMap = new CustomMapMode(level, this.save.customMap, isCustomEditor);
+      level.missions = level.customMap;
+      document.body.classList.toggle('map-editor-mode', isCustomEditor);
+    } else if (isKnockout) {
       level.knockout = new KnockoutMode(level, knockoutVariant);
       level.missions = level.knockout;
       // 🎲 «Прокачка» у Нокауті: соло-драфт на середині забігу (див. KnockoutMode.update)
@@ -3319,7 +3357,7 @@ class Game {
     }
     if (isInfected && !isGuest) this._seedInfectedThreats(level);
     // 🦙🐶🛴🦘 іграшки рівня (мегабокс гостю створить мережа — позиція від хоста)
-    level.megabox = (isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
+    level.megabox = (isCustom || isGuest || isArena || isPlayground || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isWorldBoss) ? null : new Megabox(level, isStorm ? 8 : null, isStorm ? 8 : null);
     // 🌟 супер-пікап: стан на рівні (спавн — через _trySuperPickup на 2-й місії/елітній хвилі)
     level.superPickup = null;
     level.superSpawned = false;
@@ -3330,7 +3368,7 @@ class Game {
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
-    level.pet = (isPvp || isBank || isHumans || isSoulCollector || isTurretWar || isRadiation) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
+    level.pet = (isCustomEditor || isPvp || isBank || isHumans || isSoulCollector || isTurretWar || isRadiation) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
@@ -3378,7 +3416,7 @@ class Game {
       if (roll < 0.75) return ['speed', 'rage', 'bubble', 'magnet'][Math.floor(Math.random() * 4)];
       return 'grenade';
     };
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation) level.effects.airdropT = Infinity;
+    if (isCustom || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation) level.effects.airdropT = Infinity;
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
@@ -3950,6 +3988,8 @@ class Game {
       }, 50);
     }
     if (this.level) {
+      document.getElementById('map-editor-tools')?.classList.remove('show');
+      document.body.classList.remove('map-editor-mode');
       // standalone-ресурси Effects (оригінал tracerMat, гео монет/снарядів/гранат) обхід сцени
       // нижче не дістає — звільняємо їх явно, поки рівень ще цілий.
       if (this.level.worldBoss && this.level.worldBoss.dispose) this.level.worldBoss.dispose();
@@ -5353,6 +5393,12 @@ class Game {
         const allowControl = (this.input.locked || this.testMode || this.input.touchMode)
           && this.deathT < 0 && alive
           && !(isCoop && (this.paused || this.shop.isOpen));
+        if (this.level.customMap && this.level.customMap.editor) {
+          this.level.missions.update(simDt, this.input, allowControl);
+          this.level.world.update(simDt, this.level.player.pos);
+          this.level.effects.update(simDt);
+          this.level.stats.time += timerDt;
+        } else {
         this.level.player.update(simDt, this.input, allowControl);
         this.level.zombies.update(simDt);
         if (this.level.moonHazards) this.level.moonHazards.update(simDt);
@@ -5397,6 +5443,7 @@ class Game {
             // зайвий екран «торкнись, щоб грати» після кожного респавну
             if (!this.testMode && !this.input.locked && !this.input.touchMode) this._showOverlay('overlay-start');
           }
+        }
         }
       }
       if (this.level.net) this.level.net.update(dt);
