@@ -315,15 +315,18 @@ export class FrontUI {
       : '';
     const restoring = op.countryState && op.countryState.state === 'restoring';
     const countryState = restoring ? 'rebuilding'
-      : (op.countryState && ['threat', 'safe'].includes(op.countryState.state) ? op.countryState.state : 'threat');
-    const statusLabel = op.counterattack ? 'Контратака' : restoring ? 'Відбудова' : STATUS_LABEL[op.status];
+      : (op.countryState && ['threat', 'safe', 'destroyed'].includes(op.countryState.state) ? op.countryState.state : 'threat');
+    const statusLabel = op.countryState && op.countryState.state === 'destroyed' ? 'Критичні руйнування'
+      : op.counterattack ? 'Контратака' : restoring ? 'Відбудова' : STATUS_LABEL[op.status];
     const districts = clamp(op.countryState && op.countryState.restored, 0, 3);
+    const damage = clamp(op.countryState && op.countryState.damage, 0, 3);
+    const population = clamp(op.countryState && op.countryState.population, 0, 100);
     return `<button class="front-operation ${selected ? 'selected' : ''} ${op.recommended ? 'recommended' : ''} status-${esc(op.status)} ${restoring ? 'state-restoring' : ''}" type="button"
       data-operation-id="${esc(op.id)}" aria-pressed="${selected}" ${disabled ? 'disabled' : ''}>
       <span class="front-op-flag">${country.flag}</span>
       <span class="front-op-main">
         <span class="front-op-top"><strong>${template.icon} ${esc(t(template.name))}</strong>${op.recommended ? `<b>${esc(t('РЕКОМЕНОВАНО'))}</b>` : ''}</span>
-        <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))} · 🏘️ ${districts}/3</span>
+        <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))} · 🏘️ ${districts}/3 · 🧱 ${damage}/3 · 👥 ${population}%</span>
         <span class="front-op-desc">${esc(t(template.desc))}</span>
         ${commander}
         ${stageIntel}

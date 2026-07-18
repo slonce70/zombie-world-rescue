@@ -924,13 +924,14 @@ export class DynamicMissions {
   _maybeStartLivingWorld(m) {
     const level = this.level;
     if (this.livingWorld || this.livingWorldOffered || level.mirror || level.storm || level.bossRush || level.infected) return;
-    if (!shouldOfferLivingWorld({
+    const needsRescue = !level.operation && level.frontCountryState && level.frontCountryState.damage > 0;
+    if (!needsRescue && !shouldOfferLivingWorld({
       countryId: level.countryId,
       runIndex: this.runIndex,
       missionIndex: m.slotIndex,
       modeId: level.modeId,
     })) return;
-    const ev = pickLivingWorldEvent({
+    const ev = needsRescue ? { id: 'survivor' } : pickLivingWorldEvent({
       countryId: level.countryId,
       seed: level.country.seed,
       runIndex: this.runIndex,
@@ -1019,6 +1020,10 @@ export class DynamicMissions {
     input.justPressed.delete('KeyE');
     if (live.id === 'survivor') {
       this._spawnLivingWorldWave(live, 4);
+      if (level.game && typeof level.game._applyFrontTransition === 'function') {
+        level.game._applyFrontTransition({ type: 'RESCUE_CIVILIAN', countryId: level.countryId });
+        level.frontCountryState.population = Math.min(100, level.frontCountryState.population + 5);
+      }
       this._completeLivingWorld();
     } else {
       if (live.mesh) { level.scene.remove(live.mesh); live.mesh = null; }

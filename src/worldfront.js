@@ -153,6 +153,35 @@ function cleanRestored(value) {
   return restored;
 }
 
+function cleanWorld(value, liberated = []) {
+  const source = value && typeof value === 'object' ? value : {};
+  const rawCountries = source.countries && typeof source.countries === 'object' ? source.countries : {};
+  const countries = {};
+  for (const country of CAMPAIGN_COUNTRIES) {
+    const raw = rawCountries[country];
+    if (raw && typeof raw === 'object') {
+      countries[country] = {
+        damage: clamp(raw.damage, 0, 3),
+        population: clamp(raw.population, 20, 100, 100),
+      };
+    }
+  }
+  for (const country of cleanCountries(liberated)) {
+    if (!countries[country]) countries[country] = { damage: 0, population: 100 };
+  }
+  return {
+    day: typeof source.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.day) ? source.day : '',
+    countries,
+  };
+}
+
+function elapsedDays(from, to) {
+  if (!from || !to || to <= from) return 0;
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.min(7, Math.floor((end - start) / 864e5)) : 0;
+}
+
 function specialistId(value, rescuedFriends, enforceAvailability) {
   const id = typeof value === 'string' && SPECIALIST_SET.has(value) ? value : 'dispatcher';
   if (id === 'dispatcher' || !enforceAvailability) return id;
@@ -201,6 +230,7 @@ export function createFront({ seed = Date.now(), liberated = [], rescuedFriends 
     activeProject: 'medbay',
     projectProgress: 0,
     restored: {},
+    world: cleanWorld(null, liberated),
     claims: [],
     stats: cleanStats(null),
   };
@@ -270,6 +300,7 @@ export function sanitizeFront(value, context = {}) {
     activeProject,
     projectProgress: clamp(value.projectProgress, 0, 2),
     restored: cleanRestored(value.restored),
+    world: cleanWorld(value.world, context.liberated),
     claims: cleanIds(value.claims, null, MAX_CLAIMS),
     stats: cleanStats(value.stats),
   };
@@ -297,6 +328,10 @@ function cloneFront(front) {
     active: front.active ? { ...front.active, build: front.active.build.slice() } : null,
     projects: { ...front.projects },
     restored: { ...front.restored },
+    world: {
+      day: front.world.day,
+      countries: Object.fromEntries(Object.entries(front.world.countries).map(([id, state]) => [id, { ...state }])),
+    },
     claims: front.claims.slice(),
     stats: { ...front.stats, sent: front.stats.sent.slice() },
   };
@@ -314,7 +349,23 @@ export function applyFrontEvent(value, event = {}) {
     if (!front.stats.firstSeenDay && typeof event.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.day)) {
       front.stats.firstSeenDay = event.day;
     }
-    return changed(front);
+    front.world = cleanWorld(front.world, event.liberated);
+    const days = elapsedDays(front.world.day, event.day);
+    let attacked = false;
+    for (let day = 0; day < days; day++) {
+      const targets = front.board.filter((operation) => operation.status !== 'claimed');
+      if (!targets.length) break;
+      const operation = targets[hash(front.seed, front.generation + day, targets.length, 0x6d2b79f5) % targets.length];
+      const country = front.world.countries[operation.country] || { damage: 0, population: 100 };
+      country.damage = Math.min(3, country.damage + 1);
+      country.population = Math.max(20, country.population - 4 - operation.threat * 2);
+      front.world.countries[operation.country] = country;
+      attacked = true;
+    }
+    if ((days === 0 || attacked) && typeof event.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.day) && event.day >= front.world.day) {
+      front.world.day = event.day;
+    }
+    return changed(front, [], attacked ? 'front.worldAttacked' : '');
   }
 
   const sanitized = sanitizeFront(value, Object.hasOwn(event, 'rescuedFriends') ? { rescuedFriends: event.rescuedFriends } : {});
@@ -400,6 +451,10 @@ export function applyFrontEvent(value, event = {}) {
       }
     }
     front.restored[operation.country] = Math.min(3, (front.restored[operation.country] || 0) + 1);
+    const country = front.world.countries[operation.country] || { damage: 0, population: 100 };
+    country.damage = Math.max(0, country.damage - 1);
+    country.population = Math.min(100, country.population + 8 + operation.threat * 2);
+    front.world.countries[operation.country] = country;
     operation.status = 'claimed';
     front.active = null;
 
@@ -433,6 +488,10 @@ export function applyFrontEvent(value, event = {}) {
     if (counterattackCountry) {
       front.restored[counterattackCountry]--;
       if (!front.restored[counterattackCountry]) delete front.restored[counterattackCountry];
+      const country = front.world.countries[counterattackCountry] || { damage: 0, population: 100 };
+      country.damage = Math.min(3, country.damage + 1);
+      country.population = Math.max(20, country.population - 10);
+      front.world.countries[counterattackCountry] = country;
     }
     const nextBoard = makeBoard(front.seed, front.generation + 1,
       liberated.length ? liberated : front.board.map((operation) => operation.country), counterattackCountry);
@@ -440,6 +499,14 @@ export function applyFrontEvent(value, event = {}) {
     front.generation++;
     front.board = nextBoard;
     return changed(front, [], counterattackCountry ? 'front.counterattack' : 'front.generationAdvanced');
+  }
+
+  if (event.type === 'RESCUE_CIVILIAN') {
+    if (!COUNTRY_SET.has(event.countryId) || !front.world.countries[event.countryId]) return unchanged(sanitized);
+    const country = front.world.countries[event.countryId];
+    if (country.population >= 100) return unchanged(sanitized);
+    country.population = Math.min(100, country.population + 5);
+    return changed(front, [], 'front.civilianRescued');
   }
 
   return unchanged(sanitized);
@@ -467,11 +534,13 @@ export function frontCountryState(value, countryId) {
   const front = sanitizeFront(value);
   if (!front || !COUNTRY_SET.has(countryId)) return null;
   const operation = front.board.find((entry) => entry.country === countryId) || null;
-  let state = front.restored[countryId] ? 'safe' : 'neutral';
+  const world = front.world.countries[countryId] || { damage: 0, population: 100 };
+  let state = world.damage >= 3 ? 'destroyed' : world.damage > 0 ? 'threat' : front.restored[countryId] ? 'safe' : 'neutral';
   if (operation) {
-    if (operation.status === 'completed') state = 'restoring';
+    if (world.damage >= 3) state = 'destroyed';
+    else if (operation.status === 'completed') state = 'restoring';
     else if (operation.status === 'claimed') {
-      state = front.board.every((entry) => entry.status === 'claimed') ? 'safe' : 'restoring';
+      state = world.damage > 0 || !front.board.every((entry) => entry.status === 'claimed') ? 'restoring' : 'safe';
     }
     else state = 'threat';
   }
@@ -481,6 +550,8 @@ export function frontCountryState(value, countryId) {
     threat: operation ? operation.threat : 0,
     restored: front.restored[countryId] || 0,
     outpostLevel: front.restored[countryId] || 0,
+    damage: world.damage,
+    population: world.population,
     operationId: operation ? operation.id : null,
   };
 }

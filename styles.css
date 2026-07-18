@@ -1615,6 +1615,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .front-threat-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .front-marker { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .front-marker.threat { background: var(--front-danger); box-shadow: 0 0 7px var(--front-danger); }
+.front-marker.destroyed { background: #8f2433; box-shadow: 0 0 9px #ff465f; }
 .front-marker.rebuilding { border-radius: 2px; background: var(--front-building); }
 .front-operation.state-restoring { border-color: #f3c64d; background: rgba(243, 198, 77, .09); }
 .front-marker.safe { background: var(--front-safe); }

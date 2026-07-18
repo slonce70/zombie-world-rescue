@@ -188,6 +188,35 @@ test('INIT owns local counters and rejects unavailable specialists', () => {
   assert.equal(result.front.active.specialist, 'dispatcher');
 });
 
+test('living world attacks once per new day and rescuing people changes the country', () => {
+  let front = reduce(null, {
+    type: 'INIT', seed: 910, liberated: ['UKR'], day: '2026-07-17',
+  }).front;
+  assert.deepEqual(front.world.countries.UKR, { damage: 0, population: 100 });
+
+  let result = reduce(front, { type: 'INIT', liberated: ['UKR'], day: '2026-07-18' });
+  front = result.front;
+  assert.equal(front.world.countries.UKR.damage, 1);
+  assert.ok(front.world.countries.UKR.population < 100);
+  assert.ok(result.effects.some((effect) => effect.key === 'front.worldAttacked'));
+
+  const sameDay = reduce(front, { type: 'INIT', liberated: ['UKR'], day: '2026-07-18' }).front;
+  assert.deepEqual(sameDay.world, front.world);
+  const beforeRescue = front.world.countries.UKR.population;
+  front = reduce(front, { type: 'RESCUE_CIVILIAN', countryId: 'UKR' }).front;
+  assert.equal(front.world.countries.UKR.population, Math.min(100, beforeRescue + 5));
+  assert.equal(frontCountryState(front, 'UKR').damage, 1);
+});
+
+test('claiming an operation repairs damage and brings people home', () => {
+  let front = createFront({ seed: 911, liberated: ['UKR'] });
+  front.world.countries.UKR = { damage: 3, population: 40 };
+  assert.equal(frontCountryState(front, 'UKR').state, 'destroyed');
+  front = winAndClaim(front, front.board[0].id).front;
+  assert.equal(front.world.countries.UKR.damage, 2);
+  assert.ok(front.world.countries.UKR.population > 40);
+});
+
 test('active scout reveals commander intel without a Radio Tower level', () => {
   let front = createFront({ seed: 508, liberated: ['UKR', 'POL', 'DEU'], rescuedFriends: ['POL'] });
   const operationId = front.board[0].id;

@@ -20,7 +20,7 @@ import {
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
 } from './expedition.js';
 import {
-  applyFrontEvent, createFront, frontStageConfig, frontViewModel, sanitizeFront,
+  applyFrontEvent, createFront, frontCountryState, frontStageConfig, frontViewModel, sanitizeFront,
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
@@ -129,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 546;
+const APP_VERSION = 547;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1161,6 +1161,7 @@ class Game {
     // 🎁 catch-up продовженого Зоряного шляху (40→65): пропущені по XP рівні видаються разом
     this.progress.grantBacklog();
     this._ensureFront();
+    if (this.save.front) this._applyFrontTransition({ type: 'INIT' });
     sendFrontReturns(this);
     this._showGlobeUI(true);
     // 🌍 ретро-ветеран: перший вхід на глобус із уже повними 12/12 (гра до v303 нічого не
@@ -2388,6 +2389,7 @@ class Game {
       seed: this.seed,
       liberated: this.save.liberated || {},
       rescuedFriends: this.save.friends || {},
+      day: this.gift ? this.gift.dayKey() : new Date().toISOString().slice(0, 10),
     };
   }
 
@@ -2403,6 +2405,8 @@ class Game {
       'front.cycleComplete': '🥚 Покоління фронту завершено!',
       'front.generationAdvanced': '🛰️ Нові операції вже на карті.',
       'front.counterattack': '🚨 Зомбі захопили район незахищеної країни — контратака вже на карті!',
+      'front.worldAttacked': '🚨 Поки тебе не було, зомбі атакували країну: місто пошкоджене, люди чекають допомоги.',
+      'front.civilianRescued': '🆘 Врятована людина повернулася до міста. Населення зростає!',
     };
     return messages[effect.key] || effect.key;
   }
@@ -2486,7 +2490,7 @@ class Game {
     if (!front.active && front.board.every((operation) => operation.status === 'claimed')) {
       this._applyFrontTransition({ type: 'ADVANCE_GENERATION' });
     }
-    this._applyFrontTransition({ type: 'INIT', opened: true, day: new Date().toISOString().slice(0, 10) });
+    this._applyFrontTransition({ type: 'INIT', opened: true });
     this.frontui.open(this.getFrontViewModel());
     return true;
   }
@@ -2637,6 +2641,29 @@ class Game {
       level.scene.add(rig.group);
       level.frontLivingCity.citizens.push({ rig, angle, radius, speed: 0.08 + (i % 3) * 0.025 });
     }
+  }
+
+  _addFrontDamage(level, damageLevel) {
+    const damage = Math.max(0, Math.min(3, damageLevel | 0));
+    if (!damage) return;
+    const village = level.world.layout.village || level.world.layout.SPAWN;
+    const group = new THREE.Group();
+    group.name = 'front-city-damage';
+    const rubble = new THREE.MeshStandardMaterial({ color: 0x665d58, roughness: 1 });
+    const count = damage * 6;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + damage * 0.37;
+      const radius = 9 + (i % 4) * 3.4;
+      const x = village.x + Math.cos(angle) * radius;
+      const z = village.z + Math.sin(angle) * radius;
+      const piece = new THREE.Mesh(new THREE.BoxGeometry(1.2 + (i % 3), 0.5 + (i % 2) * 0.5, 1.4), rubble);
+      piece.position.set(x, level.world.groundH(x, z) + 0.25, z);
+      piece.rotation.set((i % 2) * 0.18, angle, (i % 3 - 1) * 0.22);
+      piece.castShadow = piece.receiveShadow = true;
+      group.add(piece);
+    }
+    level.scene.add(group);
+    level.frontDamage = group;
   }
 
   _addFrontEvacuees(level) {
@@ -3180,6 +3207,7 @@ class Game {
       weekly: opts.weekly || null,
       expedition: sanitizeExpedition(opts.expedition || (coop && coop.spec && coop.spec.ex)),
       operation,
+      frontCountryState: frontCountryState(savedFront, countryId),
       encounterPlan: operation ? (opts.encounterPlan || null) : null,
       noGadgets: isCustomEditor || !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
@@ -3871,6 +3899,7 @@ class Game {
     this.level = level;
     if (savedFront && (level.operation || modeId === 'campaign')) {
       this._addFrontOutpost(level, savedFront.restored[level.countryId] || 0);
+      this._addFrontDamage(level, level.frontCountryState && level.frontCountryState.damage);
     }
     if (level.operation) this._initFrontRuntime(level, savedFront);
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {

@@ -7,6 +7,7 @@ import { frontCountryState } from './worldfront.js';
 import { MOON_REGION_LIST, getMoonRegion, moonRegionFeatures } from './moonregions.js';
 
 const FRONT_GLOBE_COLORS = Object.freeze({
+  destroyed: ['#49151f', '#a7353f'],
   threat: ['#c93455', '#ff7b6d'],
   restoring: ['#d7a62a', '#ffe08a'],
   safe: ['#25aeb8', '#79edf2'],
@@ -303,10 +304,11 @@ export class Globe {
   _frontStatusLine(id) {
     const state = this._frontState(id);
     if (!state) return '';
-    const label = state.state === 'restoring' ? t('відбудова')
+    const label = state.state === 'destroyed' ? t('критичні руйнування')
+      : state.state === 'restoring' ? t('відбудова')
       : state.state === 'safe' ? t('безпечно') : t('загроза');
-    const threat = state.state === 'threat' ? ` ${'⚠️'.repeat(state.threat)}` : '';
-    return `<br>🛰️ ${label}${threat}`;
+    const threat = ['threat', 'destroyed'].includes(state.state) ? ` ${'⚠️'.repeat(state.threat)}` : '';
+    return `<br>🛰️ ${label}${threat}<br>🧱 ${t('Руйнування')}: ${state.damage}/3 · 👥 ${t('Люди')}: ${state.population}%`;
   }
 
   repaint() {
