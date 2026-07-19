@@ -99,6 +99,7 @@ const ELITE_INFO = {
   default: { icon: '👑', color: 0xffd23f },
 };
 const WEEKLY_ELITE_SOURCE_TYPES = new Set(['walker', 'runner', 'headphones', 'boxer', 'mummy', 'imp']);
+const HEAVY_TYPES = new Set(['tank', 'stone', 'moonbrute', 'ironclad', 'robot']);
 
 // 🦁 Бестіарій-колекція (R2-5.3): усі звичайні типи зомбі з TYPE_STATS (включно з 'boss' —
 // його вбивають у кінці кожної глави, тож ціль «усі види» лишається реально досяжною).
@@ -122,6 +123,18 @@ const PILUM_RANGED = { min: 8, max: 42, hold: 0, cd: 2.9, projSpeed: 26, dmg: 20
 // CELL=4 м: будь-яка пара зомбі взаємодіє в межах minD ≤ ~1.7 м, тож 3×3 комірки покривають усіх.
 const SEP_CELL = 4;
 const SKEY = (cx, cz) => (cx + 512) * 4096 + (cz + 512);
+
+// Side the shot came from in zombie-local space. Keeping this mathematical
+// avoids extra hitbox meshes and works for every procedural zombie variant.
+const impactSide = (z, dir) => {
+  if (!dir) return 'front';
+  const yaw = z.rig.group.rotation.y;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const fromX = -dir.x, fromZ = -dir.z;
+  const front = fromX * fx + fromZ * fz;
+  if (Math.abs(front) >= 0.55) return front > 0 ? 'front' : 'back';
+  return fromX * Math.cos(yaw) - fromZ * Math.sin(yaw) > 0 ? 'right' : 'left';
+};
 
 export class Zombies {
   constructor(level, seed = 999) {
@@ -260,6 +273,8 @@ export class Zombies {
       wanderT: this.rng.range(0, 3),
       wx: x, wz: z,
       attackT: -1, didHit: false, attackLockT: 0,
+      staggerT: 0, recoverT: 0,
+      investigateT: 0, investigateX: x, investigateZ: z,
       // Тактична зграя: сусідні зомбі заходять із різних боків, а не шикуються в одну чергу.
       flankLane: (nid % 3) - 1,
       avoidSide: (nid & 1) ? 1 : -1,
@@ -710,7 +725,17 @@ export class Zombies {
       const res = closestRaySeg(origin, dir, this._p0, this._p1);
       if (res.dist < r && res.t > 0.3 && res.t < maxD && (!best || res.t < best.t)) {
         const point = origin.clone().addScaledVector(dir, res.t);
-        best = { zombie: z, t: res.t, point, headshot: point.y > z.y + h * 0.74 };
+        const heightT = clamp((point.y - z.y) / h, 0, 1);
+        const yaw = z.rig.group.rotation.y;
+        const lateral = Math.abs((point.x - z.x) * Math.cos(yaw) - (point.z - z.z) * Math.sin(yaw));
+        const hitZone = heightT >= 0.74 ? 'head'
+          : heightT <= 0.32 ? 'legs'
+            : lateral > r * 0.42 ? 'arms' : 'body';
+        best = {
+          zombie: z, t: res.t, point, hitZone,
+          headshot: hitZone === 'head',
+          impactSide: impactSide(z, dir),
+        };
       }
     }
     return best;
@@ -724,6 +749,8 @@ export class Zombies {
     if (z.type === 'robot') this.level.bus.emit('robotMet'); // 🎓 перша зустріч з роботом → разовий банер
     if (z.elite) this.level.bus.emit('eliteMet'); // 🎓 перший елітний зомбі → разова підказка
     const fire = !!(opts && opts.fire);
+    const hitZone = (opts && opts.hitZone) || (headshot ? 'head' : 'body');
+    const side = (opts && opts.impactSide) || impactSide(z, dir);
     if (z.worldBossShield) amt *= 0.25;
     if (z.worldBossCoreClosed) amt *= 0.35;
     if (z.worldBossCoreOpen) amt *= 1.4;
@@ -832,12 +859,35 @@ export class Zombies {
     // 💥 постріл ФІЗИЧНО відчутний: здригання + нокбек у напрямку пострілу.
     // ВАЖЛИВО: лазер/вогнемет/калюжі б'ють ЩОКАДРУ дрібним amt — такі тіки НЕ дають
     // ні flinch, ні нокбек (інакше зомбі здуває через мапу і морозить у позі). Поріг amt.
-    if (amt >= 5) z.rig.anim.flinchT = 0.18;
+    if (amt >= 5) {
+      z.rig.anim.flinchT = 0.18;
+      z.rig.anim.flinchSide = side;
+      z.lastImpactSide = side;
+    }
+    if (z.type !== 'boss') {
+      if (hitZone === 'legs' && amt >= 3) {
+        z.slowT = Math.max(z.slowT || 0, 1);
+        z.slowMul = Math.min(z.slowMul || 1, 0.8);
+      }
+      const force = Number(opts && opts.impactForce) || 0;
+      const staggerTime = Number(opts && opts.staggerTime) || (force >= 2.5 ? 0.22 : 0);
+      const armInterrupt = hitZone === 'arms' && (amt >= 15 || force >= 1);
+      if (armInterrupt) z.attackLockT = Math.max(z.attackLockT || 0, 0.35);
+      if (!(z.stats && z.stats.stunImmune) && (staggerTime > 0 || armInterrupt)) {
+        z.staggerT = Math.max(z.staggerT || 0, staggerTime || 0.18);
+        z.state = 'stagger';
+        z.throwProj = false;
+        z.didHit = true;
+        z.rig.anim.staggerSide = side;
+        setAnim(z.rig, 'stagger');
+      }
+    }
     if (dir && z.type !== 'boss' && amt >= 3) {
       // важкі майже не зсуваються, дрібнота відлітає далі
       const mass = (z.type === 'tank' || z.type === 'robot' || z.type === 'ironclad') ? 0.3
         : z.type === 'imp' ? 1.7 : 1;
-      const kb = Math.min(3.5, amt * 0.04) * mass;
+      const requested = Number(opts && opts.impactForce) || 0;
+      const kb = (requested > 0 ? Math.min(12, requested) : Math.min(3.5, amt * 0.04)) * mass;
       z.kbX = (z.kbX || 0) + dir.x * kb;
       z.kbZ = (z.kbZ || 0) + dir.z * kb;
     }
@@ -902,10 +952,24 @@ export class Zombies {
     if (z.golden) { z.state = 'flee'; return; } // золотий не нападає — тікає
     z.sleeping = false;
     z.aggroed = true;
-    if (z.state === 'wander') z.state = 'chase';
+    if (z.state === 'wander' || z.state === 'investigate') z.state = 'chase';
     const p = this.level.player;
     const d = Math.hypot(z.x - p.pos.x, z.z - p.pos.z);
     if (d < 42) this.level.audio.shriek(1 - clamp(d / 42, 0, 0.85), z.stats.pitch);
+  }
+
+  hearShot(x, zPos, radius) {
+    const r2 = radius * radius;
+    for (const zombie of this.list) {
+      if (zombie.state === 'dead' || zombie.aggroed) continue;
+      const dx = zombie.x - x, dz = zombie.z - zPos;
+      if (dx * dx + dz * dz > r2) continue;
+      zombie.sleeping = false;
+      zombie.state = 'investigate';
+      zombie.investigateX = x;
+      zombie.investigateZ = zPos;
+      zombie.investigateT = 4;
+    }
   }
 
   // 🪬 шаман воскресає (перша смерть): повне hp + зелено-золотий спалах; добий ще раз
@@ -925,6 +989,7 @@ export class Zombies {
   _kill(z, dir) {
     z.state = 'dead';
     z.deadT = 0;
+    z.rig.anim.deathSide = z.lastImpactSide || impactSide(z, dir);
     setAnim(z.rig, 'die');
     // фінальний удар збиває з ніг: труп ковзає від пострілу (ковзання у dead-блоці update)
     if (dir && z.type !== 'boss') {
@@ -1055,6 +1120,10 @@ export class Zombies {
         get health() { return c.hp; },
       })))
       : players;
+    // Three melee attackers in solo; one extra slot per additional co-op player.
+    // Map keys are the stable player/clone/zombie objects already used as targets.
+    const meleeSlots = new Map();
+    const meleeSlotLimit = 2 + Math.max(1, players.reduce((n, p) => n + (p.health > 0 ? 1 : 0), 0));
 
     // спавн орди хвилями
     this._updateHordeWaves(dt, players, player);
@@ -1147,6 +1216,18 @@ export class Zombies {
       const dxP = tp.x - z.x, dzP = tp.z - z.z;
       const dyP = Math.abs((tp.y ?? z.y) - z.y);
       const st = z.stats;
+      const attackKey = tgt && (tgt.clone || tgt.zombie || tgt);
+      const usesMeleeSlot = attackKey && z.type !== 'boss' && !z.ranged;
+      if (usesMeleeSlot && z.state === 'attack' && !z.throwProj) {
+        meleeSlots.set(attackKey, (meleeSlots.get(attackKey) || 0) + 1);
+      }
+      let barricadeHit = null;
+      if (z.state === 'chase' && !z.ranged && z.stuckT >= 0.8 && this.world.hitTestDestructible && distP > 0.01) {
+        this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
+        this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
+        const hit = this.world.hitTestDestructible(this._p0, this._p1, st.attackR * 1.25);
+        if (hit && hit.destructible.type === 'barricade') barricadeHit = hit;
+      }
       if (z.rangedCd > 0) z.rangedCd -= dt;
 
       // 🌙 вночі зомбі помічають здалеку; 🌪️ у піщану бурю — ближче (чесно: і зомбі,
@@ -1210,7 +1291,33 @@ export class Zombies {
       }
 
       // --- стани ---
-      if (z.state === 'wander') {
+      if (z.state === 'stagger') {
+        z.staggerT = Math.max(0, (z.staggerT || 0) - dt);
+        if (z.staggerT === 0) {
+          z.state = 'recover';
+          z.recoverT = Math.max(z.recoverT || 0, 0.16);
+        }
+      } else if (z.state === 'recover') {
+        z.recoverT = Math.max(0, (z.recoverT || 0) - dt);
+        if (z.recoverT === 0) z.state = z.aggroed ? 'chase' : 'wander';
+      } else if (z.state === 'investigate') {
+        z.investigateT = Math.max(0, (z.investigateT || 0) - dt);
+        if (playerAlive && distP < st.aggro * nightAggro) {
+          z.state = 'chase';
+          this._aggro(z);
+        } else if (z.investigateT === 0 || Math.hypot(z.investigateX - z.x, z.investigateZ - z.z) < 1) {
+          z.state = 'wander';
+          z.wanderT = 0;
+        }
+      } else if (z.state === 'approach') {
+        if (!playerAlive) {
+          z.state = 'wander';
+          z.aggroed = z.horde;
+        } else if (!usesMeleeSlot || distP > st.attackR * 1.5
+          || (meleeSlots.get(attackKey) || 0) < meleeSlotLimit) {
+          z.state = 'chase';
+        }
+      } else if (z.state === 'wander') {
         if (playerAlive && (distP < st.aggro * nightAggro || z.aggroed)) {
           z.state = 'chase';
           this._aggro(z);
@@ -1229,7 +1336,15 @@ export class Zombies {
         if (!playerAlive) {
           z.state = 'wander';
           z.aggroed = z.horde;
-        } else if (distP < st.attackR && dyP < 2.8 && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
+        } else if (barricadeHit && !(z.attackLockT > 0)) {
+          z.state = 'attack';
+          z.attackT = 0;
+          z.didHit = false;
+          z.throwProj = false;
+          z.attackDestructible = barricadeHit;
+          setAnim(rig, 'attack');
+        } else if (distP < st.attackR && dyP <= 1.4 && z.telegraph <= 0 && z.charging <= 0
+          && !(z.attackLockT > 0) && (!usesMeleeSlot || (meleeSlots.get(attackKey) || 0) < meleeSlotLimit)) {
           // мелі тільки з прямою видимістю — крізь стіни бити не можна
           this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
           this._p1.set(dxP, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dzP).normalize();
@@ -1239,8 +1354,15 @@ export class Zombies {
             z.attackT = 0;
             z.didHit = false;
             z.throwProj = false;
+            z.attackDestructible = null;
             setAnim(rig, 'attack');
+            if (usesMeleeSlot) meleeSlots.set(attackKey, (meleeSlots.get(attackKey) || 0) + 1);
           }
+        } else if (usesMeleeSlot && distP < st.attackR * 1.35 && dyP <= 1.4
+          && (meleeSlots.get(attackKey) || 0) >= meleeSlotLimit) {
+          z.state = 'approach';
+          z.approachLane = HEAVY_TYPES.has(z.type) ? 0
+            : z.type === 'runner' ? (z.avoidSide || 1) : (z.flankLane || z.avoidSide || 1);
         } else if (z.ranged && z.rangedCd <= 0 && distP >= z.ranged.min && distP <= z.ranged.max
           && z.telegraph <= 0 && z.charging <= 0 && !(z.attackLockT > 0)) {
           // кидок сніжки, якщо є пряма видимість
@@ -1252,6 +1374,7 @@ export class Zombies {
             z.attackT = 0;
             z.didHit = false;
             z.throwProj = true;
+            z.attackDestructible = null;
             z.rangedCd = z.ranged.cd;
             setAnim(rig, 'attack');
           } else {
@@ -1271,7 +1394,14 @@ export class Zombies {
         z.attackT += dt / 0.55;
         if (!z.didHit && z.attackT > 0.45) {
           z.didHit = true;
-          if (z.throwProj) {
+          if (z.attackDestructible) {
+            const hit = z.attackDestructible;
+            z.attackDestructible = null;
+            if (!hit.destructible.destroyed) {
+              this.world.damageDestructible(hit, Math.max(8, st.dmg * this.diff.dmg), hit.point);
+              level.audio.zattack(1);
+            }
+          } else if (z.throwProj) {
             z.throwProj = false;
             if (playerAlive) {
               const from = new THREE.Vector3(z.x, z.y + z.rig.height * 0.78, z.z);
@@ -1283,7 +1413,7 @@ export class Zombies {
                 z.ranged.projSpeed, z.ranged.size, z.ranged.color || 0);
               level.audio.throwWhoosh(1 - clamp(distP / 40, 0, 0.8));
             }
-          } else if (playerAlive && distP < st.attackR * 1.35) {
+          } else if (playerAlive && this._canMeleeContact(z, tp, st.attackR)) {
             const confusedBonus = z.confusedT > 0 ? (z.confusedDmgBonus || 0) : 0;
             const damage = (z.type === 'stone' || z.type === 'moonbrute' ? st.dmg : st.dmg * this.diff.dmg) + confusedBonus;
             const hit = this._hurt(tgt, damage, z.x, z.z, st.hitStun || 0, z.y);
@@ -1299,13 +1429,14 @@ export class Zombies {
           }
         }
         if (z.attackT >= 1) {
-          z.state = 'chase';
-          setAnim(rig, 'walk');
+          z.state = 'recover';
+          z.recoverT = z.throwProj ? 0.12 : 0.18;
+          setAnim(rig, 'idle');
         }
       }
 
       // --- 🐂 торо (charger, не-бос): телеграф → ривок рогами здаля ---
-      if (z.charger && z.type !== 'boss' && z.state !== 'dead' && z.aggroed) {
+      if (z.charger && z.type !== 'boss' && z.state !== 'dead' && z.state !== 'stagger' && z.state !== 'recover' && z.aggroed) {
         this._updateChargerAI(z, dt, distP, dxP, dzP, tp, playerAlive, tgt);
       }
 
@@ -1529,7 +1660,7 @@ export class Zombies {
       const cs = 13;
       z.x += z.chargeDX * cs * dt;
       z.z += z.chargeDZ * cs * dt;
-      if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.3 && !z.didHit) {
+      if (playerAlive && this._canMeleeContact(z, tp, 2.3, z.chargeDX, z.chargeDZ) && !z.didHit) {
         z.didHit = true;
         this._hurt(tgt, 20 * this.diff.dmg, z.x, z.z, 0, z.y);
         level.audio.slam();
@@ -1644,7 +1775,7 @@ export class Zombies {
       const cs = 15;
       z.x += z.chargeDX * cs * dt;
       z.z += z.chargeDZ * cs * dt;
-      if (playerAlive && Math.hypot(tp.x - z.x, tp.z - z.z) < 2.6 && !z.didHit) {
+      if (playerAlive && this._canMeleeContact(z, tp, 2.6, z.chargeDX, z.chargeDZ) && !z.didHit) {
         z.didHit = true;
         this._hurt(tgt, 34 * this.diff.dmg, z.x, z.z, 0, z.y);
         level.audio.slam();
@@ -1682,6 +1813,22 @@ export class Zombies {
       targetX = z.x - dxP;
       targetZ = z.z - dzP;
       spd = 6.2;
+    } else if (z.state === 'investigate') {
+      targetX = z.investigateX;
+      targetZ = z.investigateZ;
+      spd = st.speed;
+    } else if (z.state === 'approach') {
+      const lane = z.approachLane || 0;
+      if (lane && distP > 0.01) {
+        const orbit = st.attackR * (z.type === 'runner' ? 1.15 : 0.9);
+        targetX = tp.x + (-dzP / distP) * lane * orbit;
+        targetZ = tp.z + (dxP / distP) * lane * orbit;
+        spd = st.chaseSpeed * 0.75;
+      } else if (distP > st.attackR * 0.9) {
+        targetX = tp.x;
+        targetZ = tp.z;
+        spd = st.chaseSpeed * 0.45;
+      }
     } else if (z.state === 'chase') {
       if (z.type === 'boss' && z.leashed) {
         targetX = this.L.arena.x; targetZ = this.L.arena.z;
@@ -1807,32 +1954,25 @@ export class Zombies {
     const movedD = Math.hypot(movedX, movedZ);
     moving = spd > 0 && movedD > 1e-4;
 
-    // Якщо прямий крок кілька кадрів поспіль не дає прогресу, не завмираємо:
-    // коротко йдемо дотично до перешкоди. Якщо й цей бік замкнений — міняємо його.
+    // 0.8с без прогресу — боковий обхід; 1.8с — міняємо бік і локальну flank-ціль.
     if (z.state === 'chase' && spd > 0 && targetX !== null && !z.charging && !z.telegraph) {
       const tx = targetX - startX, tz = targetZ - startZ;
       const td = Math.hypot(tx, tz);
       const expected = spd * dt;
       const progress = td > 0.01 ? (movedX * tx + movedZ * tz) / td : movedD;
-      if (!avoiding && expected > 0.001 && progress < expected * 0.18) z.stuckT = (z.stuckT || 0) + dt;
+      if (expected > 0.001 && progress < expected * 0.18) z.stuckT = (z.stuckT || 0) + dt;
       else z.stuckT = Math.max(0, (z.stuckT || 0) - dt * 2);
-      if (z.stuckT > 0.28) {
+      if (!avoiding && z.stuckT >= 0.8) {
         z.avoidT = 1.25;
-        z.stuckT = 0;
       }
-      if (avoiding && expected > 0.001 && movedD < expected * 0.14) {
-        z.avoidBlockedT = (z.avoidBlockedT || 0) + dt;
-        if (z.avoidBlockedT > 0.24) {
-          z.avoidSide = -(z.avoidSide || 1);
-          z.avoidT = 1.25;
-          z.avoidBlockedT = 0;
-        }
-      } else {
-        z.avoidBlockedT = 0;
+      if (z.stuckT >= 1.8) {
+        z.avoidSide = -(z.avoidSide || 1);
+        z.flankLane = -(z.flankLane || z.avoidSide);
+        z.avoidT = 1.25;
+        z.stuckT = 0.8;
       }
     } else {
       z.stuckT = 0;
-      z.avoidBlockedT = 0;
     }
 
     // --- поворот і анімація ---
@@ -1854,6 +1994,8 @@ export class Zombies {
     if (z.state !== 'attack') {
       if (z.telegraph > 0) {
         setAnim(rig, 'cheer'); // махає руками — телеграф чарджу
+      } else if (z.state === 'stagger') {
+        setAnim(rig, 'stagger');
       } else if (moving) {
         setAnim(rig, spd > 4 || z.charging > 0 ? 'run' : 'walk');
         rig.anim.speed = z.charging > 0 ? 14 : spd;
@@ -2000,6 +2142,18 @@ export class Zombies {
   }
 
   // шкода гравцю: у коопі — через мережу (хост), соло — напряму
+  _canMeleeContact(z, tp, range, faceX, faceZ) {
+    const dx = tp.x - z.x, dz = tp.z - z.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > range || Math.abs((tp.y ?? z.y) - z.y) > 1.4) return false;
+    const fx = faceX === undefined ? -Math.sin(z.rig.group.rotation.y) : faceX;
+    const fz = faceZ === undefined ? -Math.cos(z.rig.group.rotation.y) : faceZ;
+    if (dist > 0.001 && (dx * fx + dz * fz) / dist < 0.45) return false;
+    this._p0.set(z.x, z.y + z.rig.height * 0.6, z.z);
+    this._p1.set(dx, (tp.y + 1.0) - (z.y + z.rig.height * 0.6), dz).normalize();
+    return this.world.shotBlockDist(this._p0, this._p1, dist) > dist - 0.35;
+  }
+
   _hurt(tgt, dmg, fx, fz, stun = 0, fy = null) {
     if (!tgt) return false;
     if (tgt.zombie) {
@@ -2199,7 +2353,7 @@ export class Zombies {
         continue;
       }
       const b = z.netB || 0;
-      const state = b & ZS_MASK; // 0 wander 1 chase 2 attack 3 dead 4 flee
+      const state = b & ZS_MASK; // 0 wander 1 chase 2 attack 3 dead 4 flee 5 stagger 6 recover
       const charging = (b & ZF.CHARGING) !== 0;
       const telegraph = (b & ZF.TELEGRAPH) !== 0;
       if (z.netT) {
@@ -2239,6 +2393,8 @@ export class Zombies {
       if (state === 2) {
         if (rig.anim.mode !== 'attack') setAnim(rig, 'attack');
         else if (rig.anim.attackT >= 1) { rig.anim.attackT = 0; }
+      } else if (state === 5) {
+        setAnim(rig, 'stagger');
       } else if (telegraph) {
         setAnim(rig, 'cheer');
       } else if (moving) {

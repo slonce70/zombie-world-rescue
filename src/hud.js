@@ -41,6 +41,7 @@ export class HUD {
       vignette: $('vignette'),
       healGlow: $('heal-glow'),
       hitmarker: $('hitmarker'),
+      damageDirection: $('damage-direction'),
       bossbar: $('bossbar'),
       bossFill: $('boss-fill'),
       hordeCounter: $('horde-counter'),
@@ -73,6 +74,7 @@ export class HUD {
     this._bnQueue = [];
     this._hintPending = new Set(); // 🎓 hintOnce-ключі, що чекають показу в черзі
     this.hitT = 0;
+    this.damageDirT = 0;
     this.vignetteT = 0;
     this.lastHealth = 100;
     this.minimapT = 0;
@@ -85,8 +87,8 @@ export class HUD {
   }
 
   wire(bus) {
-    bus.on('hitmarker', (crit) => this.hitmarker(crit));
-    bus.on('playerHurt', () => this.damageFlash());
+    bus.on('hitmarker', (crit, _weapon, zone) => this.hitmarker(crit, zone));
+    bus.on('playerHurt', (hit) => this.damageFlash(hit));
     bus.on('toast', (text) => this.toast(text));
     bus.on('missionDone', (m) => {
       this.banner(t('✅ МІСІЮ ВИКОНАНО!'), t('{title} · +{r} монет 💰', { title: m.title, r: m.reward }));
@@ -242,16 +244,22 @@ export class HUD {
     }, dur * 1000);
   }
 
-  hitmarker(crit) {
-    this.el.hitmarker.classList.remove('show', 'crit');
+  hitmarker(crit, zone = 'body') {
+    this.el.hitmarker.classList.remove('show', 'crit', 'arms', 'legs', 'armor');
     void this.el.hitmarker.offsetWidth;
     this.el.hitmarker.classList.add('show');
     if (crit) this.el.hitmarker.classList.add('crit');
+    else if (zone !== 'body') this.el.hitmarker.classList.add(zone);
     this.hitT = 0.18;
   }
 
-  damageFlash() {
+  damageFlash(hit) {
     this.vignetteT = 0.7;
+    if (hit && Number.isFinite(hit.angle) && this.el.damageDirection) {
+      this.el.damageDirection.style.transform = `translate(-50%, -50%) rotate(${hit.angle}rad)`;
+      this.el.damageDirection.classList.add('show');
+      this.damageDirT = 0.65;
+    }
   }
 
   // 🌟 золотий екранний спалах при активації супер-сили (самодостатній оверлей)
@@ -512,7 +520,11 @@ export class HUD {
     // хітмаркер
     if (this.hitT > 0) {
       this.hitT -= dt;
-      if (this.hitT <= 0) this.el.hitmarker.classList.remove('show', 'crit');
+      if (this.hitT <= 0) this.el.hitmarker.classList.remove('show', 'crit', 'arms', 'legs', 'armor');
+    }
+    if (this.damageDirT > 0) {
+      this.damageDirT -= dt;
+      if (this.damageDirT <= 0) this.el.damageDirection.classList.remove('show');
     }
 
     // бос

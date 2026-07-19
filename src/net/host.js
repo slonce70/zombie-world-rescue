@@ -16,6 +16,12 @@ const REMOTE_PROJECTILE_ORIGIN_MAX = 8;
 // санітизація вхідної шкоди від гостя: завжди скінченне число в розумних межах
 // (родинний кооп довіряє гостю, але NaN/Infinity/абсурд не мають псувати стан хоста)
 const clampDmg = (v) => Math.max(0, Math.min(2000, Number(v) || 0));
+const HIT_ZONES = new Set(['head', 'arms', 'legs', 'body']);
+const clampHitMeta = (h) => ({
+  hitZone: HIT_ZONES.has(h[5]) ? h[5] : (h[2] ? 'head' : 'body'),
+  impactForce: Math.max(0, Math.min(12, Number(h[6]) || 0)),
+  staggerTime: Math.max(0, Math.min(1.5, Number(h[7]) || 0)),
+});
 const isVec3 = (a) => Array.isArray(a) && a.length >= 3
   && isFinite(a[0]) && isFinite(a[1]) && isFinite(a[2]);
 
@@ -37,6 +43,7 @@ export class HostNet {
     this._tmpV = new THREE.Vector3();
     this._hostShotCd = 0;
     this._fountainAt = new Map(); // pid -> час останнього fountain (анти-флуд декору)
+    this._destroyedWorldIds = new Set((level.world.destructibles || []).filter((d) => d.destroyed).map((d) => d.id));
 
     // адаптер власного гравця для AI-циклів (level.players)
     const p = level.player;
@@ -148,6 +155,22 @@ export class HostNet {
         return true;
       }
       case 'shot': return (this._onShot(from, d), true);
+      case 'dh': {
+        const rp = this.remotes.get(from);
+        const id = Number.isInteger(d.id) ? d.id : -1;
+        const target = level.world.destructibles?.[id];
+        if (!rp || !target || target.destroyed) return true;
+        const weaponId = idxToWeapon(d.w);
+        const w = WEAPONS[weaponId] || WEAPONS.pistol;
+        const reach = ((w.pellets ? 45 : (w.range || 140))) + 30;
+        const pos = target.mesh.getWorldPosition(this._tmpV);
+        if (Math.hypot(pos.x - rp.pos.x, pos.z - rp.pos.z) > reach) return true;
+        if (level.world.damageDestructible(id, clampDmg(d.dmg))) {
+          this._destroyedWorldIds.add(id);
+          this.ev('dx', id);
+        }
+        return true;
+      }
       case 'nade': {
         const o = d.o, v = d.v;
         if (!isVec3(o) || !isVec3(v)) return true;
@@ -265,7 +288,12 @@ export class HostNet {
         const dir = this._tmpV.set(zb.x - (rp ? rp.pos.x : 0), 0, zb.z - (rp ? rp.pos.z : 0));
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
-        zb.damage(clampDmg(h[1]), dir, !!h[2], w.flame ? { fire: true } : undefined);
+        // [5..7] are additive Combat Reborn metadata; old 3/5-field hit arrays
+        // still resolve to the legacy head/body behavior. Weapon comes from d.w,
+        // never from guest-provided hit metadata, so the host remains authoritative.
+        const opts = { weaponId, ...clampHitMeta(h) };
+        if (w.flame) opts.fire = true;
+        zb.damage(clampDmg(h[1]), dir, !!h[2], opts);
         // 💫 гаджет «Оглушливі кулі» гостя: оглушуємо лише з пістолета/магнума
         if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead' && !(zb.stats && zb.stats.stunImmune)) zb.stunT = h[4] === 1 ? 1 : 0.5;
       }
@@ -444,6 +472,12 @@ export class HostNet {
 
     // ⛈️👑 кооп-виживання: якщо впала ВСЯ команда — забіг завершено для всіх
     const level = this.level;
+    for (const d of level.world.destructibles || []) {
+      if (d.destroyed && !this._destroyedWorldIds.has(d.id)) {
+        this._destroyedWorldIds.add(d.id);
+        this.ev('dx', d.id);
+      }
+    }
     const run = level.storm || level.bossRush;
     if (run && !run.over) {
       // D4: виключаємо «привидів» — гостей, чий останній пакет старший за 8 с.
@@ -564,6 +598,7 @@ export class HostNet {
       crate: level.world.crateOpened ? 1 : 0,
       tower: level.world.towerFixed ? 1 : 0,
       barrelsGone: (eff.barrels || []).map((b, i) => (b.exploded ? i : -1)).filter((i) => i >= 0),
+      destructiblesGone: (level.world.destructibles || []).filter((d) => d.destroyed).map((d) => d.id),
       walls: level.gadgets.walls.map((w) => [w.nid, w.x, w.z, w.yaw, Math.round(w.hp)]),
       tramps: level.gadgets.tramps.map((t) => [t.nid, t.pad.x, t.pad.z]),
       turrets: level.gadgets.turrets.map((t) => [t.nid, t.ownerPid, r1(t.x), r1(t.z)]),

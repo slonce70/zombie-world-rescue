@@ -129,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 548;
+const APP_VERSION = 549;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -571,6 +571,22 @@ class Game {
     });
     this._applyMapStyle();
 
+    const cameraShakeBtn = document.getElementById('btn-camera-shake');
+    if (cameraShakeBtn) cameraShakeBtn.addEventListener('click', () => {
+      this.save.cameraShake = !this.save.cameraShake;
+      this.saveGame();
+      this._applyCombatSettings();
+      this.audio.click();
+    });
+    const reducedFlashesBtn = document.getElementById('btn-reduced-flashes');
+    if (reducedFlashesBtn) reducedFlashesBtn.addEventListener('click', () => {
+      this.save.reducedFlashes = !this.save.reducedFlashes;
+      this.saveGame();
+      this._applyCombatSettings();
+      this.audio.click();
+    });
+    this._applyCombatSettings();
+
     // 🐣 Режим Малюк: за замовчуванням УВІМКНЕНО на телефоні, ВИМКНЕНО на десктопі.
     // kidMode === null/undefined → ще не обрано вручну → беремо тип пристрою.
     // Щойно дитина/батько торкнеться кнопки, вибір стає явним (true/false) і більше не перезаписується.
@@ -669,6 +685,7 @@ class Game {
       pets: [], activePet: null,
       towerSkins: ['default'], activeTowerSkin: 'default',
       missionRuns: {}, moonRegions: {}, kidMode: null, strongZombies: false, toughZombies: false,
+      cameraShake: true, reducedFlashes: false,
       mapSize: 'standard', mapStyle: 'classic', cloudTs: 0, goal: null,
       customMap: { biome: 'summer', objects: [] }, customMap2: { biome: 'summer', objects: [] }, customMapSlot: 0,
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
@@ -923,6 +940,8 @@ class Game {
         if (out.weeklyCamp !== null && (typeof out.weeklyCamp !== 'object' || Array.isArray(out.weeklyCamp))) out.weeklyCamp = null;
         out.strongZombies = !!out.strongZombies;
         out.toughZombies = !!out.toughZombies;
+        out.cameraShake = out.cameraShake !== false;
+        out.reducedFlashes = out.reducedFlashes === true;
         out.mapSize = sanitizeMapSize(out.mapSize);
         out.mapStyle = sanitizeMapStyle(out.mapStyle);
         // 🎭 кооп-роль: лише з білого списку (зіпсоване/чуже → null, без ролі)
@@ -1069,6 +1088,15 @@ class Game {
     this.save.mapStyle = style;
     const btn = document.getElementById('btn-map-style');
     if (btn) btn.textContent = t('🌍 Вид карти: {style}', { style: MAP_STYLE_LABELS[style] });
+  }
+
+  _applyCombatSettings() {
+    const shake = this.save.cameraShake !== false;
+    const flashes = this.save.reducedFlashes === true;
+    const shakeBtn = document.getElementById('btn-camera-shake');
+    const flashesBtn = document.getElementById('btn-reduced-flashes');
+    if (shakeBtn) shakeBtn.textContent = shake ? t('📳 Тряска камери: увімк') : t('📳 Тряска камери: викл');
+    if (flashesBtn) flashesBtn.textContent = flashes ? t('✨ Зменшені спалахи: увімк') : t('✨ Зменшені спалахи: викл');
   }
 
   // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (м'яка допомога з прицілом + CSS)
@@ -3624,6 +3652,12 @@ class Game {
       for (const w of [...level.gadgets.walls]) {
         if (Math.hypot(w.x - x, w.z - z) < r) level.gadgets.damageWall(w, baseDmg);
       }
+      for (const destructible of level.world.destructibles || []) {
+        if (destructible.destroyed) continue;
+        const pos = destructible.mesh.getWorldPosition(new THREE.Vector3());
+        const d = Math.hypot(pos.x - x, pos.z - z);
+        if (d < r) level.world.damageDestructible(destructible, Math.round(baseDmg * (1 - d / r * 0.55)), pos);
+      }
       for (const zb of [...level.zombies.list]) {
         if (zb.state === 'dead') continue;
         const d = Math.hypot(zb.x - x, zb.z - z);
@@ -3637,7 +3671,7 @@ class Game {
             level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), dmg, false);
           }
           zb.lastHitBy = ownerPid; // чесний кіл-кредит за вибухове добивання
-          zb.damage(dmg, null, false);
+          zb.damage(dmg, null, false, { weaponId: 'explosion', hitZone: 'body', impactForce: 8, staggerTime: 0.45 });
         }
       }
       const missionEngine = level.missions && (level.missions.delegate || level.missions);

@@ -45,6 +45,8 @@ export class GuestNet {
   myPid() { return this.session.myPid; }
 
   // ---------- наміри (викликаються ігровим кодом) ----------
+  // hit: [nid, damage, headshot, legacyStun, legacyStunTime,
+  //       hitZone?, impactForce?, staggerTime?]
   shotReport(weapon, endPoint, hits, barrels, walls, ball) {
     const d = { t: 'shot', w: weaponToIdx(weapon) };
     if (endPoint) d.e = [Math.round(endPoint.x * 10) / 10, Math.round(endPoint.y * 10) / 10, Math.round(endPoint.z * 10) / 10];
@@ -53,6 +55,10 @@ export class GuestNet {
     if (walls && walls.length) d.wl = walls;
     if (ball) d.ball = 1;
     this.send(d);
+  }
+
+  reportDestructibleHit(id, damage) {
+    this.send({ t: 'dh', id, dmg: Math.round(damage), w: weaponToIdx(this.level.player.cur) });
   }
 
   sendNade(pos, vel) {
@@ -261,6 +267,7 @@ export class GuestNet {
       case 'zsb': level.zombies.puppetShieldBreak(a[0]); break;
       case 'zsr': level.zombies.puppetShieldRecast(a[0]); break;
       case 'zcb': level.zombies.puppetChestBreak(a[0]); break;
+      case 'dx': level.world.removeDestructible?.(a[0]); break;
       case 'zrev': { // 🪬 шаман воскрес — спалах у гостя
         const zr = level.zombies.byNid(a[0]);
         if (zr) level.effects.totemBurst(new THREE.Vector3(zr.x, zr.y + 1.2, zr.z));
@@ -434,6 +441,7 @@ export class GuestNet {
     if (w.crate) level.world.openCrate();
     if (w.tower) level.world.setTowerFixed();
     for (const idx of w.barrelsGone || []) level.effects.netBarrelGone(idx);
+    for (const id of w.destructiblesGone || []) level.world.removeDestructible?.(id);
     for (const [wid, x, z, yaw] of w.walls || []) level.gadgets.netWall(wid, 0, x, z, yaw);
     for (const [tid, x, z] of w.tramps || []) level.gadgets.netTramp(tid, 0, x, z);
     for (const [tnid, owner, x, z] of w.turrets || []) level.gadgets.netTurret(tnid, owner, x, z);

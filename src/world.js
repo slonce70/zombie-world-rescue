@@ -44,6 +44,10 @@ export class World {
     this._sbP1 = new THREE.Vector3();
     this._raySegOut = { dist: 0, t: 0, u: 0 }; // scratch для closestRaySeg у shotBlockDist
     this.occluders = []; // {x, z, r, h} — вертикальні капсули для куль
+    this.destructibles = [];
+    this.destructibleShards = [];
+    this._destructibleRay = new THREE.Raycaster();
+    this._destructibleHits = [];
     this.grid = new Map();
     this.time = 0;
     this.animatedFlags = [];
@@ -621,7 +625,7 @@ export class World {
     win.position.set(-0.4, 1.5, -0.18);
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.1, 0.2), toonMat(0x6b4226));
     door.position.set(2.0, 1.05, -0.18);
-    g.add(wall, win, door);
+    g.add(wall);
     // смугастий навіс
     const awning = new THREE.Mesh(this._prismGeo(6, 0.8, 2.4), toonMat(0xd84f4f));
     awning.position.set(0, 2.6, -1.0);
@@ -630,6 +634,12 @@ export class World {
     g.add(awning, awnStripe);
     g.position.set(x, gy, z);
     this.staticGroup.add(g);
+    const facade = new THREE.Group();
+    facade.position.set(x, gy, z);
+    facade.add(win, door);
+    this.scene.add(facade);
+    this._addDestructible(win, 'glass');
+    this._addDestructible(door, 'door');
     this._addCollider(x, z, 2.8, gy + 3, 2.6);
     // столики з круасанами перед кафе
     for (const side of [-1, 1]) {
@@ -3877,6 +3887,80 @@ export class World {
     }
   }
 
+  _addDestructible(mesh, type, collider = null, occluder = null) {
+    const maxHp = type === 'glass' ? 20 : type === 'door' ? 120 : 180;
+    const item = { id: this.destructibles.length, type, hp: maxHp, maxHp, mesh, collider, occluder, destroyed: false };
+    if (collider) collider.destructible = item;
+    if (occluder) occluder.destructible = item;
+    this.destructibles.push(item);
+    return item;
+  }
+
+  // Найближчий явний руйнівний проп уздовж пострілу.
+  hitTestDestructible(origin, dir, maxDist = Infinity) {
+    const ray = this._destructibleRay;
+    ray.set(origin, dir);
+    ray.near = 0;
+    ray.far = maxDist;
+    let best = null;
+    for (const destructible of this.destructibles) {
+      if (destructible.destroyed || !destructible.mesh.visible) continue;
+      destructible.mesh.updateWorldMatrix(true, true);
+      const hits = this._destructibleHits;
+      hits.length = 0;
+      ray.intersectObject(destructible.mesh, true, hits);
+      if (hits[0] && (!best || hits[0].distance < best.distance)) {
+        best = { destructible, point: hits[0].point.clone(), distance: hits[0].distance, t: hits[0].distance };
+      }
+    }
+    return best;
+  }
+
+  // Повертає true лише коли цей удар знищив об'єкт.
+  damageDestructible(target, amount, point = null) {
+    const destructible = typeof target === 'number' ? this.destructibles[target] : target?.destructible || target;
+    if (!destructible || destructible.destroyed || amount <= 0 || !this.destructibles.includes(destructible)) return false;
+    destructible.hp = Math.max(0, destructible.hp - amount);
+    return destructible.hp === 0 ? this.removeDestructible(destructible, point || target?.point) : false;
+  }
+
+  removeDestructible(target, point = null) {
+    const destructible = typeof target === 'number' ? this.destructibles[target] : target?.destructible || target;
+    if (!destructible || destructible.destroyed || !this.destructibles.includes(destructible)) return false;
+    destructible.destroyed = true;
+    destructible.mesh.visible = false;
+    const worldPoint = point?.clone?.() || destructible.mesh.getWorldPosition(new THREE.Vector3());
+    destructible.mesh.removeFromParent();
+    const geometries = new Set();
+    destructible.mesh.traverse((child) => { if (child.geometry) geometries.add(child.geometry); });
+    for (const geometry of geometries) geometry.dispose();
+    const ci = this.colliders.indexOf(destructible.collider);
+    if (ci >= 0) this.colliders.splice(ci, 1);
+    const oi = this.occluders.indexOf(destructible.occluder);
+    if (oi >= 0) this.occluders.splice(oi, 1);
+    if (ci >= 0) this._buildGrid();
+    this._spawnDestructibleShards(destructible, worldPoint);
+    return true;
+  }
+
+  _spawnDestructibleShards(destructible, point) {
+    const group = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(0.16, 0.12, 0.08);
+    let material = destructible.mesh.material;
+    if (!material) destructible.mesh.traverse((child) => { if (!material && child.material) material = child.material; });
+    material ||= toonMat(destructible.type === 'glass' ? 0x9fd8ff : 0x8a5a32);
+    const pieces = [];
+    for (let i = 0; i < 5; i++) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set((Math.random() - 0.5) * 0.35, Math.random() * 0.35, (Math.random() - 0.5) * 0.35);
+      group.add(mesh);
+      pieces.push({ mesh, velocity: new THREE.Vector3((Math.random() - 0.5) * 3, 1.5 + Math.random() * 2.5, (Math.random() - 0.5) * 3) });
+    }
+    group.position.copy(point);
+    this.scene.add(group);
+    this.destructibleShards.push({ group, geometry, pieces, ttl: 0.9 });
+  }
+
   // ---------- хлів із людьми (місія 1) ----------
   _buildBarn() {
     if (this.map.moon) return this._buildMoonRescueModule();
@@ -3932,6 +4016,7 @@ export class World {
     this._addCollider(x + 3, z, 3.0, gy + H, 3.0);
     this._addCollider(x, z + 1.5, 3.0, gy + H, 3.0);
     this.colliders.push(this.barnDoorCollider);
+    this.barnDoorDestructible = this._addDestructible(g, 'door', this.barnDoorCollider);
     // багаття перед хлівом (декор)
     const fireG = new THREE.Group();
     const logM = toonMat(0x6b4226);
@@ -4261,14 +4346,23 @@ export class World {
       [x + 8, z - 6, 1.3], [x + 9.4, z - 6.5, 1.0], [x + 8.6, z - 6, 0, 1.1],
       [x - 4, z - 8.5, 1.15], [x + 3, z - 9, 1.25],
     ];
+    let barricades = 0;
     for (const c of cratePos) {
       const s = c[3] || c[2];
       const stacked = c.length === 4;
       const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), this.rng.chance(0.5) ? crateM : crateM2);
       crate.position.set(c[0], this.groundH(c[0], c[1]) + (stacked ? s * 1.5 : s / 2), c[1]);
       crate.rotation.y = this.rng.next() * 0.8;
-      this.staticGroup.add(crate);
-      if (!stacked) this._addCollider(c[0], c[1], s * 0.75, this.groundH(c[0], c[1]) + s, s * 0.7);
+      if (!stacked && barricades < 2) {
+        const collider = { x: c[0], z: c[1], r: s * 0.75, top: this.groundH(c[0], c[1]) + s };
+        this.scene.add(crate);
+        this.colliders.push(collider);
+        this._addDestructible(crate, 'barricade', collider);
+        barricades++;
+      } else {
+        this.staticGroup.add(crate);
+        if (!stacked) this._addCollider(c[0], c[1], s * 0.75, this.groundH(c[0], c[1]) + s, s * 0.7);
+      }
     }
 
     // військовий ящик зі зброєю (відкривається)
@@ -4648,6 +4742,21 @@ export class World {
 
   update(dt, playerPos) {
     this.time += dt;
+    for (let i = this.destructibleShards.length - 1; i >= 0; i--) {
+      const shards = this.destructibleShards[i];
+      shards.ttl -= dt;
+      for (const piece of shards.pieces) {
+        piece.velocity.y -= 9 * dt;
+        piece.mesh.position.addScaledVector(piece.velocity, dt);
+        piece.mesh.rotation.x += dt * 8;
+        piece.mesh.rotation.z += dt * 6;
+      }
+      if (shards.ttl <= 0) {
+        shards.group.removeFromParent();
+        shards.geometry.dispose();
+        this.destructibleShards.splice(i, 1);
+      }
+    }
     if (this.moonStation && this.moonStation.launching) {
       const station = this.moonStation;
       station.speed = Math.min(42, station.speed + dt * 9);

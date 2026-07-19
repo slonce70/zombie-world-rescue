@@ -2,7 +2,7 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 20; // v518: Turkey rescue ship phase/progress/carrier snapshot
+export const PROTO_VERSION = 21; // v549: optional Combat Reborn hit metadata
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {
@@ -37,6 +37,9 @@ export function packZombieState(z, moving) {
 }
 
 // індекси зброї для компактної передачі
-export const WEAPON_IDX = ['pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff'];
+export const WEAPON_IDX = [
+  'pistol', 'rifle', 'shotgun', 'smg', 'magnum', 'sniper', 'bazooka', 'laser', 'flamethrower', 'staff',
+  'cannon', 'sword', 'hammer', 'axe', 'pickaxe',
+];
 export const weaponToIdx = (w) => Math.max(0, WEAPON_IDX.indexOf(w));
 export const idxToWeapon = (i) => WEAPON_IDX[i] || 'pistol';

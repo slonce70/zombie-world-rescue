@@ -177,6 +177,16 @@ body.map-editor-mode.touch-mode #tb-scope { display: none; }
 }
 #hitmarker.show { opacity: 1; transform: translate(-50%, -50%) scale(1); transition: all .12s ease-out; }
 #hitmarker.crit { color: #ffd23f; font-size: 38px; }
+#hitmarker.arms { color: #7fd8ff; }
+#hitmarker.legs { color: #8fe388; }
+#hitmarker.armor { color: #b9c8dd; text-shadow: 0 0 8px #6f89a8; }
+
+#damage-direction {
+  position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; text-align: center;
+  color: #ff665c; font-size: 30px; font-weight: 900; opacity: 0;
+  transform-origin: 50% 50%; pointer-events: none; transition: opacity .12s;
+}
+#damage-direction.show { opacity: .9; }
 
 /* місії */
 #mission-panel {

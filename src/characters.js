@@ -477,12 +477,28 @@ export function updateRig(rig, dt) {
       legR = -Math.sin(a.phase) * 0.15;
       break;
     }
+    case 'stagger': {
+      const side = a.staggerSide || a.flinchSide || 'front';
+      const kick = Math.exp(-a.t * 5);
+      if (side === 'front') bodyRotX += 0.34 * kick;
+      else if (side === 'back') bodyRotX -= 0.28 * kick;
+      else bodyRotZ += (side === 'left' ? -1 : 1) * 0.38 * kick;
+      headRotZ -= bodyRotZ * 0.7;
+      armL += 0.35 * kick;
+      armR += 0.5 * kick;
+      squash *= 1 - 0.08 * kick;
+      break;
+    }
     case 'die': {
       a.dieT += dt / 0.85;
       const t = Math.min(1, a.dieT);
+      const side = a.deathSide || 'front';
+      const fallX = side === 'back' ? -1 : (side === 'left' || side === 'right') ? 0.35 : 1;
+      const fallZ = side === 'left' ? -1.25 : side === 'right' ? 1.25 : rig.dieSpin;
       // падає з мультяшним відскоком наприкінці
-      bodyRotX = b.bodyRotX + sstep(0, 0.75, t) * 1.62 + Math.sin(sstep(0.72, 1, t) * Math.PI) * 0.14;
-      bodyRotZ = sstep(0, 1, t) * rig.dieSpin;
+      bodyRotX = b.bodyRotX + sstep(0, 0.75, t) * 1.62 * fallX
+        + Math.sin(sstep(0.72, 1, t) * Math.PI) * 0.14 * fallX;
+      bodyRotZ = sstep(0, 1, t) * fallZ;
       armL = b.armL + t * 1.2;
       armR = b.armR + t * 0.8;
       legL = t * 0.4;
@@ -612,10 +628,43 @@ export function updateRig(rig, dt) {
   if (a.flinchT > 0) {
     a.flinchT = Math.max(0, a.flinchT - dt);
     const f = a.flinchT / 0.18;
-    bodyRotX += f * 0.22;   // сіпається назад
-    headRotX -= f * 0.5;
-    headRotZ += f * rig.dieSpin * 0.6;
+    const side = a.flinchSide || 'front';
+    if (side === 'front') bodyRotX += f * 0.24;
+    else if (side === 'back') bodyRotX -= f * 0.2;
+    else bodyRotZ += f * (side === 'left' ? -0.28 : 0.28);
+    headRotX += f * (side === 'back' ? 0.38 : -0.5);
+    headRotZ -= bodyRotZ * 0.45;
     squash *= 1 - f * 0.06;
+  }
+
+  // Third-person weapon overlays. Player only sets these short countdowns;
+  // the shared procedural rig supplies the pose without another animation system.
+  if (a.mode === 'aim') {
+    if (a.fireT > 0) {
+      if (a.fireT > (a._firePrev || 0)) a.fireDuration = a.fireT;
+      a.fireT = Math.max(0, a.fireT - dt);
+      const f = a.fireT / (a.fireDuration || 0.12);
+      a._firePrev = a.fireT;
+      armR -= 0.32 * f;
+      armL -= 0.14 * f;
+      bodyRotX += 0.08 * f;
+    }
+    if (a.reloadT > 0) {
+      if (a.reloadT > (a._reloadPrev || 0)) a.reloadDuration = a.reloadT;
+      a.reloadT = Math.max(0, a.reloadT - dt);
+      const duration = Math.max(a.reloadDuration || 1, 0.001);
+      const wave = Math.sin(Math.PI * (1 - a.reloadT / duration));
+      a._reloadPrev = a.reloadT;
+      armR = lerp(armR, 0.35, wave);
+      armL = lerp(armL, 0.65, wave);
+      bodyRotZ += wave * 0.12;
+    } else if (a.drawT > 0) {
+      a.drawT = Math.max(0, a.drawT - dt);
+      const f = a.drawT / (a.drawDuration || 0.28);
+      armR = lerp(armR, 0.2, f);
+      armL = lerp(armL, 0.35, f);
+      bodyRotZ += f * 0.1;
+    }
   }
 
   p.legL.rotation.x = legL;
@@ -816,6 +865,17 @@ function updateSnowmanRig(rig, dt) {
       armL = -0.4;
       break;
     }
+    case 'stagger': {
+      const side = a.staggerSide || a.flinchSide || 'front';
+      const kick = Math.exp(-a.t * 5);
+      if (side === 'front') bodyRotX = 0.3 * kick;
+      else if (side === 'back') bodyRotX = -0.24 * kick;
+      else bodyRotZ = (side === 'left' ? -1 : 1) * 0.34 * kick;
+      headRotZ = -bodyRotZ * 0.7;
+      armL += 0.25 * kick;
+      armR += 0.35 * kick;
+      break;
+    }
     case 'die': {
       a.dieT += dt / 0.9;
       const t = Math.min(1, a.dieT);
@@ -828,6 +888,15 @@ function updateSnowmanRig(rig, dt) {
       armR = 1.2 * t;
       break;
     }
+  }
+  if (a.flinchT > 0) {
+    a.flinchT = Math.max(0, a.flinchT - dt);
+    const f = a.flinchT / 0.18;
+    const side = a.flinchSide || 'front';
+    if (side === 'front') bodyRotX += 0.2 * f;
+    else if (side === 'back') bodyRotX -= 0.16 * f;
+    else bodyRotZ += (side === 'left' ? -1 : 1) * 0.24 * f;
+    headRotZ -= bodyRotZ * 0.5;
   }
   rig.body.rotation.z = bodyRotZ;
   rig.body.rotation.x = bodyRotX;

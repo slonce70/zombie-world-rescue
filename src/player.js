@@ -7,20 +7,20 @@ import { t } from './i18n.js';
 import { momentumStats } from './combatmomentum.js';
 
 export const WEAPONS = {
-  pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, infinite: true },
-  rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, infinite: false, reserve: 120, cap: 240 },
-  shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, infinite: false, pellets: 7, reserve: 24, cap: 60 },
-  smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, infinite: false, reserve: 160, cap: 320 },
-  magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, infinite: false, reserve: 36, cap: 90 },
-  sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, infinite: false, pierce: 3, reserve: 25, cap: 60 },
+  pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, kick: 0.65, recover: 11, noise: 18, impact: 1, stagger: 0.08, infinite: true },
+  rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, kick: 0.72, recover: 8, noise: 30, impact: 1.5, stagger: 0.12, burst: true, infinite: false, reserve: 120, cap: 240 },
+  shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, kick: 1.45, recover: 5, noise: 40, impact: 4, stagger: 0.32, infinite: false, pellets: 7, reserve: 24, cap: 60 },
+  smg: { name: 'Швидкостріл', icon: '🌀', dmg: 13, rpm: 920, mag: 40, spread: 0.034, auto: true, reloadT: 1.2, recoil: 0.008, kick: 0.52, recover: 10, noise: 30, impact: 1, stagger: 0.08, burst: true, infinite: false, reserve: 160, cap: 320 },
+  magnum: { name: 'Магнум', icon: '🤠', dmg: 60, rpm: 140, mag: 6, spread: 0.006, auto: false, reloadT: 1.6, recoil: 0.05, kick: 1.35, recover: 5, noise: 30, impact: 5, stagger: 0.35, infinite: false, reserve: 36, cap: 90 },
+  sniper: { name: 'Снайперка', icon: '🎯', dmg: 120, rpm: 42, mag: 5, spread: 0.001, auto: false, reloadT: 2.2, recoil: 0.07, kick: 1.55, recover: 4, noise: 40, impact: 6, stagger: 0.35, infinite: false, pierce: 3, reserve: 25, cap: 60 },
   staff: { name: 'Посох', icon: '🪄', dmg: 95, rpm: 55, mag: 1, spread: 0.002, auto: false, reloadT: 3.0, recoil: 0.04, infinite: true, pierce: 2 },
   cannon: { name: 'Гармата', icon: '💣', dmg: 350, rpm: 24, mag: 1, spread: 0.002, auto: false, reloadT: 2.5, recoil: 0.09, infinite: true },
-  sword: { name: 'Меч', icon: '🗡️', dmg: 300, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.04, infinite: true, melee: true, range: 3.0 },
+  sword: { name: 'Меч', icon: '🗡️', dmg: 300, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.04, kick: 1, recover: 6, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3.0, cleave: 3 },
   // 🔨 молот — єдина зброя режиму «Оборона турелі»: 35 шкоди, 1 удар/с
-  hammer: { name: 'Молот', icon: '🔨', dmg: 35, rpm: 60, mag: Infinity, spread: 0, auto: false, reloadT: 1.0, recoil: 0.06, infinite: true, melee: true, range: 3.2 },
-  axe: { name: 'Сокира', icon: '🪓', dmg: 45, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, infinite: true, melee: true, range: 3.6 },
-  pickaxe: { name: 'Кірка', icon: '⛏️', dmg: 35, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, infinite: true, melee: true, range: 3.6 },
-  bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, infinite: false, rocket: true, reserve: 0, cap: 9 },
+  hammer: { name: 'Молот', icon: '🔨', dmg: 35, rpm: 60, mag: Infinity, spread: 0, auto: false, reloadT: 1.0, recoil: 0.06, kick: 1.1, recover: 5, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3.2 },
+  axe: { name: 'Сокира', icon: '🪓', dmg: 45, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, kick: 1.1, recover: 6, impact: 4, stagger: 0.25, infinite: true, melee: true, range: 3.6, cleave: 3 },
+  pickaxe: { name: 'Кірка', icon: '⛏️', dmg: 35, rpm: 80, mag: Infinity, spread: 0, auto: false, reloadT: 0.6, recoil: 0.06, kick: 1.1, recover: 6, impact: 4, stagger: 0.25, infinite: true, melee: true, range: 3.6 },
+  bazooka: { name: 'Базука', icon: '🚀', dmg: 220, rpm: 30, mag: 1, spread: 0.004, auto: false, reloadT: 2.5, recoil: 0.09, kick: 1.8, recover: 3.5, noise: 50, impact: 8, stagger: 0.45, infinite: false, rocket: true, reserve: 0, cap: 9 },
   // 🔋 паливні зброї (v46): стріляють БЕЗПЕРЕРВНО, поки тримаєш вогонь, і витрачають
   // ЗАРЯД-МАГАЗИН (балон = 5с безперервної стрільби), а не патрони-штуки. fuelMax — місткість балона.
   // Коли балон вичерпано (або тиснеш R) — ПЕРЕЗАРЯДКА (reloadT), після неї знову повні 5с. Нескінченно.
@@ -37,6 +37,7 @@ const ALL_WEAPON_IDS = Object.keys(WEAPONS);
 const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4: 'smg', Digit5: 'magnum', Digit6: 'sniper', Digit7: 'bazooka', Digit8: 'laser', Digit9: 'flamethrower', Digit0: 'staff' };
 // 🟡 зброя з гільзами (лазер/вогнемет/посох/меч/молот/базука гільз не викидають)
 const SHELL_WEAPONS = new Set(['pistol', 'rifle', 'smg', 'shotgun', 'magnum', 'sniper']);
+const HIT_ZONE_MULT = { head: 2, arms: 0.85, legs: 0.75, body: 1 };
 
 export class Player {
   constructor(level) {
@@ -158,6 +159,11 @@ export class Player {
     this.bobPhase = 0;
     this.bobAmp = 0;
     this.gunKick = 0;
+    this.fireHeat = 0;
+    this.fireHeatT = 0;
+    this.weaponSwitchT = 0;
+    this.reloadDur = 0;
+    this.meleeSwing = null;
     this.camShake = 0;
     this.landDip = 0; // 🦶 squash приземлення: 1 у момент торкання землі → 0 за ~0.12с
     this.fovTarget = 75;
@@ -196,8 +202,12 @@ export class Player {
     if (!this.weapons.includes(w) || this.cur === w) return;
     this.cur = w;
     this.reloading = 0;
+    this.meleeSwing = null;
+    this.rig.anim.reloadT = 0;
     this.scoped = false;
     this.shootCd = Math.max(this.shootCd, 0.25);
+    this.weaponSwitchT = 0.28;
+    this.rig.anim.drawT = 0.22;
     this._applyView();
     this.level.audio.click();
   }
@@ -298,12 +308,18 @@ export class Player {
       // континуальна зброя (лазер/вогнемет): перезаряджаємо балон, якщо він не повний
       if (this.reloading > 0 || (this.fuel[this.cur] || 0) >= w.fuelMax) return;
       this.reloading = w.reloadT;
+      this.reloadDur = w.reloadT;
+      this.rig.anim.reloadT = w.reloadT;
+      this.rig.anim.reloadDuration = w.reloadT;
       this.level.audio.reload(this.cur);
       return;
     }
     const a = this.curAmmo;
     if (this.reloading > 0 || a.mag >= w.mag || (!w.infinite && a.reserve <= 0)) return;
     this.reloading = w.reloadT;
+    this.reloadDur = w.reloadT;
+    this.rig.anim.reloadT = w.reloadT;
+    this.rig.anim.reloadDuration = w.reloadT;
     this.level.audio.reload(this.cur);
   }
 
@@ -390,6 +406,7 @@ export class Player {
     if (this.grenadeCd > 0) this.grenadeCd -= dt;
 
     this._updateWeaponFiring(dt, input, allowControl);
+    this._updateMeleeSwing(dt);
 
     // --- кроки ---
     const hSpeed0 = Math.hypot(this.vel.x, this.vel.z);
@@ -409,7 +426,10 @@ export class Player {
     const bobTarget = this.riding ? 0 : (this.onGround ? Math.min(1, hSpeed / 5) : 0);
     this.bobAmp = damp(this.bobAmp, bobTarget, 8, dt);
     this.bobPhase += dt * (4 + hSpeed * 1.15);
-    this.gunKick = Math.max(0, this.gunKick - dt * 7);
+    this.fireHeatT = Math.max(0, this.fireHeatT - dt);
+    if (this.fireHeatT <= 0) this.fireHeat = Math.max(0, this.fireHeat - dt * 4);
+    this.weaponSwitchT = Math.max(0, this.weaponSwitchT - dt);
+    this.gunKick = Math.max(0, this.gunKick - dt * (this.weapon.recover || 7));
     this.camShake = Math.max(0, this.camShake - dt * 3);
     this.landDip = Math.max(0, this.landDip - dt / 0.12); // squash приземлення відновлюється за ~0.12с
     this.fovTarget = this.scoped ? 24 : sprint ? 82 : 75;
@@ -695,12 +715,14 @@ export class Player {
       // зброя: боб + віддача
       this.weaponRoot.position.set(
         this.weaponBase.x + Math.cos(this.bobPhase) * 0.013 * this.bobAmp,
-        this.weaponBase.y + Math.abs(Math.sin(this.bobPhase)) * 0.018 * this.bobAmp - (this.reloading > 0 ? 0.16 : 0),
+        this.weaponBase.y + Math.abs(Math.sin(this.bobPhase)) * 0.018 * this.bobAmp
+          - (this.reloading > 0 ? 0.16 : 0) - (this.weaponSwitchT > 0 ? Math.sin(this.weaponSwitchT / 0.28 * Math.PI) * 0.22 : 0),
         this.weaponBase.z + this.gunKick * 0.13
       );
       this.weaponRoot.rotation.set(
         this.gunKick * 0.22 + (this.reloading > 0 ? -0.5 : 0),
-        0.06, Math.sin(this.bobPhase) * 0.008 * this.bobAmp
+        0.06 + this.gunKick * (this.cur === 'magnum' || this.cur === 'sniper' ? 0.08 : 0),
+        Math.sin(this.bobPhase) * 0.008 * this.bobAmp + (this.reloading > 0 ? -0.18 : 0)
       );
     } else {
       // третя особа: орбітальна камера за спиною
@@ -739,13 +761,16 @@ export class Player {
       cam.position.copy(this._camPos);
       cam.rotation.set(this.pitch, this.yaw, 0);
     }
-    if (this.camShake > 0) {
+    if (this.camShake > 0 && (!this.level.game || this.level.game.save.cameraShake !== false)) {
       cam.position.x += (Math.random() - 0.5) * this.camShake * 0.09;
       cam.position.y += (Math.random() - 0.5) * this.camShake * 0.09;
     }
   }
 
   _updateRigs(dt, hSpeed, moving, sprint) {
+    if (this.firstPerson) {
+      for (const key of ['fireT', 'reloadT', 'drawT']) this.rig.anim[key] = Math.max(0, (this.rig.anim[key] || 0) - dt);
+    }
     if (!this.firstPerson) {
       this.rig.group.position.set(this.pos.x, this.pos.y, this.pos.z);
       // 🦶 squash приземлення: через anim.extSquash — сам масштаб виставляє updateRig
@@ -823,7 +848,12 @@ export class Player {
     if (!infAmmo) a.mag--;
     // «Шквал»: скорострільність ×1.8 (композиться з гаджет-прискоренням 0.45)
     this.shootCd = (60 / w.rpm) * (gadgetInf ? 0.45 : 1) / ((shkval ? 1.8 : 1) * momentumStats(level.combo).fire);
-    this.gunKick = 1;
+    if (w.burst) {
+      this.fireHeat = Math.min(1, this.fireHeat + (this.cur === 'smg' ? 0.08 : 0.12));
+      this.fireHeatT = 0.25;
+    } else this.fireHeat = 0;
+    this.gunKick = (w.kick || 1) * (1 + this.fireHeat * 0.35);
+    this.rig.anim.fireT = w.melee ? 0.22 : 0.12;
     level.stats.shotsFired++;
     const dmgMult = this.damageMult * (this.damageTotemMult || 1) * (this.buffs.rage > 0 ? 2 : 1) * momentumStats(level.combo).damage;
 
@@ -832,45 +862,14 @@ export class Player {
 
     if (w.melee) {
       level.audio.throwWhoosh(0.65);
-      const origin = this._shootOrigin.set(this.pos.x, this.pos.y + 1.2, this.pos.z);
-      const dir = this.forwardVec(this._shootDir).normalize();
-      const hit = level.zombies ? level.zombies.hitTest(origin, dir, w.range || 3) : null;
-      const missionEngine = level.missions && (level.missions.delegate || level.missions);
-      const barracksHit = missionEngine && missionEngine.barracksHitTest
-        ? missionEngine.barracksHitTest(origin, dir, w.range || 3) : null;
-      const resourceHit = missionEngine && missionEngine.resourceHitTest
-        ? missionEngine.resourceHitTest(origin, dir, w.range || 3, this.cur) : null;
-      if (resourceHit && (!hit || resourceHit.t < hit.t) && (!barracksHit || resourceHit.t < barracksHit.t)) {
-        missionEngine.damageResource(resourceHit.node, resourceHit.point, this.cur);
-        level.audio.hit(false);
-        this._applyRecoil(w);
-        return;
-      }
-      if (barracksHit && (!hit || barracksHit.t < hit.t)) {
-        const damage = w.dmg * dmgMult;
-        missionEngine.damageBarracks(damage, barracksHit.point);
-        level.effects.burst(barracksHit.point, 0xff8a3d, 8, { speed: 2.4, life: 0.4 });
-        level.audio.hit(false);
-        level.stats.shotsHit++;
-        this._applyRecoil(w);
-        return;
-      }
-      if (hit) {
-        const baseDmg = level.soulCollector && this.cur === 'sword' ? 30 : w.dmg;
-        if (level.mirror) level.net.shotReport(this.cur, hit.point, [[hit.zombie.nid, Math.round(baseDmg * dmgMult), 0]], [], [], false);
-        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(baseDmg * dmgMult, dir, false); }
-        level.effects.burst(hit.point, 0x86d14e, 8, { speed: 2.4, life: 0.4 });
-        level.effects.damageNumber(hit.point, baseDmg * dmgMult, false);
-        level.audio.hit(false);
-        level.stats.shotsHit++;
-        level.bus.emit('hitmarker', false, this.cur);
-      }
-      this._applyRecoil(w);
+      this.meleeSwing = { t: 0.14, weaponId: this.cur, dmgMult };
       return;
     }
 
     level.audio.shot(this.cur);
-    level.effects.muzzleFlash(this._muzzlePos, shkval ? 1.7 : 1); // 🔥 «Шквал» — соковитіший спалах
+    level.zombies?.hearShot?.(this.pos.x, this.pos.z, w.noise || 30);
+    const reducedFlashes = level.game && level.game.save.reducedFlashes;
+    level.effects.muzzleFlash(this._muzzlePos, (shkval ? 1.7 : 1) * (reducedFlashes ? 0.45 : 1));
     // 🟡 гільза вилітає праворуч-вгору від дула
     if (SHELL_WEAPONS.has(this.cur)) level.effects.ejectShell(this._muzzlePos, Math.cos(this.yaw), -Math.sin(this.yaw));
 
@@ -893,10 +892,11 @@ export class Player {
     // промені через приціл (дробовик — кілька шротин)
     const MAX_D = w.pellets ? 45 : 140;
     const pellets = w.pellets || 1;
-    const spreadMult = (this.bobAmp > 0.5 ? 1.6 : 1);
+    const spreadMult = (this.bobAmp > 0.5 ? 1.6 : 1) * (1 + this.fireHeat * 0.55);
 
     let anyHit = false;
     let anyHeadshot = false;
+    let hitZone = 'body';
     // 💫 «Оглушливі кулі»: лише пістолет і магнум оглушують на 0.5с / 1с з гіперзарядом
     const stunShot = this.stunAmmoT > 0 && (this.cur === 'pistol' || this.cur === 'magnum');
     const stunTime = stunShot && (level.game.save.gadgetHypers || []).includes('stunammo') ? 1 : 0.5;
@@ -910,6 +910,15 @@ export class Player {
 
       const hit = level.zombies ? level.zombies.hitTest(origin, dir, MAX_D) : null;
       const blockT = this.world.shotBlockDist(origin, dir, hit ? hit.t : MAX_D);
+      const destructibleHit = this.world.hitTestDestructible?.(origin, dir, MAX_D);
+
+      if (destructibleHit && destructibleHit.t <= blockT + 0.25 && (!hit || destructibleHit.t < hit.t)) {
+        if (level.mirror && level.net.reportDestructibleHit) level.net.reportDestructibleHit(destructibleHit.destructible.id, Math.round(w.dmg * dmgMult));
+        else this.world.damageDestructible(destructibleHit.destructible, w.dmg * dmgMult, destructibleHit.point);
+        if (i < 3) level.effects.tracer(this._muzzlePos, destructibleHit.point);
+        anyHit = true;
+        continue;
+      }
 
       // вибухові бочки і м'яч — теж цілі
       const bHit = level.effects.barrelHitTest(origin, dir, MAX_D);
@@ -968,10 +977,15 @@ export class Player {
         if (i < 2) level.effects.burst(endPoint, 0xb09a72, 4, { speed: 2, life: 0.35, size: 0.7 });
       } else if (hit) {
         endPoint = hit.point;
-        let dmg = w.dmg * dmgMult * (hit.headshot ? 2 : 1);
+        const zone = hit.hitZone || (hit.headshot ? 'head' : 'body');
+        let dmg = w.dmg * dmgMult * (HIT_ZONE_MULT[zone] || 1);
+        const impactForce = w.impact || 1;
+        const staggerTime = this.cur === 'shotgun' && hit.t > 12 ? 0.12 : (w.stagger || 0);
+        const damageOpts = { weaponId: this.cur, hitZone: zone, impactSide: hit.impactSide, impactForce, staggerTime };
+        const armoredBefore = hit.zombie.shieldHp > 0 || hit.zombie.chestHp > 0 || hit.zombie.helmetHp > 0;
         const canStun = stunShot && !(hit.zombie.stats && hit.zombie.stats.stunImmune);
-        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, canStun ? 1 : 0, stunTime]);
-        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot); }
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, canStun ? 1 : 0, stunTime, zone, impactForce, staggerTime]);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot, damageOpts); }
         // оглушення хост-авторитетне: соло/хост ставлять одразу, гість шле прапорець хосту (4-й елемент)
         if (canStun && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = stunTime;
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
@@ -982,10 +996,13 @@ export class Player {
         if (i < 3) level.effects.burst(hit.point, 0x86d14e, 6, { speed: 2.6, life: 0.45 });
         anyHit = true;
         anyHeadshot = anyHeadshot || hit.headshot;
+        const markerZone = armoredBefore ? 'armor' : zone;
+        if (hit.headshot || hitZone === 'body') hitZone = markerZone;
 
         // 🎯 снайперка: куля пробиває кілька зомбі наскрізь
         if (w.pierce) {
           let pierceLeft = w.pierce - 1;
+          let pierceBase = w.dmg * dmgMult;
           let from = hit.point.clone().addScaledVector(dir, 0.5);
           let travelled = hit.t;
           while (pierceLeft > 0 && travelled < MAX_D) {
@@ -993,9 +1010,12 @@ export class Player {
             if (!next) break;
             const wallT = this.world.shotBlockDist(from, dir, next.t);
             if (wallT < next.t) break;
-            dmg *= 0.7;
-            if (level.mirror) netHits.push([next.zombie.nid, Math.round(dmg), next.headshot ? 1 : 0]);
-            else { next.zombie.lastHitBy = 1; next.zombie.damage(dmg, dir, next.headshot); }
+            pierceBase *= 0.7;
+            const nextZone = next.hitZone || (next.headshot ? 'head' : 'body');
+            dmg = pierceBase * (HIT_ZONE_MULT[nextZone] || 1);
+            const nextOpts = { weaponId: this.cur, hitZone: nextZone, impactSide: next.impactSide, impactForce, staggerTime };
+            if (level.mirror) netHits.push([next.zombie.nid, Math.round(dmg), next.headshot ? 1 : 0, 0, 0, nextZone, impactForce, staggerTime]);
+            else { next.zombie.lastHitBy = 1; next.zombie.damage(dmg, dir, next.headshot, nextOpts); }
             const acc2 = dmgByZombie.get(next.zombie) || { total: 0, point: next.point, crit: false };
             acc2.total += dmg;
             acc2.point = next.point;
@@ -1027,14 +1047,100 @@ export class Player {
     if (anyHit) {
       level.audio.hit(anyHeadshot);
       level.stats.shotsHit++;
-      level.bus.emit('hitmarker', anyHeadshot, this.cur);
+      level.bus.emit('hitmarker', anyHeadshot, this.cur, hitZone);
     }
+  }
+
+  _updateMeleeSwing(dt) {
+    if (!this.meleeSwing) return;
+    this.meleeSwing.t -= dt;
+    if (this.meleeSwing.t > 0) return;
+    const swing = this.meleeSwing;
+    this.meleeSwing = null;
+    this._resolveMeleeSwing(swing);
+  }
+
+  _resolveMeleeSwing({ weaponId, dmgMult }) {
+    const w = WEAPONS[weaponId];
+    if (!w || this.health <= 0) return;
+    const level = this.level;
+    const range = w.range || 3;
+    const origin = new THREE.Vector3(this.pos.x, this.pos.y + 1.2, this.pos.z);
+    const dir = this.forwardVec(new THREE.Vector3()).setY(0).normalize();
+    const lineHit = level.zombies?.hitTest(origin, dir, range);
+    const missionEngine = level.missions && (level.missions.delegate || level.missions);
+    const resourceHit = missionEngine?.resourceHitTest?.(origin, dir, range, weaponId);
+    const barracksHit = missionEngine?.barracksHitTest?.(origin, dir, range);
+    const destructibleHit = this.world.hitTestDestructible?.(origin, dir, range);
+    const nearestEnemyT = lineHit?.t ?? Infinity;
+
+    if (resourceHit && resourceHit.t < nearestEnemyT && (!barracksHit || resourceHit.t < barracksHit.t)
+      && (!destructibleHit || resourceHit.t < destructibleHit.t)) {
+      missionEngine.damageResource(resourceHit.node, resourceHit.point, weaponId);
+      level.audio.hit(false);
+      this._applyRecoil(w);
+      return;
+    }
+    if (destructibleHit && destructibleHit.t < nearestEnemyT && (!barracksHit || destructibleHit.t < barracksHit.t)) {
+      if (level.mirror && level.net.reportDestructibleHit) level.net.reportDestructibleHit(destructibleHit.destructible.id, Math.round(w.dmg * dmgMult));
+      else this.world.damageDestructible(destructibleHit.destructible, w.dmg * dmgMult, destructibleHit.point);
+      level.audio.hit(false);
+      this._applyRecoil(w);
+      return;
+    }
+    if (barracksHit && barracksHit.t < nearestEnemyT) {
+      missionEngine.damageBarracks(w.dmg * dmgMult, barracksHit.point);
+      level.effects.burst(barracksHit.point, 0xff8a3d, 8, { speed: 2.4, life: 0.4 });
+      level.audio.hit(false);
+      level.stats.shotsHit++;
+      this._applyRecoil(w);
+      return;
+    }
+
+    const hits = [];
+    for (const zombie of level.zombies?.list || []) {
+      if (zombie.state === 'dead' || Math.abs(zombie.y - this.pos.y) > 1.4) continue;
+      const dx = zombie.x - this.pos.x;
+      const dz = zombie.z - this.pos.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance < 0.2 || distance > range + zombie.rig.radius) continue;
+      if ((dx * dir.x + dz * dir.z) / distance < Math.cos(35 * Math.PI / 180)) continue;
+      const point = new THREE.Vector3(zombie.x, zombie.y + zombie.rig.height * 0.55, zombie.z);
+      const ray = point.clone().sub(origin);
+      const rayLen = ray.length();
+      ray.normalize();
+      if (this.world.shotBlockDist(origin, ray, rayLen) < rayLen - zombie.rig.radius) continue;
+      hits.push({ zombie, point, distance });
+    }
+    hits.sort((a, b) => a.distance - b.distance);
+    hits.length = Math.min(hits.length, w.cleave || 1);
+    if (!hits.length) { this._applyRecoil(w); return; }
+
+    const netHits = [];
+    const falloff = [1, 0.75, 0.55];
+    const baseDmg = level.soulCollector && weaponId === 'sword' ? 30 : w.dmg;
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      const damage = baseDmg * dmgMult * falloff[i];
+      const opts = { weaponId, hitZone: 'body', impactForce: w.impact || 4, staggerTime: w.stagger || 0.25 };
+      if (level.mirror) netHits.push([hit.zombie.nid, Math.round(damage), 0, 0, 0, 'body', opts.impactForce, opts.staggerTime]);
+      else { hit.zombie.lastHitBy = 1; hit.zombie.damage(damage, dir, false, opts); }
+      level.effects.burst(hit.point, 0x86d14e, 8, { speed: 2.4, life: 0.4 });
+      level.effects.damageNumber(hit.point, damage, false);
+    }
+    if (level.mirror) level.net.shotReport(weaponId, hits[0].point, netHits, [], [], false);
+    else if (level.net) level.net.onLocalShot(weaponId, hits[0].point);
+    level.audio.hit(false);
+    level.stats.shotsHit++;
+    level.bus.emit('hitmarker', false, weaponId, 'body');
+    this._applyRecoil(w);
   }
 
   // віддача підкидає приціл ПІСЛЯ пострілу — куля летить туди, куди цілився
   _applyRecoil(w) {
-    this.pitch = clamp(this.pitch + w.recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
-    this.yaw += (Math.random() - 0.5) * w.recoil * 0.4;
+    const recoil = w.recoil * (1 + this.fireHeat * 0.75);
+    this.pitch = clamp(this.pitch + recoil * (0.6 + Math.random() * 0.7), -1.45, 1.45);
+    this.yaw += (Math.random() - 0.5) * recoil * 0.4;
   }
 
   // 🚀 базука: летить ракета (соло — локально, кооп — через мережу), шкода — вибухом при влучанні.
@@ -1092,6 +1198,7 @@ export class Player {
 
     if (this._contSfxT <= 0) {
       this._contSfxT = 0.11;
+      level.zombies?.hearShot?.(this.pos.x, this.pos.z, w.beam ? 30 : 18);
       if (w.beam) level.audio.beamTick(); else level.audio.flameTick();
       this._contAudio = true;
       // ponytail: лік дроселюємо разом зі звуком (~9/с). Без цього континуалка
@@ -1106,6 +1213,7 @@ export class Player {
     const MAX_D = w.range;
     let anyHit = false;
     let endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
+    const destructibleHit = this.world.hitTestDestructible?.(origin, dir, MAX_D);
     if (level.zombies) {
       let pierceLeft = w.pierce;
       let from = origin;
@@ -1115,14 +1223,23 @@ export class Player {
         const hit = level.zombies.hitTest(from, dir, MAX_D - travelled);
         if (!hit) break;
         const wallT = this.world.shotBlockDist(from, dir, hit.t);
+        if (first && destructibleHit && destructibleHit.t <= wallT + 0.25 && destructibleHit.t < hit.t) {
+          if (level.mirror && level.net.reportDestructibleHit) level.net.reportDestructibleHit(destructibleHit.destructible.id, dmg);
+          else this.world.damageDestructible(destructibleHit.destructible, dmg, destructibleHit.point);
+          endPoint = destructibleHit.point;
+          anyHit = true;
+          break;
+        }
         if (wallT < hit.t) { // стіна раніше за зомбі — промінь гаснемо об стіну
           endPoint = this._shootEnd.copy(from).addScaledVector(dir, wallT);
           first = false;
           break;
         }
         // соло/хост б'є локально; гість (mirror) репортить влучання, шкоду рахує хост
-        if (level.mirror) netReport?.hits.push([hit.zombie.nid, Math.round(dmg), 0]);
-        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, false); }
+        const zone = hit.hitZone || (hit.headshot ? 'head' : 'body');
+        const dealt = dmg * (HIT_ZONE_MULT[zone] || 1);
+        if (level.mirror) netReport?.hits.push([hit.zombie.nid, Math.round(dealt), hit.headshot ? 1 : 0, 0, 0, zone, 1, 0]);
+        else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dealt, dir, hit.headshot, { weaponId: this.cur, hitZone: zone, impactSide: hit.impactSide, impactForce: 1, staggerTime: 0 }); }
         anyHit = true;
         endPoint = hit.point;
         // легке свічення/іскри в точці влучання (без важких ефектів)
@@ -1135,7 +1252,12 @@ export class Player {
       if (first) {
         // нікого не зачепили — перевіряємо лише стіну
         const wallT = this.world.shotBlockDist(origin, dir, MAX_D);
-        if (wallT < MAX_D) endPoint = this._shootEnd.copy(origin).addScaledVector(dir, wallT);
+        if (destructibleHit && destructibleHit.t <= wallT + 0.25) {
+          if (level.mirror && level.net.reportDestructibleHit) level.net.reportDestructibleHit(destructibleHit.destructible.id, dmg);
+          else this.world.damageDestructible(destructibleHit.destructible, dmg, destructibleHit.point);
+          endPoint = destructibleHit.point;
+          anyHit = true;
+        } else if (wallT < MAX_D) endPoint = this._shootEnd.copy(origin).addScaledVector(dir, wallT);
       }
     }
     const missionEngine = level.missions && (level.missions.delegate || level.missions);
@@ -1239,7 +1361,8 @@ export class Player {
     this.vel.x += (dx / d) * 4;
     this.vel.z += (dz / d) * 4;
     this.level.audio.hurt();
-    this.level.bus.emit('playerHurt');
+    const sourceYaw = Math.atan2(-(fromX - this.pos.x), -(fromZ - this.pos.z));
+    this.level.bus.emit('playerHurt', { angle: sourceYaw - this.yaw });
     if (this.health <= 0) {
       // 🪬 тотем безсмертя: рятує від смерті 1 раз — воскресає замість гинути
       if (this.reviveCharges > 0) {
