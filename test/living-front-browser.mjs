@@ -20,6 +20,7 @@ try {
     game._ensureFront();
     const id = game.save.front.board[0].country;
     game.save.front.world.countries[id] = { damage: 2, population: 70 };
+    game.save.front.restored[id] = 3;
     game.frontui.render();
     game.openFront();
     return id;
@@ -44,15 +45,23 @@ try {
     level.player.pos.x = level.missions.livingWorld.x;
     level.player.pos.z = level.missions.livingWorld.z;
     level.missions._updateLivingWorld(0, { pressed: () => true, justPressed: new Set(['KeyE']) }, true);
+    const guard = level.frontLivingCity.citizens.find((citizen) => citizen.job === 'guard');
+    const defenderTarget = level.zombies.spawn('walker', guard.rig.group.position.x + 2, guard.rig.group.position.z);
+    const beforeGuardHit = defenderTarget.hp;
+    guard.hitT = 0;
+    game._updateLivingCity(level, 0.1);
     return {
       damage: level.frontCountryState.damage,
       rubble: level.frontDamage?.children.length || 0,
       eventId,
       populationGain: game.save.front.world.countries[level.countryId].population - before,
+      cityJobs: [...new Set(level.frontLivingCity.citizens.map((citizen) => citizen.job))].sort(),
+      guardDamage: beforeGuardHit - defenderTarget.hp,
     };
   });
   if (shots) await page.screenshot({ path: `${shots}/living-front-level.png` });
-  if (levelState.damage !== 2 || levelState.rubble !== 12 || levelState.eventId !== 'survivor' || levelState.populationGain !== 5) {
+  if (levelState.damage !== 2 || levelState.rubble !== 12 || levelState.eventId !== 'survivor' || levelState.populationGain !== 5
+    || levelState.cityJobs.join(',') !== 'builder,guard,resident' || levelState.guardDamage !== 12) {
     throw new Error(`Living country runtime failed: ${JSON.stringify(levelState)}`);
   }
   if (errors.length) throw new Error(`Browser errors: ${errors.join(' | ')}`);

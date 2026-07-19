@@ -208,6 +208,19 @@ test('living world attacks once per new day and rescuing people changes the coun
   assert.equal(frontCountryState(front, 'UKR').damage, 1);
 });
 
+test('people flee an attacked country to the safest liberated city', () => {
+  let front = reduce(null, {
+    type: 'INIT', seed: 912, liberated: ['UKR', 'POL', 'DEU'], day: '2026-07-17',
+  }).front;
+  for (const state of Object.values(front.world.countries)) state.population = 70;
+  const before = Object.fromEntries(Object.entries(front.world.countries).map(([id, state]) => [id, state.population]));
+  front = reduce(front, { type: 'INIT', liberated: ['UKR', 'POL', 'DEU'], day: '2026-07-18' }).front;
+  const attacked = Object.entries(front.world.countries).find(([, state]) => state.damage === 1);
+  assert.ok(attacked);
+  assert.ok(attacked[1].population < before[attacked[0]]);
+  assert.ok(Object.entries(front.world.countries).some(([id, state]) => id !== attacked[0] && state.population > before[id]));
+});
+
 test('claiming an operation repairs damage and brings people home', () => {
   let front = createFront({ seed: 911, liberated: ['UKR'] });
   front.world.countries.UKR = { damage: 3, population: 40 };

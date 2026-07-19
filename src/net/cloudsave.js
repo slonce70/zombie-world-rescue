@@ -85,7 +85,10 @@ export function saveHasProgress(s) {
     || Object.keys(s.moonRegions || {}).length > 0
     || Object.keys(s.stormBest || {}).length > 0
     || Object.keys(s.worldBosses || {}).length > 0
-    || !!(s.moonRescue && (s.moonRescue.done || (s.moonRescue.relays || []).length > 0))
+    || !!(s.moonRescue && (s.moonRescue.done || (s.moonRescue.relays || []).length > 0
+      || Object.values(s.moonRescue.space?.regions || {}).some((regions) => Object.keys(regions || {}).length > 0)
+      || Object.values(s.moonRescue.space?.colonies || {}).some((colonies) => Object.values(colonies || {}).some((level) => (level | 0) > 0))
+      || (s.moonRescue.space?.ship?.level | 0) > 1 || (s.moonRescue.space?.ship?.parts | 0) > 0))
     || !!(s.settlement && ((s.settlement.level | 0) > 0 || (s.settlement.wood | 0) > 0
       || (s.settlement.stone | 0) > 0 || (s.settlement.survivors | 0) > 0))
     || Object.keys(s.modeBest || {}).length > 0             // рекорди соло-режимів

@@ -24,7 +24,7 @@ import {
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
-import { getMoonRegion } from './moonregions.js';
+import { getMoonRegion, getSpaceWorld } from './moonregions.js';
 import { MoonHazards } from './moonhazards.js';
 import { Bus, RNG, disposeObject } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
@@ -129,7 +129,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 547;
+const APP_VERSION = 548;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -490,7 +490,7 @@ class Game {
     });
     document.getElementById('btn-moon-globe').addEventListener('click', () => {
       this.audio.click();
-      this.globe.setMode(this.globe.mode === 'moon' ? 'earth' : 'moon');
+      this.globe.cycleMode();
     });
     document.getElementById('btn-solo').addEventListener('click', () => {
       this.audio.click();
@@ -713,7 +713,8 @@ class Game {
       // підміняє особисті board/projects/restored.
       frontCoopClaims: [],
       // 🌙 жива місячна місія: реле, оборона, бос і одноразова нагорода
-      moonRescue: { relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false },
+      moonRescue: { relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false,
+        space: { regions: { MARS: {}, EUROPA: {} }, colonies: { MOON: {}, MARS: {}, EUROPA: {} }, ship: { level: 1, parts: 0 } } },
       // 🏘️ постійний результат української відбудови
       settlement: { level: 0, wood: 0, stone: 0, survivors: 0 },
     };
@@ -831,12 +832,32 @@ class Game {
         const moonRelays = [...new Set((Array.isArray(moon.relays) ? moon.relays : []).filter((id) => ['solar', 'comms', 'oxygen'].includes(id)))];
         const moonDefenseDone = !!moon.defenseDone;
         const moonBossDefeated = !!moon.bossDefeated;
+        const rawSpace = moon.space && typeof moon.space === 'object' ? moon.space : {};
+        const rawRegions = rawSpace.regions && typeof rawSpace.regions === 'object' ? rawSpace.regions : {};
+        const rawColonies = rawSpace.colonies && typeof rawSpace.colonies === 'object' ? rawSpace.colonies : {};
+        const cleanFlags = (value, ids) => Object.fromEntries(Object.entries(value && typeof value === 'object' ? value : {})
+          .filter(([id, done]) => ids.includes(id) && done === true));
+        const cleanLevels = (value, ids) => Object.fromEntries(Object.entries(value && typeof value === 'object' ? value : {})
+          .filter(([id]) => ids.includes(id)).map(([id, level]) => [id, Math.max(0, Math.min(3, Math.trunc(Number(level) || 0)))]));
+        const ship = rawSpace.ship && typeof rawSpace.ship === 'object' ? rawSpace.ship : {};
         out.moonRescue = {
           relays: moonRelays,
           defenseDone: moonDefenseDone,
           bossDefeated: moonBossDefeated,
           rewarded: !!moon.rewarded || !!moon.done,
           done: moonRelays.length === 3 && moonDefenseDone && moonBossDefeated,
+          space: {
+            regions: {
+              MARS: cleanFlags(rawRegions.MARS, ['ARSIA', 'UTOPIA', 'VALLES', 'OLYMPUS']),
+              EUROPA: cleanFlags(rawRegions.EUROPA, ['CONAMARA', 'LINEA', 'THERA', 'ARGADNEL']),
+            },
+            colonies: {
+              MOON: cleanLevels(rawColonies.MOON, ['MARE', 'TYCHO', 'COPERNICUS', 'POLARIS']),
+              MARS: cleanLevels(rawColonies.MARS, ['ARSIA', 'UTOPIA', 'VALLES', 'OLYMPUS']),
+              EUROPA: cleanLevels(rawColonies.EUROPA, ['CONAMARA', 'LINEA', 'THERA', 'ARGADNEL']),
+            },
+            ship: { level: Math.max(1, Math.min(3, Math.trunc(Number(ship.level) || 1))), parts: Math.max(0, Math.min(4, Math.trunc(Number(ship.parts) || 0))) },
+          },
         };
         const settlement = out.settlement && typeof out.settlement === 'object' && !Array.isArray(out.settlement) ? out.settlement : {};
         const settlementInt = (value, max) => Math.max(0, Math.min(max, Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0));
@@ -2637,9 +2658,12 @@ class Game {
       const cz = z + Math.sin(angle) * radius;
       rig.group.position.set(cx, level.world.groundH(cx, cz), cz);
       rig.group.rotation.y = angle + Math.PI / 2;
-      setAnim(rig, i % 3 === 0 ? 'walk' : 'idle');
+      const job = ['guard', 'builder', 'resident'][i % 3];
+      setAnim(rig, job === 'resident' ? 'walk' : 'idle');
       level.scene.add(rig.group);
-      level.frontLivingCity.citizens.push({ rig, angle, radius, speed: 0.08 + (i % 3) * 0.025 });
+      level.frontLivingCity.citizens.push({
+        rig, angle, radius, job, hitT: i * 0.17, speed: 0.08 + (i % 3) * 0.025,
+      });
     }
   }
 
@@ -2688,12 +2712,37 @@ class Game {
     if (city) {
       const now = level.stats.time;
       city.citizens.forEach((citizen, index) => {
-        if (index % 3 === 0) {
+        if (citizen.job === 'guard') {
+          let target = null;
+          let nearest = 18;
+          for (const zombie of level.zombies.list) {
+            if (zombie.state === 'dead') continue;
+            const distance = Math.hypot(zombie.x - citizen.rig.group.position.x, zombie.z - citizen.rig.group.position.z);
+            if (distance < nearest) { nearest = distance; target = zombie; }
+          }
+          citizen.hitT -= dt;
+          if (target) {
+            const dx = target.x - citizen.rig.group.position.x;
+            const dz = target.z - citizen.rig.group.position.z;
+            citizen.rig.group.rotation.y = Math.atan2(-dx, -dz);
+            if (citizen.hitT <= 0) {
+              citizen.hitT = 1.15;
+              setAnim(citizen.rig, 'attack');
+              if (!level.net || level.net.authority) {
+                target.lastHitBy = 1;
+                target.damage(6 + city.tier * 2, new THREE.Vector3(dx, 0, dz).normalize(), false);
+              }
+            }
+          } else setAnim(citizen.rig, 'idle');
+        } else if (citizen.job === 'builder') {
+          setAnim(citizen.rig, Math.floor(now * 1.3 + index) % 5 === 0 ? 'attack' : 'idle');
+        } else {
           const angle = citizen.angle + now * citizen.speed;
           const x = city.x + Math.cos(angle) * citizen.radius;
           const z = city.z + Math.sin(angle) * citizen.radius;
           citizen.rig.group.position.set(x, level.world.groundH(x, z), z);
           citizen.rig.group.rotation.y = -angle;
+          setAnim(citizen.rig, level.nightK > 0.72 ? 'idle' : 'walk');
         }
         updateRig(citizen.rig, dt);
       });
@@ -3030,14 +3079,22 @@ class Game {
     if (victoryGlobe) victoryGlobe.style.display = '';
     const victoryNext = document.getElementById('btn-victory-next');
     if (victoryNext) victoryNext.textContent = t('▶️ Далі');
-    const moonRegion = countryId === 'MOON' ? getMoonRegion(opts.moonRegion) : null;
+    const spaceWorld = countryId === 'MOON' ? getSpaceWorld(opts.spaceWorld) : null;
+    const moonRegion = countryId === 'MOON' ? getMoonRegion(opts.moonRegion, spaceWorld.id) : null;
     const isCustomEditor = opts.customMap === 'edit';
     const isCustomPlay = opts.customMap === 'play';
     const isCustom = isCustomEditor || isCustomPlay;
     const customMapSlot = this.save.upgrades.mapeditorplus > 0 && opts.customMapSlot === 1 ? 1 : 0;
     const customMapData = opts.customMapData || (customMapSlot ? this.save.customMap2 : this.save.customMap);
     const rawCountry = isCustom ? CUSTOM_COUNTRY : (COUNTRIES[countryId] || COUNTRIES.UKR);
-    const baseCountry = moonRegion ? { ...rawCountry, name: moonRegion.name, seed: moonRegion.seed } : rawCountry;
+    const baseCountry = moonRegion ? {
+      ...rawCountry,
+      name: moonRegion.name,
+      flag: spaceWorld.icon,
+      seed: moonRegion.seed,
+      banner: t(spaceWorld.banner),
+      boss: { ...rawCountry.boss, name: t(spaceWorld.bossName) },
+    } : rawCountry;
     const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
     const mapStyle = sanitizeMapStyle((opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
     const country = { ...baseCountry, map: { ...scaleMap(baseCountry.map, mapSize), mapStyle } };
@@ -3183,6 +3240,7 @@ class Game {
       modeId,
       country,
       moonRegion,
+      spaceWorld,
       mapSize,
       mapStyle,
       scene: new THREE.Scene(),
@@ -3226,7 +3284,9 @@ class Game {
     const soloReplay = !operation && !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
     level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
     this._applyLevelExposure(countryId);
-    level.world = new World(level.scene, country.seed, getBiome(isCustom ? (customMapData.biome === 'snow' ? 'POL' : 'UKR') : countryId), country.map, this._qualityWorldOpts());
+    level.world = new World(level.scene, country.seed,
+      getBiome(isCustom ? (customMapData.biome === 'snow' ? 'POL' : 'UKR') : countryId, moonRegion && spaceWorld.palette),
+      country.map, this._qualityWorldOpts());
     level.effects = new Effects(level.scene, level.world, this.audio);
     level.effects.levelRef = level;
     // 💸 R3 «Поразка теж платить»: знімок XP на старті — щоб показати ЗДОБУТЕ за забіг на екрані смерті

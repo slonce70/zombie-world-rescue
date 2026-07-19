@@ -508,9 +508,10 @@ export const COUNTRIES = {
 
 export const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
 
-export function getBiome(countryId) {
+export function getBiome(countryId, overrides = null) {
   const c = COUNTRIES[countryId] || COUNTRIES.UKR;
-  return BIOMES[c.biome] || BIOMES.summer;
+  const biome = BIOMES[c.biome] || BIOMES.summer;
+  return overrides ? { ...biome, ...overrides } : biome;
 }
 
 // Перша незвільнена країна кампанії (наступна ціль) або null, якщо все пройдено

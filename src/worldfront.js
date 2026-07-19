@@ -357,9 +357,17 @@ export function applyFrontEvent(value, event = {}) {
       if (!targets.length) break;
       const operation = targets[hash(front.seed, front.generation + day, targets.length, 0x6d2b79f5) % targets.length];
       const country = front.world.countries[operation.country] || { damage: 0, population: 100 };
+      const beforePopulation = country.population;
       country.damage = Math.min(3, country.damage + 1);
       country.population = Math.max(20, country.population - 4 - operation.threat * 2);
       front.world.countries[operation.country] = country;
+      // Половина людей, які покинули атаковане місто, переїжджає до найбезпечнішої
+      // звільненої країни. Так наслідки фронту живуть на карті, а не зникають у toast.
+      const refugees = Math.floor((beforePopulation - country.population) / 2);
+      const shelter = Object.entries(front.world.countries)
+        .filter(([id, state]) => id !== operation.country && state.population < 100)
+        .sort(([aId, a], [bId, b]) => a.damage - b.damage || b.population - a.population || aId.localeCompare(bId))[0]?.[1];
+      if (shelter && refugees > 0) shelter.population = Math.min(100, shelter.population + refugees);
       attacked = true;
     }
     if ((days === 0 || attacked) && typeof event.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.day) && event.day >= front.world.day) {

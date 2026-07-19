@@ -76,8 +76,20 @@ export function showVictory(game) {
   const wasLiberated = !!game.save.liberated[country.id];
   game.save.liberated[country.id] = true;
   if (game.level.moonRegion) {
-    game.save.moonRegions = game.save.moonRegions || {};
-    game.save.moonRegions[game.level.moonRegion.id] = true;
+    const worldId = game.level.spaceWorld?.id || 'MOON';
+    const space = game.save.moonRescue.space;
+    const done = worldId === 'MOON' ? game.save.moonRegions : space.regions[worldId];
+    const firstLanding = !done[game.level.moonRegion.id];
+    done[game.level.moonRegion.id] = true;
+    const colonies = space.colonies[worldId];
+    colonies[game.level.moonRegion.id] = Math.min(3, (colonies[game.level.moonRegion.id] || 0) + 1);
+    if (firstLanding) {
+      const completed = Object.keys(done).length;
+      space.ship.parts = completed < 4 ? completed : 0;
+      if (completed >= 4) space.ship.level = Math.min(3, space.ship.level + 1);
+      game.save.coins += 300;
+      game.hud.toast(t('🚀 Нова колонія заснована! +300 монет'));
+    }
   }
   const infectedFirstWin = game.level.infected && !(game.save.infected && game.save.infected.cleared && game.save.infected.cleared[country.id]);
   // 🎁 нагорода-зброя країни видається ОДРАЗУ в момент перемоги (раніше з'являлась лише

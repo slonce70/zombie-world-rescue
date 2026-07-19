@@ -4,7 +4,9 @@ import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
 import { countryStars, STARS_PER_COUNTRY } from './stars.js';
 import { frontCountryState } from './worldfront.js';
-import { MOON_REGION_LIST, getMoonRegion, moonRegionFeatures } from './moonregions.js';
+import {
+  SPACE_WORLD_ORDER, getSpaceRegion, getSpaceWorld, moonRegionFeatures, spaceRegionList, spaceWorldUnlocked,
+} from './moonregions.js';
 
 const FRONT_GLOBE_COLORS = Object.freeze({
   destroyed: ['#49151f', '#a7353f'],
@@ -37,7 +39,7 @@ export class Globe {
     this.R = 1;
     this.features = [];
     this.earthFeatures = [];
-    this.moonFeatures = moonRegionFeatures();
+    this.spaceFeatures = Object.fromEntries(SPACE_WORLD_ORDER.map((id) => [id, moonRegionFeatures(id)]));
     this.mode = 'earth';
     this.ready = false;
     this.dragging = false;
@@ -90,6 +92,9 @@ export class Globe {
     const mat = new THREE.MeshStandardMaterial({ map: this.texture, roughness: 0.85, metalness: 0 });
     this.sphere = new THREE.Mesh(new THREE.SphereGeometry(this.R, 96, 64), mat);
     this.group.add(this.sphere);
+    this.spaceShip = this._makeSpaceShip();
+    this.spaceShip.visible = false;
+    this.scene.add(this.spaceShip);
 
     // маяк над поточною ціллю кампанії
     this.targetId = nextTarget(this.game.save.liberated || {}) || 'UKR';
@@ -109,7 +114,7 @@ export class Globe {
   }
 
   _rotateToCountry(id, instant = false) {
-    const c = this.mode === 'moon' ? getMoonRegion(id) : (COUNTRIES[id] || COUNTRIES.UKR);
+    const c = this.mode !== 'earth' ? getSpaceRegion(this.mode.toUpperCase(), id) : (COUNTRIES[id] || COUNTRIES.UKR);
     const up = latLonToVec3(c.lat, c.lon, 1);
     this.targetRotY = -Math.atan2(up.x, up.z);
     if (instant) this.group.rotation.y = this.targetRotY;
@@ -144,6 +149,25 @@ export class Globe {
     return g;
   }
 
+  _makeSpaceShip() {
+    const ship = new THREE.Group();
+    const hull = new THREE.MeshStandardMaterial({ color: 0xd9e4ef, metalness: 0.55, roughness: 0.35 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x5ad9ff, emissive: 0x17668b, emissiveIntensity: 0.8 });
+    const engine = new THREE.MeshStandardMaterial({ color: 0xff9f45, emissive: 0xff5a16, emissiveIntensity: 1.5 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.52, 12), hull);
+    body.rotation.z = Math.PI / 2;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 12), glass);
+    nose.rotation.z = -Math.PI / 2; nose.position.x = 0.35;
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 10), engine);
+    flame.rotation.z = Math.PI / 2; flame.position.x = -0.34;
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.025, 0.42), hull);
+    wing.position.x = -0.05;
+    ship.add(body, nose, flame, wing);
+    ship.position.set(1.55, -0.52, 0.15);
+    ship.rotation.set(-0.12, -0.28, -0.14);
+    return ship;
+  }
+
   _drawBeaconLabel(title, sub, color = '#ffd23f') {
     const ctx = this.labelCanvas.getContext('2d');
     ctx.clearRect(0, 0, 512, 160);
@@ -169,12 +193,14 @@ export class Globe {
   }
 
   _aimBeaconAt(id) {
-    if (this.mode === 'moon') {
-      const region = getMoonRegion(id);
+    if (this.mode !== 'earth') {
+      const world = getSpaceWorld(this.mode.toUpperCase());
+      const region = getSpaceRegion(world.id, id);
       this._placeBeacon(latLonToVec3(region.lat, region.lon, this.R));
-      this.beamMesh.material.color.setHex(0xd8ecff);
-      this.ringMesh.material.color.setHex(0xd8ecff);
-      this._drawBeaconLabel(region.name.toUpperCase(), t('натисни — почни місію!'), '#d8ecff');
+      const color = world.id === 'MARS' ? 0xffa06f : world.id === 'EUROPA' ? 0xd8f7ff : 0xd8ecff;
+      this.beamMesh.material.color.setHex(color);
+      this.ringMesh.material.color.setHex(color);
+      this._drawBeaconLabel(region.name.toUpperCase(), t('натисни — почни місію!'), `#${color.toString(16).padStart(6, '0')}`);
       return;
     }
     // 🦖 фінал відкрито: світ вільний, але острів динозаврів чекає — червоний маяк-заклик
@@ -222,14 +248,31 @@ export class Globe {
     this.ready = true;
   }
 
+  _spaceDone(worldId) {
+    if (worldId === 'MOON') return this.game.save.moonRegions || {};
+    return this.game.save.moonRescue?.space?.regions?.[worldId] || {};
+  }
+
+  _spaceColony(worldId, regionId) {
+    return this.game.save.moonRescue?.space?.colonies?.[worldId]?.[regionId] || 0;
+  }
+
   setMode(mode) {
-    this.mode = mode === 'moon' ? 'moon' : 'earth';
-    this.features = this.mode === 'moon' ? this.moonFeatures : this.earthFeatures;
-    this.atmo.visible = this.mode !== 'moon';
-    this.beacon.visible = this.mode !== 'moon';
-    if (this.mode === 'moon') {
-      const done = this.game.save.moonRegions || {};
-      this.targetId = (MOON_REGION_LIST.find((region) => !done[region.id]) || MOON_REGION_LIST[0]).id;
+    const requested = String(mode || 'earth').toUpperCase();
+    const world = SPACE_WORLD_ORDER.includes(requested) ? getSpaceWorld(requested) : null;
+    if (world && !spaceWorldUnlocked(this.game.save, world.id)) {
+      this.game.hud.toast(t('🔒 Спочатку звільни попередню планету.'));
+      return false;
+    }
+    this.mode = world ? world.id.toLowerCase() : 'earth';
+    this.features = world ? this.spaceFeatures[world.id] : this.earthFeatures;
+    this.atmo.visible = !world;
+    this.spaceShip.visible = !!world;
+    this.beacon.visible = true;
+    if (world) {
+      const done = this._spaceDone(world.id);
+      const list = spaceRegionList(world.id);
+      this.targetId = (list.find((region) => !done[region.id]) || list[0]).id;
       this.allDone = false;
     } else {
       this.targetId = nextTarget(this.game.save.liberated || {}) || 'UKR';
@@ -239,20 +282,38 @@ export class Globe {
     const sub = document.querySelector('.globe-sub');
     const hint = document.querySelector('.globe-hint');
     const toggle = document.getElementById('btn-moon-globe');
-    if (title) title.innerHTML = this.mode === 'moon' ? '🌙 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК МІСЯЦЯ</span>' : '🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span>';
-    if (sub) sub.textContent = this.mode === 'moon' ? 'Обирай вигадану місячну країну — у кожної свої завдання.' : 'Зомбі захопили планету! Рятуй країни — сам або з друзями.';
-    if (hint) hint.textContent = this.mode === 'moon' ? '🖱️ Обертай Місяць · натисни на країну, щоб почати операцію!' : '🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!';
-    if (toggle) toggle.textContent = this.mode === 'moon' ? '🌍 Земля' : '🌙 Місяць';
+    const ship = this.game.save.moonRescue?.space?.ship || { level: 1, parts: 0 };
+    this.spaceShip.scale.setScalar(0.85 + Math.min(3, ship.level) * 0.12);
+    if (title) title.innerHTML = world ? `${world.icon} ОПЕРАЦІЯ: <span class="accent">${world.name.toUpperCase()}</span>` : '🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span>';
+    if (sub) sub.textContent = world ? `Корабель рівня ${ship.level} · деталі ${ship.parts}/4 · засновуй колонії та відкривай наступну планету.` : 'Зомбі захопили планету! Рятуй країни — сам або з друзями.';
+    if (hint) hint.textContent = world ? `🖱️ Обертай ${world.name} · натисни на державу, щоб висадитися!` : '🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!';
+    if (toggle) {
+      const next = this._nextMode();
+      const nextWorld = next === 'earth' ? null : getSpaceWorld(next.toUpperCase());
+      toggle.textContent = nextWorld ? `${nextWorld.icon} ${nextWorld.name}` : '🌍 Земля';
+    }
     for (const selector of ['#gift-chip', '#camp-quest-chip', '#globe-compass', '.globe-play-row', '#globe-progress', '#weekly-goal']) {
       const el = document.querySelector(selector);
-      if (el) el.style.display = this.mode === 'moon' ? 'none' : '';
+      if (el) el.style.display = world ? 'none' : '';
     }
     const tooltip = document.getElementById('globe-tooltip');
     if (tooltip) tooltip.style.display = 'none';
     this._aimBeaconAt(this.targetId);
     this._rotateToCountry(this.targetId);
     this.repaint();
+    return true;
   }
+
+  _nextMode() {
+    if (this.mode === 'earth') return 'moon';
+    const index = SPACE_WORLD_ORDER.indexOf(this.mode.toUpperCase());
+    for (let i = index + 1; i < SPACE_WORLD_ORDER.length; i++) {
+      if (spaceWorldUnlocked(this.game.save, SPACE_WORLD_ORDER[i])) return SPACE_WORLD_ORDER[i].toLowerCase();
+    }
+    return 'earth';
+  }
+
+  cycleMode() { return this.setMode(this._nextMode()); }
 
   _eachRing(feature, cb) {
     const geom = feature.geometry;
@@ -314,9 +375,12 @@ export class Globe {
   repaint() {
     const ctx = this.texCanvas.getContext('2d');
     const w = this.texCanvas.width, h = this.texCanvas.height;
-    if (this.mode === 'moon') {
+    if (this.mode !== 'earth') {
+      const world = getSpaceWorld(this.mode.toUpperCase());
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, '#d7d9dc'); grad.addColorStop(0.5, '#989da3'); grad.addColorStop(1, '#c4c7ca');
+      const bg = world.id === 'MARS' ? ['#7c321f', '#b65332', '#57251e']
+        : world.id === 'EUROPA' ? ['#d9f2f7', '#83b8ce', '#b8e2ec'] : ['#d7d9dc', '#989da3', '#c4c7ca'];
+      grad.addColorStop(0, bg[0]); grad.addColorStop(0.5, bg[1]); grad.addColorStop(1, bg[2]);
       ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
       const rng = (n) => ((Math.sin(n * 91.17) + 1) * 0.5);
       for (let i = 0; i < 95; i++) {
@@ -324,15 +388,15 @@ export class Globe {
         ctx.fillStyle = 'rgba(55,58,63,0.16)'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 3; ctx.stroke();
       }
-      const done = this.game.save.moonRegions || {};
+      const done = this._spaceDone(world.id);
       this.features.forEach((f, index) => {
         const id = f.id;
-        const base = ['#758696', '#8b819a', '#727d73', '#6d7f8f'][index];
-        this._paintCountry(ctx, f, done[id] ? '#a9c9bd' : (this.hoverId === id ? '#c7d9e8' : base), '#e8edf2', w, h);
+        const base = world.colors[index];
+        this._paintCountry(ctx, f, done[id] ? world.done : (this.hoverId === id ? world.hover : base), world.stroke, w, h);
       });
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f5f7fa';
       ctx.strokeStyle = 'rgba(20,24,30,0.8)'; ctx.lineWidth = 7; ctx.font = 'bold 34px Arial';
-      MOON_REGION_LIST.forEach((region) => {
+      spaceRegionList(world.id).forEach((region) => {
         const x = ((region.lon + 180) / 360) * w;
         const y = ((90 - region.lat) / 180) * h;
         ctx.strokeText(region.name, x, y); ctx.fillText(region.name, x, y);
@@ -459,10 +523,12 @@ export class Globe {
       tooltip.style.display = 'block';
       tooltip.style.left = (e.clientX + 14) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
-      if (this.mode === 'moon') {
-        const region = getMoonRegion(c.id);
-        const done = (this.game.save.moonRegions || {})[c.id];
-        tooltip.innerHTML = `${done ? '✅' : '🌙'} <b>${region.name}</b><br>${region.story ? 'Важка сюжетна операція' : `Місії: ${region.missions.join(' · ')}`}`;
+      if (this.mode !== 'earth') {
+        const world = getSpaceWorld(this.mode.toUpperCase());
+        const region = getSpaceRegion(world.id, c.id);
+        const doneMap = this._spaceDone(world.id);
+        const colony = this._spaceColony(world.id, c.id);
+        tooltip.innerHTML = `${doneMap[c.id] ? '✅' : world.icon} <b>${region.name}</b><br>${region.story ? 'Важка сюжетна операція' : `Місії: ${region.missions.join(' · ')}`}<br>🏠 Колонія: ${colony}/3`;
         tooltip.classList.add('available');
         document.body.style.cursor = 'pointer';
       } else {
@@ -500,11 +566,11 @@ export class Globe {
     const c = this.pickCountry(hit.uv);
     if (!c) return;
     this.game.audio.ensure();
-    if (this.mode === 'moon') {
+    if (this.mode !== 'earth') {
       this.game.audio.click();
       document.getElementById('globe-tooltip').style.display = 'none';
       document.body.style.cursor = 'default';
-      this.game.startLevel('MOON', { moonRegion: c.id });
+      this.game.startLevel('MOON', { moonRegion: c.id, spaceWorld: this.mode.toUpperCase() });
       return;
     }
     const playable = (this.game.save.liberated || {})[c.id] || isCountryOpen(this.game.save.liberated, c.id);
@@ -520,7 +586,7 @@ export class Globe {
   }
 
   setLiberated() {
-    if (this.mode === 'moon') { this.setMode('moon'); return; }
+    if (this.mode !== 'earth') { this.setMode(this.mode); return; }
     const lastTarget = this.targetId;
     const nt = nextTarget(this.game.save.liberated || {});
     this.allDone = nt === null;
@@ -538,6 +604,10 @@ export class Globe {
     this.group.rotation.y += (this.targetRotY - this.group.rotation.y) * Math.min(1, dt * 8);
     this.group.rotation.x += (this.targetRotX - this.group.rotation.x) * Math.min(1, dt * 8);
     this.stars.rotation.y += dt * 0.008;
+    if (this.spaceShip.visible) {
+      this.spaceShip.position.y = -0.52 + Math.sin(this.t * 1.3) * 0.035;
+      this.spaceShip.rotation.y += dt * 0.18;
+    }
     // пульс маяка
     const pulse = 1 + Math.sin(this.t * 3) * 0.25;
     this.ringMesh.scale.setScalar(pulse);
