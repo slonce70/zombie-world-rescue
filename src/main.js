@@ -516,6 +516,12 @@ class Game {
       this._hideOverlay('overlay-arena-end');
       this.endLevel();
     });
+    document.getElementById('btn-front-result-primary').addEventListener('click', () => {
+      this._finishFrontResult(document.getElementById('btn-front-result-primary').dataset.action);
+    });
+    document.getElementById('btn-front-result-end').addEventListener('click', () => {
+      this._finishFrontResult(document.getElementById('btn-front-result-end').dataset.action);
+    });
     document.getElementById('btn-storm-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-storm-end');
       const c = this.level ? this.level.countryId : null;
@@ -2587,16 +2593,50 @@ class Game {
     if (!level || !level.operation || level._frontFinished) return false;
     level._frontFinished = true;
     if (level.net && !level.net.authority) return true;
+    const before = frontCountryState(this.save.front, level.countryId);
     const picked = level.runBuild ? level.runBuild.ids.slice(level._frontBuildStart || 0) : [];
     this._applyFrontTransition({ type: won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked });
     if (won && this.save.front && this.save.front.active && this.save.front.active.status === 'completed') {
       this._applyFrontTransition({ type: 'CLAIM_OPERATION' });
     }
-    const retry = document.getElementById('btn-arena-retry');
-    const globe = document.getElementById('btn-arena-globe');
-    if (retry) retry.style.display = 'none';
-    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
+    const terminal = won && !this.save.front.active;
+    const after = frontCountryState(this.save.front, level.countryId);
+    return this._showFrontResult({ won, terminal, before, after });
+  }
+
+  _showFrontResult({ won, terminal, before, after }) {
+    const kind = won ? (terminal ? 'complete' : 'checkpoint') : 'failed';
+    const primary = document.getElementById('btn-front-result-primary');
+    const end = document.getElementById('btn-front-result-end');
+    const state = { peaceful: 'спокій', attacked: 'під атакою', destroyed: 'зруйновано', rebuilding: 'відбудова', saved: 'врятовано' };
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    this.input.exitLock();
+    document.getElementById('front-result-title').textContent = t(won
+      ? (terminal ? '🌟 ОПЕРАЦІЮ ЗАВЕРШЕНО!' : '✅ ЕТАП ПРОЙДЕНО!')
+      : '💀 ОПЕРАЦІЮ ПРОВАЛЕНО');
+    document.getElementById('front-result-summary').textContent = t(won
+      ? (terminal ? 'Країна відбудовується, а проєкт Бази просунувся.' : 'Прогрес збережено. Наступний етап уже готовий.')
+      : 'Етап можна повторити або завершити операцію.');
+    const change = document.getElementById('front-result-change');
+    change.className = 'front-result-change front-status';
+    change.innerHTML = `<span class="front-status-icon">🗺️</span><div><strong>${t('Стан країни')}</strong><span>${t(state[before && before.state] || '—')} → ${t(state[after && after.state] || '—')}</span></div>`;
+    primary.textContent = t(won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
+    primary.dataset.action = won ? (terminal ? 'globe' : 'continue') : 'retry';
+    end.textContent = t(won ? 'ДО ГЛОБУСА' : 'ЗАВЕРШИТИ ОПЕРАЦІЮ');
+    end.dataset.action = won ? 'globe' : 'end';
+    const overlay = document.getElementById('overlay-front-result');
+    overlay.dataset.kind = kind;
+    this._showOverlay('overlay-front-result');
     return true;
+  }
+
+  _finishFrontResult(action) {
+    this._hideOverlay('overlay-front-result');
+    if (action === 'end') this._applyFrontTransition({ type: 'END_FAILED_OPERATION' });
+    this._frontNextAction = action;
+    this.endLevel();
   }
 
   _initFrontRuntime(level, front) {
@@ -2921,24 +2961,12 @@ class Game {
     this.audio.setMode(null);
     this.input.exitLock();
     if (won && level.net && level.net.authority) level.netEv('vict');
-    this._finishFrontStage(!!won);
-    const retry = document.getElementById('btn-arena-retry');
-    if (retry) retry.style.display = 'none';
-    const globe = document.getElementById('btn-arena-globe');
-    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
-    document.getElementById('arena-league-place').textContent = '';
-    document.querySelector('#overlay-arena-end h1').textContent = won ? t('✅ ЕТАП ПРОЙДЕНО!') : t('💚 СПРОБУЙ ЩЕ РАЗ');
-    document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">${icon}</span><span class="stat-name">${t(objective)}</span><span class="stat-val">${detail}</span></div>
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
-      <div class="stat best"><span class="stat-icon">💾</span><span class="stat-name">${t('Прогрес')}</span><span class="stat-val">${won ? t('збережено') : t('без штрафу')}</span></div>`;
-    this._showOverlay('overlay-arena-end');
+    return this._finishFrontStage(!!won);
   }
 
   _leaveFrontResult(overlay) {
     this._hideOverlay(overlay);
-    this.endLevel();
-    setTimeout(() => this.openFront(), 50);
+    this._finishFrontResult('globe');
   }
 
   // ---------- 🧭 експедиція ----------
@@ -4117,6 +4145,9 @@ class Game {
   endLevel() {
     const leavingExpedition = !!(this.level && this.level.expedition);
     const leavingFront = !!(this.level && this.level.operation);
+    const leavingFrontCoop = !!(this.level && this.level.net);
+    const frontNextAction = this._frontNextAction;
+    this._frontNextAction = null;
     if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
@@ -4130,7 +4161,12 @@ class Game {
       setTimeout(() => {
         if (sess.state === 'lobby') {
           if (leavingFront && sess.role === 'host') {
-            this.openFront();
+            const active = this.save.front && this.save.front.active;
+            if ((frontNextAction === 'continue' || frontNextAction === 'retry') && active) {
+              this.startFrontOperation(active.operationId);
+            } else {
+              this.openFront();
+            }
           } else if (leavingFront) {
             this._showOverlay('overlay-lobby');
             this.coop._renderLobby();
@@ -4187,7 +4223,7 @@ class Game {
     if (this.touch && this.touch.resetPointers) this.touch.resetPointers();
     else if (this.input && this.input.resetTransient) this.input.resetTransient();
     // прибираємо всі оверлеї рівня
-    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end']) {
+    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end', 'overlay-front-result']) {
       this._hideOverlay(id);
     }
     if (this.shop.isOpen) this.shop.close();
@@ -4195,6 +4231,12 @@ class Game {
     this._showGlobeUI(true);
     this.audio.setMode(this.audio.ctx ? 'globe' : null);
     this.hud.showBoss(false);
+    if (leavingFront && !leavingFrontCoop && (frontNextAction === 'continue' || frontNextAction === 'retry')) {
+      const active = this.save.front && this.save.front.active;
+      if (active) this.startFrontOperation(active.operationId);
+    } else if (leavingFront && !leavingFrontCoop && (frontNextAction === 'end' || frontNextAction === 'globe')) {
+      this.openFront();
+    }
   }
 
   _onPlayerDied() {
@@ -5441,7 +5483,7 @@ class Game {
 
   // 🏆 v305: екрани кінця винесено у src/ui/endscreens.js — делегати лишають назви методів
   // (netVictory/_onBossDied/глобус викликають _showVictory/_maybeWorldSaved по цих іменах).
-  _showVictory() { return showVictory(this); }
+  _showVictory() { return this.level && this.level.operation ? this._finishFrontStage(true) : showVictory(this); }
 
   _maybeWorldSaved() { return maybeWorldSaved(this); }
 

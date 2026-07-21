@@ -1617,6 +1617,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .front-status strong, .front-status span { display: block; }
 .front-status strong { color: #fff; font-size: 16px; }
 .front-status span { margin-top: 3px; color: #b9d0e8; font-size: 13px; font-weight: 700; }
+.front-result-change { max-width: 420px; margin: 18px auto; }
 .front-section { min-width: 0; text-align: left; }
 .front-section + .front-section { margin-top: 14px; }
 .front-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 2px 8px; }
