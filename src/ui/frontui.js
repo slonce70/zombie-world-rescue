@@ -29,6 +29,8 @@ const STAGE_UI = {
   'commander-stalker': 'Командир-сталкер',
 };
 
+export const frontStageLabel = (stage) => STAGE_UI[stage] || String(stage || '').replace(/[-_]+/g, ' ');
+
 const SPECIALIST_UI = {
   dispatcher: { icon: '📡', name: 'Диспетчер', desc: 'Без бонусу — зате завжди поруч' },
   medic: { icon: '🩺', name: 'Медик', desc: '+25% лікування і аптечка' },
@@ -302,7 +304,7 @@ export class FrontUI {
     const threat = '⚠️'.repeat(op.threat);
     const commander = op.commander ? `<span class="front-op-intel">👑 ${esc(op.commander)}</span>` : '';
     const stages = op.stages.map((stage, index) => {
-      const label = STAGE_UI[stage] || stage.replace(/[-_]+/g, ' ');
+      const label = frontStageLabel(stage);
       return `<span role="listitem" data-stage-id="${esc(stage)}"><b>${index + 1}</b>${esc(t(label))}</span>`;
     }).join('');
     const stageIntel = stages

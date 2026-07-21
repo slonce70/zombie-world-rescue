@@ -2600,7 +2600,7 @@ class Game {
     if (!this.save.front.active) this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
     if (!this.save.front.active || this.save.front.active.status !== 'ready') return false;
     this.frontui.close();
-    document.getElementById('btn-coop').click();
+    this.coop.openForFront();
     return true;
   }
 
@@ -4191,8 +4191,8 @@ class Game {
               this.openFront();
             }
           } else if (leavingFront) {
-            this._showOverlay('overlay-lobby');
-            this.coop._renderLobby();
+            document.getElementById('net-wait-sub').textContent = t('Чекаємо на хоста');
+            this._showOverlay('overlay-net-wait');
           } else if (leavingExpedition) {
             this.renderExpedition();
             this._showOverlay('overlay-expedition');

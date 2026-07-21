@@ -2666,4 +2666,10 @@ export const EN = {
 "ГРАТИ СОЛО": "PLAY SOLO",
 "🤝 ПОЧАТИ РАЗОМ": "🤝 START TOGETHER",
 "🎮 ГРАТИ СОЛО": "🎮 PLAY SOLO",
+"Світ хоста: {n}": "Host's world: {n}",
+"Етап {n}/3": "Stage {n}/3",
+"Ціль: {objective}": "Objective: {objective}",
+"Готовий до старту": "Ready to start",
+"Скасувати готовність": "Cancel ready",
+"Чекаємо на хоста": "Waiting for the host",
 };

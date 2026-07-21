@@ -108,6 +108,7 @@ export function sanitizeRosterEntry(raw, forcedPid = undefined) {
     tracer: rosterId(TRACERS, own(src, 'tracer'), 'classic'),
     dance: rosterId(DANCES, own(src, 'dance'), 'shuffle'),
     pet: rosterId(PETS, own(src, 'pet'), null),
+    ready: own(src, 'ready') === true,
   };
 }
 
@@ -129,6 +130,7 @@ export class CoopSession {
     this.onStarted = null;     // () => {} — рівень стартував (закрити лобі)
     this.expeditionVotes = new Map();
     this.frontRun = null;      // canonical host snapshot for the current Front room
+    this.frontStartedOperationId = null;
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);
@@ -233,17 +235,21 @@ export class CoopSession {
     this.state = 'idle';
     this.roster.clear();
     this.frontRun = null;
+    this.frontStartedOperationId = null;
     if (this.net) { this.net.dispose(); this.net = null; }
   }
 
   // ---------- лобі (хост) ----------
   setCountry(countryId) {
+    if (countryId !== this.countryId) this._resetReady();
     this.countryId = countryId;
     if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode }, true);
   }
 
   setMode(mode) {
+    if (mode !== this.mode) this._resetReady();
     this.mode = mode;
+    if (mode !== 'front') this.frontStartedOperationId = null;
     if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode }, true);
   }
 
@@ -270,6 +276,33 @@ export class CoopSession {
     rr.role = sanitizeCoopRole(r);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
+  }
+
+  setMyReady(ready) {
+    const mine = this.roster.get(this.myPid);
+    if (!mine) return;
+    mine.ready = ready === true;
+    if (this.role === 'host') this._broadcastRoster();
+    else this.transport.send(1, { t: 'ready', ready: mine.ready }, true);
+    if (this.onRoster) this.onRoster();
+  }
+
+  _hostSetGuestReady(pid, ready) {
+    const guest = pid === 1 ? null : this.roster.get(pid);
+    if (!guest) return;
+    guest.ready = ready === true;
+    this._broadcastRoster();
+    if (this.onRoster) this.onRoster();
+  }
+
+  _resetReady() {
+    let changed = false;
+    for (const entry of this.roster.values()) {
+      if (entry.ready) changed = true;
+      entry.ready = false;
+    }
+    if (changed && this.role === 'host') this._broadcastRoster();
+    if (changed && this.onRoster) this.onRoster();
   }
 
   // хост тисне СТАРТ
@@ -348,9 +381,18 @@ export class CoopSession {
   // the only new protocol field is compact `fr`.
   startFrontStage(countryId, opts = {}, operation = null) {
     if (this.role !== 'host') return false;
-    const run = this.frontSnapshot();
-    const fr = frontSpecFromState(run, operation);
+    let run = this.frontSnapshot();
+    let fr = frontSpecFromState(run, operation);
     if (!run || !fr) return false;
+    if (this.frontStartedOperationId !== fr.o && [...this.roster.values()].some((entry) => !entry.ready)) return false;
+    let transitioned = false;
+    if (run.active && run.active.status === 'ready' && typeof this.game._applyFrontTransition === 'function') {
+      this.game._applyFrontTransition({ type: 'START_STAGE' });
+      run = this.frontSnapshot();
+      fr = frontSpecFromState(run, operation);
+      if (!run || !fr || run.active.status !== 'active') return false;
+      transitioned = true;
+    }
     const spec = {
       countryId, seed: this.game.seed, runIndex: fr.g,
       defense: opts.defense || null,
@@ -362,11 +404,12 @@ export class CoopSession {
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
-    this.syncFront(run);
+    if (!transitioned) this.syncFront(run);
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     this.mode = 'front';
     this.countryId = countryId;
+    this.frontStartedOperationId = fr.o;
     if (this.onStarted) this.onStarted();
     this.game.startLevel(countryId, {
       coop: { session: this, role: 'host', spec },
@@ -387,6 +430,12 @@ export class CoopSession {
     if (this.role !== 'host') return null;
     const run = sanitizeFrontSnapshot(value);
     if (!run) return null;
+    const previousId = this.frontRun && this.frontRun.active && this.frontRun.active.operationId;
+    const nextId = run.active && run.active.operationId;
+    if (previousId !== nextId || !run.active || run.active.status === 'completed') {
+      this.frontStartedOperationId = null;
+      this._resetReady();
+    }
     this.frontRun = run;
     const msg = { t: 'frun', run };
     this.transport.broadcast(msg, true);
@@ -459,6 +508,7 @@ export class CoopSession {
   levelEnded() {
     if (this.net) { this.net.dispose(); this.net = null; }
     if (this.state === 'level') this.state = 'lobby';
+    if (this.mode !== 'front') this._resetReady();
   }
 
   // ---------- повідомлення ----------
@@ -474,6 +524,7 @@ export class CoopSession {
       if (d.t === 'hello') this._hostHello(from, d);
       else if (d.t === 'bye') this._dropGuest(from, 'left');
       else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
+      else if (d.t === 'ready') this._hostSetGuestReady(from, d.ready);
       else if (d.t === 'xpv') {
         const run = sanitizeExpedition(this.game.save.expedition);
         if (this.state === 'lobby' && this.roster.has(from) && run && run.status === 'choice' && run.choices.some((n) => n.id === d.node)) {
@@ -576,10 +627,13 @@ export class CoopSession {
         nick = base.slice(0, 12 - suf.length).trimEnd() + suf;
       }
     }
+    const previous = this.roster.get(from);
     const entry = sanitizeRosterEntry(d, from);
     if (!entry) { this.transport.send(from, { t: 'reject', why: 'invalid' }, true); return; }
     entry.nick = nick;
+    if (isReconnect) entry.ready = previous.ready === true;
     this.roster.set(from, entry);
+    if (!isReconnect) this._resetReady();
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       roster: this._rosterList(),
@@ -627,6 +681,7 @@ export class CoopSession {
     const r = this.roster.get(pid);
     if (!r) return;
     this.roster.delete(pid);
+    this._resetReady();
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
     if (this.net) this.net.removeGuest(pid);

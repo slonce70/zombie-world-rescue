@@ -1291,6 +1291,12 @@ body.touch-mode #touch-coach.show { display: block; }
   text-shadow: 0 4px 0 #8a6a00, 0 8px 24px rgba(0,0,0,.5); padding-left: 16px;
 }
 #lobby-roster { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.lobby-front-summary {
+  display: flex; flex-direction: column; gap: 4px; margin: 8px 0 12px; padding: 10px 12px;
+  border: 2px solid rgba(77, 214, 168, .45); border-radius: 12px; background: rgba(77, 214, 168, .1);
+  color: #cfe8ff; font-size: 13px; font-weight: 800;
+}
+.lobby-front-summary strong { color: #fff; font-size: 16px; }
 .lobby-player {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px;
   background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);

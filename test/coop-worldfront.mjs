@@ -53,8 +53,16 @@ try {
     };
     const host = new CoopSession(hostGame);
     host.role = 'host'; host.myPid = 1; host.state = 'lobby';
+    host.mode = 'front';
+    host.roster = new Map([
+      [1, { pid: 1, nick: 'Host', ready: false }],
+      [2, { pid: 2, nick: 'Guest', ready: false }],
+    ]);
     host.transport.broadcast = (msg) => broadcasts.push(structuredClone(msg));
-    host.startFrontStage('UKR', { portal: true }, front.active);
+    const blockedStart = host.startFrontStage('UKR', { portal: true }, front.active);
+    host.setMyReady(true);
+    host._hostSetGuestReady(2, true);
+    const readyStart = host.startFrontStage('UKR', { portal: true }, front.active);
     host.syncFront(front, [{ type: 'grant', rewardId: 'front:123:g7-UKR-evacuation:operation', coins: 300, crystals: 3, eggs: 0 }, { type: 'toast', key: 'nope' }]);
 
     let netSawForged = 0;
@@ -82,7 +90,7 @@ try {
     guest._onMessage(1, { t: 'welcome', pid: 2, roster: [], frun: completedFront });
     guest._onMessage(1, { t: 'frun', run: claimedFront, rw: [['front:evil', 99999, 9999, 99]] });
     guest._onMessage(3, { t: 'frun', run: { ...front, generation: 999 } });
-    guest._onMessage(1, { t: 'start', countryId: 'UKR', portal: true, fr: compact });
+    guest._onMessage(1, broadcasts.find((message) => message.t === 'start'));
     const appliedBeforeBadStart = applied.length;
     guest.state = 'lobby'; guestGame.state = 'globe';
     guest._onMessage(1, { t: 'start', countryId: 'UKR', fr: { o: '<bad>' } });
@@ -136,6 +144,13 @@ try {
     roomUi._renderLobby();
     const guestFrontButton = !document.getElementById('btn-lobby-front').hidden;
 
+    let frontEntryOpened = false;
+    const previousOpenCoop = roomUi._openCoop;
+    roomUi._openCoop = () => { frontEntryOpened = true; };
+    roomUi.openForFront();
+    const openForFrontQueued = frontEntryOpened && roomUi.frontEntry === true;
+    roomUi._openCoop = previousOpenCoop;
+
     const previousLevel = realGame.level;
     const previousVictory = realGame.victoryShown;
     const previousShowVictory = realGame._showVictory;
@@ -171,16 +186,16 @@ try {
 
     return {
       proto: PROTO_VERSION, wire, compact, expanded, badVersion,
-      broadcasts, started,
+      broadcasts, started, blockedStart, readyStart,
       forged: { netSawForged, added: broadcasts.length - beforeForged },
       applied, appliedBeforeBadStart, reconnectApplied, captured: captured.frun,
       guestPersonalFront: guestGame.save.front,
-      hostFrontButton, guestFrontButton,
+      hostFrontButton, guestFrontButton, openForFrontQueued,
       remoteVictoryAccepted, remoteCompleteFlag, modeVictoryBroadcasts, modeStageFinished,
     };
   });
 
-  check(out.proto === 20, 'protocol bumped to v20', String(out.proto));
+  check(out.proto === 21, 'protocol remains at the branch baseline v21', String(out.proto));
   check(out.compact.g === 7 && out.compact.o === 'g7-UKR-evacuation' && out.compact.s === 1
     && out.compact.p === 'UKR' && out.compact.b.join(',') === 'dmg25,armor',
   'compact fr keeps generation/operation/stage/specialist/build', JSON.stringify(out.compact));
@@ -192,8 +207,12 @@ try {
 
   const starts = out.broadcasts.filter((m) => m.t === 'start');
   const runs = out.broadcasts.filter((m) => m.t === 'frun');
-  check(starts.length === 1 && starts[0].fr && starts[0].fr.o === out.compact.o, 'host start sends compact fr');
+  check(out.blockedStart === false && out.readyStart === true && starts.length === 1,
+    'host waits until every current roster entry is ready');
+  check(starts[0].fr && starts[0].fr.o === out.compact.o, 'host start sends compact fr');
   check(out.started && out.started.opts.operation.operationId === out.compact.o, 'host starts same canonical operation locally');
+  check(JSON.stringify(out.started.opts.coop.spec.fr) === JSON.stringify(out.applied.find((x) => x.kind === 'start')?.spec.fr),
+    'host and guest receive the same compact fr start spec');
   check(runs.length >= 2 && runs.every((message) => message.rw == null),
     'host frun never sends reward amounts');
   check(out.forged.netSawForged === 0 && out.forged.added === 0, 'forged guest state/result/reward is rejected before level net');
@@ -201,9 +220,9 @@ try {
   const rewards = out.applied.filter((x) => x.kind === 'reward');
   const guestStart = out.applied.find((x) => x.kind === 'start');
   check(rewards.length === 1 && rewards[0].rewards.length === 1
-    && rewards[0].rewards[0].rewardId === 'front:123:g7-UKR-evacuation:operation'
+    && rewards[0].rewards[0].rewardId === 'front:123:g7-UKR-evacuation:r2:operation'
     && rewards[0].rewards[0].coins === 300 && rewards[0].rewards[0].crystals === 3,
-  'guest derives canonical reward locally and ignores wire amounts');
+  'guest derives canonical reward locally and ignores wire amounts', JSON.stringify(rewards));
   check(out.guestPersonalFront.marker === 'guest-personal-front',
     'host snapshot never replaces guest personal Front progress');
   check(guestStart && guestStart.operation.generation === 7 && guestStart.operation.build.length === 2,
@@ -215,6 +234,7 @@ try {
     'host captureState includes canonical frun');
   check(out.hostFrontButton && !out.guestFrontButton,
     'room exposes Front entry to the host only');
+  check(out.openForFrontQueued, 'prepared Front opens the co-op entry flow');
   check(out.remoteCompleteFlag && out.remoteVictoryAccepted,
     'trusted host victory bypasses the guest-only Director clock');
   check(out.modeVictoryBroadcasts === 1 && out.modeStageFinished,
