@@ -4051,6 +4051,7 @@ class Game {
     }
     if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
+    this.hud.update(0);
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;

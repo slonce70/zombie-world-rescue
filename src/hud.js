@@ -480,8 +480,8 @@ export class HUD {
     if (so && !so.done) {
       // 🎓 перший чип вторинної цілі — разове знайомство
       this.hintOnce('secondary1', t('⭐ ДОДАТКОВА ЦІЛЬ!'), t('Виконай ціль забігу — отримаєш зірку! ⭐'));
-      html += `<div class="mission secondary ${so.done ? 'done' : ''}">`
-        + `<span class="mi">${so.done ? '✅' : '⭐'}</span> ${so.label()} `
+      html += '<div class="mission secondary">'
+        + `<span class="mi">⭐</span> ${so.label()} `
         + `<span class="sec-prog">${Math.min(so.target, so.progress)}/${so.target}</span></div>`;
     }
     if (this.el.missions.innerHTML !== html) this.el.missions.innerHTML = html;

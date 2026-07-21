@@ -49,13 +49,13 @@ const previews = await page.evaluate(() => [...document.querySelectorAll('#solo-
   icons: [...country.querySelectorAll('.mission-preview span')].map((el) => el.textContent),
 })));
 const preview = previews.find((country) => country.id === 'UKR')?.icons || [];
-check(preview.length === 4 && preview.slice(0, 3).join('') === '🆘📡🛡️', 'UKR preview shows 3 story goals and its extra mission', preview.join(''));
+check(preview.join('') === '🆘📡🛡️🏗️', 'UKR preview shows all 4 story goals', preview.join(''));
 check(previews.every((country) => country.icons.length === 4), 'every campaign country preview shows all 4 missions', JSON.stringify(previews));
 
 await page.click('#solo-countries #country-list .country-item[data-id="UKR"]');
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level, null, { timeout: 30000 });
-await page.waitForFunction(() => document.querySelector('.story-objective')?.textContent, null, { timeout: 3000 }).catch(() => null);
-const storyObjectiveText = await page.evaluate(() => document.querySelector('.story-objective')?.textContent || '');
+await page.waitForFunction(() => document.querySelector('#mission-list .story-objective')?.textContent, null, { timeout: 3000 });
+const storyObjectiveText = await page.evaluate(() => document.querySelector('#mission-list .story-objective')?.textContent || '');
 check(/Врятуй людей/.test(storyObjectiveText), 'HUD shows current UKR story objective', storyObjectiveText);
 const visible = await page.locator('#mission-list .story-objective').count();
 check(visible === 1, 'HUD renders exactly one primary objective');
@@ -69,7 +69,7 @@ let st = await page.evaluate(() => ({
   current: window.__game.level.missions.currentStoryObjective(),
 }));
 check(st.kind === 'StoryMissions', 'UKR solo campaign uses StoryMissions', JSON.stringify(st));
-check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense', 'UKR story objective IDs are present', JSON.stringify(st.ids));
+check(st.ids.join(',') === 'ukr-rescue,ukr-signal,ukr-defense,ukr-rebuild', 'UKR story objective IDs are present', JSON.stringify(st.ids));
 const ukrHudCount = await page.evaluate(() => window.__game.level.missions.getHudList().length);
 check(ukrHudCount === 4, 'UKR HUD shows all 4 real missions', String(ukrHudCount));
 check(st.replayNightRaid === false, 'first UKR story start does not enable replayNightRaid', JSON.stringify(st));
@@ -87,6 +87,13 @@ await page.evaluate(() => {
   window.__game.test.completeStoryObjective('ukr-signal');
   window.__game.test.completeStoryObjective('ukr-defense');
 });
+st = await page.evaluate(() => ({
+  current: window.__game.level.missions.currentStoryObjective(),
+  unlocked: window.__game.level.missions.bossUnlocked,
+  markers: window.__game.level.missions.getMarkers().map((m) => m.icon),
+}));
+check(!st.unlocked && /віднови центр/i.test(st.current), 'UKR story advances from defense to rebuild', JSON.stringify(st));
+await page.evaluate(() => window.__game.test.completeStoryObjective('ukr-rebuild'));
 st = await page.evaluate(() => ({
   unlocked: window.__game.level.missions.bossUnlocked,
   markers: window.__game.level.missions.getMarkers().map((m) => m.icon),
@@ -117,6 +124,7 @@ await page.evaluate(async () => {
   window.__game.test.completeMission('ukr-rescue');
   window.__game.test.completeMission('ukr-signal');
   window.__game.test.completeMission('ukr-defense');
+  window.__game.test.completeMission('ukr-rebuild');
   window.__game.test.finishHorde();
   const arena = window.__game.level.world.layout.arena;
   window.__game.test.teleport(arena.x, arena.z);
