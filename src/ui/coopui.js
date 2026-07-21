@@ -541,7 +541,7 @@ export class CoopUI {
 
   _openLobby() {
     this._renderLobby();
-    this.game._showOverlay('overlay-lobby');
+    this.game._showOverlay('overlay-lobby', this.el.open);
     this._syncPolling();
   }
 
@@ -615,7 +615,7 @@ export class CoopUI {
         || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
         || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
         || (mid === 'weekly-coop' && !anyLib));
-      mh += `<button type="button" class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}" ${!isHost || locked ? 'disabled' : ''}>${label}${locked ? ' 🔒' : ''}</button>`;
+      mh += `<button type="button" class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}" aria-pressed="${sel}" ${!isHost || locked ? 'disabled' : ''}>${label}${locked ? ' 🔒' : ''}</button>`;
     }
     this.el.modes.innerHTML = mh;
     document.getElementById('lobby-mode-section').hidden = s.mode === 'front';
@@ -656,7 +656,7 @@ export class CoopUI {
         : isCountryOpen(save.liberated, id);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;
-      ch += `<button type="button" class="${cls}" data-id="${id}" ${!isHost || !unlocked ? 'disabled' : ''}>${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</button>`;
+      ch += `<button type="button" class="${cls}" data-id="${id}" aria-pressed="${sel}" ${!isHost || !unlocked ? 'disabled' : ''}>${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</button>`;
     }
     this.el.countries.innerHTML = ch;
     if (isHost) {

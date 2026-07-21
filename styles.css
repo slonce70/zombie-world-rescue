@@ -1198,7 +1198,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .coop-rename:hover { opacity: 1; }
 .coop-public {
   display: flex; align-items: center; gap: 8px; justify-content: center;
-  color: #9fb6c9; font-size: 13px; font-weight: 700; margin-top: 10px; cursor: pointer;
+  min-height: 44px; color: #9fb6c9; font-size: 13px; font-weight: 700; margin-top: 10px; cursor: pointer;
 }
 .coop-public input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
 .coop-online-head {

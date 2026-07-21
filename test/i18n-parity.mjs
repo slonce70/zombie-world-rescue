@@ -166,7 +166,7 @@ if (perFile.length === 0 && perFileRaw.length === 0 && placeholderMismatches.len
   process.exit(0);
 }
 
-console.log('  ❌ i18n-parity: знайдено пропущені переклади');
+console.log('  ❌ i18n-parity: знайдено помилки локалізації');
 for (const f of perFile) {
   console.log(`\n— ${f.rel}`);
   if (f.misEn.length) for (const k of f.misEn) console.log(`    [en] ${JSON.stringify(k)}`);
@@ -181,5 +181,7 @@ for (const mismatch of placeholderMismatches) {
   console.log(`\n— src/i18n/${mismatch.lang}.js (placeholders)`);
   console.log(`    ${JSON.stringify(mismatch.key)} -> ${JSON.stringify(mismatch.value)}`);
 }
-console.log(`\n  Разом: ${missingEn + missingRawEn} без en, ${missingRu + missingRawRu} без ru`);
+const placeholderEn = placeholderMismatches.filter(({ lang }) => lang === 'en').length;
+const placeholderRu = placeholderMismatches.filter(({ lang }) => lang === 'ru').length;
+console.log(`\n  Разом: ${missingEn + missingRawEn} без en, ${missingRu + missingRawRu} без ru, ${placeholderEn} placeholder en, ${placeholderRu} placeholder ru`);
 process.exit(1);

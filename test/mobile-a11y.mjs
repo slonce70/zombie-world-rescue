@@ -62,7 +62,7 @@ check(wheelState.closedHidden === 'true', 'Escape closes weapon wheel', JSON.str
 check(wheelState.focusReturned === 'tb-weapon', 'closing weapon wheel returns focus to trigger', JSON.stringify(wheelState));
 
 console.log('▸ Mobile a11y: Front sheet, touch targets, dialog focus and dismissal');
-const coreFlow = await page.evaluate(() => {
+const coreFlow = await page.evaluate(async () => {
   const game = window.__game;
   game.endLevel();
   const trigger = document.getElementById('btn-front');
@@ -74,14 +74,30 @@ const coreFlow = await page.evaluate(() => {
   game.openFront();
   const cardStyle = getComputedStyle(document.querySelector('.front-card'));
   const actionStyle = getComputedStyle(document.querySelector('.front-actions'));
-  const bodyStyle = getComputedStyle(document.querySelector('.front-body'));
+  const body = document.querySelector('.front-body');
+  const bodyStyle = getComputedStyle(body);
+  const scrollbarStyle = getComputedStyle(body, '::-webkit-scrollbar');
+  const scrollbarThumbStyle = getComputedStyle(body, '::-webkit-scrollbar-thumb');
+  const decision = document.querySelector('.front-op-summary');
+  const decisionStyle = getComputedStyle(decision);
+  const decisionRect = decision.getBoundingClientRect();
+  body.scrollTop = body.scrollHeight;
   const front = {
     focusIn: document.activeElement && document.activeElement.id,
     maxHeight: parseFloat(cardStyle.maxHeight),
     bottomRadius: [cardStyle.borderBottomLeftRadius, cardStyle.borderBottomRightRadius],
     stickyActions: actionStyle.position,
     scrollable: bodyStyle.overflowY,
-    contentWithoutHover: !!document.querySelector('.front-op-summary')?.textContent.trim(),
+    overflow: body.scrollHeight > body.clientHeight && body.scrollTop > 0,
+    scrollbarWidth: bodyStyle.scrollbarWidth,
+    scrollbarColor: bodyStyle.scrollbarColor,
+    webkitScrollbarWidth: scrollbarStyle.width,
+    scrollbarThumb: scrollbarThumbStyle.backgroundColor,
+    scrollAffordance: (bodyStyle.scrollbarWidth === 'thin' || parseFloat(scrollbarStyle.width) > 0)
+      && !/rgba\(0, 0, 0, 0\)|transparent/.test(scrollbarThumbStyle.backgroundColor),
+    contentWithoutHover: !!decision.textContent.trim() && decisionStyle.display !== 'none'
+      && decisionStyle.visibility !== 'hidden' && Number(decisionStyle.opacity) > 0
+      && decisionRect.width > 0 && decisionRect.height > 0,
   };
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
   front.closed = !document.getElementById('overlay-front').classList.contains('show');
@@ -98,28 +114,53 @@ const coreFlow = await page.evaluate(() => {
   game._hideOverlay('overlay-front-result');
   result.focusOut = document.activeElement && document.activeElement.id;
 
-  const lobbyTrigger = document.getElementById('btn-coop');
-  const liveSession = game.coop.session;
-  game.coop.session = {
-    state: 'lobby', role: 'host', room: 'TEST', myPid: 1, mode: 'campaign', countryId: 'UKR',
-    roster: new Map([[1, { nick: 'Хост', role: null, skin: 'classic', ready: false }]]),
-    setMode() {}, setCountry() {}, setMyRole() {}, frontSnapshot() { return null; },
+  const coop = game.coop;
+  const session = coop.session;
+  const originalCreate = session.create;
+  const originalLeave = session.leave;
+  session.create = async () => {
+    Object.assign(session, {
+      state: 'lobby', role: 'host', room: 'TEST', myPid: 1, mode: 'campaign', countryId: 'UKR',
+      roster: new Map([[1, { nick: 'Хост', role: null, skin: 'classic', ready: false }]]),
+    });
   };
-  game.coop._renderLobby();
-  game.coop.session = liveSession;
+  session.leave = () => { session.state = 'idle'; session.role = null; session.room = null; session.roster = new Map(); };
+  localStorage.setItem('zr-nick', 'Хост');
   document.getElementById('globe-other').open = true;
+  const lobbyTrigger = document.getElementById('btn-coop');
   lobbyTrigger.focus();
-  game._showOverlay('overlay-lobby');
-  const lobbyTargets = [...document.querySelectorAll('.lobby-role, .lobby-mode, .lobby-country, #btn-lobby-ready')]
+  lobbyTrigger.click();
+  const coopOpened = document.getElementById('overlay-coop').classList.contains('show');
+  coop.el.create.focus();
+  await coop._create();
+  const lobbyChoices = [...document.querySelectorAll('.lobby-role, .lobby-mode, .lobby-country')]
     .filter((element) => getComputedStyle(element).display !== 'none')
     .map((element) => {
       const rect = element.getBoundingClientRect();
-      return { tag: element.tagName, id: element.id || element.className, width: rect.width, height: rect.height };
+      return {
+        tag: element.tagName, id: element.id || element.className, width: rect.width, height: rect.height,
+        selected: element.classList.contains('sel'), pressed: element.getAttribute('aria-pressed'),
+      };
     });
-  const lobby = { focusIn: document.activeElement && document.activeElement.id, targets: lobbyTargets };
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+  const publicRect = document.getElementById('lobby-public-row').getBoundingClientRect();
+  const readyRect = document.getElementById('btn-lobby-ready').getBoundingClientRect();
+  const lobby = {
+    actualTransition: coopOpened && document.getElementById('overlay-lobby').classList.contains('show'),
+    focusIn: document.activeElement && document.activeElement.id,
+    choices: lobbyChoices,
+    targets: [
+      ...lobbyChoices,
+      { id: 'lobby-public-row', width: publicRect.width, height: publicRect.height },
+      { id: 'btn-lobby-ready', width: readyRect.width, height: readyRect.height },
+    ],
+  };
+  const lobbyPublic = document.getElementById('lobby-public');
+  lobbyPublic.focus();
+  lobbyPublic.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
   lobby.closed = !document.getElementById('overlay-lobby').classList.contains('show');
   lobby.focusOut = document.activeElement && document.activeElement.id;
+  session.create = originalCreate;
+  session.leave = originalLeave;
 
   game.openFront();
   const targets = ['#btn-front', '#globe-other summary', '#btn-front-close', '.front-operation-choice', '.front-choice', '.front-actions .btn']
@@ -136,16 +177,21 @@ const coreFlow = await page.evaluate(() => {
 check(coreFlow.front.focusIn === 'btn-front-close' && coreFlow.front.closed && coreFlow.front.focusOut === 'btn-front',
   'Front receives focus, closes with Escape, and restores its trigger', JSON.stringify(coreFlow.front));
 check(coreFlow.front.maxHeight <= 844 * 0.72 + 1 && coreFlow.front.bottomRadius.every((radius) => radius === '0px')
-    && coreFlow.front.stickyActions === 'sticky' && coreFlow.front.scrollable === 'auto',
-  'Front is a 72dvh bottom sheet with sticky actions and scrolling', JSON.stringify(coreFlow.front));
-check(coreFlow.front.contentWithoutHover, 'Front country decision copy is visible without hover');
+    && coreFlow.front.stickyActions === 'sticky' && coreFlow.front.scrollable === 'auto'
+    && coreFlow.front.overflow && coreFlow.front.scrollAffordance,
+  'Front is a 72dvh bottom sheet with sticky actions and a visible working scroll affordance', JSON.stringify(coreFlow.front));
+check(coreFlow.front.contentWithoutHover, 'Front country decision copy has visible geometry without hover');
 check(coreFlow.result.focusIn === 'btn-front-result-primary' && coreFlow.result.backdropKeptOpen
     && coreFlow.result.escapeKeptOpen && coreFlow.result.focusOut === 'btn-front',
   'result requires an explicit decision and restores focus', JSON.stringify(coreFlow.result));
-check(coreFlow.lobby.focusIn === 'btn-lobby-leave' && coreFlow.lobby.closed && coreFlow.lobby.focusOut === 'btn-coop',
-  'lobby receives focus, closes with Escape, and restores its trigger', JSON.stringify(coreFlow.lobby));
-check(coreFlow.lobby.targets.every(({ tag }) => tag === 'BUTTON'),
-  'lobby choices use native buttons', JSON.stringify(coreFlow.lobby.targets));
+check(coreFlow.lobby.actualTransition && coreFlow.lobby.focusIn === 'btn-lobby-leave'
+    && coreFlow.lobby.closed && coreFlow.lobby.focusOut === 'btn-coop',
+  'actual co-op create transition focuses lobby, closes from its checkbox with Escape, and restores btn-coop', JSON.stringify(coreFlow.lobby));
+check(coreFlow.lobby.choices.every(({ tag }) => tag === 'BUTTON'),
+  'lobby choices use native buttons', JSON.stringify(coreFlow.lobby.choices));
+check(coreFlow.lobby.choices.filter(({ id }) => /lobby-(mode|country)/.test(id))
+    .every(({ selected, pressed }) => pressed === String(selected)),
+  'lobby mode and country buttons expose selection through aria-pressed', JSON.stringify(coreFlow.lobby.choices));
 const shortTargets = coreFlow.targets.filter(({ width, height }) => width < 44 || height < 44);
 const shortLobbyTargets = coreFlow.lobby.targets.filter(({ width, height }) => width < 44 || height < 44);
 check(coreFlow.targets.length > 5 && shortTargets.length === 0 && shortLobbyTargets.length === 0,

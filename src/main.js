@@ -302,12 +302,12 @@ class Game {
 
     window.addEventListener('keydown', (e) => {
       // у полі вводу літери B/M — це просто літери, а не магазин/звук
-      const tgt = e.target;
-      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Escape') {
         const dialog = [...document.querySelectorAll('.overlay.show[role="dialog"][data-escape-close]')].pop();
         if (dialog) { document.getElementById(dialog.dataset.escapeClose)?.click(); return; }
       }
+      const tgt = e.target;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Escape' && this.state === 'hqbase') { this.exitHQBase(); return; }
       if (e.code === 'Escape' && this.shop.isOpen) { this.shop.close(); return; }
       if (e.code === 'Escape' && this.state === 'level' && !this.paused
@@ -2435,11 +2435,11 @@ class Game {
     if (tag) tag.textContent = t('🔄 Вийшло оновлення v{v}! Онови сторінку: Ctrl(⌘)+Shift+R', { v });
   }
 
-  _showOverlay(id) {
+  _showOverlay(id, returnFocus = document.activeElement) {
     const overlay = document.getElementById(id);
     if (!overlay.classList.contains('show') && overlay.getAttribute('role') === 'dialog') {
       this._overlayFocus ||= new Map();
-      this._overlayFocus.set(id, document.activeElement);
+      this._overlayFocus.set(id, returnFocus);
     }
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden', 'false');
