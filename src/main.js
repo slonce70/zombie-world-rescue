@@ -2536,6 +2536,19 @@ class Game {
     return front ? frontViewModel(front, this.save, { previewSpecialist }) : null;
   }
 
+  continueRescue() {
+    if (!this._ensureFront()) {
+      this.renderSoloMenu();
+      this._showOverlay('overlay-solo');
+      document.querySelector('.solo-mode[data-mode="campaign"]')?.click();
+      document.querySelector(`#solo-countries [data-id="${nextTarget(this.save.liberated) || 'UKR'}"]`)?.focus();
+      return true;
+    }
+    const vm = this.getFrontViewModel();
+    this.frontui.selectedOperationId = vm && vm.recommendedOperationId;
+    return this.openFront();
+  }
+
   openFront() {
     const front = this._ensureFront();
     if (!front) {
@@ -2580,6 +2593,15 @@ class Game {
       missionPreset: config.missionPreset,
       encounterPlan: config.encounterPlan,
     });
+  }
+
+  prepareFrontTogether(operationId, specialist = 'dispatcher') {
+    if (!this._ensureFront()) return false;
+    if (!this.save.front.active) this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
+    if (!this.save.front.active || this.save.front.active.status !== 'ready') return false;
+    this.frontui.close();
+    document.getElementById('btn-coop').click();
+    return true;
   }
 
   abandonFrontOperation() {

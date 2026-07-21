@@ -826,6 +826,19 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .globe-play.coop-btn:hover { border-color: #4dd6a8; }
 .globe-play.expedition-btn { background: linear-gradient(135deg, #6f45d4, #2e8bc0); border-color: #a78bfa; color: #fff; }
 .globe-play.expedition-btn:hover { border-color: #d8c9ff; }
+.globe-other { position: relative; pointer-events: auto; }
+.globe-other > summary {
+  list-style: none; cursor: pointer; color: #e7f1fa; background: rgba(20, 38, 57, .92);
+  border: 3px solid rgba(140, 213, 255, .32); box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.globe-other > summary::-webkit-details-marker { display: none; }
+.globe-other[open] > summary { border-color: #8cd5ff; }
+.globe-other-buttons {
+  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 2;
+  display: flex; gap: 8px; padding: 10px; border: 1px solid rgba(140, 213, 255, .25);
+  border-radius: 16px; background: rgba(12, 24, 36, .97); box-shadow: 0 12px 30px rgba(0,0,0,.45);
+}
+.globe-other-buttons .globe-play { padding: 11px 16px; font-size: 15px; white-space: nowrap; }
 
 .expedition-card { width: min(700px, 95vw); }
 .expedition-route { display: grid; gap: 10px; margin: 14px 0; }
@@ -1587,9 +1600,6 @@ body.touch-mode #touch-coach.show { display: block; }
   0% { box-shadow: 0 0 0 0 rgba(255, 106, 84, .7); }
   65%, 100% { box-shadow: 0 0 0 9px rgba(255, 106, 84, 0); }
 }
-/* Front замінює Expedition як meta-run CTA, а не стає четвертою рівноцінною кнопкою. */
-.globe-play-row.front-ready #btn-expedition { display: none; }
-
 #overlay-front { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
 .front-card {
   --front-danger: #ff715d;
@@ -1633,26 +1643,35 @@ body.touch-mode #touch-coach.show { display: block; }
 
 .front-operations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .front-operation {
-  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 11px; align-items: center; width: 100%; min-height: 92px; padding: 11px 13px;
+  position: relative; width: 100%; min-height: 92px; overflow: hidden;
   border: 2px solid rgba(255,255,255,.12); border-radius: 15px;
   color: #fff; background: rgba(255,255,255,.045); text-align: left;
-  font-family: var(--font); cursor: pointer; transition: transform .12s, border-color .12s, background .12s;
+  font-family: var(--font); transition: transform .12s, border-color .12s, background .12s;
+}
+.front-operation-choice {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: center;
+  width: 100%; padding: 11px 13px; border: 0; color: inherit; background: transparent;
+  font: inherit; text-align: left; cursor: pointer;
 }
 .front-operation.recommended { grid-column: 1 / -1; border-color: rgba(255, 191, 101, .45); background: linear-gradient(90deg, rgba(173, 58, 59, .18), rgba(255, 193, 83, .08)); }
-.front-operation:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(255,255,255,.42); }
+.front-operation:not(.disabled):hover { transform: translateY(-2px); border-color: rgba(255,255,255,.42); }
 .front-operation.selected { border-color: #ffd057; box-shadow: inset 0 0 0 1px rgba(255,208,87,.35); }
 .front-operation.status-completed, .front-operation.status-claimed { border-color: rgba(94, 219, 139, .36); background: rgba(60, 151, 91, .1); }
-.front-operation:disabled { cursor: default; opacity: .6; }
-.front-operation:focus-visible, .front-choice:focus-visible, .front-actions .btn:focus-visible, .front-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.front-operation.disabled { opacity: .6; }
+.front-operation-choice:disabled { cursor: default; }
+.front-operation-choice:focus-visible, .front-choice:focus-visible, .front-actions .btn:focus-visible, .front-btn:focus-visible, .globe-other > summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .front-op-flag { font-size: 31px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
 .front-op-main, .front-op-side, .front-op-top { min-width: 0; }
 .front-op-main > span { display: block; }
 .front-op-top { display: flex !important; align-items: center; gap: 8px; flex-wrap: wrap; }
-.front-op-top strong { font-size: 16px; }
+.front-op-top small { color: #ffba79; font-size: 9px; font-weight: 900; letter-spacing: 1.4px; }
 .front-op-top b { padding: 3px 7px; border-radius: 7px; color: #382400; background: #ffd057; font-size: 9px; letter-spacing: .8px; }
 .front-op-country { margin-top: 3px; color: #cfe3f6; font-size: 12px; font-weight: 800; }
 .front-op-country .front-marker { margin-right: 5px; vertical-align: 1px; }
+.front-op-summary { margin-top: 4px; color: #fff; font-size: 16px; line-height: 1.25; }
+.front-op-consequence { margin-top: 3px; color: #b9d0e8; font-size: 11px; font-weight: 700; }
+.front-op-next { display: flex !important; gap: 7px; margin-top: 7px; color: #fff; font-size: 12px; font-weight: 900; }
+.front-op-next b { color: #ffd057; font-size: 9px; letter-spacing: .8px; }
 .front-op-desc, .front-op-intel { margin-top: 3px; color: #8fa9c1; font-size: 11px; font-weight: 700; }
 .front-op-intel { color: #ffd98a; }
 .front-op-stages { display: flex !important; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -1664,6 +1683,9 @@ body.touch-mode #touch-coach.show { display: block; }
 .front-op-stages b { color: #8cd5ff; }
 .front-op-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; color: #cfe3f6; font-size: 11px; font-weight: 900; white-space: nowrap; }
 .front-threat { color: var(--front-danger); letter-spacing: -2px; }
+.front-details { padding: 7px 13px 9px 55px; border-top: 1px solid rgba(255,255,255,.09); color: #9fb8d4; font-size: 10px; font-weight: 800; }
+.front-details summary { cursor: pointer; color: #bedcf2; }
+.front-details span { display: block; margin-top: 5px; }
 .front-empty { grid-column: 1/-1; padding: 22px; border: 1px dashed var(--ui-border); border-radius: 14px; color: #9fb8d4; font-weight: 800; text-align: center; }
 
 .front-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 15px; }
@@ -1714,10 +1736,15 @@ body.touch-mode #touch-coach.show { display: block; }
   .front-threat-legend { gap: 7px; font-size: 9px; }
   .front-operations { grid-template-columns: 1fr; }
   .front-operation.recommended { grid-column: auto; }
-  .front-operation { min-height: 76px; padding: 8px 9px; grid-template-columns: auto minmax(0, 1fr); }
+  .front-operation { min-height: 76px; }
+  .front-operation-choice { padding: 8px 9px; grid-template-columns: auto minmax(0, 1fr); }
   .front-op-flag { font-size: 25px; }
   .front-op-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 5px; }
   .front-op-desc, .front-op-intel { display: none !important; }
+  .front-op-summary { font-size: 14px; }
+  .front-op-consequence { font-size: 10px; }
+  .front-op-next { font-size: 11px; }
+  .front-details { padding-left: 43px; }
   .front-op-stages > span { padding: 2px 5px; font-size: 8px; }
   .front-setup-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
   .front-setup-grid .front-section + .front-section { margin-top: 0; }
@@ -1736,13 +1763,18 @@ body.touch-mode #touch-coach.show { display: block; }
   .front-choice-grid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 700px) {
+  .globe-other-buttons { right: 50%; transform: translateX(50%); flex-direction: column; }
+}
+
 @media (max-height: 520px) and (orientation: landscape) {
   .front-card { max-height: calc(100dvh - 8px); padding: 10px 16px; }
   .front-kicker, .front-status, .front-op-desc, .front-threat-legend, .front-rewards { display: none; }
   .front-header { padding-bottom: 6px; }
   .front-header h2 { font-size: 21px; }
   .front-section-head { margin-bottom: 5px; }
-  .front-operation { min-height: 62px; padding: 6px 9px; }
+  .front-operation { min-height: 62px; }
+  .front-operation-choice { padding: 6px 9px; }
   .front-choice { min-height: 48px; padding: 5px 7px; }
   .front-setup-grid { margin-top: 8px; }
   .front-actions { margin-top: 2px; }

@@ -69,7 +69,7 @@ try {
   check(await page.locator('#overlay-front').getAttribute('aria-hidden') === 'false', 'Front overlay opens accessibly');
   check(await page.locator('.front-operation').count() === 3, 'board renders recommended plus alternatives');
   check(await page.locator('.front-operation').first().evaluate((node) => node.classList.contains('recommended')), 'recommended operation leads the board');
-  check(await page.locator('#btn-front-go').isVisible(), 'primary action remains visible at 1280x720');
+  check(await page.locator('#btn-front-together').isVisible(), 'primary action remains visible at 1280x720');
   await screenshot('front-board-1280x720');
 
   await page.locator('[data-specialist-id="POL"]').click();
@@ -227,7 +227,7 @@ try {
   await page.evaluate(() => { window.__game.frontui.render(); window.__game.frontui.open(); });
   const mobile = await page.locator('.front-card').boundingBox();
   check(mobile && mobile.width <= 390, 'Front board fits a 390px portrait viewport');
-  check(await page.locator('#btn-front-go').isVisible(), 'primary touch action remains visible on mobile');
+  check(await page.locator('#btn-front-together').isVisible(), 'primary touch action remains visible on mobile');
   await screenshot('front-board-390x844');
 
   await page.setViewportSize({ width: 1280, height: 720 });

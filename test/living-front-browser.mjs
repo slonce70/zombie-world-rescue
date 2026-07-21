@@ -1,6 +1,9 @@
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { ensureWebServer } from './_server.mjs';
+
+const EN = readFileSync(new URL('../src/i18n/en.js', import.meta.url), 'utf8');
+const RU = readFileSync(new URL('../src/i18n/ru.js', import.meta.url), 'utf8');
 
 const { base, close } = await ensureWebServer();
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
@@ -25,9 +28,52 @@ try {
     game.openFront();
     return id;
   });
-  const card = await page.locator('.front-operation').first().textContent();
-  if (!card.includes('🧱 2/3') || !card.includes('👥 70%')) throw new Error(`Country state missing from Front card: ${card}`);
+  const recommended = page.locator('.front-operation.recommended');
+  if (await recommended.count() !== 1) throw new Error('Front must expose exactly one recommended country card');
+  const primary = await recommended.locator('.front-operation-choice').textContent();
+  const details = await recommended.locator('details.front-details').textContent();
+  for (const meaning of ['ЩО СТАЛОСЯ', 'НАСТУПНА ОПЕРАЦІЯ', 'Поразка не забере вже відновлений район.']) {
+    if (!primary.includes(meaning)) throw new Error(`Country decision is missing "${meaning}": ${primary}`);
+  }
+  if (primary.includes('🧱 2/3') || primary.includes('👥 70%')) throw new Error(`Raw counters leaked into the primary decision: ${primary}`);
+  if (!details.includes('🧱 2/3') || !details.includes('👥 70%')) throw new Error(`Country details are missing raw state: ${details}`);
+  if (await recommended.locator('.front-op-stages [data-stage-id]').count() !== 3) throw new Error('Recommended operation must name all three phases');
+  if (await page.locator('#btn-front-together').count() !== 1 || await page.locator('#btn-front-solo').count() !== 1) {
+    throw new Error('Front must expose together and solo actions');
+  }
+  const translations = {
+    'ЩО СТАЛОСЯ': ['WHAT HAPPENED', 'ЧТО ПРОИЗОШЛО'],
+    'НАСТУПНА ОПЕРАЦІЯ': ['NEXT OPERATION', 'СЛЕДУЮЩАЯ ОПЕРАЦИЯ'],
+    'Поразка не забере вже відновлений район.': [
+      'Defeat will not take away a district that has already been restored.',
+      'Поражение не отнимет уже восстановленный район.',
+    ],
+  };
+  for (const [key, [en, ru]] of Object.entries(translations)) {
+    if (!EN.includes(`${JSON.stringify(key)}: ${JSON.stringify(en)}`)
+        || !RU.includes(`${JSON.stringify(key)}: ${JSON.stringify(ru)}`)) {
+      throw new Error(`Missing exact EN/RU mapping for ${key}`);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileCard = await recommended.boundingBox();
+  if (!mobileCard || mobileCard.width > 390 || !await page.locator('#btn-front-together').isVisible() || !await page.locator('#btn-front-solo').isVisible()) {
+    throw new Error(`Country decision does not fit mobile: ${JSON.stringify(mobileCard)}`);
+  }
+  if (shots) await page.screenshot({ path: `${shots}/living-front-board-mobile.png` });
+  await page.setViewportSize({ width: 1280, height: 720 });
   if (shots) await page.screenshot({ path: `${shots}/living-front-board.png` });
+
+  await page.click('#btn-front-together');
+  const together = await page.evaluate(() => ({
+    active: window.__game.save.front.active?.status,
+    coopOpen: document.getElementById('overlay-coop').classList.contains('show'),
+    state: window.__game.state,
+  }));
+  if (together.active !== 'ready' || !together.coopOpen || together.state !== 'globe') {
+    throw new Error(`Together action must prepare without starting solo: ${JSON.stringify(together)}`);
+  }
+  await page.evaluate(() => window.__game._hideOverlay('overlay-coop'));
 
   await page.evaluate(async (id) => {
     const game = window.__game;

@@ -581,7 +581,7 @@ export function frontViewModel(value, save = {}, { previewSpecialist = null } = 
       recommended: operation.id === recommended,
       countryState: frontCountryState(front, operation.country),
       commander: radio >= 1 || scoutIntel ? template.commander : null,
-      stages: radio >= 2 ? operationStages(operation).slice() : [],
+      stages: operationStages(operation).slice(),
       reward: radio >= 3 ? { coins: operationCoins(operation), crystals: 1 + operation.threat } : null,
     };
   });

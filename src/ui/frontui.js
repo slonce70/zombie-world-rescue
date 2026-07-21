@@ -1,6 +1,7 @@
 // 🛰️ World Front DOM overlay. Gameplay and save transitions stay in worldfront.js/main.js.
 import { t } from '../i18n.js';
 import { COUNTRIES } from '../countries.js';
+import { frontCountryCopy } from './frontcopy.js';
 
 const TEMPLATE_UI = {
   evacuation: { icon: '🏘️', name: 'Відродження', desc: 'Підготуй місто, переживи ніч і врятуй людей' },
@@ -79,7 +80,8 @@ export class FrontUI {
       projects: document.getElementById('front-projects'),
       projectProgress: document.getElementById('front-project-progress'),
       rewards: document.getElementById('front-rewards'),
-      go: document.getElementById('btn-front-go'),
+      together: document.getElementById('btn-front-together'),
+      soloAction: document.getElementById('btn-front-solo'),
       abandon: document.getElementById('btn-front-abandon'),
       close: document.getElementById('btn-front-close'),
       solo: document.getElementById('btn-solo'),
@@ -88,8 +90,7 @@ export class FrontUI {
 
     this.el.cta.addEventListener('click', () => {
       this._click();
-      if (typeof this.game.openFront === 'function') this.game.openFront();
-      else this.open();
+      if (typeof this.game.continueRescue === 'function') this.game.continueRescue();
     });
     this.el.close.addEventListener('click', () => { this._click(); this.close(); });
     this.el.overlay.addEventListener('click', (event) => {
@@ -98,7 +99,8 @@ export class FrontUI {
     this.el.operations.addEventListener('click', (event) => this._selectOperation(event));
     this.el.specialists.addEventListener('click', (event) => this._selectSpecialist(event));
     this.el.projects.addEventListener('click', (event) => this._selectProject(event));
-    this.el.go.addEventListener('click', () => this._start());
+    this.el.together.addEventListener('click', () => this._together());
+    this.el.soloAction.addEventListener('click', () => this._start());
     this.el.abandon.addEventListener('click', () => this._abandon());
     document.addEventListener('keydown', (event) => {
       if (event.code === 'Escape' && this.el.overlay.classList.contains('show')) this.close();
@@ -126,15 +128,12 @@ export class FrontUI {
     const vm = this._normalize(input === undefined ? this._readViewModel() : input);
     this.vm = vm;
 
-    this.el.cta.hidden = !vm.unlocked;
+    this.el.cta.hidden = false;
     if (this.el.solo) {
-      this.el.solo.textContent = vm.unlocked ? t('🎮 ІНШІ РЕЖИМИ') : t('🎮 ГРАТИ');
-      this.el.solo.classList.toggle('btn-primary', !vm.unlocked);
+      this.el.solo.textContent = t('🎮 ГРАТИ');
     }
-    const playRow = this.el.cta.closest('.globe-play-row');
-    if (playRow) playRow.classList.toggle('front-ready', vm.unlocked);
+    this.el.ctaLabel.textContent = t('Продовжити порятунок');
     if (!vm.unlocked) {
-      this.el.ctaLabel.textContent = t('🛰️ ЖИВИЙ ФРОНТ');
       this._renderLocked();
       return vm;
     }
@@ -155,10 +154,6 @@ export class FrontUI {
         || vm.specialists.find((item) => item.available);
       this.selectedSpecialistId = selected ? selected.id : null;
     }
-
-    this.el.ctaLabel.textContent = active
-      ? t('▶️ ПРОДОВЖИТИ · ЕТАП {n}/3', { n: clamp(active.stage, 0, 2) + 1 })
-      : t('🛰️ ЖИВИЙ ФРОНТ');
 
     this.el.status.innerHTML = this._statusHtml(vm, activeOperation);
     const orderedOperations = [...vm.operations].sort((a, b) => Number(b.recommended) - Number(a.recommended));
@@ -280,8 +275,8 @@ export class FrontUI {
     this.el.projects.innerHTML = '';
     this.el.projectProgress.textContent = '';
     this.el.rewards.innerHTML = '';
-    this.el.go.disabled = true;
-    this.el.go.textContent = t('🔒 СПОЧАТКУ ЗВІЛЬНИ УКРАЇНУ');
+    this.el.together.disabled = true;
+    this.el.soloAction.disabled = true;
     this.el.abandon.hidden = true;
   }
 
@@ -318,23 +313,28 @@ export class FrontUI {
       : op.countryState && op.countryState.state === 'saved' ? 'safe'
         : op.countryState && op.countryState.state === 'attacked' ? 'threat'
           : op.countryState && op.countryState.state === 'destroyed' ? 'destroyed' : 'threat';
-    const statusLabel = op.countryState && op.countryState.state === 'destroyed' ? 'Критичні руйнування'
-      : op.counterattack ? 'Контратака' : rebuilding ? 'Відбудова' : STATUS_LABEL[op.status];
+    const copy = frontCountryCopy(op.countryState, country.name);
     const districts = clamp(op.countryState && op.countryState.restored, 0, 3);
     const damage = clamp(op.countryState && op.countryState.damage, 0, 3);
     const population = clamp(op.countryState && op.countryState.population, 0, 100);
-    return `<button class="front-operation ${selected ? 'selected' : ''} ${op.recommended ? 'recommended' : ''} status-${esc(op.status)} ${rebuilding ? 'state-restoring' : ''}" type="button"
-      data-operation-id="${esc(op.id)}" aria-pressed="${selected}" ${disabled ? 'disabled' : ''}>
-      <span class="front-op-flag">${country.flag}</span>
-      <span class="front-op-main">
-        <span class="front-op-top"><strong>${template.icon} ${esc(t(template.name))}</strong>${op.recommended ? `<b>${esc(t('РЕКОМЕНОВАНО'))}</b>` : ''}</span>
-        <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(country.name)} · ${esc(t(statusLabel))} · 🏘️ ${districts}/3 · 🧱 ${damage}/3 · 👥 ${population}%</span>
-        <span class="front-op-desc">${esc(t(template.desc))}</span>
-        ${commander}
-        ${stageIntel}
-      </span>
-      <span class="front-op-side"><span class="front-threat" aria-label="${esc(t('Загроза {n} з 3', { n: op.threat }))}">${threat}</span><span>${esc(rewardText)}</span></span>
-    </button>`;
+    const details = op.countryState ? `<details class="front-details"><summary>${esc(t('Деталі стану'))}</summary><span>🏘️ ${districts}/3 ${esc(t('Відновлено'))} · 🧱 ${damage}/3 ${esc(t('Руйнування'))} · 👥 ${population}% ${esc(t('Люди'))}</span></details>` : '';
+    return `<article class="front-operation ${selected ? 'selected' : ''} ${op.recommended ? 'recommended' : ''} status-${esc(op.status)} ${rebuilding ? 'state-restoring' : ''} ${disabled ? 'disabled' : ''}">
+      <button class="front-operation-choice" type="button" data-operation-id="${esc(op.id)}" aria-pressed="${selected}" ${disabled ? 'disabled' : ''}>
+        <span class="front-op-flag">${country.flag}</span>
+        <span class="front-op-main">
+          <span class="front-op-top"><small>${esc(t('ЩО СТАЛОСЯ'))}</small>${op.recommended ? `<b>${esc(t('РЕКОМЕНОВАНО'))}</b>` : ''}</span>
+          <span class="front-op-country"><i class="front-marker ${countryState}"></i>${esc(copy.label)} · ${esc(country.name)}</span>
+          <strong class="front-op-summary">${esc(copy.summary)}</strong>
+          <span class="front-op-consequence">${esc(copy.consequence)}</span>
+          <span class="front-op-next"><b>${esc(t('НАСТУПНА ОПЕРАЦІЯ'))}</b>${esc(copy.action)}</span>
+          <span class="front-op-desc">${template.icon} ${esc(t(template.name))} · ${esc(t(template.desc))}</span>
+          ${commander}
+          ${stageIntel}
+        </span>
+        <span class="front-op-side"><span class="front-threat" aria-label="${esc(t('Загроза {n} з 3', { n: op.threat }))}">${threat}</span><span>${esc(rewardText)}</span></span>
+      </button>
+      ${details}
+    </article>`;
   }
 
   _specialistHtml(item, operationActive) {
@@ -364,10 +364,11 @@ export class FrontUI {
   _renderActions(vm) {
     const active = vm.active;
     const selected = vm.operations.find((op) => op.id === this.selectedOperationId);
-    this.el.go.disabled = !vm.canAdvance || (!active && (!selected || ['completed', 'claimed', 'locked'].includes(selected.status)));
-    this.el.go.textContent = active
-      ? t('▶️ ПРОДОВЖИТИ ЕТАП {n}/3', { n: clamp(active.stage, 0, 2) + 1 })
-      : t('🚀 ПОЧАТИ ОПЕРАЦІЮ');
+    const disabled = !vm.canAdvance || (!active && (!selected || ['completed', 'claimed', 'locked'].includes(selected.status)));
+    this.el.together.disabled = disabled;
+    this.el.soloAction.disabled = disabled;
+    this.el.together.textContent = `🤝 ${t('ПОЧАТИ РАЗОМ')}`;
+    this.el.soloAction.textContent = `🎮 ${t('ГРАТИ СОЛО')}`;
     this.el.abandon.hidden = !active;
     if (selected) {
       const reward = selected.reward && typeof selected.reward === 'object' ? selected.reward : null;
@@ -410,11 +411,20 @@ export class FrontUI {
   }
 
   _start() {
-    if (this.el.go.disabled) return;
+    if (this.el.soloAction.disabled) return;
     this._click();
     const operationId = this.vm.active ? this.vm.active.operationId : this.selectedOperationId;
     if (typeof this.game.startFrontOperation === 'function') {
       this.game.startFrontOperation(operationId, this.selectedSpecialistId);
+    }
+  }
+
+  _together() {
+    if (this.el.together.disabled) return;
+    this._click();
+    const operationId = this.vm.active ? this.vm.active.operationId : this.selectedOperationId;
+    if (typeof this.game.prepareFrontTogether === 'function') {
+      this.game.prepareFrontTogether(operationId, this.selectedSpecialistId);
     }
   }
 
