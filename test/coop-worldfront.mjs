@@ -194,7 +194,7 @@ try {
     };
   });
 
-  check(out.proto === 21, 'protocol remains at the branch baseline v21', String(out.proto));
+  check(out.proto === 22, 'v600 Front protocol is v22', String(out.proto));
   check(out.compact.g === 7 && out.compact.o === 'g7-UKR-evacuation' && out.compact.s === 1
     && out.compact.p === 'UKR' && out.compact.b.join(',') === 'dmg25,armor',
   'compact fr keeps generation/operation/stage/specialist/build', JSON.stringify(out.compact));

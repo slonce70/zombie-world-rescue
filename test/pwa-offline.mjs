@@ -1,9 +1,12 @@
+import { readFileSync } from 'fs';
 import { openBrowserTest, makeCheck } from './_browser.mjs';
 
 const { BASE, ctx, page, errors, closeTest } = await openBrowserTest({ context: { viewport: { width: 1024, height: 768 } } });
 
 let failed = 0;
 const check = makeCheck(() => failed++);
+const swSource = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+check(swSource.includes("'./src/ui/frontcopy.js'"), 'Front copy module is cached for offline play');
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
