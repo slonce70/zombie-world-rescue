@@ -2745,7 +2745,7 @@ class Game {
     const { x, z, group = null } = center || { x: village.x, z: village.z };
     level.frontLivingCity = { x, z, tier, group, citizens: [] };
     const kinds = ['boy', 'girl', 'granny', 'medic', 'farmer', 'mechanic'];
-    const count = state === 'attacked' ? 3 : 2 + tier * 2;
+    const count = 2 + tier * 2;
     for (let i = 0; i < count; i++) {
       const rig = makeCivilian(kinds[i % kinds.length], level.rng);
       const angle = (i / count) * Math.PI * 2;
@@ -2754,9 +2754,8 @@ class Game {
       const cz = z + Math.sin(angle) * radius;
       rig.group.position.set(cx, level.world.groundH(cx, cz), cz);
       rig.group.rotation.y = angle + Math.PI / 2;
-      const job = state === 'attacked' ? (i < 2 ? 'guard' : 'resident')
-        : state === 'saved' ? (i < 2 ? 'guard' : i === 2 ? 'builder' : 'resident')
-          : i < Math.ceil(count / 2) ? 'builder' : 'resident';
+      const job = state === 'saved' ? (i < 2 ? 'guard' : i === 2 ? 'builder' : 'resident')
+        : i < Math.ceil(count / 2) ? 'builder' : 'resident';
       setAnim(rig, job === 'resident' ? 'walk' : 'idle');
       level.scene.add(rig.group);
       level.frontLivingCity.citizens.push({
@@ -4075,7 +4074,18 @@ class Game {
     if (savedFront && (level.operation || modeId === 'campaign')) {
       const state = level.frontCountryState && level.frontCountryState.state;
       if (state === 'attacked' || state === 'destroyed') this._addFrontDamage(level, level.frontCountryState.damage);
-      if (state === 'attacked') this._addFrontCitizens(level, state);
+      if (state === 'attacked') {
+        const village = level.world.layout.village || level.world.layout.SPAWN;
+        level.frontPressure = level.zombies.list.filter((zombie) => !zombie.dead && !zombie.gone).slice(0, 3);
+        level.frontPressure.forEach((zombie, index) => {
+          const angle = index * Math.PI * 2 / level.frontPressure.length;
+          zombie.x = village.x + Math.cos(angle) * 12;
+          zombie.z = village.z + Math.sin(angle) * 12;
+          zombie.rig.group.position.set(zombie.x, level.world.groundH(zombie.x, zombie.z), zombie.z);
+          zombie.horde = zombie.aggroed = true;
+          zombie.state = 'chase';
+        });
+      }
       if (state === 'rebuilding' || state === 'saved') this._addFrontOutpost(level, level.frontCountryState.restored, state);
       if (state === 'destroyed') this._addFrontEvacuees(level);
     }
