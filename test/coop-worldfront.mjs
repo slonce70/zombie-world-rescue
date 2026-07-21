@@ -1,17 +1,16 @@
 // v500 World Front network contract: host-only state/results, compact starts,
 // canonical reconnect snapshots and stable reward ids.
-import { makeCheck } from './_browser.mjs';
-import { chromium } from 'playwright';
-import { ensureWebServer } from './_server.mjs';
+import { makeCheck, openCoopTest } from './_browser.mjs';
 
-const { base: BASE, close: closeServer } = await ensureWebServer();
+const RELAY_PORT = 8776;
+const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
+const { BASE, RELAY, A: page, B: guestPage, errors, closeTest } = await openCoopTest({
+  relayPort: RELAY_PORT,
+  launch: { args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] },
+  context: { viewport: { width: 960, height: 720 } },
+});
 let failed = 0;
 const check = makeCheck(() => failed++);
-
-const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 960, height: 720 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
 
 try {
   await page.goto(`${BASE}/?test&fresh`);
@@ -240,14 +239,139 @@ try {
   check(out.modeVictoryBroadcasts === 1 && out.modeStageFinished,
     'host Front defense/portal result broadcasts victory before finishing locally');
 
+  // Real room path: an already prepared host Front becomes authoritative for
+  // an ordinary room, survives a guest disconnect + checkpoint, and resumes
+  // the same pid directly into the current phase without touching personal Front.
+  await page.goto(`${BASE}/?test&fresh&relay=${encodeURIComponent(RELAY)}`);
+  await guestPage.goto(`${BASE}/?test&fresh&lang=en&relay=${encodeURIComponent(RELAY)}`);
+  await Promise.all([
+    page.waitForFunction(() => window.__game?.state === 'globe', null, { timeout: 30000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game?.state === 'globe', null, { timeout: 30000 * SLOW }),
+  ]);
+  const prepared = await page.evaluate(() => {
+    const game = window.__game;
+    game.save.liberated = { UKR: true, POL: true, FRA: true };
+    game._ensureFront();
+    const operation = game.save.front.board[0];
+    game._applyFrontTransition({ type: 'START_OPERATION', operationId: operation.id, specialist: 'dispatcher' });
+    return { operationId: operation.id, country: operation.country };
+  });
+  const room = await page.evaluate(() => window.__game.test.coopCreate('Host'));
+  const guestPersonalBefore = await guestPage.evaluate(() => {
+    const game = window.__game;
+    game.save.liberated = { UKR: true, POL: true, FRA: true };
+    game._ensureFront();
+    game.save.front.marker = 'guest-personal-front';
+    return JSON.stringify(game.save.front);
+  });
+  await guestPage.evaluate((code) => window.__game.test.coopJoin(code, 'Guest'), room);
+  await Promise.all([
+    page.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, { timeout: 20000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, { timeout: 20000 * SLOW }),
+  ]);
+  await guestPage.evaluate(() => {
+    const session = window.__game.coop.session;
+    const render = session.onCfg;
+    session.onCfg = (...args) => {
+      render(...args);
+      window.__frontCfgProbe = {
+        snapshot: session.frontSnapshot(),
+        hidden: document.getElementById('lobby-front-summary').hidden,
+        text: document.getElementById('lobby-front-summary').textContent,
+      };
+    };
+  });
+  await page.evaluate(({ operationId }) => window.__game.prepareFrontTogether(operationId, 'dispatcher'), prepared);
+  await guestPage.waitForFunction(() => window.__game.coop.session.mode === 'front'
+    && window.__game.coop.session.frontRun?.active
+    && !document.getElementById('lobby-front-summary').hidden, null, { timeout: 20000 * SLOW });
+  const authoritativeLobby = await guestPage.evaluate(async () => {
+    const { frontStageConfig } = await import('/src/worldfront.js');
+    const { frontStageLabel } = await import('/src/ui/frontui.js');
+    const { t } = await import('/src/i18n.js');
+    const session = window.__game.coop.session;
+    const config = frontStageConfig(session.frontRun);
+    const rawObjective = frontStageLabel(config.missionPreset);
+    return {
+      cfgProbe: window.__frontCfgProbe,
+      text: document.getElementById('lobby-front-summary').textContent,
+      operationId: session.frontRun.active.operationId,
+      expectedObjective: t(rawObjective),
+      rawObjective,
+    };
+  });
+  check(authoritativeLobby.cfgProbe?.snapshot === null && authoritativeLobby.cfgProbe.hidden,
+    'cfg never renders guest personal Front as the host world', JSON.stringify(authoritativeLobby.cfgProbe));
+  check(authoritativeLobby.operationId === prepared.operationId && authoritativeLobby.text.includes('Host'),
+    'frun rerenders the lobby with the authoritative host operation', authoritativeLobby.text);
+  check(authoritativeLobby.expectedObjective !== authoritativeLobby.rawObjective
+    && authoritativeLobby.text.includes(authoritativeLobby.expectedObjective),
+  'co-op objective label is translated like FrontUI', JSON.stringify(authoritativeLobby));
+
+  await page.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await guestPage.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await page.waitForFunction(() => [...window.__game.coop.session.roster.values()].every((entry) => entry.ready), null, { timeout: 15000 * SLOW });
+  const guestPid = await guestPage.evaluate(() => window.__game.coop.session.myPid);
+  await page.evaluate(() => document.getElementById('btn-lobby-start').click());
+  await Promise.all([
+    page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.net && window.__game.level?.operation?.stage === 0, null, { timeout: 50000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.net && window.__game.level?.operation?.stage === 0, null, { timeout: 50000 * SLOW }),
+  ]);
+  await guestPage.evaluate(() => {
+    const session = window.__game.coop.session;
+    window.__resumeFront = session._tryReconnect.bind(session);
+    session._tryReconnect = async () => { window.__frontResumePending = true; };
+    session.transport.ws.close();
+  });
+  await page.waitForFunction(() => window.__game.coop.session.roster.size === 1, null, { timeout: 15000 * SLOW });
+  const dropped = await page.evaluate(() => ({
+    size: window.__game.coop.session.roster.size,
+    started: window.__game.coop.session.frontStartedOperationId,
+  }));
+  check(dropped.size === 1 && dropped.started === prepared.operationId,
+    'peer loss leaves the host operation active and removes the guest quorum', JSON.stringify(dropped));
+  const checkpoint = await page.evaluate(() => {
+    const game = window.__game;
+    game._applyFrontTransition({ type: 'COMPLETE_STAGE', build: [] });
+    const stage = game.save.front.active.stage;
+    game._frontNextAction = 'continue';
+    game.endLevel();
+    return stage;
+  });
+  await page.waitForFunction((stage) => window.__game.state === 'level' && window.__game.level?.net
+    && window.__game.level?.operation?.stage === stage, checkpoint, { timeout: 50000 * SLOW });
+  check(checkpoint === 1, 'host continues to the next Front checkpoint without a new ready gate', String(checkpoint));
+  await guestPage.evaluate(() => window.__resumeFront());
+  await Promise.all([
+    page.waitForFunction((pid) => window.__game.coop.session.roster.get(pid)?.ready === true, guestPid, { timeout: 30000 * SLOW }),
+    guestPage.waitForFunction((stage) => window.__game.coop.session.transport.connected
+      && window.__game.coop.session.frontRun?.active?.stage === stage
+      && window.__game.level?.operation?.stage === stage
+      && window.__game.level?.net?.spec?.fr?.s === stage, checkpoint, { timeout: 50000 * SLOW }),
+  ]);
+  const resumed = await guestPage.evaluate((before) => ({
+    pid: window.__game.coop.session.myPid,
+    ready: window.__game.coop.session.roster.get(window.__game.coop.session.myPid)?.ready,
+    frontStage: window.__game.coop.session.frontRun.active.stage,
+    levelStage: window.__game.level.operation.stage,
+    specStage: window.__game.level.net.spec.fr.s,
+    personalUnchanged: JSON.stringify(window.__game.save.front) === before,
+    personalMarker: window.__game.save.front.marker,
+  }), guestPersonalBefore);
+  check(resumed.pid === guestPid && resumed.ready === true,
+    'same-pid Front resume restores guest readiness', JSON.stringify(resumed));
+  check(resumed.frontStage === checkpoint && resumed.levelStage === checkpoint && resumed.specStage === checkpoint,
+    'same-pid resume restores authoritative frun and current fr checkpoint', JSON.stringify(resumed));
+  check(resumed.personalUnchanged && resumed.personalMarker === 'guest-personal-front',
+    'real-room reconnect never overwrites guest personal Front', JSON.stringify(resumed));
+
   const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_|favicon/i.test(e));
   check(realErrors.length === 0, 'no browser JS errors', realErrors.join(' | '));
 } catch (e) {
   failed++;
   console.error('  ❌ coop-worldfront crashed:', e.stack || e.message);
 } finally {
-  await browser.close();
-  if (closeServer) await closeServer();
+  await closeTest();
 }
 
 if (failed) process.exit(1);

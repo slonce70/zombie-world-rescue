@@ -578,7 +578,7 @@ export class CoopUI {
       const countryState = ['completed', 'claimed'].includes(frontOperation.status) ? t('відбудова') : t('під атакою');
       this.el.frontSummary.innerHTML = `<strong>${t('Світ хоста: {n}', { n: this._esc(owner && owner.nick || t('Хост')) })}</strong>`
         + `<span>${this._esc(country ? `${country.flag} ${country.name}` : frontConfig.countryId)} · ${countryState}</span>`
-        + `<span>${t('Етап {n}/3', { n: frontRun.active.stage + 1 })} · ${t('Ціль: {objective}', { objective: frontStageLabel(frontConfig.missionPreset) })}</span>`;
+        + `<span>${t('Етап {n}/3', { n: frontRun.active.stage + 1 })} · ${t('Ціль: {objective}', { objective: t(frontStageLabel(frontConfig.missionPreset)) })}</span>`;
     }
     this.el.frontSummary.hidden = !frontConfig;
 
