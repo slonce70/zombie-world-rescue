@@ -2490,6 +2490,7 @@ export const EN = {
 "загроза": "threat",
 "відбудова": "rebuilding",
 "безпечно": "safe",
+"спокійно": "calm",
 "🧑‍🚒 Фахівець": "🧑‍🚒 Specialist",
 "🏗️ Проєкт Бази": "🏗️ Base Project",
 "🏳️ Залишити операцію": "🏳️ Abandon operation",
