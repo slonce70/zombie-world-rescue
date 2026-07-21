@@ -20,6 +20,27 @@ function dictKeys(path) {
 const EN = dictKeys(root + 'src/i18n/en.js');
 const RU = dictKeys(root + 'src/i18n/ru.js');
 
+const DICT_ENTRY_RE = /^\s*(['"])((?:\\.|(?!\1).)*?)\1\s*:\s*(['"])((?:\\.|(?!\3).)*?)\3\s*,?/gm;
+function dictEntries(path) {
+  const src = readFileSync(path, 'utf8');
+  const entries = new Map();
+  let m;
+  while ((m = DICT_ENTRY_RE.exec(src)) !== null) {
+    const unescape = (value) => value.replace(/\\(['"\\])/g, '$1');
+    entries.set(unescape(m[2]), unescape(m[4]));
+  }
+  return entries;
+}
+
+const placeholders = (value) => [...String(value).matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)]
+  .map((match) => match[1]).sort().join(',');
+const placeholderMismatches = [];
+for (const [lang, entries] of [['en', dictEntries(root + 'src/i18n/en.js')], ['ru', dictEntries(root + 'src/i18n/ru.js')]]) {
+  for (const [key, value] of entries) {
+    if (placeholders(key) !== placeholders(value)) placeholderMismatches.push({ lang, key, value });
+  }
+}
+
 function walk(dir, out) {
   for (const name of readdirSync(dir)) {
     const full = dir + name;
@@ -140,8 +161,8 @@ for (const file of rawFieldFiles) {
   }
 }
 
-if (perFile.length === 0 && perFileRaw.length === 0) {
-  console.log('  ✅ i18n-parity: усі ключі t(), статичні тексти index.html і «голі» name/title/cat/label/sub присутні в en.js і ru.js');
+if (perFile.length === 0 && perFileRaw.length === 0 && placeholderMismatches.length === 0) {
+  console.log('  ✅ i18n-parity: усі ключі t(), статичні тексти index.html, «голі» name/title/cat/label/sub і placeholders присутні в en.js і ru.js');
   process.exit(0);
 }
 
@@ -155,6 +176,10 @@ for (const f of perFileRaw) {
   console.log(`\n— ${f.rel} (голі поля name/title/cat/label/sub без t())`);
   if (f.misEn.length) for (const k of f.misEn) console.log(`    [en] ${k}`);
   if (f.misRu.length) for (const k of f.misRu) console.log(`    [ru] ${k}`);
+}
+for (const mismatch of placeholderMismatches) {
+  console.log(`\n— src/i18n/${mismatch.lang}.js (placeholders)`);
+  console.log(`    ${JSON.stringify(mismatch.key)} -> ${JSON.stringify(mismatch.value)}`);
 }
 console.log(`\n  Разом: ${missingEn + missingRawEn} без en, ${missingRu + missingRawRu} без ru`);
 process.exit(1);

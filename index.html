@@ -666,11 +666,11 @@
   </div>
 
   <!-- Кооп: лобі -->
-  <div id="overlay-lobby" class="overlay">
+  <div id="overlay-lobby" class="overlay" role="dialog" aria-modal="true" aria-labelledby="lobby-title" aria-hidden="true" data-escape-close="btn-lobby-leave">
     <div class="overlay-card panel-card coop-card">
       <div class="panel-header">
-        <h2>🛋️ КІМНАТА</h2>
-        <button id="btn-lobby-leave" class="btn-x">✕</button>
+        <h2 id="lobby-title">🛋️ КІМНАТА</h2>
+        <button id="btn-lobby-leave" class="btn-x" type="button" data-dialog-focus aria-label="Залишити кімнату">✕</button>
       </div>
       <div class="lobby-code-box">
         <div class="lobby-code-label">Код кімнати — продиктуй другу:</div>
@@ -718,14 +718,14 @@
     </div>
   </div>
 
-  <div id="overlay-front-result" class="overlay" data-kind="" aria-hidden="true">
+  <div id="overlay-front-result" class="overlay" data-kind="" role="dialog" aria-modal="true" aria-labelledby="front-result-title" aria-hidden="true">
     <div class="overlay-card victory-card front-result-card">
       <h1 id="front-result-title"></h1>
       <p id="front-result-summary" class="storm-sub"></p>
       <div id="front-result-change" class="front-result-change"></div>
       <div class="btn-row">
-        <button id="btn-front-result-primary" class="btn btn-primary big"></button>
-        <button id="btn-front-result-end" class="btn big"></button>
+        <button id="btn-front-result-primary" class="btn btn-primary big" type="button" data-dialog-focus></button>
+        <button id="btn-front-result-end" class="btn big" type="button"></button>
       </div>
     </div>
   </div>

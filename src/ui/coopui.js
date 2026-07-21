@@ -615,7 +615,7 @@ export class CoopUI {
         || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
         || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
         || (mid === 'weekly-coop' && !anyLib));
-      mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
+      mh += `<button type="button" class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}" ${!isHost || locked ? 'disabled' : ''}>${label}${locked ? ' 🔒' : ''}</button>`;
     }
     this.el.modes.innerHTML = mh;
     document.getElementById('lobby-mode-section').hidden = s.mode === 'front';
@@ -656,7 +656,7 @@ export class CoopUI {
         : isCountryOpen(save.liberated, id);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;
-      ch += `<div class="${cls}" data-id="${id}">${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</div>`;
+      ch += `<button type="button" class="${cls}" data-id="${id}" ${!isHost || !unlocked ? 'disabled' : ''}>${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</button>`;
     }
     this.el.countries.innerHTML = ch;
     if (isHost) {
@@ -700,9 +700,8 @@ export class CoopUI {
     let rh = '';
     for (const [id, icon, label] of chips) {
       const sel = cur === id;
-      rh += `<div class="lobby-role ${sel ? 'sel' : ''}" data-role="${id || ''}"`
-        + ` role="button" tabindex="0" aria-pressed="${sel}"`
-        + ` aria-label="${t('Роль: {r}', { r: label })}">${icon}<span>${this._esc(label)}</span></div>`;
+      rh += `<button type="button" class="lobby-role ${sel ? 'sel' : ''}" data-role="${id || ''}"`
+        + ` aria-pressed="${sel}" aria-label="${t('Роль: {r}', { r: label })}">${icon}<span>${this._esc(label)}</span></button>`;
     }
     this.el.roles.innerHTML = rh;
     this.el.roles.querySelectorAll('.lobby-role').forEach((el) => {

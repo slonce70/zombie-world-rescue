@@ -304,6 +304,10 @@ class Game {
       // у полі вводу літери B/M — це просто літери, а не магазин/звук
       const tgt = e.target;
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
+      if (e.code === 'Escape') {
+        const dialog = [...document.querySelectorAll('.overlay.show[role="dialog"][data-escape-close]')].pop();
+        if (dialog) { document.getElementById(dialog.dataset.escapeClose)?.click(); return; }
+      }
       if (e.code === 'Escape' && this.state === 'hqbase') { this.exitHQBase(); return; }
       if (e.code === 'Escape' && this.shop.isOpen) { this.shop.close(); return; }
       if (e.code === 'Escape' && this.state === 'level' && !this.paused
@@ -2431,9 +2435,23 @@ class Game {
     if (tag) tag.textContent = t('🔄 Вийшло оновлення v{v}! Онови сторінку: Ctrl(⌘)+Shift+R', { v });
   }
 
-  _showOverlay(id) { document.getElementById(id).classList.add('show'); }
+  _showOverlay(id) {
+    const overlay = document.getElementById(id);
+    if (!overlay.classList.contains('show') && overlay.getAttribute('role') === 'dialog') {
+      this._overlayFocus ||= new Map();
+      this._overlayFocus.set(id, document.activeElement);
+    }
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.querySelector('[data-dialog-focus]')?.focus({ preventScroll: true });
+  }
   _hideOverlay(id) {
-    document.getElementById(id).classList.remove('show');
+    const overlay = document.getElementById(id);
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+    const trigger = this._overlayFocus && this._overlayFocus.get(id);
+    if (trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
+    if (this._overlayFocus) this._overlayFocus.delete(id);
     // закрили гардероб — гасимо 3D-прев'ю (вигляд героя застосується при вході в рівень)
     if (id === 'overlay-wardrobe') this._stopHeroPreview();
   }
