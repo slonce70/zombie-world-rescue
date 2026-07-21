@@ -4076,14 +4076,13 @@ class Game {
       if (state === 'attacked' || state === 'destroyed') this._addFrontDamage(level, level.frontCountryState.damage);
       if (state === 'attacked') {
         const village = level.world.layout.village || level.world.layout.SPAWN;
-        level.frontPressure = level.zombies.list.filter((zombie) => !zombie.dead && !zombie.gone).slice(0, 3);
+        level.frontPressure = level.zombies.list.filter((zombie) =>
+          !zombie.dead && !zombie.gone && !zombie.horde && !zombie.aggroed && zombie.state !== 'chase').slice(0, 3);
         level.frontPressure.forEach((zombie, index) => {
           const angle = index * Math.PI * 2 / level.frontPressure.length;
           zombie.x = village.x + Math.cos(angle) * 12;
           zombie.z = village.z + Math.sin(angle) * 12;
           zombie.rig.group.position.set(zombie.x, level.world.groundH(zombie.x, zombie.z), zombie.z);
-          zombie.horde = zombie.aggroed = true;
-          zombie.state = 'chase';
         });
       }
       if (state === 'rebuilding' || state === 'saved') this._addFrontOutpost(level, level.frontCountryState.restored, state);

@@ -219,16 +219,32 @@ try {
         front.restored[country] = 3;
       }
       if (wanted === 'attacked') {
-        const captured = [];
-        for (const name of ['_addFrontDamage', '_addFrontCitizens']) {
-          const original = game[name];
-          game[name] = (...args) => captured.push({ name, original, args });
-        }
+        const snapshot = (zombie) => ({
+          x: zombie.x, y: zombie.y, z: zombie.z,
+          position: zombie.rig.group.position.toArray(),
+          horde: zombie.horde, aggroed: zombie.aggroed, state: zombie.state,
+        });
+        const restore = (zombie, value) => {
+          Object.assign(zombie, { x: value.x, y: value.y, z: value.z, horde: value.horde, aggroed: value.aggroed, state: value.state });
+          zombie.rig.group.position.fromArray(value.position);
+        };
+        const originalDamage = game._addFrontDamage;
+        game._addFrontDamage = (level, damage) => {
+          game.__frontBaseline = { level, damage, actors: level.zombies.list.map(snapshot) };
+        };
+        game.__prepareFrontBaseline = () => {
+          const baseline = game.__frontBaseline;
+          baseline.presented = baseline.level.zombies.list.map(snapshot);
+          baseline.frontPressure = baseline.level.frontPressure;
+          baseline.level.zombies.list.forEach((zombie, index) => restore(zombie, baseline.actors[index]));
+          baseline.level.frontPressure = null;
+          game._addFrontDamage = originalDamage;
+        };
         game.__applyFrontPresentation = () => {
-          for (const entry of captured) {
-            game[entry.name] = entry.original;
-            entry.original.apply(game, entry.args);
-          }
+          const baseline = game.__frontBaseline;
+          originalDamage.call(game, baseline.level, baseline.damage);
+          baseline.level.zombies.list.forEach((zombie, index) => restore(zombie, baseline.presented[index]));
+          baseline.level.frontPressure = baseline.frontPressure;
         };
       }
       await game.startLevel(country);
@@ -237,6 +253,7 @@ try {
     presentations[state] = await page.evaluate(() => {
       const game = window.__game;
       const level = window.__game.level;
+      if (game.__prepareFrontBaseline) game.__prepareFrontBaseline();
       game.renderer.render(level.scene, level.player.camera);
       const baselineCalls = game.renderer.info.render.calls;
       if (game.__applyFrontPresentation) game.__applyFrontPresentation();
@@ -260,6 +277,7 @@ try {
         tier: level.frontLivingCity?.tier || 0,
         citizens: citizens.length,
         pressure: level.frontPressure?.length || 0,
+        quietPressure: (level.frontPressure || []).every((zombie) => !zombie.horde && !zombie.aggroed && zombie.state !== 'chase'),
         guards: citizens.filter((citizen) => citizen.job === 'guard').length,
         builders: citizens.filter((citizen) => citizen.job === 'builder').length,
         residents: citizens.filter((citizen) => citizen.job === 'resident').length,
@@ -272,7 +290,7 @@ try {
     || attacked.semantic !== 'attacked' || destroyed.semantic !== 'destroyed'
     || rebuilding.semantic !== 'rebuilding' || saved.semantic !== 'saved'
     || !(attacked.rubble > 0 && destroyed.rubble > attacked.rubble)
-    || attacked.outpost !== 0 || attacked.citizens !== 0 || attacked.pressure !== 3
+    || attacked.outpost !== 0 || attacked.citizens !== 0 || attacked.pressure !== 3 || !attacked.quietPressure
     || attacked.presentationCalls <= 0 || attacked.presentationCalls > 10
     || destroyed.evacuees === 0 || destroyed.outpost !== 0 || destroyed.duplicateEvacuees !== 0
     || rebuilding.rubble !== 0 || rebuilding.outpost === 0 || rebuilding.builders === 0
