@@ -35,6 +35,25 @@ function winAndClaim(front, operationId, specialist = 'dispatcher') {
   return result;
 }
 
+function saveCountry(front, country) {
+  const effects = [];
+  while ((front.restored[country] || 0) < 3
+    || front.world.countries[country].damage > 0
+    || front.board.some((row) => row.country === country && row.status !== 'claimed')) {
+    const operation = front.board.find((row) => row.country === country && row.status === 'available');
+    assert.ok(operation, `available recovery operation for ${country}`);
+    const expectedCoins = 200 + operation.threat * 50 + (operation.counterattack ? 100 : 0);
+    const expectedCrystals = 1 + operation.threat;
+    const result = winAndClaim(front, operation.id);
+    const grant = result.effects.find((effect) => effect.type === 'grant' && effect.rewardId.endsWith(':operation'));
+    assert.equal(grant.coins, expectedCoins);
+    assert.equal(grant.crystals, expectedCrystals);
+    front = result.front;
+    effects.push(...result.effects);
+  }
+  return { front, effects };
+}
+
 test('unlock creates deterministic guided and full boards', () => {
   assert.equal(createFront({ seed: 500, liberated: [] }), null);
   const guided = createFront({ seed: 500, liberated: { UKR: true, POL: true } });
@@ -127,18 +146,17 @@ test('evacuation becomes a country-specific rebirth operation', () => {
 
 test('operation and cycle rewards are canonical, stable and idempotent', () => {
   let front = createFront({ seed: 505, liberated: ['UKR', 'POL', 'DEU'] });
-  for (let index = 0; index < 3; index++) {
-    const operation = front.board.find((entry) => entry.status === 'available');
-    const expectedCoins = 200 + operation.threat * 50;
-    const result = winAndClaim(front, operation.id);
-    const operationGrant = result.effects.find((effect) => effect.type === 'grant' && effect.rewardId.endsWith(':operation'));
-    assert.equal(operationGrant.coins, expectedCoins);
-    assert.equal(operationGrant.crystals, 1 + operation.threat);
+  const countries = [...new Set(front.board.map((row) => row.country))];
+  const allEffects = [];
+  for (const country of countries) {
+    const result = saveCountry(front, country);
     front = result.front;
-    if (index < 2) assert.equal(result.effects.some((effect) => effect.eggs === 1), false);
-    else assert.ok(result.effects.some((effect) => effect.eggs === 1 && effect.crystals === 10));
+    allEffects.push(...result.effects);
   }
-  assert.equal(front.projects.medbay, 1);
+  const operationGrants = allEffects.filter((effect) => effect.type === 'grant' && effect.rewardId.endsWith(':operation'));
+  assert.equal(operationGrants.length, 9);
+  assert.equal(allEffects.filter((effect) => effect.key === 'front.cycleComplete').length, 1);
+  assert.equal(front.projects.medbay, 3);
   assert.equal(front.projectProgress, 0);
   assert.equal(front.active, null);
   assert.equal(front.board.every((operation) => operation.status === 'claimed'), true);
@@ -167,11 +185,26 @@ test('view model exposes recommendation, specialists, projects and country conse
   const operation = front.board[0];
   front = winAndClaim(front, operation.id).front;
   const country = frontCountryState(front, operation.country);
-  assert.equal(country.state, 'restoring');
+  assert.equal(country.state, 'rebuilding');
   assert.equal(country.outpostLevel, 1);
   view = frontViewModel(front);
-  assert.equal(view.completedOperations, 1);
+  assert.equal(view.completedOperations, 0);
   assert.equal(view.canSelectProject, false);
+});
+
+test('country states use the approved five-name lifecycle', () => {
+  const front = createFront({ seed: 915, liberated: ['UKR', 'POL', 'DEU', 'FRA'] });
+  const attacked = front.board[0].country;
+  const peaceful = ['UKR', 'POL', 'DEU', 'FRA'].find((country) => !front.board.some((operation) => operation.country === country));
+  assert.equal(frontCountryState(front, attacked).state, 'attacked');
+  assert.equal(frontCountryState(front, peaceful).state, 'peaceful');
+  front.world.countries[attacked].damage = 3;
+  assert.equal(frontCountryState(front, attacked).state, 'destroyed');
+  front.world.countries[attacked].damage = 0;
+  front.restored[attacked] = 1;
+  assert.equal(frontCountryState(front, attacked).state, 'rebuilding');
+  front.restored[attacked] = 3;
+  assert.equal(frontCountryState(front, attacked).state, 'saved');
 });
 
 test('INIT owns local counters and rejects unavailable specialists', () => {
@@ -188,37 +221,36 @@ test('INIT owns local counters and rejects unavailable specialists', () => {
   assert.equal(result.front.active.specialist, 'dispatcher');
 });
 
-test('living world attacks once per new day and rescuing people changes the country', () => {
+test('offline days never change a country', () => {
   let front = reduce(null, {
     type: 'INIT', seed: 910, liberated: ['UKR'], day: '2026-07-17',
   }).front;
-  assert.deepEqual(front.world.countries.UKR, { damage: 0, population: 100 });
-
-  let result = reduce(front, { type: 'INIT', liberated: ['UKR'], day: '2026-07-18' });
-  front = result.front;
-  assert.equal(front.world.countries.UKR.damage, 1);
-  assert.ok(front.world.countries.UKR.population < 100);
-  assert.ok(result.effects.some((effect) => effect.key === 'front.worldAttacked'));
-
-  const sameDay = reduce(front, { type: 'INIT', liberated: ['UKR'], day: '2026-07-18' }).front;
-  assert.deepEqual(sameDay.world, front.world);
-  const beforeRescue = front.world.countries.UKR.population;
-  front = reduce(front, { type: 'RESCUE_CIVILIAN', countryId: 'UKR' }).front;
-  assert.equal(front.world.countries.UKR.population, Math.min(100, beforeRescue + 5));
-  assert.equal(frontCountryState(front, 'UKR').damage, 1);
+  front.world.countries.UKR = { damage: 2, population: 64 };
+  const before = structuredClone(front.world.countries);
+  const result = reduce(front, { type: 'INIT', liberated: ['UKR'], day: '2026-07-24' });
+  assert.deepEqual(result.front.world.countries, before);
+  assert.equal(result.effects.some((effect) => effect.key === 'front.worldAttacked'), false);
 });
 
-test('people flee an attacked country to the safest liberated city', () => {
-  let front = reduce(null, {
-    type: 'INIT', seed: 912, liberated: ['UKR', 'POL', 'DEU'], day: '2026-07-17',
-  }).front;
-  for (const state of Object.values(front.world.countries)) state.population = 70;
-  const before = Object.fromEntries(Object.entries(front.world.countries).map(([id, state]) => [id, state.population]));
-  front = reduce(front, { type: 'INIT', liberated: ['UKR', 'POL', 'DEU'], day: '2026-07-18' }).front;
-  const attacked = Object.entries(front.world.countries).find(([, state]) => state.damage === 1);
-  assert.ok(attacked);
-  assert.ok(attacked[1].population < before[attacked[0]]);
-  assert.ok(Object.entries(front.world.countries).some(([id, state]) => id !== attacked[0] && state.population > before[id]));
+test('terminal defeat is explicit, idempotent and rebuilding never regresses', () => {
+  let front = createFront({ seed: 913, liberated: ['UKR'] });
+  const operationId = front.board[0].id;
+  front = reduce(front, { type: 'START_OPERATION', operationId }).front;
+  front = reduce(front, { type: 'START_STAGE' }).front;
+  front = reduce(front, { type: 'FAIL_STAGE' }).front;
+  const failed = reduce(front, { type: 'END_FAILED_OPERATION' });
+  assert.equal(failed.front.active, null);
+  assert.equal(failed.front.world.countries.UKR.damage, 1);
+  assert.deepEqual(reduce(failed.front, { type: 'END_FAILED_OPERATION' }).front, failed.front);
+
+  front = createFront({ seed: 914, liberated: ['UKR'] });
+  front.restored.UKR = 1;
+  const restoredBefore = structuredClone(front);
+  front = reduce(front, { type: 'START_OPERATION', operationId: front.board[0].id }).front;
+  front = reduce(front, { type: 'START_STAGE' }).front;
+  front = reduce(front, { type: 'FAIL_STAGE' }).front;
+  front = reduce(front, { type: 'END_FAILED_OPERATION' }).front;
+  assert.equal(front.restored.UKR, restoredBefore.restored.UKR);
 });
 
 test('claiming an operation repairs damage and brings people home', () => {
@@ -240,18 +272,15 @@ test('active scout reveals commander intel without a Radio Tower level', () => {
   assert.ok(view.board.find((operation) => operation.id === operationId).commander);
 });
 
-test('an unprotected rebuilt country loses one district and receives a counterattack', () => {
+test('a next-cycle counterattack preserves completed rebuilding', () => {
   let front = createFront({ seed: 509, liberated: ['UKR', 'POL', 'DEU', 'FRA'] });
-  front.restored = { UKR: 2, POL: 2, DEU: 2, FRA: 2 };
+  front.restored = { UKR: 3, POL: 3, DEU: 3, FRA: 3 };
   const protectedCountries = new Set(front.board.map((operation) => operation.country));
   const exposedCountry = ['UKR', 'POL', 'DEU', 'FRA'].find((country) => !protectedCountries.has(country));
-  for (const operation of front.board.slice()) front = winAndClaim(front, operation.id).front;
+  for (const operation of front.board.slice()) front = saveCountry(front, operation.country).front;
   const before = front.restored[exposedCountry];
   const result = reduce(front, { type: 'ADVANCE_GENERATION', liberated: ['UKR', 'POL', 'DEU', 'FRA'] });
-  const emergency = result.front.board.find((operation) => operation.country === exposedCountry);
-  assert.equal(result.front.restored[exposedCountry], before - 1);
-  assert.equal(emergency.counterattack, true);
-  assert.equal(emergency.template, 'siege');
-  assert.equal(emergency.threat, 3);
-  assert.ok(result.effects.some((effect) => effect.key === 'front.counterattack'));
+  assert.equal(result.front.restored[exposedCountry], before);
+  assert.equal(result.front.world.countries[exposedCountry].damage, 1);
+  assert.equal(result.front.board.find((operation) => operation.country === exposedCountry).counterattack, true);
 });

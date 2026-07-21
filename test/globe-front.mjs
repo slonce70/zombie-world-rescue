@@ -22,31 +22,31 @@ try {
       game._applyFrontTransition({ type: 'CLAIM_OPERATION' });
     };
 
-    const threat = state(countries[0]);
-    const threatLine = game.globe._frontStatusLine(countries[0]);
+    const attacked = state(countries[0]);
+    const attackedLine = game.globe._frontStatusLine(countries[0]);
     complete(ids[0]);
-    const restoring = state(countries[0]);
-    const restoringLine = game.globe._frontStatusLine(countries[0]);
-    complete(ids[1]);
-    complete(ids[2]);
-    const safe = countries.every((country) => state(country) === 'safe');
+    const rebuilding = state(countries[0]);
+    const rebuildingLine = game.globe._frontStatusLine(countries[0]);
+    while (state(countries[0]) !== 'saved') complete(game.save.front.board.find((operation) => operation.country === countries[0]).id);
+    for (const country of countries.slice(1)) while (state(country) !== 'saved') complete(game.save.front.board.find((operation) => operation.country === country).id);
+    const saved = countries.every((country) => state(country) === 'saved');
     game.globe._paintedFront = null;
     game.globe.update(0);
     return {
-      threat,
-      restoring,
-      safe,
-      threatLine,
-      restoringLine,
+      attacked,
+      rebuilding,
+      saved,
+      attackedLine,
+      rebuildingLine,
       repaintTracked: game.globe._paintedFront === game.save.front,
     };
   });
 
-  if (result.threat !== 'threat' || result.restoring !== 'restoring' || !result.safe
-      || !result.threatLine.includes('⚠️') || !result.restoringLine.includes('🛰️') || !result.repaintTracked) {
+  if (result.attacked !== 'attacked' || result.rebuilding !== 'rebuilding' || !result.saved
+      || !result.attackedLine.includes('⚠️') || !result.rebuildingLine.includes('🛰️') || !result.repaintTracked) {
     throw new Error(`Living Front globe states failed: ${JSON.stringify(result)}`);
   }
-  console.log('✅ Living Front threat, restoration and safe states reach the globe');
+  console.log('✅ Living Front attacked, rebuilding and saved states reach the globe');
 } finally {
   await closeTest();
 }

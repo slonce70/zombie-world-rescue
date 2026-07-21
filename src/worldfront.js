@@ -93,7 +93,7 @@ function cleanIds(value, allowed = null, max = 64) {
 const cleanCountries = (value) => cleanIds(value, COUNTRY_SET, CAMPAIGN_COUNTRIES.length);
 const cleanBuild = (value) => cleanIds(value, BUILD_SET, MAX_BUILD_IDS);
 const operationId = (generation, country, template) => `g${generation}-${country}-${template}`;
-const operationRewardId = (front, operation) => `front:${front.seed}:${operation.id}:operation`;
+const operationRewardId = (front, operation) => `front:${front.seed}:${operation.id}:r${front.restored[operation.country] || 0}:operation`;
 const cycleRewardId = (front) => `front:${front.seed}:g${front.generation}:cycle`;
 const maxProjectRewardId = (front) => `front:${front.seed}:g${front.generation}:projects-max`;
 
@@ -173,13 +173,6 @@ function cleanWorld(value, liberated = []) {
     day: typeof source.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.day) ? source.day : '',
     countries,
   };
-}
-
-function elapsedDays(from, to) {
-  if (!from || !to || to <= from) return 0;
-  const start = Date.parse(`${from}T00:00:00Z`);
-  const end = Date.parse(`${to}T00:00:00Z`);
-  return Number.isFinite(start) && Number.isFinite(end) ? Math.min(7, Math.floor((end - start) / 864e5)) : 0;
 }
 
 function specialistId(value, rescuedFriends, enforceAvailability) {
@@ -350,30 +343,10 @@ export function applyFrontEvent(value, event = {}) {
       front.stats.firstSeenDay = event.day;
     }
     front.world = cleanWorld(front.world, event.liberated);
-    const days = elapsedDays(front.world.day, event.day);
-    let attacked = false;
-    for (let day = 0; day < days; day++) {
-      const targets = front.board.filter((operation) => operation.status !== 'claimed');
-      if (!targets.length) break;
-      const operation = targets[hash(front.seed, front.generation + day, targets.length, 0x6d2b79f5) % targets.length];
-      const country = front.world.countries[operation.country] || { damage: 0, population: 100 };
-      const beforePopulation = country.population;
-      country.damage = Math.min(3, country.damage + 1);
-      country.population = Math.max(20, country.population - 4 - operation.threat * 2);
-      front.world.countries[operation.country] = country;
-      // Половина людей, які покинули атаковане місто, переїжджає до найбезпечнішої
-      // звільненої країни. Так наслідки фронту живуть на карті, а не зникають у toast.
-      const refugees = Math.floor((beforePopulation - country.population) / 2);
-      const shelter = Object.entries(front.world.countries)
-        .filter(([id, state]) => id !== operation.country && state.population < 100)
-        .sort(([aId, a], [bId, b]) => a.damage - b.damage || b.population - a.population || aId.localeCompare(bId))[0]?.[1];
-      if (shelter && refugees > 0) shelter.population = Math.min(100, shelter.population + refugees);
-      attacked = true;
-    }
-    if ((days === 0 || attacked) && typeof event.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.day) && event.day >= front.world.day) {
+    if (typeof event.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.day) && event.day >= front.world.day) {
       front.world.day = event.day;
     }
-    return changed(front, [], attacked ? 'front.worldAttacked' : '');
+    return changed(front);
   }
 
   const sanitized = sanitizeFront(value, Object.hasOwn(event, 'rescuedFriends') ? { rescuedFriends: event.rescuedFriends } : {});
@@ -432,6 +405,22 @@ export function applyFrontEvent(value, event = {}) {
     return changed(front, [], 'front.stageFailed');
   }
 
+  if (event.type === 'END_FAILED_OPERATION') {
+    if (!front.active || front.active.status !== 'ready') return unchanged(sanitized);
+    const operation = operationById(front, front.active.operationId);
+    if (!operation) return unchanged(sanitized);
+    const rebuilding = (front.restored[operation.country] || 0) > 0 && !operation.counterattack;
+    if (!rebuilding) {
+      const country = front.world.countries[operation.country] || { damage: 0, population: 100 };
+      country.damage = Math.min(3, country.damage + 1);
+      country.population = Math.max(20, country.population - 4 - operation.threat * 2);
+      front.world.countries[operation.country] = country;
+    }
+    operation.status = 'available';
+    front.active = null;
+    return changed(front, [], 'front.operationFailed');
+  }
+
   if (event.type === 'ABANDON_OPERATION') {
     if (!front.active || front.active.status === 'completed') return unchanged(sanitized);
     const operation = operationById(front, front.active.operationId);
@@ -463,7 +452,16 @@ export function applyFrontEvent(value, event = {}) {
     country.damage = Math.max(0, country.damage - 1);
     country.population = Math.min(100, country.population + 8 + operation.threat * 2);
     front.world.countries[operation.country] = country;
-    operation.status = 'claimed';
+    const saved = country.damage === 0 && front.restored[operation.country] >= 3;
+    if (saved) {
+      operation.status = 'claimed';
+    } else {
+      operation.template = country.damage >= 2 ? 'evacuation' : 'siege';
+      operation.id = operationId(front.generation, operation.country, operation.template);
+      operation.threat = Math.max(1, Math.min(3, country.damage || 1));
+      operation.counterattack = false;
+      operation.status = 'available';
+    }
     front.active = null;
 
     const cycleComplete = front.board.length === 3 && front.board.every((entry) => entry.status === 'claimed');
@@ -494,8 +492,6 @@ export function applyFrontEvent(value, event = {}) {
       .map((country, index) => ({ country, score: hash(front.seed, front.generation + 1, index, 0x71c4a11d) }))
       .sort((a, b) => a.score - b.score || a.country.localeCompare(b.country))[0]?.country || null;
     if (counterattackCountry) {
-      front.restored[counterattackCountry]--;
-      if (!front.restored[counterattackCountry]) delete front.restored[counterattackCountry];
       const country = front.world.countries[counterattackCountry] || { damage: 0, population: 100 };
       country.damage = Math.min(3, country.damage + 1);
       country.population = Math.max(20, country.population - 10);
@@ -543,21 +539,21 @@ export function frontCountryState(value, countryId) {
   if (!front || !COUNTRY_SET.has(countryId)) return null;
   const operation = front.board.find((entry) => entry.country === countryId) || null;
   const world = front.world.countries[countryId] || { damage: 0, population: 100 };
-  let state = world.damage >= 3 ? 'destroyed' : world.damage > 0 ? 'threat' : front.restored[countryId] ? 'safe' : 'neutral';
-  if (operation) {
-    if (world.damage >= 3) state = 'destroyed';
-    else if (operation.status === 'completed') state = 'restoring';
-    else if (operation.status === 'claimed') {
-      state = world.damage > 0 || !front.board.every((entry) => entry.status === 'claimed') ? 'restoring' : 'safe';
-    }
-    else state = 'threat';
-  }
+  const restored = front.restored[countryId] || 0;
+  const activeAttack = !!operation && ['available', 'active'].includes(operation.status)
+    && (operation.counterattack || restored === 0);
+  let state = 'peaceful';
+  if (world.damage >= 3) state = 'destroyed';
+  else if (activeAttack) state = 'attacked';
+  else if (world.damage === 0 && restored >= 3) state = 'saved';
+  else if (restored > 0 || (operation && ['completed', 'claimed'].includes(operation.status))) state = 'rebuilding';
+  else if (world.damage > 0 || operation) state = 'attacked';
   return {
     countryId,
     state,
     threat: operation ? operation.threat : 0,
-    restored: front.restored[countryId] || 0,
-    outpostLevel: front.restored[countryId] || 0,
+    restored,
+    outpostLevel: restored,
     damage: world.damage,
     population: world.population,
     operationId: operation ? operation.id : null,
@@ -576,7 +572,8 @@ export function frontViewModel(value, save = {}, { previewSpecialist = null } = 
   const available = front.board.filter((operation) => operation.status === 'available');
   const recommended = front.active
     ? front.active.operationId
-    : available.slice().sort((a, b) => a.threat - b.threat || a.id.localeCompare(b.id))[0]?.id || null;
+    : available.slice().sort((a, b) => (front.restored[b.country] > 0) - (front.restored[a.country] > 0)
+      || a.threat - b.threat || a.id.localeCompare(b.id))[0]?.id || null;
   const board = front.board.map((operation) => {
     const template = FRONT_TEMPLATES[operation.template];
     return {

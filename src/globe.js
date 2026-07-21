@@ -10,9 +10,10 @@ import {
 
 const FRONT_GLOBE_COLORS = Object.freeze({
   destroyed: ['#49151f', '#a7353f'],
-  threat: ['#c93455', '#ff7b6d'],
-  restoring: ['#d7a62a', '#ffe08a'],
-  safe: ['#25aeb8', '#79edf2'],
+  attacked: ['#c93455', '#ff7b6d'],
+  rebuilding: ['#d7a62a', '#ffe08a'],
+  saved: ['#25aeb8', '#79edf2'],
+  peaceful: ['#8d86a3', '#6b6485'],
 });
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
@@ -359,16 +360,17 @@ export class Globe {
   _frontState(id) {
     if (!CAMPAIGN_ORDER.includes(id)) return null;
     const state = frontCountryState(this.game.save.front, id);
-    return state && state.state !== 'neutral' ? state : null;
+    return state;
   }
 
   _frontStatusLine(id) {
     const state = this._frontState(id);
     if (!state) return '';
     const label = state.state === 'destroyed' ? t('критичні руйнування')
-      : state.state === 'restoring' ? t('відбудова')
-      : state.state === 'safe' ? t('безпечно') : t('загроза');
-    const threat = ['threat', 'destroyed'].includes(state.state) ? ` ${'⚠️'.repeat(state.threat)}` : '';
+      : state.state === 'rebuilding' ? t('відбудова')
+      : state.state === 'saved' ? t('безпечно')
+      : state.state === 'peaceful' ? t('спокійно') : t('загроза');
+    const threat = ['attacked', 'destroyed'].includes(state.state) ? ` ${'⚠️'.repeat(state.threat)}` : '';
     return `<br>🛰️ ${label}${threat}<br>🧱 ${t('Руйнування')}: ${state.damage}/3 · 👥 ${t('Люди')}: ${state.population}%`;
   }
 
