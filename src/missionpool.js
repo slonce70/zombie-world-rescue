@@ -797,7 +797,7 @@ export class DynamicMissions {
         }
       }
       const prefix = m.optional ? '⭐ ' : '';
-      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done' });
+      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done', primary: m.state === 'active' && !m.optional, optional: m.optional });
     }
     if (!this.objectiveOnly && this.allDone && !this.bossStarted) {
       out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });

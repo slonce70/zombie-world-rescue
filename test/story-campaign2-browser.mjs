@@ -38,6 +38,7 @@ const completeStoryObjectiveSnapshot = (objectiveId, delegateId) => page.evaluat
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
+await page.click('.globe-other > summary');
 await page.click('#btn-solo');
 await page.waitForSelector('#overlay-solo.show', { timeout: 10000 });
 await page.click('.solo-mode[data-mode="campaign"]');
@@ -56,6 +57,11 @@ await page.waitForFunction(() => window.__game.state === 'level' && window.__gam
 await page.waitForFunction(() => document.querySelector('.story-objective')?.textContent, null, { timeout: 3000 }).catch(() => null);
 const storyObjectiveText = await page.evaluate(() => document.querySelector('.story-objective')?.textContent || '');
 check(/Врятуй людей/.test(storyObjectiveText), 'HUD shows current UKR story objective', storyObjectiveText);
+const visible = await page.locator('#mission-list .story-objective').count();
+check(visible === 1, 'HUD renders exactly one primary objective');
+const text = await page.locator('#mission-list').innerText();
+const objective = 'Врятуй людей із хліва';
+check(text.split(objective).length - 1 === 1, 'primary objective is not duplicated');
 let st = await page.evaluate(() => ({
   kind: window.__game.test.missionKind(),
   ids: window.__game.test.storyObjectiveIds(),
