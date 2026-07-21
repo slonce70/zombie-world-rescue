@@ -2677,7 +2677,7 @@ class Game {
       level.defense.towerHp = level.defense.towerMaxHp;
     }
     if (level.operation.template === 'evacuation' && level.operation.stage === 1) {
-      this._addFrontEvacuees(level);
+      if (!level.frontEvacuees) this._addFrontEvacuees(level);
       if (level.defense && level.defense.zone) level.defense.timer = Math.min(level.defense.timer, 75);
     }
     this._addFrontSupport(level);
@@ -2694,7 +2694,7 @@ class Game {
     this._enterFrontPhase(level, 0);
   }
 
-  _addFrontOutpost(level, restoredLevel) {
+  _addFrontOutpost(level, restoredLevel, state) {
     const tier = Math.max(0, Math.min(3, restoredLevel | 0));
     if (!tier) return;
     const village = level.world.layout.village || level.world.layout.SPAWN;
@@ -2737,9 +2737,15 @@ class Game {
     group.position.set(x, y, z);
     level.scene.add(group);
     level.frontOutpostDrawCalls = group.children.length;
+    this._addFrontCitizens(level, state, tier, { x, z, group });
+  }
+
+  _addFrontCitizens(level, state, tier = 0, center = null) {
+    const village = level.world.layout.village || level.world.layout.SPAWN;
+    const { x, z, group = null } = center || { x: village.x, z: village.z };
     level.frontLivingCity = { x, z, tier, group, citizens: [] };
     const kinds = ['boy', 'girl', 'granny', 'medic', 'farmer', 'mechanic'];
-    const count = 2 + tier * 2;
+    const count = state === 'attacked' ? 3 : 2 + tier * 2;
     for (let i = 0; i < count; i++) {
       const rig = makeCivilian(kinds[i % kinds.length], level.rng);
       const angle = (i / count) * Math.PI * 2;
@@ -2748,7 +2754,9 @@ class Game {
       const cz = z + Math.sin(angle) * radius;
       rig.group.position.set(cx, level.world.groundH(cx, cz), cz);
       rig.group.rotation.y = angle + Math.PI / 2;
-      const job = ['guard', 'builder', 'resident'][i % 3];
+      const job = state === 'attacked' ? (i < 2 ? 'guard' : 'resident')
+        : state === 'saved' ? (i < 2 ? 'guard' : i === 2 ? 'builder' : 'resident')
+          : i < Math.ceil(count / 2) ? 'builder' : 'resident';
       setAnim(rig, job === 'resident' ? 'walk' : 'idle');
       level.scene.add(rig.group);
       level.frontLivingCity.citizens.push({
@@ -2880,9 +2888,22 @@ class Game {
     const labels = {
       quiet: ['🧭 ОЗИРНИСЬ', 'Виконуй задачу — тиск почнеться не одразу.'],
       pressure: ['⚠️ ТИСК', 'Орда наближається!'],
-      spike: ['👑 КОМАНДИР', 'Атаку телеграфовано — тримай дистанцію.'],
       reward: ['🎁 ПЕРЕПОЧИНОК', 'Збери припаси та заверши задачу.'],
     };
+    if (phase.id === 'spike') {
+      const warnings = {
+        charger: 'Ривок: відійди з лінії атаки.',
+        summon: 'Викликає підкріплення: не дай себе оточити.',
+        shield: 'Щит: атакуй з флангу.',
+        invisible: 'Невидимість: стеж за рухом.',
+      };
+      const mechanics = phase.commander && phase.commander.mechanics.map((mechanic) => t(warnings[mechanic])).join(' · ');
+      this.hud.banner(t(phase.commander ? '👑 КОМАНДИР' : '⚠️ Елітна хвиля!'),
+        mechanics || t('Готуйся — йдуть еліти! 👹'), 2, { prio: 1 });
+      this.audio.horde();
+      director.spikeWarning = 2;
+      return;
+    }
     const copy = labels[phase.id];
     if (copy) this.hud.banner(t(copy[0]), t(copy[1]), 2.8);
     const authority = !level.net || level.net.authority;
@@ -2928,7 +2949,12 @@ class Game {
       }
       return;
     }
-    if (phase.id !== 'spike') return;
+  }
+
+  _spawnFrontSpike(level) {
+    const director = level.frontDirector;
+    const phase = director && director.plan.phases[director.phaseIndex];
+    if (!phase || phase.id !== 'spike' || (level.net && !level.net.authority)) return;
     if (level.operation.stage === 2) {
       const a = level.world.layout.arena || level.world.layout.village;
       const commander = director.plan.commander;
@@ -2948,6 +2974,11 @@ class Game {
   _updateFrontDirector(level, dt) {
     const director = level.frontDirector;
     if (!director || director.phaseIndex >= director.plan.phases.length - 1) return;
+    if (director.spikeWarning > 0) {
+      director.spikeWarning -= dt;
+      if (director.spikeWarning <= 0) this._spawnFrontSpike(level);
+      return;
+    }
     director.remaining -= dt;
     if (director.remaining <= 0) this._enterFrontPhase(level, director.phaseIndex + 1);
   }
@@ -4042,8 +4073,11 @@ class Game {
 
     this.level = level;
     if (savedFront && (level.operation || modeId === 'campaign')) {
-      this._addFrontOutpost(level, savedFront.restored[level.countryId] || 0);
-      this._addFrontDamage(level, level.frontCountryState && level.frontCountryState.damage);
+      const state = level.frontCountryState && level.frontCountryState.state;
+      if (state === 'attacked' || state === 'destroyed') this._addFrontDamage(level, level.frontCountryState.damage);
+      if (state === 'attacked') this._addFrontCitizens(level, state);
+      if (state === 'rebuilding' || state === 'saved') this._addFrontOutpost(level, level.frontCountryState.restored, state);
+      if (state === 'destroyed') this._addFrontEvacuees(level);
     }
     if (level.operation) this._initFrontRuntime(level, savedFront);
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {

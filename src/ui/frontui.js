@@ -13,20 +13,20 @@ const TEMPLATE_UI = {
 const STAGE_UI = {
   'rescue-group': 'Порятунок групи',
   'evacuation-zone': 'Зона евакуації',
-  'commander-pursuer': 'Командир-переслідувач',
+  'commander-pursuer': 'Командир: ривок',
   'rebuild-center': 'Відбудова центру міста',
   'rescue-train': 'Запуск рятувального поїзда',
   'rescue-ship': 'Ремонт рятувального корабля',
   'night-evacuation': 'Нічна евакуація міста',
   'destroy-nests': 'Знищення гнізд',
   'close-portals': 'Закриття порталів',
-  'commander-queen': 'Командир-королева',
+  'commander-queen': 'Командир: виклик підкріплень',
   'repair-generator': 'Ремонт генератора',
   'defense-waves': 'Оборона від хвиль',
-  'commander-ram': 'Командир-таран',
+  'commander-ram': 'Командир: щит і ривок',
   'activate-beacons': 'Активація маяків',
   'elite-squad': 'Елітний загін',
-  'commander-stalker': 'Командир-сталкер',
+  'commander-stalker': 'Командир: невидимість',
 };
 
 export const frontStageLabel = (stage) => STAGE_UI[stage] || String(stage || '').replace(/[-_]+/g, ' ');
@@ -302,7 +302,7 @@ export class FrontUI {
       ? `🪙 ${clamp(reward.coins, 0, 99999)} · 💎 ${clamp(reward.crystals, 0, 999)}`
       : t('🎁 Розвідай');
     const threat = '⚠️'.repeat(op.threat);
-    const commander = op.commander ? `<span class="front-op-intel">👑 ${esc(op.commander)}</span>` : '';
+    const commander = op.commander ? `<span class="front-op-intel">👑 ${esc(t(frontStageLabel(op.stages[2])))}</span>` : '';
     const stages = op.stages.map((stage, index) => {
       const label = frontStageLabel(stage);
       return `<span role="listitem" data-stage-id="${esc(stage)}"><b>${index + 1}</b>${esc(t(label))}</span>`;

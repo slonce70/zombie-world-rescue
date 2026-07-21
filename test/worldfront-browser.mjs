@@ -108,6 +108,7 @@ try {
       game._enterFrontPhase(level, 1);
       const pressure = level.zombies.list.filter((zombie) => zombie.frontEncounter).length - before;
       game._onFrontObjectiveComplete(level);
+      if (level.operation.stage === 2) game._updateFrontDirector(level, 2.01);
       const objectiveAdvanced = level.operation.stage < 2
         ? game.save.front.active && game.save.front.active.stage === level.operation.stage + 1
         : level.zombies.list.some((zombie) => zombie.frontCommander);
@@ -132,7 +133,7 @@ try {
     check(!stageState.campaignBossUnlocked, 'Front stage does not unlock the ordinary campaign boss');
     check(stageState.phases.join(',') === 'quiet,pressure,spike,reward', 'Encounter Director has four deterministic phases');
     check(stageState.objectiveAdvanced,
-      stage === 2 ? 'commander-only finale spawns immediately' : 'objective completion finishes the short stage immediately');
+      stage === 2 ? 'commander-only finale spawns after its warning' : 'objective completion finishes the short stage immediately');
     if (stageState.stage === 0) {
       check(stageState.pressure === stageState.pressureBudget, 'pressure phase executes its deterministic spawn budget');
       check(stageState.rewardDrop, 'reward phase creates a safe supply drop');
