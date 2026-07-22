@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 const path = new URL('../src/expedition.js', import.meta.url);
 const source = readFileSync(path, 'utf8')
   .replace("import { CAMPAIGN_ORDER } from './countries.js';", "const CAMPAIGN_ORDER = ['UKR','POL','DEU','FRA','ESP','PRT','ITA','TUR','SWE','EGY','JPN','CHN','LOST','LAB'];")
-  .replace("import { CARD_POOL } from './runbuild.js';", "const CARD_POOL = ['dmg25','nades2','dmgnade','dmg40','nades4','dmg60','boombag','nades6','dmgvamp','spd12','spdheal','spd18','spdfull','spd25','spdjump','jumphi','spdvamp','maxhp25','armor','maxhp40','vamp','maxhp60','shield30','vamp2','fortress'].map(id => ({ id }));");
+  .replace("import { CARD_POOL, cardWeight } from './runbuild.js';", "const CARD_POOL = ['dmg25','nades2','dmgnade','dmg40','nades4','dmg60','boombag','nades6','dmgvamp','spd12','spdheal','spd18','spdfull','spd25','spdjump','jumphi','spdvamp','maxhp25','armor','maxhp40','vamp','maxhp60','shield30','vamp2','fortress'].map((id, i) => ({ id, tag: i < 9 ? 'power' : i < 17 ? 'speed' : 'tank', rarity: 'common' })); const cardWeight = (card, bias) => 6 * (bias && ((bias.tags || []).includes(card.tag) || (bias.ids || []).includes(card.id)) ? 2 : 1);")
+  .replace("import { sanitizeSpecialistId, specialistBias } from './specialists.js';", "const sanitizeSpecialistId = (id, fallback = null) => ['guard','medic','scout'].includes(id) ? id : fallback; const specialistBias = (id) => id === 'guard' ? { tags: ['tank'], ids: [], multiplier: 2 } : id === 'scout' ? { tags: ['speed'], ids: [], multiplier: 2 } : id === 'medic' ? { tags: [], ids: ['spdheal','spdfull','dmgvamp','spdvamp','vamp','vamp2'], multiplier: 2 } : null;");
 
 const expedition = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
@@ -63,4 +64,23 @@ test('failed expedition keeps a small earned reward', () => {
   assert.equal(run.status, 'failed');
   assert.equal(run.reward.coins, 35);
   assert.equal(run.reward.crystals, 0);
+});
+
+test('v1 solo run migrates to v2 guard without losing progress', () => {
+  const old = {
+    v: 1, seed: 405, coop: false, countries: ['UKR'], step: 2, wins: 2,
+    status: 'active', current: { id: '2-1-rescue-UKR' }, choices: [],
+    build: ['dmg25'], reward: { coins: 0, crystals: 0, claimed: false },
+  };
+  const run = sanitizeExpedition(old);
+  assert.equal(run.v, 2);
+  assert.equal(run.specialist, 'guard');
+  assert.equal(run.step, 2);
+  assert.deepEqual(run.build, ['dmg25']);
+});
+
+test('co-op run never stores a shared specialist', () => {
+  const run = createExpedition({ seed: 406, coop: true, specialist: 'scout' });
+  assert.equal(run.specialist, null);
+  assert.deepEqual(sanitizeExpedition(run), run);
 });

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { WEAPONS } from './player.js';
 import { GADGETS } from './extras.js';
+import { SPECIALISTS } from './specialists.js';
 import { clamp } from './utils.js';
 import { momentumProgress, momentumTier, MOMENTUM_TIERS } from './combatmomentum.js';
 
@@ -410,7 +411,24 @@ export class HUD {
     const gadgets = level.gadgets;
     const activeG = gadgets ? gadgets.active : this.game.save.activeGadget;
     let gHtml = '';
-    if (activeG && gadgets) {
+    if (level.specialist) {
+      const specialist = level.specialist;
+      const cfg = SPECIALISTS[specialist.id];
+      const charge = Math.floor(specialist.charge);
+      gHtml = specialist.active
+        ? `${cfg.icon} ${t(cfg.name)} · ${t('Ранг')} ${specialist.rank} · Super ${charge}%`
+        : t('☢️ Контракт: спеціаліст вимкнений');
+      const btn = document.getElementById('tb-gadget');
+      const badge = document.getElementById('tb-gadget-n');
+      if (btn) {
+        btn.childNodes[0].textContent = cfg.superIcon;
+        btn.classList.toggle('super-ready', specialist.active && charge >= 100);
+        btn.setAttribute('aria-label', specialist.active
+          ? `${t(cfg.superName)} · Super ${charge}%`
+          : t('☢️ Контракт: спеціаліст вимкнений'));
+      }
+      if (badge) badge.textContent = specialist.active ? `${charge}%` : '—';
+    } else if (activeG && gadgets) {
       const icon = GADGETS[activeG] ? GADGETS[activeG].icon : '';
       gHtml = gadgets.cd > 0
         ? `<span class="none">${icon} ${Math.ceil(gadgets.cd)}${t('с')}</span>`
@@ -423,12 +441,13 @@ export class HUD {
     if (this._lastGadgetHtml !== gHtml) {
       this.el.gadgetChips.innerHTML = gHtml;
       this._lastGadgetHtml = gHtml;
-      const btn = document.getElementById('tb-gadget');
-      if (btn && activeG) {
-        btn.childNodes[0].textContent = GADGETS[activeG] ? GADGETS[activeG].icon : '';
+      if (!level.specialist) {
+        const btn = document.getElementById('tb-gadget');
+        if (btn && activeG) btn.childNodes[0].textContent = GADGETS[activeG] ? GADGETS[activeG].icon : '';
+        if (btn) btn.classList.remove('super-ready');
+        const badge = document.getElementById('tb-gadget-n');
+        if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
       }
-      const badge = document.getElementById('tb-gadget-n');
-      if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
     }
 
     // 🔫 тач: на кнопці перемикання показуємо ПОТОЧНУ зброю — дитина бачить, що тримає

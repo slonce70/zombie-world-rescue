@@ -20,6 +20,10 @@ import {
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
 } from './expedition.js';
 import {
+  SPECIALISTS, claimSpecialistMastery, sanitizeSpecialistClaims, sanitizeSpecialistId,
+  sanitizeSpecialistXp, specialistModifiers, specialistRank,
+} from './specialists.js';
+import {
   applyFrontEvent, createFront, frontCountryState, frontStageConfig, frontViewModel, sanitizeFront,
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
@@ -130,7 +134,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 606;
+const APP_VERSION = 607;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -710,6 +714,8 @@ class Game {
       customMap: { biome: 'summer', objects: [] }, customMap2: { biome: 'summer', objects: [] }, customMapSlot: 0,
       // 🎭 кооп-роль (null|'guard'|'medic'|'scout'): прес-налаштування кооп-лобі, НЕ прогрес
       coopRole: null,
+      specialistXp: { guard: 0, medic: 0, scout: 0 },
+      specialistClaims: [],
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -861,6 +867,8 @@ class Game {
         if (!out.infected || typeof out.infected !== 'object') out.infected = { cleared: {}, done: false };
         if (!out.infected.cleared || typeof out.infected.cleared !== 'object') out.infected.cleared = {};
         if (!Array.isArray(out.medals)) out.medals = [];
+        out.specialistXp = sanitizeSpecialistXp(out.specialistXp);
+        out.specialistClaims = sanitizeSpecialistClaims(out.specialistClaims);
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
@@ -3080,13 +3088,41 @@ class Game {
   openExpedition({ coop = false } = {}) {
     let run = sanitizeExpedition(this.save.expedition);
     if (!run || (run.coop && !coop) || (!run.coop && coop)) {
-      run = createExpedition({ countries: this._expeditionCountries(), coop });
+      run = createExpedition({
+        countries: this._expeditionCountries(),
+        coop,
+        specialist: sanitizeSpecialistId(this.save.coopRole, 'guard'),
+      });
       this.save.expedition = run;
       this.saveGame();
     }
     this.renderExpedition();
     this._showOverlay('overlay-expedition');
     this.audio.click();
+  }
+
+  _selectExpeditionSpecialist(id) {
+    const run = sanitizeExpedition(this.save.expedition);
+    if (!run || run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0) return false;
+    run.specialist = sanitizeSpecialistId(id, 'guard');
+    this.save.coopRole = run.specialist;
+    this.save.expedition = run;
+    this.saveGame();
+    this.renderExpedition();
+    return true;
+  }
+
+  _claimExpeditionMastery(run) {
+    if (!run || !['won', 'failed'].includes(run.status)) return null;
+    const id = run.coop ? sanitizeSpecialistId(this.save.coopRole, 'guard') : run.specialist;
+    const next = claimSpecialistMastery(this.save, run, id);
+    this.save.specialistXp = next.specialistXp;
+    this.save.specialistClaims = next.specialistClaims;
+    if (next.result.awarded) {
+      this._lastSpecialistMastery = { id, ...next.result };
+      if (run.coop && this.coop && this.coop.session.state !== 'idle') this.coop.session.setMyRole(id);
+    }
+    return { id, ...next.result };
   }
 
   renderExpedition() {
@@ -3099,6 +3135,20 @@ class Game {
     const votes = document.getElementById('expedition-votes');
     const go = document.getElementById('btn-expedition-go');
     const abandon = document.getElementById('btn-expedition-abandon');
+    const specialists = document.getElementById('expedition-specialists');
+    const lock = document.getElementById('expedition-specialist-lock');
+    const mastery = document.getElementById('expedition-mastery');
+    const selected = run.coop ? sanitizeSpecialistId(this.save.coopRole, 'guard') : run.specialist;
+    const locked = run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0;
+    specialists.innerHTML = Object.entries(SPECIALISTS).map(([id, cfg]) => {
+      const rank = specialistRank(this.save.specialistXp[id]);
+      return `<button class="expedition-specialist${rank === 3 ? ' rank-3' : ''}" data-specialist="${id}" aria-pressed="${id === selected}" ${locked ? 'disabled' : ''}><strong>${cfg.icon} ${t(cfg.name)} · ${t('Ранг')} ${rank}</strong><span>${t(cfg.passive)} · Super: ${t(cfg.superName)}</span></button>`;
+    }).join('');
+    specialists.querySelectorAll('[data-specialist]').forEach((button) => {
+      button.addEventListener('click', () => this._selectExpeditionSpecialist(button.dataset.specialist));
+    });
+    lock.textContent = !run.coop && locked ? t('Спеціаліста зафіксовано до кінця забігу') : '';
+    mastery.textContent = '';
     summary.textContent = run.status === 'won'
       ? t('Експедицію завершено: {n}/{all} перемог.', { n: run.wins, all: EXPEDITION_STEPS })
       : run.status === 'failed'
@@ -3141,8 +3191,16 @@ class Game {
         all: this.coop.session.roster.size,
       });
     } else {
+      const claim = this._claimExpeditionMastery(run);
+      if (claim.awarded) this.saveGame();
       const r = run.reward;
       route.innerHTML = `<div class="expedition-node sel"><strong>${run.status === 'won' ? t('🏆 ЕКСПЕДИЦІЮ ПРОЙДЕНО!') : t('🧭 ЗАБІГ ЗАВЕРШЕНО')}</strong><span>${t('Нагорода')}: 🪙 ${r.coins} · 💎 ${r.crystals}</span></div>`;
+      const xp = this.save.specialistXp[claim.id];
+      const rank = specialistRank(xp);
+      const next = rank === 1 ? 100 : rank === 2 ? 300 : null;
+      const gained = this._lastSpecialistMastery && this._lastSpecialistMastery.id === claim.id
+        ? this._lastSpecialistMastery.awarded : 0;
+      mastery.textContent = `${SPECIALISTS[claim.id].icon} ${t('Майстерність')}: ${gained ? `+${gained} XP · ` : ''}${xp} XP · ${t('Ранг')} ${rank}${next ? ` · ${next - xp} XP ${t('до наступного рангу')}` : ` · ${t('МАКС. РАНГ')}`}`;
       go.textContent = t('🧭 НОВА ЕКСПЕДИЦІЯ');
       go.style.display = run.coop && this.coop.session.role !== 'host' ? 'none' : '';
     }
@@ -3157,7 +3215,12 @@ class Game {
       if (run.coop && this.coop.session.role === 'host') return this.coop.session.commitExpeditionVote();
       return;
     }
-    this.save.expedition = createExpedition({ countries: this._expeditionCountries(), coop: run.coop });
+    this._lastSpecialistMastery = null;
+    this.save.expedition = createExpedition({
+      countries: this._expeditionCountries(),
+      coop: run.coop,
+      specialist: sanitizeSpecialistId(this.save.coopRole, 'guard'),
+    });
     this.saveGame();
     if (run.coop && this.coop.session.syncExpedition) this.coop.session.syncExpedition(this.save.expedition);
     this.renderExpedition();
@@ -3183,6 +3246,7 @@ class Game {
       if (run.status === 'won' && this.level.net) this._grantCoopWin();
       run.reward.claimed = true;
     }
+    this._claimExpeditionMastery(run);
     this.save.expedition = run;
     this.saveGame();
     if (run.coop && this.coop.session.syncExpedition) this.coop.session.syncExpedition(run);
@@ -3517,6 +3581,30 @@ class Game {
       // 🔋 паливні зброї (v46): на старті рівня — повний балон у кожної наявної
       for (const w of loadout) level.player.refillFuel(w);
     }
+    if (level.expedition) {
+      const id = level.expedition.coop
+        ? sanitizeSpecialistId(this.save.coopRole, 'guard')
+        : sanitizeSpecialistId(level.expedition.specialist, 'guard');
+      const rank = specialistRank(this.save.specialistXp[id]);
+      const modifiers = specialistModifiers(id, rank);
+      const active = !isRadiation;
+      level.specialist = { id, rank, charge: 0, maxCharge: 100, active };
+      if (active) {
+        level.player.maxHealth += modifiers.maxHealthBonus;
+        level.player.health = level.player.maxHealth;
+        level.player.healMult *= modifiers.healMult;
+        level.player.speedMult *= modifiers.speedMult;
+        level.player.pickupMult *= modifiers.pickupMult;
+        const nodeType = level.expedition.current && level.expedition.current.type;
+        if (['rescue', 'elite', 'boss'].includes(nodeType)) {
+          level.player.weapons = [...SPECIALISTS[id].kit];
+        } else if (nodeType !== 'turretwar') {
+          level.player.weapons = [...new Set([...level.player.weapons, SPECIALISTS[id].signature])];
+        }
+        if (!level.player.weapons.includes(level.player.cur)) level.player.cur = level.player.weapons[0];
+        level.player._applyView();
+      }
+    }
     if (operation) {
       level.operationEffects = specialistEffects(operation.specialist, savedFront.projects);
       const baseHeal = level.player.heal.bind(level.player);
@@ -3838,6 +3926,12 @@ class Game {
     level.bus.on('hitmarker', (crit, weapon) => {
       if (crit && weapon !== 'rifle' && weapon !== 'smg') this._hitstopT = Math.max(this._hitstopT, 0.055);
     });
+    level.bus.on('hitmarker', () => {
+      const specialist = level.specialist;
+      if (!specialist || !specialist.active || level.player.health <= 0) return;
+      specialist.charge = Math.min(specialist.maxCharge,
+        specialist.charge + SPECIALISTS[specialist.id].chargePerHit);
+    });
     level.bus.on('zombieKilled', (z) => {
       if (level.mirror) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
@@ -4053,7 +4147,7 @@ class Game {
     // анти-гриф). Скромні САМО-бафи; radiation (контракт 50 HP) і pvp — виключення.
     // Дефолт для соло/несумісних режимів: без ролі, revive-фактор 1/3 (3с).
     this._coopReviveRate = 1 / 3;
-    if (coop && !isRadiation && !isPvp) {
+    if (coop && !level.expedition && !isRadiation && !isPvp) {
       const myRole = ['guard', 'medic', 'scout'].includes(this.save.coopRole) ? this.save.coopRole : null;
       level.coopRole = myRole;
       if (myRole === 'guard') {
@@ -4065,6 +4159,9 @@ class Game {
       } else if (myRole === 'medic') {
         this._coopReviveRate = 1 / 1.8;
       }
+    } else if (coop && level.specialist && level.specialist.active) {
+      level.coopRole = level.specialist.id;
+      this._coopReviveRate = 1 / specialistModifiers(level.specialist.id, level.specialist.rank).reviveSecs;
     }
 
     // 🤝 кооп: мережевий шар рівня
@@ -4080,7 +4177,8 @@ class Game {
             if (pl.health <= 0) continue;
             // 🎭 scout: ширший радіус підбору. Хост читає роль кожного гравця з ростера
             // (снапшот на старті рівня — зміна ролі посеред бою не діє: див. _buildLevel).
-            const remoteScout = pl.pid !== 1 && (roster.get(pl.pid) || {}).role === 'scout';
+            const remoteInfo = roster.get(pl.pid) || {};
+            const remoteScout = pl.pid !== 1 && remoteInfo.role === 'scout';
             out.push({
               pos: pl.pos,
               magnet: pl.pid === 1 ? level.player.buffs.magnet > 0 : !!pl.magnet,
@@ -4091,7 +4189,8 @@ class Game {
                 : ((level.superActive && level.superActive.get(pl.pid) || {}).power === 'magnet'),
               pid: pl.pid,
               // pid 1 — снапшот у player.pickupMult (заморожено на старті); гості — роль з ростера
-              pickMult: pl.pid === 1 ? (level.player.pickupMult || 1) : (remoteScout ? 1.25 : 1),
+              pickMult: pl.pid === 1 ? (level.player.pickupMult || 1)
+                : (remoteScout ? (remoteInfo.rank >= 2 ? 1.35 : 1.25) : 1),
             });
           }
           return out;
@@ -4236,7 +4335,7 @@ class Game {
 
   _secondaryDoneToast(level) { return secondaryDoneToast(this, level); }
 
-  _trySuperPickup(level) { return trySuperPickup(this, level); }
+  _trySuperPickup(level) { return level && level.expedition ? null : trySuperPickup(this, level); }
 
   _spawnSuperMirror(nid, x, z) { return spawnSuperMirror(this, nid, x, z); }
 

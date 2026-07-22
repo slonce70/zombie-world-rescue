@@ -5,6 +5,13 @@
 
 export const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1 };
 
+export function cardWeight(card, bias = null) {
+  const base = RARITY_WEIGHT[card.rarity] || RARITY_WEIGHT.common;
+  if (!bias) return base;
+  const preferred = (bias.tags || []).includes(card.tag) || (bias.ids || []).includes(card.id);
+  return base * (preferred ? (bias.multiplier || 2) : 1);
+}
+
 export const CARD_POOL = [
   // 💥 power
   { id: 'dmg25',   icon: '💥', tag: 'power', rarity: 'common', name: '+25% шкоди',
@@ -123,7 +130,7 @@ export class RunBuild {
 
   // 3–4 РІЗНІ картки: четверта доступна лише через видимий бонус Снабженця у Front.
   // Взяті картки не повторюються; коли колода майже пуста — «перетасовується» заново.
-  offer(rng, count = 3) {
+  offer(rng, count = 3, bias = null) {
     const offerCount = Math.max(3, Math.min(4, Math.floor(Number(count) || 3)));
     let pool = CARD_POOL.filter((c) => !this.taken.has(c.id));
     if (pool.length < offerCount) {
@@ -133,11 +140,11 @@ export class RunBuild {
     const out = [];
     while (out.length < offerCount && pool.length) {
       let total = 0;
-      for (const c of pool) total += RARITY_WEIGHT[c.rarity] || RARITY_WEIGHT.common;
+      for (const c of pool) total += cardWeight(c, bias);
       let roll = rng.int(0, total - 1);
       let idx = 0;
       for (let i = 0; i < pool.length; i++) {
-        roll -= RARITY_WEIGHT[pool[i].rarity] || RARITY_WEIGHT.common;
+        roll -= cardWeight(pool[i], bias);
         if (roll < 0) { idx = i; break; }
       }
       out.push(pool.splice(idx, 1)[0]);

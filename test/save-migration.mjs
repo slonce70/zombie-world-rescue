@@ -107,6 +107,20 @@ async function loadWith(raw) {
   check(save.activeGadget === 'heal', 'битий activeGadget → перший валідний гаджет');
 }
 
+// 9. Майстерність спеціалістів чиститься окремо й не скидає профіль
+{
+  const claims = Array.from({ length: 55 }, (_, i) => `expedition:${i}:solo`);
+  const { save, errs } = await loadWith(JSON.stringify({
+    coins: 777,
+    specialistXp: { guard: -1, medic: 12.8, scout: 2e9 },
+    specialistClaims: [...claims, claims.at(-1), 'bad'],
+  }));
+  check(errs.length === 0, `майстерність: без винятків (${errs[0] || 'ok'})`);
+  check(save.coins === 777, 'биті поля майстерності не скидають решту профілю');
+  check(JSON.stringify(save.specialistXp) === JSON.stringify({ guard: 0, medic: 12, scout: 999999 }), 'XP спеціалістів клампиться');
+  check(save.specialistClaims.length === 50 && new Set(save.specialistClaims).size === 50, 'ledger майстерності дедупиться і тримає 50 id');
+}
+
 await browser.close();
 closeServer();
 console.log(failed === 0 ? '\n🎉 МІГРАЦІЯ СЕЙВА НАДІЙНА' : `\n❌ МІГРАЦІЯ: ${failed} провалів`);

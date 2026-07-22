@@ -82,7 +82,7 @@ const r2 = await page.evaluate(async () => {
   // повторний cleanNick на гості (регресія: «Володимир123 (2)» різалась у кашу)
   const dedupSurvives = coop.cleanNick('Володими (2)');
   const malicious = coop.sanitizeRosterEntry({
-    pid: 3, nick: 'Оля', role: 'root', skin: 'toString', tracer: 'constructor',
+    pid: 3, nick: 'Оля', role: 'root', rank: 99, skin: 'toString', tracer: 'constructor',
     dance: '__proto__', pet: 'toString', hero: { shirt: 'red', hat: '__proto__' },
     admin: true,
   });
@@ -151,7 +151,8 @@ check(r2.dedupSurvives === 'Володими (2)', 'дедуп-суфікс хо
 check(r2.malicious && r2.malicious.skin === 'classic' && r2.malicious.tracer === 'classic'
   && r2.malicious.dance === 'shuffle' && r2.malicious.pet === null && r2.malicious.hero === null,
   'недовірені prototype-ключі косметики → безпечні defaults', JSON.stringify(r2.malicious));
-check(JSON.stringify(r2.maliciousKeys) === JSON.stringify(['dance', 'hero', 'nick', 'pet', 'pid', 'role', 'skin', 'tracer']),
+check(r2.malicious.rank === 3, 'ранг ростера клампиться до 1..3', String(r2.malicious.rank));
+check(JSON.stringify(r2.maliciousKeys) === JSON.stringify(['dance', 'hero', 'nick', 'pet', 'pid', 'rank', 'ready', 'role', 'skin', 'tracer']),
   'ростер відкидає невідомі поля', JSON.stringify(r2.maliciousKeys));
 check(r2.custom && r2.custom.hero.shirt === 0x234567 && r2.custom.hero.pants === 0xffffff
   && r2.custom.hero.shoes === 0x303642 && r2.custom.hero.hat === 'cap' && r2.custom.hero.face === 'cool',

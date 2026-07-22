@@ -707,6 +707,9 @@ export class Gadgets {
 
   get active() {
     if (this.level.modeShield) return 'shield';
+    if (this.level.specialist) return this.level.specialist.active
+      ? ({ guard: 'shield', medic: 'heal', scout: 'dash' }[this.level.specialist.id] || null)
+      : null;
     if (this.level.noGadgets) return null;
     return this.level.playground ? this.level.playgroundGadget : this.level.game.save.activeGadget;
   }
@@ -826,6 +829,7 @@ export class Gadgets {
       level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине {n} шкоди!', { n: level.modeShield.hp }));
       return true;
     }
+    if (level.specialist) return this.useSpecialistSuper();
     if (level.noGadgets) {
       level.bus.emit('toast', t('У цьому режимі гаджети вимкнені'));
       game.audio.denied();
@@ -1024,6 +1028,60 @@ export class Gadgets {
       level.bus.emit('gadgetUsed', id);
     }
     return ok;
+  }
+
+  useSpecialistSuper() {
+    const level = this.level;
+    const specialist = level.specialist;
+    const p = level.player;
+    if (!specialist || !specialist.active) {
+      level.bus.emit('toast', t('☢️ Контракт: спеціаліст вимкнений'));
+      level.game.audio.denied();
+      return false;
+    }
+    if (specialist.charge < specialist.maxCharge) {
+      level.bus.emit('toast', t('Super: {n}%', { n: Math.floor(specialist.charge) }));
+      level.game.audio.denied();
+      return false;
+    }
+    const rank3 = specialist.rank >= 3;
+    if (specialist.id === 'guard') {
+      const hp = rank3 ? 100 : 50;
+      p.gadgetShield = hp;
+      level.audio.powerup();
+      level.bus.emit('toast', t('🛡️ Щит увімкнено: поглине {n} шкоди!', { n: hp }));
+    } else if (specialist.id === 'medic') {
+      if (p.health >= p.maxHealth) {
+        level.bus.emit('toast', t('Здоров\'я і так повне! 💪'));
+        level.game.audio.denied();
+        return false;
+      }
+      const before = p.health;
+      p.heal(rank3 ? 100 : 50);
+      level.audio.heal();
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
+      level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: Math.round(p.health - before) }));
+    } else {
+      const hyper = rank3;
+      const sx = p.pos.x;
+      const sz = p.pos.z;
+      const dist = hyper ? 12 : 8;
+      const solved = level.world.collide(p.pos.x - Math.sin(p.yaw) * dist,
+        p.pos.z - Math.cos(p.yaw) * dist, 0.45, p.pos.y);
+      p.watchtower = null;
+      p.pos.x = solved.x;
+      p.pos.z = solved.z;
+      p.pos.y = Math.max(level.world.groundH(solved.x, solved.z), level.world.floorAt(solved.x, solved.z, p.pos.y));
+      p.vel.set(0, 0, 0);
+      p.onGround = true;
+      p.respawnProtect = Math.max(p.respawnProtect, hyper ? 3 : 1);
+      if (hyper) this._addDashFireTrail(sx, sz, solved.x, solved.z);
+      level.effects.burst(p.pos.clone().setY(p.pos.y + 1), 0xffd23f, 14, { speed: 4, up: 2.5, life: 0.45 });
+      level.audio.powerup();
+      level.bus.emit('toast', hyper ? t('🏃🔥 Гіпер-ривок! 3с невразливості') : t('🏃 Ривок! 1с невразливості'));
+    }
+    specialist.charge = 0;
+    return true;
   }
 
   _frostBlast() {

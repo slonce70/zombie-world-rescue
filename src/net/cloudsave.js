@@ -57,7 +57,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   // 🌍 v303 «Світ врятовано»: одноразовий прапорець фіналу кампанії (усі 12 країн вільні)
   'worldSaved',
   // 🧭 v400: активний маршрут, збірка і незабрана нагорода експедиції
-  'expedition',
+  'expedition', 'specialistXp', 'specialistClaims',
   // 🛰️ v500: дошка Живого фронту, активна операція, проєкти та id вже виданих нагород
   'front', 'frontCoopClaims',
   // 🌙 відновлені реле й одноразова нагорода живої місячної бази
@@ -131,6 +131,8 @@ export function saveHasProgress(s) {
     || (s.weeklyCamp && typeof s.weeklyCamp === 'object' && ((s.weeklyCamp.p | 0) > 0 || !!s.weeklyCamp.claimed)) // 🏕️ прогрес/нагорода тижневого квесту табору
     || (s.worldSaved | 0) > 0                               // 🌍 фінал кампанії пройдено (усі 12 країн вільні)
     || !!s.expedition                                      // 🧭 активний/завершений маршрут і нагорода
+    || (s.specialistXp && Object.values(s.specialistXp).some((xp) => (xp | 0) > 0))
+    || (Array.isArray(s.specialistClaims) && s.specialistClaims.length > 0)
     || !!s.front                                           // 🛰️ операції, проєкти Бази та незабраний прогрес Front
     || !!(s.customMap && Array.isArray(s.customMap.objects) && s.customMap.objects.length)
     || !!(s.customMap2 && Array.isArray(s.customMap2.objects) && s.customMap2.objects.length)

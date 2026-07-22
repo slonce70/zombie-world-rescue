@@ -1,7 +1,8 @@
 import { CAMPAIGN_ORDER } from './countries.js';
-import { CARD_POOL } from './runbuild.js';
+import { CARD_POOL, cardWeight } from './runbuild.js';
+import { sanitizeSpecialistId, specialistBias } from './specialists.js';
 
-export const EXPEDITION_VERSION = 1;
+export const EXPEDITION_VERSION = 2;
 export const EXPEDITION_STEPS = 5;
 
 export const EXPEDITION_NODE_TYPES = Object.freeze({
@@ -44,17 +45,24 @@ function cleanCountries(value) {
   return clean.length ? clean : ['UKR'];
 }
 
-function cardFor(seed, step, branch, build) {
+function cardFor(seed, step, branch, build, bias = null) {
   const available = CARD_POOL.filter((card) => !build.includes(card.id));
   const pool = available.length ? available : CARD_POOL;
-  return pool[hash(seed, step, branch, 0x51ed270b) % pool.length];
+  const total = pool.reduce((sum, card) => sum + cardWeight(card, bias), 0);
+  let roll = hash(seed, step, branch, 0x51ed270b) % total;
+  for (const card of pool) {
+    roll -= cardWeight(card, bias);
+    if (roll < 0) return card;
+  }
+  return pool[0];
 }
 
 function makeNode(run, step, branch) {
   const types = (run.coop ? COOP_STEPS : SOLO_STEPS)[step] || ['rescue'];
   const type = types[branch % types.length];
   const country = run.countries[hash(run.seed, step, branch) % run.countries.length];
-  const card = step > 0 ? cardFor(run.seed, step, branch, run.build) : null;
+  const card = step > 0 ? cardFor(run.seed, step, branch, run.build,
+    run.coop ? null : specialistBias(run.specialist)) : null;
   return {
     id: `${step}-${branch}-${type}-${country}`,
     step,
@@ -70,11 +78,12 @@ function nextChoices(run) {
   return types.map((_, branch) => makeNode(run, step, branch));
 }
 
-export function createExpedition({ seed = Date.now(), countries = CAMPAIGN_ORDER, coop = false } = {}) {
+export function createExpedition({ seed = Date.now(), countries = CAMPAIGN_ORDER, coop = false, specialist = 'guard' } = {}) {
   const run = {
     v: EXPEDITION_VERSION,
     seed: int(seed),
     coop: !!coop,
+    specialist: coop ? null : sanitizeSpecialistId(specialist, 'guard'),
     countries: cleanCountries(countries),
     step: 0,
     wins: 0,
@@ -89,8 +98,14 @@ export function createExpedition({ seed = Date.now(), countries = CAMPAIGN_ORDER
 }
 
 export function sanitizeExpedition(value) {
-  if (!value || typeof value !== 'object' || int(value.v) !== EXPEDITION_VERSION) return null;
-  const run = createExpedition({ seed: value.seed, countries: value.countries, coop: value.coop });
+  const version = int(value && value.v);
+  if (!value || typeof value !== 'object' || ![1, EXPEDITION_VERSION].includes(version)) return null;
+  const run = createExpedition({
+    seed: value.seed,
+    countries: value.countries,
+    coop: value.coop,
+    specialist: version === 1 ? 'guard' : value.specialist,
+  });
   run.step = Math.max(0, Math.min(EXPEDITION_STEPS - 1, int(value.step)));
   run.wins = Math.max(0, Math.min(EXPEDITION_STEPS, int(value.wins)));
   run.build = [...new Set((Array.isArray(value.build) ? value.build : []).filter((id) => CARD_IDS.has(id)))].slice(0, 12);

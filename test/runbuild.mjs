@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 const srcPath = fileURLToPath(new URL('../src/runbuild.js', import.meta.url));
 const src = readFileSync(srcPath, 'utf8');
-const { CARD_POOL, COMBOS, RunBuild } =
+const { CARD_POOL, COMBOS, RunBuild, cardWeight } =
   await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
 
 let fail = 0;
@@ -26,6 +26,9 @@ check(new Set(off.map((c) => c.id)).size === 3, 'усі 3 — різні');
 const supplierOffer = new RunBuild().offer({ int: () => 0 }, 4);
 check(supplierOffer.length === 4, 'Снабженець пропонує 4 картки', supplierOffer.length);
 check(new Set(supplierOffer.map((c) => c.id)).size === 4, 'усі 4 — різні');
+const tank = CARD_POOL.find((c) => c.tag === 'tank');
+check(cardWeight(tank, { tags: ['tank'], ids: [], multiplier: 2 }) === cardWeight(tank) * 2,
+  'тематична картка має подвійну вагу');
 
 // power-картка піднімає шкоду; не пише в жоден save (сигнатура apply(card, player) — без save)
 const p = mkPlayer();

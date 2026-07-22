@@ -13,6 +13,7 @@ import {
   sanitizeFrontResult, sanitizeFrontSnapshot, sanitizeFrontSpec,
 } from './frontsync.js';
 import { sanitizeMapSize, sanitizeMapStyle } from '../mapsize.js';
+import { SPECIALIST_IDS, SPECIALISTS, sanitizeSpecialistId, specialistModifiers, specialistRank } from '../specialists.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -21,15 +22,14 @@ const JOIN_WELCOME_TIMEOUT_MS = 30000;
 // Роль знімається СНАПШОТОМ на старті рівня (див. main._buildLevel), змінити посеред бою не діє.
 // Бафи скромні: guard — +25 maxHealth; medic — швидший ревайв друга (3с→1.8с);
 // scout — швидкість ×1.08 + радіус підбору ×1.25. У radiation/pvp/соло ролі НЕ діють.
-export const COOP_ROLE_IDS = ['guard', 'medic', 'scout'];
-export const COOP_ROLES = {
-  guard: { icon: '🛡️', maxHealthBonus: 25 },
-  medic: { icon: '💉', reviveSecs: 1.8 },
-  scout: { icon: '🏹', speedMult: 1.08, pickupMult: 1.25 },
-};
+export const COOP_ROLE_IDS = SPECIALIST_IDS;
+export const COOP_ROLES = Object.fromEntries(SPECIALIST_IDS.map((id) => [id, {
+  icon: SPECIALISTS[id].icon,
+  ...specialistModifiers(id, 1),
+}]));
 // клампимо будь-яку вхідну роль (сейв/мережа) у whitelist — інакше null (без ролі)
 export function sanitizeCoopRole(r) {
-  return COOP_ROLE_IDS.includes(r) ? r : null;
+  return sanitizeSpecialistId(r, null);
 }
 export function coopRoleIcon(r) {
   return (COOP_ROLES[r] && COOP_ROLES[r].icon) || '';
@@ -103,6 +103,7 @@ export function sanitizeRosterEntry(raw, forcedPid = undefined) {
     pid,
     nick: cleanNick(own(src, 'nick')) || t('Гравець'),
     role: sanitizeCoopRole(own(src, 'role')),
+    rank: Math.max(1, Math.min(3, Math.trunc(Number(own(src, 'rank')) || 1))),
     skin,
     hero: skin === 'custom' ? sanitizeHero(own(src, 'hero')) : null,
     tracer: rosterId(TRACERS, own(src, 'tracer'), 'classic'),
@@ -143,11 +144,13 @@ export class CoopSession {
 
   myInfo() {
     const save = this.game.save;
+    const role = sanitizeCoopRole(save.coopRole);
     return sanitizeRosterEntry({
       pid: this.myPid,
       nick: this.nick,
       // 🎭 кооп-роль (див. COOP_ROLES): їде в hello/roster, щоб друзі бачили «💉 медик»
-      role: sanitizeCoopRole(save.coopRole),
+      role,
+      rank: specialistRank((save.specialistXp || {})[role || 'guard']),
       skin: save.activeSkin || 'classic',
       // 🎨 кастом-герой: 3 числа {shirt,pants,skin} — щоб друзі бачили твій вигляд.
       // Лише для активного кастом-скіна; інакше null (дефолтна гілка makeHero).
@@ -271,23 +274,25 @@ export class CoopSession {
   // Хост міняє локально + ребродкаст; гість шле намір хосту (той клампить і ребродкастить).
   setMyRole(role) {
     role = sanitizeCoopRole(role);
+    const rank = specialistRank((this.game.save.specialistXp || {})[role || 'guard']);
     this.game.save.coopRole = role;
     this.game.saveGame();
     const mine = this.roster.get(this.myPid);
-    if (mine) mine.role = role;
+    if (mine) { mine.role = role; mine.rank = rank; }
     if (this.role === 'host') {
       this._broadcastRoster();
     } else {
-      this.transport.send(1, { t: 'role', r: role }, true);
+      this.transport.send(1, { t: 'role', r: role, rank }, true);
     }
     if (this.onRoster) this.onRoster();
   }
 
   // хост отримав намір гостя змінити роль: клампимо, оновлюємо ростер, ребродкаст
-  _hostSetGuestRole(from, r) {
+  _hostSetGuestRole(from, r, rank) {
     const rr = this.roster.get(from);
     if (!rr) return;
     rr.role = sanitizeCoopRole(r);
+    rr.rank = Math.max(1, Math.min(3, Math.trunc(Number(rank) || 1)));
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
   }
@@ -551,7 +556,7 @@ export class CoopSession {
     if (this.role === 'host') {
       if (d.t === 'hello') this._hostHello(from, d);
       else if (d.t === 'bye') this._dropGuest(from, 'left');
-      else if (d.t === 'role') this._hostSetGuestRole(from, d.r);
+      else if (d.t === 'role') this._hostSetGuestRole(from, d.r, d.rank);
       else if (d.t === 'ready') this._hostSetGuestReady(from, d.ready);
       else if (d.t === 'xpv') {
         const run = sanitizeExpedition(this.game.save.expedition);
@@ -569,7 +574,11 @@ export class CoopSession {
         for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); if (c) this.roster.set(c.pid, c); }
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
-        if (d.ex) this.game.save.expedition = sanitizeExpedition(d.ex);
+        if (d.ex) {
+          this.game.save.expedition = sanitizeExpedition(d.ex);
+          this.game._claimExpeditionMastery(this.game.save.expedition);
+          this.game.saveGame();
+        }
         if (d.frun) this.applyFrontSnapshot(d.frun, d.result);
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
         if (this.onRoster) this.onRoster();
@@ -597,7 +606,11 @@ export class CoopSession {
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
-        if (d.ex) { this.game.save.expedition = sanitizeExpedition(d.ex); this.game.saveGame(); }
+        if (d.ex) {
+          this.game.save.expedition = sanitizeExpedition(d.ex);
+          this.game._claimExpeditionMastery(this.game.save.expedition);
+          this.game.saveGame();
+        }
         this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
@@ -606,6 +619,7 @@ export class CoopSession {
         const run = sanitizeExpedition(d.run);
         if (run) {
           this.game.save.expedition = run;
+          this.game._claimExpeditionMastery(run);
           this.game.saveGame();
           if (this.game.state === 'globe') this.game.renderExpedition();
         }

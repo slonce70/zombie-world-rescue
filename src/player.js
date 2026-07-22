@@ -66,6 +66,7 @@ export class Player {
     this.health = 100;
     this.speedMult = 1;
     this.pickupMult = 1; // 🎭 кооп-scout: радіус підбору монет/дропів ×1.25 (див. effects)
+    this.healMult = 1;
     this.damageMult = 1;
     this.damageTotemMult = 1;
     this.respawnProtect = 0;
@@ -466,7 +467,7 @@ export class Player {
     if (this.invisibleT > 0) {
       const activeDt = Math.min(dt, this.invisibleT);
       if ((this.invisibleRegenRate || 0) > 0 && this.health > 0) {
-        this.health = Math.min(this.maxHealth, this.health + this.invisibleRegenRate * activeDt);
+        this.heal(this.invisibleRegenRate * activeDt);
       }
       this.invisibleT = Math.max(0, this.invisibleT - dt);
       this.rig.group.visible = false;
@@ -1384,7 +1385,7 @@ export class Player {
     if (this.health <= 0) return false;
     if (this.health >= this.maxHealth) return false;
     const before = this.health;
-    this.health = Math.min(this.maxHealth, this.health + amt);
+    this.health = Math.min(this.maxHealth, this.health + amt * (this.healMult || 1));
     const healed = this.health - before;
     const game = this.level && this.level.game;
     if (healed > 0 && game && game.quests && !this.level.playground) {

@@ -1,6 +1,7 @@
 // 🎲 Оверлей «Прокачка»: пауза + 3 картки, один тап. Патерн як у Shop.
 import { t } from './i18n.js';
 import { CARD_POOL, COMBOS } from './runbuild.js';
+import { specialistBias } from './specialists.js';
 
 export class Draft {
   constructor(game) {
@@ -16,7 +17,8 @@ export class Draft {
     if (!level || !level.runBuild || this.isOpen) return;
     this.isOpen = true;                       // → головний цикл blocked: сим завмирає
     const count = level.operationEffects && level.operationEffects.cardOfferCount;
-    this.offered = level.runBuild.offer(level.zombies.rng, count);
+    const bias = level.expedition && !level.expedition.coop ? specialistBias(level.expedition.specialist) : null;
+    this.offered = level.runBuild.offer(level.zombies.rng, count, bias);
     this.el.classList.add('show');
     this.game.input.exitLock();
     this._render();

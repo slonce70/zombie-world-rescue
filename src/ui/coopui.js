@@ -16,6 +16,7 @@ import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
 import { frontCountryState, frontStageConfig } from '../worldfront.js';
 import { frontStageLabel } from './frontui.js';
 import { frontCountryCopy } from './frontcopy.js';
+import { specialistRank } from '../specialists.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -558,10 +559,11 @@ export class CoopUI {
     for (const [pid, r] of s.roster) {
       const skin = HERO_SKINS[r.skin] ? HERO_SKINS[r.skin].icon : '🙂';
       const roleIcon = coopRoleIcon(r.role); // 🎭 емодзі ролі біля ніка
+      const roleRank = r.role ? ` · ${t('Ранг')} ${r.rank || 1}` : '';
       html += `<div class="lobby-player ${pid === s.myPid ? 'me' : ''}">
         <span class="lp-skin">${skin}</span>
         <span class="lp-nick">${roleIcon ? roleIcon + ' ' : ''}${this._esc(r.nick || '...')}</span>
-        <span class="lp-role">${r.ready ? '✅' : '○'} ${pid === 1 ? t('👑 хост') : ''}</span>
+        <span class="lp-role">${r.ready ? '✅' : '○'} ${pid === 1 ? t('👑 хост') : ''}${roleRank}</span>
       </div>`;
     }
     for (let i = s.roster.size; i < 4; i++) {
@@ -694,9 +696,9 @@ export class CoopUI {
     const cur = (my && my.role) || null;
     const chips = [
       [null, '🚫', t('Без ролі')],
-      ['guard', coopRoleIcon('guard'), t('Захисник')],
-      ['medic', coopRoleIcon('medic'), t('Медик')],
-      ['scout', coopRoleIcon('scout'), t('Розвідник')],
+      ['guard', coopRoleIcon('guard'), `${t('Захисник')} · ${t('Ранг')} ${specialistRank(this.game.save.specialistXp.guard)}`],
+      ['medic', coopRoleIcon('medic'), `${t('Медик')} · ${t('Ранг')} ${specialistRank(this.game.save.specialistXp.medic)}`],
+      ['scout', coopRoleIcon('scout'), `${t('Розвідник')} · ${t('Ранг')} ${specialistRank(this.game.save.specialistXp.scout)}`],
     ];
     let rh = '';
     for (const [id, icon, label] of chips) {
