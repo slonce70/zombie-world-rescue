@@ -130,7 +130,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 603;
+const APP_VERSION = 604;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -2653,8 +2653,17 @@ class Game {
       id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:a${level.operation.attempt || 0}:${won ? 'win' : 'fail'}`,
       countryId: level.countryId, won, terminal, before, after,
     };
+    const continueSpain = won && !terminal && level.countryId === 'ESP'
+      && level.operation.missionPreset?.startsWith('spain-');
     const session = level.net && level.net.authority && this.coop && this.coop.session;
-    if (session && session.syncFront) session.syncFront(this.save.front, effects, result);
+    if (session && session.syncFront) session.syncFront(this.save.front, effects, continueSpain ? null : result);
+    if (continueSpain) {
+      this.victoryShown = true;
+      this.input.exitLock();
+      this._frontNextAction = 'continue';
+      setTimeout(() => { if (this.level === level) this.endLevel(); }, 0);
+      return true;
+    }
     return this._showFrontResult(result);
   }
 
