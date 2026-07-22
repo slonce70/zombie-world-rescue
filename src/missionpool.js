@@ -869,25 +869,23 @@ export class DynamicMissions {
     }
     const spainStage = {
       'spain-rebuild-center': 0,
-      'spain-clear-village': 4,
-      'spain-defend-fireworks': 5,
+      'spain-clear-village': 2,
+      'spain-defend-fireworks': 3,
     }[this.level.operation?.missionPreset];
     if (this.level.countryId === 'ESP' && spainStage !== undefined && out.length === 1) {
       const m = this.missions[0];
       const activeIndex = spainStage === 0
-        ? ({ musicians: 0, tools: 1, resources: 2, build: 3, done: 3 }[m.phase] ?? 0)
+        ? (m.phase === 'musicians' ? 0 : 1)
         : spainStage;
       const titles = [
         t('Врятуй музикантів'),
-        t('Знайди сокиру й кірку'),
-        t('Добудь 50 заліза, 100 каменю і 55 дерева'),
-        t('Віднови музичний центр 30 секунд'),
+        t('Знайди сокиру й кірку, добудь ресурси та віднови музичний центр'),
         t('Зачисти село від зомбі'),
         t('Оборони феєрверки'),
       ];
       titles[activeIndex] = out[0].title;
       return titles.map((title, index) => ({
-        icon: ['🎺', '🪓', '⛏️', '🎵', '🏘️', '🎆'][index],
+        icon: ['🎺', '🎵', '🏘️', '🎆'][index],
         title,
         done: index < activeIndex,
         primary: index === activeIndex,
@@ -906,6 +904,19 @@ export class DynamicMissions {
     const mk = [];
     for (const m of missions) {
       if (m.state !== 'active') continue;
+      if (m.type === 'rebuild') {
+        const target = this._beamTarget(m);
+        if (target) mk.push({
+          x: target.x,
+          z: target.z,
+          color: '#ffd23f',
+          icon: m.phase === 'musicians' ? '🎺'
+            : m.phase === 'tools' ? (target.kind === 'axe' ? '🪓' : '⛏️')
+              : m.phase === 'resources' ? ({ wood: '🌲', stone: '🪨', iron: '⛓️' }[target.kind] || '⛏️')
+                : m.spanish ? '🎵' : '🏗️',
+        });
+        continue;
+      }
       if (m.type === 'hunt') {
         // маркер — найближчий живий еліт
         const pool = this.mirror ? this.level.zombies.list.filter((e) => e.elite) : m.elites;
