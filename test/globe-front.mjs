@@ -66,7 +66,9 @@ try {
       recommendedBeacon,
       sameStateCountries,
       primaryLabel: document.getElementById('front-cta-label').textContent,
-      otherButtons: document.querySelectorAll('#globe-other #btn-solo, #globe-other #btn-coop, #globe-other #btn-expedition').length,
+      globeActions: document.querySelectorAll('.globe-play-row > #btn-front, .globe-play-row > #btn-solo, .globe-play-row > #btn-coop').length,
+      hasOtherPopover: !!document.getElementById('globe-other'),
+      hasDirectExpedition: !!document.getElementById('btn-expedition'),
       repaintTracked: game.globe._paintedFront === game.save.front,
     };
   });
@@ -75,7 +77,7 @@ try {
       || !result.campaignPickerOpen || result.campaignTarget !== 'UKR'
       || !result.frontOpened || !result.recommendedSelected || result.primaryLabel !== 'Продовжити порятунок'
       || result.sameStateCountries < 2 || result.recommendedBeacon !== result.recommendedCountry
-      || result.otherButtons !== 3
+      || result.globeActions !== 3 || result.hasOtherPopover || result.hasDirectExpedition
       || !result.attackedLine.includes('Під атакою') || !result.attackedLine.includes('Орда атакує')
       || !result.attackedLine.includes('Зупинити атаку')
       || !result.rebuildingLine.includes('Відбудова') || !result.rebuildingLine.includes('повертається до життя')

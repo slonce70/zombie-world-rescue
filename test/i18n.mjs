@@ -16,7 +16,7 @@ let txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
   lang: document.getElementById('btn-lang').textContent.trim(),
 }));
-check(txt.play === '🎮 ГРАТИ', 'uk: кнопка ГРАТИ', txt.play); // канарковий точний рядок (uk-baseline)
+check(txt.play === '🎮 РЕЖИМИ', 'uk: кнопка РЕЖИМИ', txt.play); // канарковий точний рядок (uk-baseline)
 check(txt.lang.includes('Українська'), 'uk: кнопка мови', txt.lang);
 const uk = { play: txt.play, lang: txt.lang };
 
@@ -32,7 +32,7 @@ txt = await page.evaluate(() => ({
   htmlLang: document.documentElement.lang,
   shopName: window.__game.shop ? 'ok' : 'no',
 }));
-check(txt.play.toUpperCase().includes('PLAY'), 'en: PLAY', txt.play);
+check(txt.play.toUpperCase().includes('MODES'), 'en: MODES', txt.play);
 check(txt.play !== uk.play, 'en: play відрізняється від uk', txt.play);
 check(txt.coop.toUpperCase().includes('PLAY') && txt.coop.toUpperCase().includes('TOGETHER'), 'en: PLAY TOGETHER', txt.coop);
 check(txt.ward.toLowerCase().includes('wardrobe'), 'en: Wardrobe', txt.ward);
@@ -173,7 +173,7 @@ txt = await page.evaluate(() => ({
   play: document.getElementById('btn-solo').textContent.trim(),
   prog: document.getElementById('btn-progress').textContent.trim(),
 }));
-check(txt.play.includes('ИГРАТЬ'), 'ru: ИГРАТЬ', txt.play);
+check(txt.play.includes('РЕЖИМЫ'), 'ru: РЕЖИМЫ', txt.play);
 check(txt.play !== uk.play, 'ru: play відрізняється від uk', txt.play);
 check(txt.prog.toLowerCase().includes('прогресс') || txt.prog.toLowerCase().includes('прогрес'), 'ru: Прогресс', txt.prog);
 await page.evaluate(() => window.__game.startLevel('CUSTOM', { customMap: 'edit' }));

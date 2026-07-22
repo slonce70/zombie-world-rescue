@@ -828,21 +828,6 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .globe-play:hover { transform: translateY(-3px) scale(1.03); }
 .globe-play.coop-btn { background: rgba(26, 92, 78, 0.9); border-color: rgba(77, 214, 168, 0.6); color: #eafff6; }
 .globe-play.coop-btn:hover { border-color: #4dd6a8; }
-.globe-play.expedition-btn { background: linear-gradient(135deg, #6f45d4, #2e8bc0); border-color: #a78bfa; color: #fff; }
-.globe-play.expedition-btn:hover { border-color: #d8c9ff; }
-.globe-other { position: relative; pointer-events: auto; }
-.globe-other > summary {
-  list-style: none; cursor: pointer; color: #e7f1fa; background: rgba(20, 38, 57, .92);
-  border: 3px solid rgba(140, 213, 255, .32); box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
-}
-.globe-other > summary::-webkit-details-marker { display: none; }
-.globe-other[open] > summary { border-color: #8cd5ff; }
-.globe-other-buttons {
-  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 2;
-  display: flex; gap: 8px; padding: 10px; border: 1px solid rgba(140, 213, 255, .25);
-  border-radius: 16px; background: rgba(12, 24, 36, .97); box-shadow: 0 12px 30px rgba(0,0,0,.45);
-}
-.globe-other-buttons .globe-play { padding: 11px 16px; font-size: 15px; white-space: nowrap; }
 
 .expedition-card { width: min(700px, 95vw); }
 .expedition-specialist-title { margin: 12px 0 8px; font-size: 14px; color: #d8c9ff; }
@@ -870,7 +855,7 @@ button.expedition-node:hover, .expedition-node.sel { border-color: #a78bfa; back
 }
 .globe-act:hover { border-color: var(--accent); transform: translateY(-2px); }
 .globe-act.locked { opacity: 0.55; }
-.globe-lang-btn {
+#btn-moon-globe {
   position: absolute; right: calc(14px + env(safe-area-inset-right));
   top: calc(14px + env(safe-area-inset-top)); z-index: 12;
   pointer-events: auto; font-size: 14px; padding: 10px 14px;
@@ -1431,15 +1416,30 @@ body.touch-mode #touch-coach.show { display: block; }
 
 .shop-surge { font-size: 12px; }
 
-/* ============ 🎮 меню «Грати» (соло-режими) ============ */
-.solo-card { max-width: 560px; width: min(94vw, 560px); }
+/* ============ 🎮 каталог режимів ============ */
+.solo-card { max-width: 620px; width: min(94vw, 620px); max-height: calc(100dvh - 24px); }
 .solo-modes { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
 /* 🧭 компас «Далі» у соло-меню: зазор між заголовком і текстом */
 .player-compass { display: flex; gap: 7px; align-items: baseline; flex-wrap: wrap; margin: 0 0 8px; }
 .player-compass b { color: var(--accent); white-space: nowrap; }
-.solo-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
+.solo-recommended, .solo-section { display: flex; flex-direction: column; gap: 8px; }
+.solo-recommended { padding-bottom: 4px; }
+.solo-recommended h3, .settings-section h3 {
+  margin: 2px 2px 0; color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: .12em;
+}
+.solo-category { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); overflow: clip; }
+.solo-category > summary {
+  display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 10px 14px;
+  color: #d9edff; cursor: pointer; font-weight: 900; letter-spacing: .08em; list-style: none;
+  transition: background-color .14s ease, color .14s ease;
+}
+.solo-category > summary::-webkit-details-marker { display: none; }
+.solo-category > summary::before { content: '▸'; margin-right: 9px; color: var(--accent); }
+.solo-category[open] > summary { color: #fff; background: rgba(140,213,255,.08); }
+.solo-category[open] > summary::before { content: '▾'; }
+.solo-category > summary span { margin-left: auto; color: #829bb5; font-size: 12px; }
+.solo-category .solo-section { padding: 0 8px 8px; }
 .solo-section { display: flex; flex-direction: column; gap: 8px; }
-.solo-section[hidden] { display: none; }
 .solo-mode {
   display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer;
   background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.12);
@@ -1470,6 +1470,19 @@ body.touch-mode #touch-coach.show { display: block; }
 .solo-cty-title { width: 100%; font-weight: 900; font-size: 13px; letter-spacing: 1.5px; color: var(--accent); }
 .solo-cty { font-size: 14px; padding: 9px 14px; }
 
+/* ============ ⚙️ окремі налаштування ============ */
+.settings-card { width: min(94vw, 680px); max-width: 680px; max-height: calc(100dvh - 24px); }
+.settings-card .panel-header { justify-content: flex-start; }
+.settings-card .panel-header h2 { flex: 1; margin-right: 96px; text-align: center; }
+.settings-back { min-height: 44px; margin: 0; padding: 10px 14px; font-size: 14px; }
+.settings-section { margin-top: 18px; }
+.settings-grid, .difficulty-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.settings-control, .difficulty-option { min-height: 48px; margin: 0; padding: 10px 13px; font-size: 14px; text-align: left; }
+.difficulty-option[aria-pressed="true"] { color: #2b2100; background: #ffd23f; box-shadow: 0 0 0 2px rgba(255,210,63,.3); }
+.settings-advanced { margin-top: 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); }
+.settings-advanced > summary { display: flex; align-items: center; min-height: 44px; padding: 10px 14px; cursor: pointer; color: #8fb3d8; font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.settings-advanced .settings-grid { padding: 0 10px 10px; }
+
 /* 🤝 чип кімнати в HUD: код + лічильник + множник зомбі */
 #coop-room {
   background: rgba(13, 26, 38, 0.78); border: 2px solid rgba(77, 214, 168, 0.45);
@@ -1496,7 +1509,7 @@ body.touch-mode #touch-coach.show { display: block; }
 
 @media (max-width: 900px) {
   .globe-menu-btn { font-size: 14px; padding: 8px 12px; }
-  .globe-lang-btn { font-size: 13px; padding: 8px 10px; }
+  #btn-moon-globe { font-size: 13px; padding: 8px 10px; }
   .globe-play { font-size: 15px; padding: 11px 20px; }
   .country-item { padding: 7px 10px; }
   .country-item .ci-name { font-size: 13px; }
@@ -1525,6 +1538,13 @@ body.touch-mode #touch-coach.show { display: block; }
   /* ⭐ лічильник зірок (v289) подовжив рядок прогресу — на вузькому портреті
      стискаємо в один рядок, інакше блок росте і піднімає ГРАТИ над beacon-зоною */
   #globe-progress { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
+  .globe-play-row { width: 100%; gap: 8px; }
+  .globe-play-row .globe-play { min-width: 0; min-height: 44px; margin: 0; padding: 11px 8px; }
+  .globe-play-row .front-btn { flex: 1 0 100%; }
+  .globe-play-row #btn-solo, .globe-play-row #btn-coop { flex: 1 1 calc(50% - 4px); font-size: 13px; }
+  .solo-card, .settings-card { width: calc(100vw - 16px); max-width: none; padding: 16px 14px; }
+  .settings-card .panel-header h2 { margin-right: 0; font-size: 21px; }
+  .settings-grid, .difficulty-grid { grid-template-columns: 1fr; }
 }
 
 /* короткий ландшафт (телефон боком): тісно по висоті — підтискаємо все */
@@ -1602,6 +1622,7 @@ body.touch-mode #touch-coach.show { display: block; }
   .tb.super-ready { animation: none; }
   .megabox-box,
   .megabox-reel { animation: none; }
+  .solo-mode, .solo-category > summary { transition: none; }
 }
 
 /* ================= v500: 🛰️ ЖИВИЙ ФРОНТ ================= */
@@ -1688,7 +1709,7 @@ body.touch-mode #touch-coach.show { display: block; }
 .front-operation.status-completed, .front-operation.status-claimed { border-color: rgba(94, 219, 139, .36); background: rgba(60, 151, 91, .1); }
 .front-operation.disabled { opacity: .6; }
 .front-operation-choice:disabled { cursor: default; }
-.front-operation-choice:focus-visible, .front-choice:focus-visible, .front-actions .btn:focus-visible, .front-btn:focus-visible, .globe-other > summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.front-operation-choice:focus-visible, .front-choice:focus-visible, .front-actions .btn:focus-visible, .front-btn:focus-visible, .solo-category > summary:focus-visible, .settings-advanced > summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .front-op-flag { font-size: 31px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.35)); }
 .front-op-main, .front-op-side, .front-op-top { min-width: 0; }
 .front-op-main > span { display: block; }
@@ -1784,17 +1805,13 @@ body.touch-mode #touch-coach.show { display: block; }
   .front-rewards { gap: 5px 12px; margin-top: 10px; font-size: 10px; }
   .front-actions { position: sticky; bottom: 0; margin: 6px -13px calc(-16px - env(safe-area-inset-bottom)); padding: 7px 9px calc(8px + env(safe-area-inset-bottom)); background: rgba(18, 30, 46, .96); }
   .front-actions .btn.big { flex: 1 1 190px; font-size: 16px; padding: 12px 18px; }
-  #globe-other summary, .front-actions .btn, #btn-lobby-ready { min-height: 44px; }
+  .front-actions .btn, #btn-lobby-ready { min-height: 44px; }
 }
 
 @media (max-width: 400px) {
   .front-threat-legend span { font-size: 0; }
   .front-threat-legend i { width: 10px; height: 10px; }
   .front-choice-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 700px) {
-  .globe-other-buttons { right: 50%; transform: translateX(50%); flex-direction: column; }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {

@@ -38,7 +38,6 @@ const completeStoryObjectiveSnapshot = (objectiveId, delegateId) => page.evaluat
 
 await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
-await page.click('.globe-other > summary');
 await page.click('#btn-solo');
 await page.waitForSelector('#overlay-solo.show', { timeout: 10000 });
 await page.click('.solo-mode[data-mode="campaign"]');

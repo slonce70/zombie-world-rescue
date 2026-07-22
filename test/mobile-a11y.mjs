@@ -126,7 +126,6 @@ const coreFlow = await page.evaluate(async () => {
   };
   session.leave = () => { session.state = 'idle'; session.role = null; session.room = null; session.roster = new Map(); };
   localStorage.setItem('zr-nick', 'Хост');
-  document.getElementById('globe-other').open = true;
   const lobbyTrigger = document.getElementById('btn-coop');
   lobbyTrigger.focus();
   lobbyTrigger.click();
@@ -163,7 +162,7 @@ const coreFlow = await page.evaluate(async () => {
   session.leave = originalLeave;
 
   game.openFront();
-  const targets = ['#btn-front', '#globe-other summary', '#btn-front-close', '.front-operation-choice', '.front-choice', '.front-actions .btn']
+  const targets = ['#btn-front', '#btn-solo', '#btn-coop', '#btn-front-close', '.front-operation-choice', '.front-choice', '.front-actions .btn']
     .flatMap((selector) => [...document.querySelectorAll(selector)])
     .filter((element) => !element.hidden && getComputedStyle(element).display !== 'none')
     .map((element) => {

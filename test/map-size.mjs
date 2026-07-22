@@ -46,8 +46,11 @@ check(profiles.styles.join(',') === 'classic,forest,lakes,stone' && profiles.bad
 
 const labels = [];
 await page.locator('#btn-menu').click();
+await page.locator('#btn-settings').click();
+await page.locator('.settings-advanced > summary').click();
 await page.locator('#btn-map-size').scrollIntoViewIfNeeded();
 await page.screenshot({ path: 'shots/map-size-settings.png' });
+await page.locator('#btn-settings-back').click();
 await page.locator('#overlay-menu .panel-close').click();
 for (let i = 0; i < 4; i++) {
   labels.push(await page.locator('#btn-map-size').innerText());

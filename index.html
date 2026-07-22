@@ -33,7 +33,6 @@
   <div id="globe-ui">
     <div class="globe-top">
       <button id="btn-menu" class="btn globe-menu-btn">☰ Меню</button>
-      <button id="btn-lang-globe" class="btn globe-act globe-lang-btn">🌐 Українська</button>
       <button id="btn-moon-globe" class="btn globe-act">🌙 Місяць</button>
       <h1>🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span></h1>
       <p class="globe-sub">Зомбі захопили планету! Рятуй країни — сам або з друзями.</p>
@@ -47,14 +46,8 @@
           <span class="front-threat-dot" aria-hidden="true"></span>
           <span id="front-cta-label">Продовжити порятунок</span>
         </button>
-        <details id="globe-other" class="globe-other">
-          <summary class="globe-play">Інші операції</summary>
-          <div class="globe-other-buttons">
-            <button id="btn-expedition" class="btn globe-play expedition-btn">🧭 ЕКСПЕДИЦІЯ</button>
-            <button id="btn-solo" class="btn globe-play">🎮 ГРАТИ</button>
-            <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
-          </div>
-        </details>
+        <button id="btn-solo" class="btn globe-play">🎮 РЕЖИМИ</button>
+        <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span> · ⭐ <span id="star-total">0/36</span></div>
       <div id="weekly-goal">
@@ -68,11 +61,11 @@
   <div id="globe-tooltip"></div>
 
   <!-- 🎮 Соло: вибір режиму -->
-  <div id="overlay-solo" class="overlay">
+  <div id="overlay-solo" class="overlay" role="dialog" aria-modal="true" aria-labelledby="solo-title" aria-hidden="true" data-escape-close="btn-solo-close">
     <div class="overlay-card panel-card solo-card">
       <div class="panel-header">
-        <h2>🎮 ГРАТИ</h2>
-        <button class="btn-x panel-close" data-close="overlay-solo">✕</button>
+        <h2 id="solo-title">🎮 РЕЖИМИ</h2>
+        <button id="btn-solo-close" class="btn-x panel-close" data-close="overlay-solo" data-dialog-focus aria-label="Закрити">✕</button>
       </div>
       <div id="solo-modes" class="solo-modes"></div>
       <div id="solo-countries" class="solo-countries"></div>
@@ -530,18 +523,49 @@
         <button id="btn-custom-biome" class="btn globe-act" hidden>☀️ Літня карта</button>
         <button id="btn-custom-play" class="btn globe-act" hidden>▶️ Грати власну карту</button>
         <button id="btn-custom-delete" class="btn globe-act" hidden>🗑️ Видалити власну карту</button>
-        <div class="menu-group-title">НАЛАШТУВАННЯ</div>
-        <button id="btn-quality" class="btn globe-act">⚙️ Якість: Авто</button>
-        <button id="btn-map-size" class="btn globe-act">🗺️ Карта: Стандартна · 750 м</button>
-        <button id="btn-map-style" class="btn globe-act">🌍 Вид карти: Класична</button>
-        <button id="btn-camera-shake" class="btn globe-act">📳 Тряска камери: увімк</button>
-        <button id="btn-reduced-flashes" class="btn globe-act">✨ Зменшені спалахи: викл</button>
-        <button id="btn-kid" class="btn globe-act">🐣 Малюк: викл</button>
-        <button id="btn-strong-zombies" class="btn globe-act">🧟 Сильні зомбі: викл</button>
-        <button id="btn-tough-zombies" class="btn globe-act">💪 Живучі зомбі: викл</button>
-        <button id="btn-front-metrics" class="btn globe-act">📊 Анонімна статистика: вимк</button>
-        <button id="btn-lang" class="btn globe-act">🌐 Українська</button>
+        <div class="menu-group-title">СИСТЕМА</div>
+        <button id="btn-settings" class="btn globe-act">⚙️ Налаштування</button>
       </div>
+    </div>
+  </div>
+
+  <div id="overlay-settings" class="overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true" data-escape-close="btn-settings-back">
+    <div class="overlay-card panel-card settings-card">
+      <div class="panel-header">
+        <button id="btn-settings-back" class="btn settings-back" type="button" data-dialog-focus>← Назад</button>
+        <h2 id="settings-title">⚙️ НАЛАШТУВАННЯ</h2>
+      </div>
+      <section class="settings-section" aria-labelledby="settings-basic-title">
+        <h3 id="settings-basic-title">ОСНОВНІ</h3>
+        <div class="settings-grid">
+          <button id="btn-lang" class="btn settings-control">🌐 Українська</button>
+          <button id="btn-quality" class="btn settings-control">⚙️ Якість: Авто</button>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="settings-difficulty-title">
+        <h3 id="settings-difficulty-title">СКЛАДНІСТЬ · <span id="settings-difficulty-current">Звичайна</span></h3>
+        <div class="difficulty-grid">
+          <button class="btn difficulty-option" type="button" data-difficulty="kid">🐣 Малюк</button>
+          <button class="btn difficulty-option" type="button" data-difficulty="normal">🎯 Звичайна</button>
+          <button class="btn difficulty-option" type="button" data-difficulty="hard">🔥 Складна</button>
+          <button class="btn difficulty-option" type="button" data-difficulty="extreme">💀 Екстремальна</button>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="settings-access-title">
+        <h3 id="settings-access-title">ДОСТУПНІСТЬ</h3>
+        <div class="settings-grid">
+          <button id="btn-camera-shake" class="btn settings-control">📳 Тряска камери: увімк</button>
+          <button id="btn-reduced-flashes" class="btn settings-control">✨ Зменшені спалахи: викл</button>
+        </div>
+      </section>
+      <details class="settings-advanced">
+        <summary>ДОДАТКОВІ</summary>
+        <div class="settings-grid">
+          <button id="btn-map-size" class="btn settings-control">🗺️ Карта: Стандартна · 750 м</button>
+          <button id="btn-map-style" class="btn settings-control">🌍 Вид карти: Класична</button>
+          <button id="btn-front-metrics" class="btn settings-control">📊 Анонімна статистика: вимк</button>
+        </div>
+      </details>
     </div>
   </div>
 

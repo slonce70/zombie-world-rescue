@@ -15,22 +15,22 @@ const menu = await page.evaluate(() => {
   g.save.liberated = eight;
   g.renderSoloMenu();
   const before = document.querySelector('.solo-mode[data-mode="portal"]');
-  const tabsBefore = [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim());
+  const categoriesBefore = [...document.querySelectorAll('.solo-category > summary')].map((t) => t.textContent.trim());
   g.save.liberated = nine;
   g.renderSoloMenu();
   const after = document.querySelector('.solo-mode[data-mode="portal"]');
-  const tabsAfter = [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim());
+  const categoriesAfter = [...document.querySelectorAll('.solo-category > summary')].map((t) => t.textContent.trim());
   return {
     beforeExists: !!before,
     beforeLocked: before && before.classList.contains('locked'),
     afterExists: !!after,
     afterLocked: after && after.classList.contains('locked'),
     name: after && after.querySelector('.sm-name').textContent,
-    tabsBefore,
-    tabsAfter,
+    categoriesBefore,
+    categoriesAfter,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВІЙНА'), 'до 9 країн режим заблокований', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked && menu.categoriesBefore.some((x) => x.includes('ОПЕРАЦІЇ')), 'до 9 країн режим заблокований в Операціях', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ПОРТАЛ/i.test(menu.name), 'після 9 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт Порталу: 3 портали, хвилі зомбі, перемога після закриття всіх');

@@ -134,11 +134,20 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 607;
+const APP_VERSION = 608;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
 const QUALITY_LABELS = { auto: t('Авто'), high: t('Гарна'), fast: t('Швидка') };
+const DIFFICULTY_PRESETS = {
+  kid: [true, false, false],
+  normal: [false, false, false],
+  hard: [false, true, false],
+  extreme: [false, true, true],
+};
+const DIFFICULTY_LABELS = {
+  kid: t('Малюк'), normal: t('Звичайна'), hard: t('Складна'), extreme: t('Екстремальна'), custom: t('Власна'),
+};
 const MAP_SIZE_LABELS = {
   small: t('Мала'), standard: t('Стандартна'), large: t('Велика'), huge: t('Дуже велика'),
 };
@@ -515,7 +524,6 @@ class Game {
       this.renderSoloMenu();
       this._showOverlay('overlay-solo');
     });
-    document.getElementById('btn-expedition').addEventListener('click', () => this.openExpedition());
     document.getElementById('btn-expedition-go').addEventListener('click', () => this._expeditionGo());
     document.getElementById('btn-expedition-abandon').addEventListener('click', () => {
       this.save.expedition = null;
@@ -561,7 +569,21 @@ class Game {
       });
     };
     wireLangBtn(document.getElementById('btn-lang'));
-    wireLangBtn(document.getElementById('btn-lang-globe'));
+
+    const settingsBtn = document.getElementById('btn-settings');
+    const settingsBack = document.getElementById('btn-settings-back');
+    settingsBtn.addEventListener('click', () => {
+      this.audio.click();
+      document.querySelector('#overlay-settings .settings-advanced').open = false;
+      this._renderDifficultySettings();
+      this._showOverlay('overlay-settings', settingsBtn);
+    });
+    settingsBack.addEventListener('click', () => {
+      this.audio.click();
+      this._hideOverlay('overlay-settings');
+      this._showOverlay('overlay-menu', document.getElementById('btn-menu'));
+      settingsBtn.focus({ preventScroll: true });
+    });
 
     // перемикач якості
     document.getElementById('btn-quality').addEventListener('click', () => {
@@ -618,36 +640,23 @@ class Game {
       this.save.kidMode = isTouchDevice();
       this.saveGame();
     }
-    const kidBtn = document.getElementById('btn-kid');
-    if (kidBtn) {
-      kidBtn.addEventListener('click', () => {
-        this.save.kidMode = !this.save.kidMode; // явний вибір — фіксуємо булеан
-        this.saveGame();
-        this._applyKidMode();
-        this.audio.click();
-      });
-    }
     this._applyKidMode({ silent: true }); // boot init — тост не потрібен
-    const strongZombiesBtn = document.getElementById('btn-strong-zombies');
-    if (strongZombiesBtn) {
-      strongZombiesBtn.addEventListener('click', () => {
-        this.save.strongZombies = !this.save.strongZombies;
-        this.saveGame();
-        this._applyStrongZombies();
-        this.audio.click();
-      });
-    }
     this._applyStrongZombies({ silent: true });
-    const toughZombiesBtn = document.getElementById('btn-tough-zombies');
-    if (toughZombiesBtn) {
-      toughZombiesBtn.addEventListener('click', () => {
-        this.save.toughZombies = !this.save.toughZombies;
+    this._applyToughZombies({ silent: true });
+    document.querySelectorAll('.difficulty-option').forEach((button) => {
+      button.addEventListener('click', () => {
+        const preset = DIFFICULTY_PRESETS[button.dataset.difficulty];
+        if (!preset) return;
+        [this.save.kidMode, this.save.strongZombies, this.save.toughZombies] = preset;
         this.saveGame();
-        this._applyToughZombies();
+        this._applyKidMode({ silent: true });
+        this._applyStrongZombies({ silent: true });
+        this._applyToughZombies({ silent: true });
+        this._renderDifficultySettings();
         this.audio.click();
       });
-    }
-    this._applyToughZombies({ silent: true });
+    });
+    this._renderDifficultySettings();
     const metricsBtn = document.getElementById('btn-front-metrics');
     const renderMetrics = () => {
       if (metricsBtn) metricsBtn.textContent = frontMetricsEnabled(this)
@@ -1127,6 +1136,20 @@ class Game {
     if (flashesBtn) flashesBtn.textContent = flashes ? t('✨ Зменшені спалахи: увімк') : t('✨ Зменшені спалахи: викл');
   }
 
+  _difficultyPreset() {
+    const current = [!!this.save.kidMode, !!this.save.strongZombies, !!this.save.toughZombies];
+    return Object.keys(DIFFICULTY_PRESETS).find((id) => DIFFICULTY_PRESETS[id].every((value, i) => value === current[i])) || 'custom';
+  }
+
+  _renderDifficultySettings() {
+    const current = this._difficultyPreset();
+    const label = document.getElementById('settings-difficulty-current');
+    if (label) label.textContent = DIFFICULTY_LABELS[current];
+    document.querySelectorAll('.difficulty-option').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.difficulty === current));
+    });
+  }
+
   // 🐣 Режим Малюк: оновлюємо підпис кнопки і клас на body (м'яка допомога з прицілом + CSS)
   // opts.silent — не показувати тост (при авто-init та вході в рівень)
   _applyKidMode(opts = {}) {
@@ -1483,7 +1506,6 @@ class Game {
     const root = document.getElementById('solo-modes');
     const byId = new Map(modes.map((m) => [m.id, m]));
     const groups = SOLO_MODE_GROUPS.map((g) => ({ ...g, title: g.title() }));
-    if (!this._soloModeTab || !groups.some((g) => g.id === this._soloModeTab)) this._soloModeTab = groups[0].id;
     const daily = this.dailyChallengeId();
     const weekly = this.weeklyChallengeId();
     const wkMod = this._modifierById(this.weeklyModifierId());
@@ -1506,24 +1528,36 @@ class Game {
         ${hardBtn(m)}</div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
+    const catalogOrder = groups.flatMap((g) => g.ids);
+    const recommendedIds = [];
+    const addRecommendation = (id) => {
+      const mode = byId.get(id);
+      if (mode && !mode.locked && !recommendedIds.includes(id) && recommendedIds.length < 3) recommendedIds.push(id);
+    };
+    [daily, weekly, 'expedition'].forEach(addRecommendation);
+    ['campaign', 'storm', 'defense', 'knockout', ...catalogOrder].forEach(addRecommendation);
     root.innerHTML = `
       ${this._playerCompassHtml()}
-      <div class="solo-tabs">
-        ${groups.map((g) => `<button class="shop-tab solo-tab ${this._soloModeTab === g.id ? 'on' : ''}" data-tab="${g.id}">${g.title}</button>`).join('')}
-      </div>
+      <section class="solo-recommended" aria-labelledby="solo-recommended-title">
+        <h3 id="solo-recommended-title">${t('РЕКОМЕНДОВАНО ЗАРАЗ')}</h3>
+        ${recommendedIds.map((id) => modeHtml(byId.get(id))).join('')}
+      </section>
       ${groups.map((g) => `
-      <section class="solo-section" data-tab="${g.title}" data-tab-id="${g.id}" ${this._soloModeTab === g.id ? '' : 'hidden'}>
-        ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
-      </section>`).join('')}`;
+      <details class="solo-category" data-category="${g.id}">
+        <summary>${g.title}<span>${g.ids.length}</span></summary>
+        <section class="solo-section" data-category="${g.id}" aria-label="${g.title}">
+          ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
+        </section>
+      </details>`).join('')}`;
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';
-    root.querySelectorAll('.solo-tab').forEach((el) => {
-      el.addEventListener('click', () => {
-        this._soloModeTab = el.dataset.tab;
-        this.audio.click();
-        root.querySelectorAll('.solo-tab').forEach((b) => b.classList.toggle('on', b === el));
-        root.querySelectorAll('.solo-section').forEach((s) => { s.hidden = s.dataset.tabId !== this._soloModeTab; });
+    root.querySelectorAll('.solo-category').forEach((category) => {
+      category.querySelector('summary').addEventListener('click', () => {
+        root.querySelectorAll('.solo-category').forEach((other) => { if (other !== category) other.open = false; });
+      });
+      category.addEventListener('toggle', () => {
+        if (!category.open) return;
         root.querySelectorAll('.solo-mode').forEach((x) => x.classList.remove('sel'));
         cRoot.style.display = 'none';
         cRoot.innerHTML = '';

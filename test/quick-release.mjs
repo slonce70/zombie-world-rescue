@@ -9,6 +9,7 @@ const suite = [
   ['node', ['test/save-migration.mjs']],
   ['node', ['test/cloudsave.mjs'], { SLOW: process.env.QUICK_RELEASE_CLOUDSAVE_SLOW || process.env.SLOW || '1' }],
   ['node', ['test/smoke.mjs']],
+  ['node', ['test/ux-stabilization.mjs']],
   ['node', ['test/bank.mjs']],
   ['node', ['test/zone-defense.mjs']],
   ['node', ['test/humans-vs-zombies.mjs']],

@@ -54,16 +54,16 @@ console.log('▸ UX polish: desktop globe title avoids top buttons');
   const hero = await page.evaluate(() => {
     const title = document.querySelector('#globe-ui h1').getBoundingClientRect();
     const menu = document.getElementById('btn-menu').getBoundingClientRect();
-    const lang = document.getElementById('btn-lang-globe').getBoundingClientRect();
+    const moon = document.getElementById('btn-moon-globe').getBoundingClientRect();
     return {
       clearOfMenu: title.left >= menu.right + 8,
-      clearOfLang: title.right <= lang.left - 8,
+      clearOfMoon: title.right <= moon.left - 8,
       title: { left: title.left, right: title.right },
       menu: { right: menu.right },
-      lang: { left: lang.left },
+      moon: { left: moon.left },
     };
   });
-  check(hero.clearOfMenu && hero.clearOfLang, 'desktop заголовок глобуса не залазить під верхні кнопки', JSON.stringify(hero));
+  check(hero.clearOfMenu && hero.clearOfMoon, 'desktop заголовок глобуса не залазить під верхні кнопки', JSON.stringify(hero));
   await ctx.close();
 }
 
@@ -104,7 +104,8 @@ console.log('▸ UX polish: clickable menu items are native buttons');
     (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
   30000, 'globe');
   await page.click('#btn-solo');
-  await page.click('.solo-mode[data-mode="campaign"]');
+  await page.click('.solo-category[data-category="story"] > summary');
+  await page.click('.solo-category[data-category="story"] .solo-mode[data-mode="campaign"]');
   const menu = await page.evaluate(() => ({
     soloModesAreButtons: [...document.querySelectorAll('.solo-mode')].every((el) => el.tagName === 'BUTTON'),
     countriesAreButtons: [...document.querySelectorAll('#country-list .country-item')].every((el) => el.tagName === 'BUTTON'),

@@ -141,7 +141,7 @@ export class FrontUI {
 
     this.el.cta.hidden = false;
     if (this.el.solo) {
-      this.el.solo.textContent = t('🎮 ГРАТИ');
+      this.el.solo.textContent = t('🎮 РЕЖИМИ');
     }
     this.el.ctaLabel.textContent = t('Продовжити порятунок');
     if (!vm.unlocked) {

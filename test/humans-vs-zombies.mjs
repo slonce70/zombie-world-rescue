@@ -15,7 +15,7 @@ const menu = await page.evaluate(() => {
   g.save.liberated = ten;
   g.renderSoloMenu();
   const before = document.querySelector('.solo-mode[data-mode="humans"]');
-  const tabsBefore = [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim());
+  const categories = [...document.querySelectorAll('.solo-category > summary')].map((t) => t.textContent.trim());
   g.save.liberated = eleven;
   g.renderSoloMenu();
   const after = document.querySelector('.solo-mode[data-mode="humans"]');
@@ -25,10 +25,10 @@ const menu = await page.evaluate(() => {
     afterExists: !!after,
     afterLocked: after && after.classList.contains('locked'),
     name: after && after.querySelector('.sm-name').textContent,
-    tabsBefore,
+    categories,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.tabsBefore.includes('ВІЙНА'), 'до 11 країн режим заблокований', JSON.stringify(menu));
+check(menu.beforeExists && menu.beforeLocked && menu.categories.some((x) => x.includes('АРКАДА')), 'до 11 країн режим заблокований в Аркаді', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ЗОМБІ ПРОТИ ЛЮДЕЙ/i.test(menu.name), 'після 11 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: 30 клонів проти 65 зомбі і робота');

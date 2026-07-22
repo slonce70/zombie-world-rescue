@@ -7,35 +7,33 @@ const check = makeCheck(() => failed++);
 await page.goto(`${BASE}/?test&fresh&country=UKR`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 30000 });
 
-console.log('▸ Налаштування «Сильні зомбі»');
+console.log('▸ Пресет «Складна» вмикає сильних зомбі');
 const setting = await page.evaluate(() => {
   const g = window.__game;
-  const btn = document.getElementById('btn-strong-zombies');
+  const btn = document.querySelector('[data-difficulty="hard"]');
   const before = {
     exists: !!btn,
-    label: btn ? btn.textContent : '',
     save: !!g.save.strongZombies,
   };
   if (btn) btn.click();
   const afterOn = {
-    label: btn ? btn.textContent : '',
     save: !!g.save.strongZombies,
+    tough: !!g.save.toughZombies,
     stored: JSON.parse(localStorage.getItem('zr-save-v1') || '{}').strongZombies,
+    pressed: btn?.getAttribute('aria-pressed'),
   };
-  if (btn) btn.click();
+  document.querySelector('[data-difficulty="normal"]')?.click();
   const afterOff = {
-    label: btn ? btn.textContent : '',
     save: !!g.save.strongZombies,
     stored: JSON.parse(localStorage.getItem('zr-save-v1') || '{}').strongZombies,
   };
   return { before, afterOn, afterOff };
 });
-check(setting.before.exists && setting.before.label.includes('Сильні зомбі') && setting.before.label.includes('викл'),
-  'кнопка є в меню і стартує вимкнено', JSON.stringify(setting.before));
-check(setting.afterOn.save === true && setting.afterOn.stored === true && setting.afterOn.label.includes('увімк'),
-  'натискання вмикає сильних зомбі і зберігає в сейв', JSON.stringify(setting.afterOn));
-check(setting.afterOff.save === false && setting.afterOff.stored === false && setting.afterOff.label.includes('викл'),
-  'повторне натискання вимикає сильних зомбі', JSON.stringify(setting.afterOff));
+check(setting.before.exists && !setting.before.save, 'пресет існує, сильні зомбі стартують вимкнено', JSON.stringify(setting.before));
+check(setting.afterOn.save === true && setting.afterOn.tough === false && setting.afterOn.stored === true && setting.afterOn.pressed === 'true',
+  'Складна вмикає сильних зомбі, не вмикає живучих і зберігає сейв', JSON.stringify(setting.afterOn));
+check(setting.afterOff.save === false && setting.afterOff.stored === false,
+  'Звичайна повертає сильних зомбі у вимкнений стан', JSON.stringify(setting.afterOff));
 
 const damage = await page.evaluate(() => {
   const g = window.__game;

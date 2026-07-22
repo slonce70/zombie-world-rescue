@@ -31,7 +31,7 @@ try {
     side: document.querySelectorAll('#overlay-menu .globe-act').length,
   }));
   check('дві головні кнопки, старі Шторм/Арена прибрані', menu.solo && menu.coop && !menu.oldStorm && !menu.oldArena, JSON.stringify(menu));
-  check('☰ меню: 15 другорядних кнопок у висувному меню', menu.side === 15, `${menu.side}`);
+  check('☰ меню: 14 кнопок прогресу, колекції та системи', menu.side === 14, `${menu.side}`);
 
   // ---------- соло-меню: локи на свіжому сейві ----------
   await page.click('#btn-solo');
@@ -45,7 +45,7 @@ try {
       })
       .map((m) => m.dataset.mode);
     return {
-      modes: document.querySelectorAll('.solo-mode').length,
+      modes: document.querySelectorAll('.solo-category .solo-mode').length,
       stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
       arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
       worldbossLocked: document.querySelector('.solo-mode[data-mode="worldboss"]').classList.contains('locked'),
@@ -59,12 +59,12 @@ try {
       humansLocked: document.querySelector('.solo-mode[data-mode="humans"]').classList.contains('locked'),
       pvpLocked: document.querySelector('.solo-mode[data-mode="pvp"]').classList.contains('locked'),
       campLocked: document.querySelector('.solo-mode[data-mode="campaign"]').classList.contains('locked'),
-      tabs: [...document.querySelectorAll('.solo-tab')].map((t) => t.textContent.trim()),
-      activeTab: document.querySelector('.solo-tab.on')?.textContent.trim(),
-      visibleModes: [...document.querySelectorAll('.solo-section:not([hidden]) .solo-mode')].map((m) => m.dataset.mode),
+      categories: [...document.querySelectorAll('.solo-category > summary')].map((t) => t.textContent.trim()),
+      openCategories: document.querySelectorAll('.solo-category[open]').length,
+      recommended: [...document.querySelectorAll('.solo-recommended .solo-mode')].map((m) => ({ id: m.dataset.mode, locked: m.classList.contains('locked') })),
       paintedModes: paintedModes(),
-      sections: [...document.querySelectorAll('.solo-section')].map((s) => ({
-        title: s.dataset.tab,
+      sections: [...document.querySelectorAll('.solo-category .solo-section')].map((s) => ({
+        title: s.parentElement.querySelector('summary').childNodes[0].textContent.trim(),
         modes: [...s.querySelectorAll('.solo-mode')].map((m) => m.dataset.mode),
       })),
     };
@@ -75,48 +75,32 @@ try {
       && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
     JSON.stringify(fresh));
-  check('режими згруповані у вкладки як Гардероб',
-    JSON.stringify(fresh.tabs) === JSON.stringify([
-      'КАМПАНІЯ', 'БОСИ', 'ДУЕЛІ', 'ВІЙНА', 'ВИКЛИКИ', 'ОСОБЛИВІ',
-    ])
-      && fresh.activeTab === 'КАМПАНІЯ'
-      && JSON.stringify(fresh.visibleModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
-      && JSON.stringify(fresh.paintedModes) === JSON.stringify(['campaign', 'infected', 'chapter3'])
+  check('режими згруповані у чотири згорнуті категорії',
+    fresh.categories.length === 4
+      && ['СЮЖЕТ', 'ОПЕРАЦІЇ', 'ВИПРОБУВАННЯ', 'АРКАДА'].every((name) => fresh.categories.some((x) => x.includes(name)))
+      && fresh.openCategories === 0
+      && fresh.recommended.length >= 1 && fresh.recommended.length <= 3
+      && new Set(fresh.recommended.map((x) => x.id)).size === fresh.recommended.length
+      && fresh.recommended.every((x) => !x.locked)
       && JSON.stringify(fresh.sections) === JSON.stringify([
-        { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
-        { title: 'БОСИ', modes: ['arena', 'worldboss', 'radiation'] },
-        { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
-        { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-        { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-        { title: 'ОСОБЛИВІ', modes: ['expedition', 'soul-collector'] },
+        { title: 'СЮЖЕТ', modes: ['campaign', 'infected', 'chapter3'] },
+        { title: 'ОПЕРАЦІЇ', modes: ['expedition', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
+        { title: 'ВИПРОБУВАННЯ', modes: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'] },
+        { title: 'АРКАДА', modes: ['pvp', 'knockout', 'humans', 'bank'] },
       ]),
-    JSON.stringify({ tabs: fresh.tabs, active: fresh.activeTab, visible: fresh.visibleModes, painted: fresh.paintedModes, sections: fresh.sections }));
-  await page.click('.solo-tab:has-text("ВИКЛИКИ")');
+    JSON.stringify({ categories: fresh.categories, open: fresh.openCategories, recommended: fresh.recommended, sections: fresh.sections }));
+  await page.locator('.solo-category[data-category="challenges"] > summary').click();
   const trialModes = await page.evaluate(() =>
-    [...document.querySelectorAll('.solo-mode')]
-      .filter((m) => {
-        const r = m.getBoundingClientRect();
-        const css = getComputedStyle(m);
-        return r.width > 0 && r.height > 0 && css.display !== 'none' && css.visibility !== 'hidden';
-      })
-      .map((m) => m.dataset.mode));
-  check('клік по вкладці показує тільки свої режими',
-    JSON.stringify(trialModes) === JSON.stringify(['zone-defense', 'defense', 'turretwar', 'bank', 'maze']),
+    [...document.querySelectorAll('.solo-category[data-category="challenges"] .solo-mode')].map((m) => m.dataset.mode));
+  check('клік по категорії показує тільки її режими',
+    JSON.stringify(trialModes) === JSON.stringify(['storm', 'arena', 'radiation', 'maze', 'soul-collector']),
     trialModes.join(','));
-  await page.click('.solo-tab:has-text("КАМПАНІЯ")');
-  check('кожен pane-розділ містить свої режими',
-    JSON.stringify(fresh.sections) === JSON.stringify([
-      { title: 'КАМПАНІЯ', modes: ['campaign', 'infected', 'chapter3'] },
-      { title: 'БОСИ', modes: ['arena', 'worldboss', 'radiation'] },
-      { title: 'ДУЕЛІ', modes: ['pvp', 'knockout'] },
-      { title: 'ВІЙНА', modes: ['humans', 'portal', 'storm'] },
-      { title: 'ВИКЛИКИ', modes: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-      { title: 'ОСОБЛИВІ', modes: ['expedition', 'soul-collector'] },
-    ]),
-    JSON.stringify(fresh.sections));
+  await page.locator('.solo-category[data-category="story"] > summary').click();
+  check('одночасно розгорнута лише одна категорія',
+    await page.locator('.solo-category[open]').count() === 1);
   await page.screenshot({ path: 'shots/u10-solo-fresh.png' });
 
-  await page.click('.solo-mode[data-mode="campaign"]');
+  await page.click('.solo-category[data-category="story"] .solo-mode[data-mode="campaign"]');
   // новий флоу: країну обирають ІНЛАЙН у меню (не закриваючи його, не йдучи на глобус)
   await page.waitForSelector('#country-list .country-item', { timeout: 10000 });
   const campCountries = await page.evaluate(() =>
@@ -185,8 +169,8 @@ try {
   }));
   check('2 країни звільнено → Шторм і Арена відкриті', unlocked.storm && unlocked.arena, JSON.stringify(unlocked));
 
-  await page.click('.solo-tab:has-text("ВІЙНА")');
-  await page.click('.solo-mode[data-mode="storm"]');
+  await page.locator('.solo-category[data-category="challenges"] > summary').click();
+  await page.click('.solo-category[data-category="challenges"] .solo-mode[data-mode="storm"]');
   const ctys = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-cty')].map((b) => b.dataset.id));
   check('Шторм пропонує звільнені країни', ctys.join(',') === 'UKR,POL', ctys.join(','));

@@ -16,15 +16,12 @@ import { SOUL_COLLECTOR_UNLOCK_LEVEL } from './souls.js';
 import { WORLD_BOSS_MIN_COUNTRIES } from './worldboss.js';
 import { RADIATION_UNLOCK_COUNTRIES } from './radiationmode.js';
 
-// 6 вкладок замість 10: «перегружені» варіанти живуть тумблером 💀 на базовій картці
+// Чотири категорії каталогу; складні варіанти живуть тумблером 💀 на базовій картці.
 export const SOLO_MODE_GROUPS = [
-  { id: 'campaign', title: () => t('КАМПАНІЯ'), ids: ['campaign', 'infected', 'chapter3'] },
-  { id: 'bosses', title: () => t('БОСИ'), ids: ['arena', 'worldboss', 'radiation'] },
-  { id: 'duels', title: () => t('ДУЕЛІ'), ids: ['pvp', 'knockout'] },
-  { id: 'war', title: () => t('ВІЙНА'), ids: ['humans', 'portal', 'storm'] },
-  // «ВИКЛИКИ», не «ВИПРОБУВАННЯ»: довше слово не влазить у 2 ряди табів на 375px
-  { id: 'trials', title: () => t('ВИКЛИКИ'), ids: ['zone-defense', 'defense', 'turretwar', 'bank', 'maze'] },
-  { id: 'special', title: () => t('ОСОБЛИВІ'), ids: ['expedition', 'soul-collector'] },
+  { id: 'story', title: () => t('СЮЖЕТ'), ids: ['campaign', 'infected', 'chapter3'] },
+  { id: 'operations', title: () => t('ОПЕРАЦІЇ'), ids: ['expedition', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
+  { id: 'challenges', title: () => t('ВИПРОБУВАННЯ'), ids: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'] },
+  { id: 'arcade', title: () => t('АРКАДА'), ids: ['pvp', 'knockout', 'humans', 'bank'] },
 ];
 
 // 💀 базовий режим → його «перегружений» варіант (кнопка на картці)
@@ -128,10 +125,8 @@ export const MODE_START_OPTS = {
 export const SOLO_MODES = [
   {
     id: 'expedition', icon: '🧭', name: () => t('ЕКСПЕДИЦІЯ'),
-    locked: ({ libN }) => libN < 1,
-    desc: ({ libN }) => libN < 1
-      ? t('Відкриється після першої звільненої країни')
-      : t('Особлива багаторівнева операція з власним маршрутом і збіркою.'),
+    locked: () => false,
+    desc: () => t('Особлива багаторівнева операція з власним маршрутом і збіркою.'),
     start: (game) => game.openExpedition(),
   },
   {

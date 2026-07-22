@@ -29,7 +29,7 @@ try {
     await page.evaluate((id) => document.getElementById(id).classList.remove('show'), button);
   }
 
-  const blocked = await page.evaluate(() => ['btn-menu', 'btn-lang-globe', 'btn-expedition', 'btn-solo', 'btn-coop'].filter((id) => {
+  const blocked = await page.evaluate(() => ['btn-menu', 'btn-moon-globe', 'btn-front', 'btn-solo', 'btn-coop'].filter((id) => {
     const el = document.getElementById(id), r = el.getBoundingClientRect();
     return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('button') !== el;
   }));

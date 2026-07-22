@@ -168,10 +168,10 @@ check(await page.evaluate(() => !!document.getElementById('btn-menu')), 'є кн
 // (b) другорядні кнопки живуть у висувному меню (#overlay-menu), а не над глобусом
 const inDrawer = await page.evaluate(() => {
   const ids = ['btn-pass', 'btn-quests', 'btn-wardrobe', 'btn-hq', 'btn-league',
-    'btn-quality', 'btn-map-size', 'btn-kid', 'btn-progress', 'btn-lang'];
+    'btn-settings', 'btn-progress'];
   return ids.every((id) => !!document.querySelector(`#overlay-menu #${id}`));
 });
-check(inDrawer, 'усі другорядні кнопки — у висувному меню #overlay-menu');
+check(inDrawer, 'прогрес, колекція та єдиний вхід у налаштування — у #overlay-menu');
 
 // (c) на головному екрані глобуса БІЛЬШЕ НЕМАЄ списку країн (він переїхав у ГРАТИ)
 const cListOnGlobe = await page.evaluate(() =>
