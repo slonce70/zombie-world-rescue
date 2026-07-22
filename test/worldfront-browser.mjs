@@ -43,11 +43,28 @@ try {
     await mod.sendFrontReturns(game);
     const successSent = game.save.front.stats.sent.includes('return_d1')
       && game.save.front.stats.sent.includes('return_d7');
+    const metricEvents = [];
+    window.fetch = async (_url, opts) => {
+      metricEvents.push(JSON.parse(opts.body).event);
+      return { ok: true };
+    };
+    game.save.liberated = { UKR: true };
+    game.save.front = null;
+    game._ensureFront();
+    game._applyFrontTransition({ type: 'START_OPERATION', operationId: game.save.front.board[0].id });
+    for (let stage = 0; stage < 2; stage++) {
+      game._applyFrontTransition({ type: 'START_STAGE' });
+      game._applyFrontTransition({ type: 'COMPLETE_STAGE', build: [] });
+    }
+    game._applyFrontTransition({ type: 'START_STAGE' });
+    game._applyFrontTransition({ type: 'COMPLETE_OPERATION', build: [] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const completeSent = metricEvents.filter((event) => event === 'front_complete').length === 1;
     window.fetch = originalFetch;
     game.params = originalParams;
     game.saveGame = originalSaveGame;
     game.save.front = null;
-    return { zeroDisabled, disabledUnsent, failedUnsent, successSent };
+    return { zeroDisabled, disabledUnsent, failedUnsent, successSent, completeSent };
   });
   check(Object.values(metrics).every(Boolean), 'Front return metrics require explicit opt-in and record only successful sends', JSON.stringify(metrics));
 

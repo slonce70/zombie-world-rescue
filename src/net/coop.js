@@ -134,6 +134,7 @@ export class CoopSession {
     this.frontResumeReady = new Map(); // pid -> { operationId, ready } during relay resume grace
     this.frontResults = new Set();
     this.frontResult = null;
+    this.frontAttempt = 0;
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);
@@ -242,6 +243,7 @@ export class CoopSession {
     this.frontResumeReady.clear();
     this.frontResults.clear();
     this.frontResult = null;
+    this.frontAttempt = 0;
     if (this.net) { this.net.dispose(); this.net = null; }
   }
 
@@ -416,6 +418,7 @@ export class CoopSession {
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
+    const attempt = ++this.frontAttempt;
     this.frontResult = null;
     if (!transitioned) this.syncFront(run);
     this.transport.broadcast({ t: 'start', ...spec }, true);
@@ -428,7 +431,7 @@ export class CoopSession {
       coop: { session: this, role: 'host', spec },
       defense: spec.defense, radiation: spec.radiation, turretwar: spec.turretwar,
       worldBoss: spec.wb, portal: spec.portal,
-      operation: expandFrontSpec(fr),
+      operation: { ...expandFrontSpec(fr), attempt },
     });
     return true;
   }

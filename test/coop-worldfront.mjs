@@ -356,6 +356,27 @@ try {
     page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.net && window.__game.level?.operation?.stage === 0, null, { timeout: 50000 * SLOW }),
     guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.net && window.__game.level?.operation?.stage === 0, null, { timeout: 50000 * SLOW }),
   ]);
+  const campaignDowned = await guestPage.evaluate(() => {
+    const game = window.__game;
+    game.level.player.health = 0;
+    game._onPlayerDied();
+    return {
+      deathT: game.deathT,
+      death: document.getElementById('overlay-death').classList.contains('show'),
+      result: document.getElementById('overlay-front-result').classList.contains('show'),
+      active: game.coop.session.frontRun.active.status,
+      defense: !!game.level.defense,
+      portal: !!game.level.portal,
+    };
+  });
+  check(campaignDowned.deathT > 0 && campaignDowned.death && !campaignDowned.result
+    && campaignDowned.active === 'active' && !campaignDowned.defense && !campaignDowned.portal,
+  'guest death in a campaign Front stage stays downed without a terminal result', JSON.stringify(campaignDowned));
+  await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
+  await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
+    && !document.getElementById('overlay-death').classList.contains('show'));
+  check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
+    'campaign Front guest revive returns to the same active stage');
   await guestPage.evaluate(() => {
     const session = window.__game.coop.session;
     window.__resumeFront = session._tryReconnect.bind(session);
@@ -404,6 +425,28 @@ try {
   check(resumed.personalUnchanged && resumed.personalMarker === 'guest-personal-front',
     'real-room reconnect never overwrites guest personal Front', JSON.stringify(resumed));
 
+  const defenseDowned = await guestPage.evaluate(() => {
+    const game = window.__game;
+    game.level.player.health = 0;
+    game._onPlayerDied();
+    return {
+      deathT: game.deathT,
+      death: document.getElementById('overlay-death').classList.contains('show'),
+      result: document.getElementById('overlay-front-result').classList.contains('show'),
+      active: game.coop.session.frontRun.active.status,
+      defense: !!game.level.defense,
+      portal: !!game.level.portal,
+    };
+  });
+  check(defenseDowned.deathT > 0 && defenseDowned.death && !defenseDowned.result
+    && defenseDowned.active === 'active' && (defenseDowned.defense || defenseDowned.portal),
+  'guest death in a defense/portal Front stage stays downed without a terminal result', JSON.stringify(defenseDowned));
+  await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
+  await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
+    && !document.getElementById('overlay-death').classList.contains('show'));
+  check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
+    'defense/portal Front guest revive returns to the same active stage');
+
   // Host alone reduces terminal outcomes; both browsers receive one canonical
   // result. The guest can only acknowledge it and wait for the host's choice.
   await page.evaluate(() => window.__game._finishFrontStage(false));
@@ -415,9 +458,28 @@ try {
     action: document.getElementById('btn-front-result-primary').dataset.action,
     endHidden: document.getElementById('btn-front-result-end').hidden,
     waiting: document.getElementById('front-result-summary').textContent,
+    actionLabel: document.getElementById('btn-front-result-primary').textContent,
+    resultIds: [...window.__game.coop.session.frontResults],
   }));
-  check(guestFailure.action === 'wait' && guestFailure.endHidden && /host/i.test(guestFailure.waiting),
+  check(guestFailure.action === 'wait' && guestFailure.endHidden && /host/i.test(guestFailure.waiting)
+    && /wait/i.test(guestFailure.actionLabel),
     'guest failure result is read-only and waits for the host', JSON.stringify(guestFailure));
+  await guestPage.click('#btn-front-result-primary');
+  await page.click('#btn-front-result-primary');
+  await Promise.all([
+    page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 1, null, { timeout: 50000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 1, null, { timeout: 50000 * SLOW }),
+  ]);
+
+  await page.evaluate(() => window.__game._finishFrontStage(false));
+  await Promise.all([
+    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+  ]);
+  const retriedFailureIds = await guestPage.evaluate(() => [...window.__game.coop.session.frontResults]);
+  check(retriedFailureIds.length === guestFailure.resultIds.length + 1
+    && retriedFailureIds.at(-1) !== guestFailure.resultIds.at(-1),
+  'fail → retry → fail produces a second canonical guest result', JSON.stringify(retriedFailureIds));
   await guestPage.click('#btn-front-result-primary');
   await page.click('#btn-front-result-primary');
   await Promise.all([

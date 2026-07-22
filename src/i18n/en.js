@@ -2467,6 +2467,7 @@ export const EN = {
 "ПРОДОВЖИТИ ПОРЯТУНОК": "CONTINUE THE RESCUE",
 "ПРОДОВЖИТИ ОПЕРАЦІЮ": "CONTINUE OPERATION",
 "ПОВТОРИТИ ФАЗУ": "RETRY STAGE",
+"ПІДТВЕРДИТИ Й ЧЕКАТИ": "ACKNOWLEDGE AND WAIT",
 "ДО ГЛОБУСА": "TO THE GLOBE",
 "ЗАВЕРШИТИ ОПЕРАЦІЮ": "END OPERATION",
 "🎮 ІНШІ РЕЖИМИ": "🎮 OTHER MODES",

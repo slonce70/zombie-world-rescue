@@ -2505,7 +2505,7 @@ class Game {
     if (shouldSave) this.saveGame();
     if (shouldSave) {
       const metric = event.type === 'START_OPERATION' ? 'front_start'
-        : event.type === 'CLAIM_OPERATION' ? 'front_complete'
+        : ['CLAIM_OPERATION', 'COMPLETE_OPERATION'].includes(event.type) ? 'front_complete'
         : event.type === 'INIT' && event.opened ? 'front_open'
         : event.type === 'INIT' && event.baseVisited ? 'front_base_visit' : null;
       if (metric) sendFrontMetric(this, metric);
@@ -2607,6 +2607,7 @@ class Game {
       if (!session || session.role !== 'host' || session.state !== 'lobby' || !session.startFrontStage) return false;
       return session.startFrontStage(config.countryId, config.modeOpts, config.operation);
     }
+    config.operation.attempt = (this._frontAttempt = (this._frontAttempt || 0) + 1);
     this._applyFrontTransition({ type: 'START_STAGE' }, { sync: false });
     return this.startLevel(config.countryId, {
       ...config.modeOpts,
@@ -2646,7 +2647,7 @@ class Game {
     const terminal = won && !this.save.front.active;
     const after = frontCountryState(this.save.front, level.countryId);
     const result = {
-      id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:${won ? 'win' : 'fail'}`,
+      id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:a${level.operation.attempt || 0}:${won ? 'win' : 'fail'}`,
       countryId: level.countryId, won, terminal, before, after,
     };
     const session = level.net && level.net.authority && this.coop && this.coop.session;
@@ -2674,7 +2675,7 @@ class Game {
     const change = document.getElementById('front-result-change');
     change.className = 'front-result-change front-status';
     change.innerHTML = `<span class="front-status-icon">🗺️</span><div><strong>${t('Стан країни')}</strong><span>${beforeCopy.label} → ${afterCopy.label}</span></div>`;
-    primary.textContent = t(guest ? 'ПРОДОВЖИТИ ОПЕРАЦІЮ' : won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
+    primary.textContent = t(guest ? 'ПІДТВЕРДИТИ Й ЧЕКАТИ' : won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
     primary.dataset.action = guest ? 'wait' : won ? (terminal ? 'globe' : 'continue') : 'retry';
     end.textContent = t(won ? 'ДО ГЛОБУСА' : 'ЗАВЕРШИТИ ОПЕРАЦІЮ');
     end.dataset.action = won ? 'globe' : 'end';
@@ -4353,6 +4354,10 @@ class Game {
     // кнопка реваншу — лише для фінальної соло-гілки кампанії, решта режимів мають свій end-флоу
     const revengeBtn = document.getElementById('btn-death-revenge');
     if (revengeBtn) revengeBtn.style.display = 'none';
+    if (this.level.net && this.level.operation) {
+      this._showCoopDowned();
+      return;
+    }
     if (this.level.bossRush) {
       if (this.level.net) {
         this.deathT = 9999;
@@ -4438,27 +4443,41 @@ class Game {
       return;
     }
     const coop = !!this.level.net;
-    // кооп: лежиш 20с — друг може підняти; соло — швидкий респавн
-    this.deathT = coop ? 20 : 3.5;
+    if (coop) {
+      this._showCoopDowned();
+      return;
+    }
+    // соло: швидкий респавн; кооп вище лишається в чинному revive-потоці
+    this.deathT = 3.5;
     const card = document.querySelector('#overlay-death p');
     if (card) {
-      card.textContent = coop
-        ? t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() })
-        : t('Не хвилюйся — прогрес місій зберігся.');
+      card.textContent = t('Не хвилюйся — прогрес місій зберігся.');
     }
     // 💸 R3 «Поразка теж платить» (solo): показуємо ЗДОБУТЕ за забіг (монети й XP уже збережені)
     const earnedEl = document.getElementById('death-earned');
     if (earnedEl) {
       const earnedCoins = Math.max(0, this.level.stats.coinsEarned | 0);
       const earnedXp = Math.max(0, (this.save.xp | 0) - (this.level._startXp | 0));
-      if (!coop && (earnedCoins > 0 || earnedXp > 0)) {
+      if (earnedCoins > 0 || earnedXp > 0) {
         earnedEl.textContent = t('Ти все одно здобув: 💰{c} · ⚡{x} XP', { c: earnedCoins, x: earnedXp });
         earnedEl.style.display = '';
       } else {
         earnedEl.style.display = 'none';
       }
     }
-    if (revengeBtn) revengeBtn.style.display = coop ? 'none' : '';
+    if (revengeBtn) revengeBtn.style.display = '';
+    this.audio.defeat();
+    this._showOverlay('overlay-death');
+  }
+
+  _showCoopDowned() {
+    this.deathT = 20;
+    const card = document.querySelector('#overlay-death p');
+    if (card) card.textContent = t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() });
+    const earned = document.getElementById('death-earned');
+    if (earned) earned.style.display = 'none';
+    const revenge = document.getElementById('btn-death-revenge');
+    if (revenge) revenge.style.display = 'none';
     this.audio.defeat();
     this._showOverlay('overlay-death');
   }
