@@ -472,7 +472,12 @@ export class HUD {
       ? `<div class="story-objective"><span class="mi">${primary.icon}</span> ${primary.title}</div>`
       : '';
     for (const mission of list) {
-      if (mission === primary || (!mission.done && !mission.optional)) continue;
+      if (mission === primary) continue;
+      if (mission.visible) {
+        html += `<div class="mission${mission.done ? ' done' : ''}"><span class="mi">${mission.icon}</span> ${mission.title}</div>`;
+        continue;
+      }
+      if (!mission.done && !mission.optional) continue;
       if (mission.optional) html += renderCompactOptional(mission);
     }
     // ⭐ R3 вторинна ціль забігу (⭐2) — компактний чип під місіями (лише соло-кампанія)

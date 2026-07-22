@@ -437,7 +437,7 @@ export class Globe {
         stroke = '#9c2f24';
       }
       const front = this._frontState(id);
-      if (front) {
+      if (front && front.state !== 'peaceful' && front.state !== 'saved') {
         [fill, stroke] = FRONT_GLOBE_COLORS[front.state];
         if (this.hoverId === id) fill = stroke;
       }
@@ -590,8 +590,8 @@ export class Globe {
       document.getElementById('globe-tooltip').style.display = 'none';
       document.body.style.cursor = 'default';
       const front = this._frontState(c.id);
-      if ((e.pointerType === 'touch' || document.body.classList.contains('touch-mode')) && front && this.game.save.front) {
-        if (front.operationId) this.game.frontui.selectedOperationId = front.operationId;
+      if (front && front.operationId && this.game.save.front) {
+        this.game.frontui.selectedOperationId = front.operationId;
         this.game.openFront();
         return;
       }

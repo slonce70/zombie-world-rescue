@@ -64,6 +64,8 @@ export const EN = {
 "Зачисть 3 зомбі-бази": "Clear 3 zombie bases",
 "Знайди сокиру й кірку": "Find an axe and a pickaxe",
 "Врятуй музикантів": "Rescue the musicians",
+"Добудь 50 заліза, 100 каменю і 55 дерева": "Gather 50 iron, 100 stone, and 55 wood",
+"Віднови музичний центр 30 секунд": "Rebuild the Music Center for 30 seconds",
 "Натисни {k} — врятуй музикантів": "Press {k} — rescue the musicians",
 "🎺 Музикантів врятовано! Тепер знайди сокиру й кірку.": "🎺 Musicians rescued! Now find an axe and a pickaxe.",
 "⛏️ Інструменти готові — добудь 50 заліза, 100 каменю і 55 дерева!": "⛏️ Tools ready — gather 50 iron, 100 stone, and 55 wood!",
