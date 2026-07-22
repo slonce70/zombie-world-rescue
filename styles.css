@@ -202,6 +202,8 @@ body.map-editor-mode.touch-mode #tb-scope { display: none; }
 }
 .mission { color: #fff; font-weight: 700; font-size: 14.5px; padding: 4px 0; line-height: 1.35; }
 .mission.done { color: #8aa3be; text-decoration: line-through; }
+.mission.locked { color: #8aa3be; opacity: .72; }
+.mission.locked::after { content: ' 🔒'; }
 .mission .mi { margin-right: 4px; }
 
 /* верх-право: монети + мінікарта */
