@@ -42,6 +42,8 @@ export const MISSION_TYPES = {
   barracks: { icon: '🏚️', slots: ['D'], reward: 220, horde: 0, kind: 'barracks' },
   shiprescue: { icon: '🚢', slots: ['D'], reward: 260, horde: 0, kind: 'shiprescue' },
   rebuild: { icon: '🏗️', slots: ['D'], reward: 240, horde: 0, kind: 'rebuild' },
+  villageclear: { icon: '🏘️', slots: ['D'], reward: 220, horde: 0, kind: 'villageclear' },
+  fireworks: { icon: '🎆', slots: ['D'], reward: 240, horde: 0, kind: 'fireworks' },
   stationrepair: { icon: '🛰️', slots: ['D'], reward: 300, horde: 0, kind: 'stationrepair' },
   bases: { icon: '🏚️', slots: ['D'], reward: 180, horde: 0, kind: 'bases' },
   manor: { icon: '🏛️', slots: ['D'], reward: 350, horde: 0, kind: 'manor' },
@@ -205,7 +207,15 @@ export class DynamicMissions {
       const boards = level.country.map.storySites.boardsCrate;
       slotInfo = { slot: 'D', site: dock, beamAt: { x: boards.x, z: boards.z } };
     } else if (type === 'rebuild') {
-      slotInfo = { slot: 'D', site: this.L.village, beamAt: this.L.village };
+      const spanish = level.countryId === 'ESP' && level.operation?.missionPreset === 'spain-rebuild-center';
+      const site = spanish ? level.country.map.storySites.fiestaSquare : this.L.village;
+      const beamAt = spanish ? level.country.map.storySites.musicians : site;
+      slotInfo = { slot: 'D', site, beamAt };
+    } else if (type === 'villageclear') {
+      slotInfo = { slot: 'D', site: level.country.map.sites.village, beamAt: level.country.map.sites.village };
+    } else if (type === 'fireworks') {
+      const fireworks = level.country.map.storySites.fireworks;
+      slotInfo = { slot: 'D', site: fireworks, beamAt: fireworks };
     } else if (type === 'stationrepair') {
       const station = level.country.map.storySites.stationWreck;
       slotInfo = { slot: 'D', site: station, beamAt: station };
@@ -252,6 +262,18 @@ export class DynamicMissions {
     } else if (type === 'defense') {
       m.title = t('Оборона: протримайся в зоні');
       m.timer = level.countryId === 'UKR' ? 22 : 45;
+      m.started = false;
+      m.waveT = 0;
+      m.zone = this._makeDefenseZone(m);
+    } else if (type === 'villageclear') {
+      m.siteId = 'village';
+      m.title = t('Зачисти село від зомбі');
+      m.targets = this._spawnVillageClearZombies(m);
+    } else if (type === 'fireworks') {
+      m.siteId = 'fireworks';
+      m.title = t('Оборони феєрверки');
+      m.timer = 30;
+      m.duration = 30;
       m.started = false;
       m.waveT = 0;
       m.zone = this._makeDefenseZone(m);
@@ -482,6 +504,16 @@ export class DynamicMissions {
   }
 
   _makeRebuildMission(m) {
+    m.spanish = this.level.countryId === 'ESP'
+      && this.level.operation?.missionPreset === 'spain-rebuild-center';
+    m.phases = m.spanish
+      ? ['musicians', 'tools', 'resources', 'build', 'done']
+      : ['tools', 'resources', 'build', 'done'];
+    m.required = m.spanish
+      ? { iron: 50, stone: 100, wood: 55 }
+      : { iron: 0, stone: 50, wood: 120 };
+    m.buildSeconds = 30;
+    m.attackSides = m.spanish ? [0, Math.PI / 2, Math.PI, Math.PI * 1.5] : [-1, 1];
     const axeCfg = { n: 1, color: 0xd28b3c, emoji: '🪓', seedOffset: 101 };
     const pickCfg = { n: 1, color: 0x8fa3b8, emoji: '⛏️', seedOffset: 202 };
     m.tools = [
@@ -496,25 +528,34 @@ export class DynamicMissions {
       tool.mesh.position.set(tool.x, tool.y + 0.7, tool.z);
       this.level.scene.add(tool.mesh);
     }
+    m.iron = 0;
     m.wood = 0;
     m.stone = 0;
     m.buildProgress = 0;
     m.buildWaveT = 0;
     m.buildWaves = 0;
-    m.phase = 'tools';
-    m.title = t('Знайди сокиру й кірку');
-    m.woodNodes = this._spawnActPoints(m, { n: 3, emoji: '🌲', color: 0x4f9a4b, spread: 'map', seedOffset: 303 })
-      .map((p) => ({ ...p, kind: 'wood', amount: 40, hp: 4 }));
-    m.stoneNodes = this._spawnActPoints(m, { n: 2, emoji: '🪨', color: 0x9299a3, spread: 'map', seedOffset: 404 })
-      .map((p) => ({ ...p, kind: 'stone', amount: 25, hp: 4 }));
-    m.points = [...m.woodNodes, ...m.stoneNodes];
+    m.phase = m.spanish ? 'musicians' : 'tools';
+    m.title = m.spanish ? t('Врятуй музикантів') : t('Знайди сокиру й кірку');
+    m.musiciansOpened = false;
+    m.musiciansT = 0;
+    const resourceNodes = (kind, n, amount, emoji, color, seedOffset) => this._spawnActPoints(
+      m, { n, emoji, color, spread: 'map', seedOffset },
+    ).map((p) => ({ ...p, kind, amount, hp: 4 }));
+    m.woodNodes = resourceNodes('wood', m.spanish ? 5 : 3, m.spanish ? 11 : 40, '🌲', 0x4f9a4b, 303);
+    m.stoneNodes = resourceNodes('stone', m.spanish ? 4 : 2, 25, '🪨', 0x9299a3, 404);
+    m.ironNodes = m.spanish ? resourceNodes('iron', 2, 25, '⛓️', 0x687887, 505) : [];
+    m.points = [...m.woodNodes, ...m.stoneNodes, ...m.ironNodes];
     for (const p of m.points) {
       this.level.scene.remove(p.mesh);
       p.mesh = this._makeResourceMesh(p.kind);
       p.mesh.position.set(p.x, p.y, p.z);
       this.level.scene.add(p.mesh);
     }
-    m.dest = this._makeDeliverPoint(m, { color: 0xffc857, deliver: 'cityCenter', deliverEmoji: '🏗️' });
+    m.dest = this._makeDeliverPoint(m, {
+      color: 0xffc857,
+      deliver: m.spanish ? 'musicCenter' : 'cityCenter',
+      deliverEmoji: m.spanish ? '🎵' : '🏗️',
+    });
     m.buildingAt = { x: m.site.x, z: m.site.z, y: this.level.world.groundH(m.site.x, m.site.z) };
     m.dest.x = m.site.x;
     m.dest.z = m.site.z + 13;
@@ -523,6 +564,24 @@ export class DynamicMissions {
     m.dest.icon.position.set(m.dest.x, m.dest.y + 3.2, m.dest.z);
     m.dest.ring.visible = false;
     m.dest.icon.visible = false;
+  }
+
+  _spawnVillageClearZombies(m) {
+    if (this.mirror) return [];
+    const targets = [];
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const radius = 12 + (i % 3) * 5;
+      const zombie = this.level.zombies.spawn(
+        i % 4 === 0 ? 'runner' : 'walker',
+        m.site.x + Math.cos(angle) * radius,
+        m.site.z + Math.sin(angle) * radius,
+        { horde: false, guard: true, anchor: { x: m.site.x, z: m.site.z, r: m.site.r } },
+      );
+      zombie.villageClear = true;
+      targets.push(zombie);
+    }
+    return targets;
   }
 
   _makeStationRepairMission(m) {
@@ -560,7 +619,7 @@ export class DynamicMissions {
       trunk.castShadow = crown.castShadow = true;
       g.add(trunk, crown);
     } else {
-      const rockM = toonMat(0x7e8791);
+      const rockM = toonMat(kind === 'iron' ? 0x566675 : 0x7e8791);
       for (const [x, y, z, s] of [[0, 0.75, 0, 1.25], [0.8, 0.48, 0.35, 0.75], [-0.7, 0.4, 0.4, 0.65]]) {
         const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockM);
         rock.position.set(x, y, z);
@@ -624,6 +683,12 @@ export class DynamicMissions {
     blue.position.set(1.15, 13.8, 0); yellow.position.set(1.15, 13.25, 0);
     flag.add(blue, yellow);
     g.add(pole, flag);
+    if (m.spanish) {
+      const music = this._makeIconSprite('🎵', 3.2);
+      music.position.set(0, 15.5, 0);
+      g.add(music);
+      g.userData.kind = 'music-center';
+    }
     if (tier >= 2) {
       for (const side of [-1, 1]) {
         const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 7.5, 10), stoneM);
@@ -790,7 +855,8 @@ export class DynamicMissions {
         if (m.type === 'hunt') extra = ` (${m.killed}/3)`;
         if (m.type === 'nests' || m.type === 'bases') extra = ` (${m.cleared}/3)`;
         if (m.type === 'manor') extra = m.phase === 'clear' ? ` (${m.killed}/120)` : t(' — люди на 2 поверсі!');
-        if (m.type === 'defense' && m.started) extra = ` (${Math.ceil(m.timer)}${t('с')})`;
+        if ((m.type === 'defense' || m.type === 'fireworks') && m.started) extra = ` (${Math.ceil(m.timer)}${t('с')})`;
+        if (m.type === 'villageclear') extra = ` (${m.targets.filter((zombie) => zombie.state !== 'dead' && !zombie.gone).length})`;
         if (m.type === 'escort' && m.started) extra = t(' — веди до вежі!');
         if (m.type === 'stationrepair' && m.phase === 'fragments') extra = ` (${m.found}/5)`;
         if (m.points && m.type !== 'rebuild') extra = ` (${m.activated}/${m.points.length})`;
@@ -1248,6 +1314,7 @@ export class DynamicMissions {
   _beamTarget(m) {
     if (m.state !== 'active') return null;
     if (m.type === 'rebuild') {
+      if (m.phase === 'musicians') return this.level.country.map.storySites.musicians;
       if (m.phase === 'tools') return m.tools.find((it) => !it.taken) || null;
       if (m.phase === 'resources') return m.points.find((p) => !p.done) || null;
       return m.dest;
@@ -1481,7 +1548,7 @@ export class DynamicMissions {
       m.waveT -= dt;
       if (m.waveT <= 0) {
         m.waveT = 9;
-        const total = level.countryId === 'UKR' ? 22 : 45;
+        const total = m.duration || (level.countryId === 'UKR' ? 22 : 45);
         this._towerWave(3 + Math.round(2 * (1 - m.timer / total)), m.timer > total * 0.55, m.site);
       }
       if (m.timer <= 0) {
@@ -1491,6 +1558,18 @@ export class DynamicMissions {
     } else {
       this.prompt = { text: t('🛡️ Повернись у синє коло — оборона на паузі!'), hold: false };
     }
+  }
+
+  _up_fireworks(m, dt) {
+    this._up_defense(m, dt);
+  }
+
+  _up_villageclear(m) {
+    const alive = m.targets.filter((zombie) => zombie.state !== 'dead' && !zombie.gone).length;
+    m.title = t('Зачисти село від зомбі: залишилося {n}', { n: alive });
+    if (alive > 0) return;
+    this._complete(m.id);
+    this.level.bus.emit('toast', t('🏘️ Село зачищено! Шлях до феєрверків відкрито.'));
   }
 
   _up_hunt(m) {
@@ -1719,6 +1798,30 @@ export class DynamicMissions {
   _up_rebuild(m, dt, input, allowControl) {
     const level = this.level;
     const player = level.player;
+    if (m.phase === 'musicians') {
+      const door = level.world.barnDoorCollider;
+      const d = Math.hypot(player.pos.x - door.x, player.pos.z - (door.z - 1));
+      if (!m.musiciansOpened && d < 3.2) {
+        this.prompt = { text: t('Натисни {k} — врятуй музикантів', { k: interactKey() }), hold: false };
+        if (allowControl && input.pressed('KeyE')) {
+          input.justPressed.delete('KeyE');
+          m.musiciansOpened = true;
+          level.world.openBarn();
+          level.audio.door();
+          this.spawnCivilians();
+          level.netEv('barn');
+        }
+      }
+      if (m.musiciansOpened) {
+        m.musiciansT += dt;
+        if (m.musiciansT >= 2) {
+          m.phase = 'tools';
+          m.title = t('Знайди сокиру й кірку');
+          level.bus.emit('toast', t('🎺 Музикантів врятовано! Тепер знайди сокиру й кірку.'));
+        }
+      }
+      return;
+    }
     if (m.phase === 'tools') {
       for (const tool of m.tools) {
         if (tool.taken) continue;
@@ -1736,7 +1839,9 @@ export class DynamicMissions {
           level.bus.emit('toast', tool.kind === 'axe' ? t('🪓 Сокиру знайдено!') : t('⛏️ Кірку знайдено!'));
           if (m.tools.every((it) => it.taken)) {
             m.phase = 'resources';
-            level.bus.emit('toast', t('⛏️ Інструменти готові — добудь 120 дерева і 50 каменю!'));
+            level.bus.emit('toast', m.spanish
+              ? t('⛏️ Інструменти готові — добудь 50 заліза, 100 каменю і 55 дерева!')
+              : t('⛏️ Інструменти готові — добудь 120 дерева і 50 каменю!'));
           }
         }
         break;
@@ -1744,14 +1849,17 @@ export class DynamicMissions {
       return;
     }
     if (m.phase === 'resources') {
-      m.title = t('Добудь ресурси: дерево {wood}/120 · камінь {stone}/50', { wood: m.wood, stone: m.stone });
+      m.title = m.spanish
+        ? t('Ресурси: залізо {iron}/50 · камінь {stone}/100 · дерево {wood}/55', m)
+        : t('Добудь ресурси: дерево {wood}/120 · камінь {stone}/50', m);
       for (const p of m.points) {
         if (p.done) continue;
         const d = Math.hypot(player.pos.x - p.x, player.pos.z - p.z);
         if (d >= 3.6) continue;
         const needed = p.kind === 'wood' ? 'axe' : 'pickaxe';
         this.prompt = player.cur === needed
-          ? { text: p.kind === 'wood' ? t('Атакуй дерево сокирою') : t('Атакуй камінь кіркою'), hold: false, progress: (4 - p.hp) / 4 }
+          ? { text: p.kind === 'wood' ? t('Атакуй дерево сокирою')
+            : p.kind === 'iron' ? t('Добувай залізо кіркою') : t('Атакуй камінь кіркою'), hold: false, progress: (4 - p.hp) / 4 }
           : { text: p.kind === 'wood' ? t('Обери сокиру: X або колесо зброї') : t('Обери кірку: X або колесо зброї'), hold: false };
         break;
       }
@@ -1759,18 +1867,25 @@ export class DynamicMissions {
     }
     m.dest.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.18;
     const d = Math.hypot(player.pos.x - m.dest.x, player.pos.z - m.dest.z);
-    const seconds = Math.ceil((1 - m.buildProgress) * 30);
-    m.title = t('Віднови центр міста: {n} с', { n: seconds });
-    if (d < m.dest.r) this.prompt = { text: t('Тримай {k} — відновлюй центр міста', { k: interactKey() }), hold: true, progress: m.buildProgress };
+    const seconds = Math.ceil((1 - m.buildProgress) * m.buildSeconds);
+    m.title = m.spanish ? t('Віднови музичний центр: {n} с', { n: seconds }) : t('Віднови центр міста: {n} с', { n: seconds });
+    if (d < m.dest.r) this.prompt = { text: m.spanish
+      ? t('Тримай {k} — відновлюй музичний центр', { k: interactKey() })
+      : t('Тримай {k} — відновлюй центр міста', { k: interactKey() }), hold: true, progress: m.buildProgress };
     if (d < m.dest.r && allowControl && input.down('KeyE')) {
       m.buildWaveT -= dt;
       if (m.buildWaveT <= 0) {
         m.buildWaveT += 10;
         m.buildWaves++;
-        for (const side of [-1, 1]) {
-          for (let i = 0; i < 4; i++) {
-            const x = m.dest.x + side * (18 + i * 1.5);
-            const z = m.dest.z + (i - 1.5) * 4;
+        for (const side of m.attackSides) {
+          const count = m.spanish ? 2 : 4;
+          for (let i = 0; i < count; i++) {
+            const x = m.spanish
+              ? m.dest.x + Math.cos(side) * 20 + Math.cos(side + Math.PI / 2) * (i ? 3 : -3)
+              : m.dest.x + side * (18 + i * 1.5);
+            const z = m.spanish
+              ? m.dest.z + Math.sin(side) * 20 + Math.sin(side + Math.PI / 2) * (i ? 3 : -3)
+              : m.dest.z + (i - 1.5) * 4;
             const zombie = level.zombies.spawn(i === 0 ? 'runner' : 'walker', x, z, { horde: false });
             zombie.rebuildAttack = true;
             zombie.aggroed = true;
@@ -1778,9 +1893,11 @@ export class DynamicMissions {
           }
         }
         level.audio.horde();
-        level.bus.emit('toast', t('🧟 Зомбі атакують центр з обох боків!'));
+        level.bus.emit('toast', m.spanish
+          ? t('🧟 Зомбі атакують музичний центр з усіх сторін!')
+          : t('🧟 Зомбі атакують центр з обох боків!'));
       }
-      m.buildProgress = Math.min(1, m.buildProgress + dt / 30);
+      m.buildProgress = Math.min(1, m.buildProgress + dt / m.buildSeconds);
       if (m.buildProgress >= 1) {
         const settlement = level.game.save.settlement || (level.game.save.settlement = { level: 0, wood: 0, stone: 0, survivors: 0 });
         settlement.level = Math.min(3, (settlement.level | 0) + 1);
@@ -1789,7 +1906,10 @@ export class DynamicMissions {
         settlement.survivors = Math.min(9999, (settlement.survivors | 0) + 3);
         level.game.saveGame();
         m.rebuilt = this._makeCityCenter(m);
-        level.bus.emit('toast', t('🏗️ Поселення покращено до рівня {n}/3!', { n: settlement.level }));
+        m.phase = 'done';
+        level.bus.emit('toast', m.spanish
+          ? t('🎵 Музичний центр відновлено!')
+          : t('🏗️ Поселення покращено до рівня {n}/3!', { n: settlement.level }));
         this._complete(m.id);
       }
     }
@@ -2546,17 +2666,19 @@ export class DynamicMissions {
     node.hp--;
     node.mesh.rotation.z += node.kind === 'wood' ? 0.025 : 0;
     node.mesh.scale.setScalar(0.94 + node.hp * 0.015);
-    this.level.effects.burst(point, node.kind === 'wood' ? 0xb9793d : 0xaeb6bf, 7, { speed: 2.5, up: 2.5, life: 0.45, size: 0.8 });
+    this.level.effects.burst(point, node.kind === 'wood' ? 0xb9793d : node.kind === 'iron' ? 0x718596 : 0xaeb6bf, 7, { speed: 2.5, up: 2.5, life: 0.45, size: 0.8 });
     if (node.hp > 0) return true;
     node.done = true;
     m[node.kind] += node.amount;
     this.level.scene.remove(node.mesh);
     this.level.audio.checkpoint();
-    if (m.points.every((p) => p.done)) {
+    if (m.iron >= m.required.iron && m.stone >= m.required.stone && m.wood >= m.required.wood) {
       m.phase = 'build';
       m.dest.ring.visible = true;
       m.dest.icon.visible = true;
-      this.level.bus.emit('toast', t('🏗️ Ресурси зібрано — відновлюй центр міста 30 секунд!'));
+      this.level.bus.emit('toast', m.spanish
+        ? t('🎵 Ресурси зібрано — відновлюй музичний центр 30 секунд!')
+        : t('🏗️ Ресурси зібрано — відновлюй центр міста 30 секунд!'));
     }
     return true;
   }
@@ -2694,12 +2816,18 @@ export class DynamicMissions {
   }
 
   useBarn(pid, near) {
-    const m = this.missions.find((x) => x.type === 'rescue');
-    if (!m || m.state !== 'active' || m.opened) return;
+    const m = this.missions.find((x) => x.type === 'rescue' || (x.type === 'rebuild' && x.phase === 'musicians'));
+    const opened = m && (m.type === 'rescue' ? m.opened : m.musiciansOpened);
+    if (!m || m.state !== 'active' || opened) return;
     const door = this.level.world.barnDoorCollider;
     if (!near(door.x, door.z - 1, 3.6)) return;
-    m.opened = true;
-    m.openedT = 0;
+    if (m.type === 'rescue') {
+      m.opened = true;
+      m.openedT = 0;
+    } else {
+      m.musiciansOpened = true;
+      m.musiciansT = 0;
+    }
     this.level.world.openBarn();
     this.level.audio.door();
     this.spawnCivilians();
@@ -2784,7 +2912,7 @@ export class DynamicMissions {
       else if (m.type === 'repair') a.push(Math.round(m.progress * 100) / 100);
       else if (m.type === 'clear') a.push(this.crateReady ? 1 : 0);
       else if (m.type === 'collect') a.push(m.found);
-      else if (m.type === 'defense') a.push(m.started ? 1 : 0, Math.round(m.timer * 10) / 10);
+      else if (m.type === 'defense' || m.type === 'fireworks') a.push(m.started ? 1 : 0, Math.round(m.timer * 10) / 10);
       else if (m.type === 'hunt') a.push(m.killed);
       else if (m.type === 'nests') {
         a.push(m.cleared);
@@ -2865,7 +2993,7 @@ export class DynamicMissions {
       }
       else if (m.type === 'clear') this.crateReady = !!a[1];
       else if (m.type === 'collect') m.found = a[1];
-      else if (m.type === 'defense') { m.started = !!a[1]; m.timer = a[2]; }
+      else if (m.type === 'defense' || m.type === 'fireworks') { m.started = !!a[1]; m.timer = a[2]; }
       else if (m.type === 'hunt') m.killed = a[1];
       else if (m.type === 'nests') {
         m.cleared = a[1];
@@ -2993,8 +3121,13 @@ export class DynamicMissions {
 
   // --- гість: дискретні події ---
   netBarnOpened(silent = false) {
-    const m = this.missions.find((x) => x.type === 'rescue');
-    if (m) m.opened = true;
+    const m = this.missions.find((x) => x.type === 'rescue' || (x.type === 'rebuild' && x.phase === 'musicians'));
+    if (m?.type === 'rescue') m.opened = true;
+    if (m?.type === 'rebuild') {
+      m.musiciansOpened = true;
+      m.phase = 'tools';
+      m.title = t('Знайди сокиру й кірку');
+    }
     if (!this.civilians.length) this.spawnCivilians();
     if (!silent) this.level.bus.emit('toast', t('Людей врятовано! Медик лікуватиме вас поблизу 💚'));
   }
@@ -3101,7 +3234,21 @@ export class DynamicMissions {
 
     for (const m of this.missions) {
       if (m.state !== 'active') continue;
-      if (m.type === 'rescue' && !m.opened) {
+      if (m.type === 'rebuild') {
+        if (m.phase === 'musicians') {
+          const door = level.world.barnDoorCollider;
+          if (near(door.x, door.z - 1, 3.2)) {
+            this.prompt = { text: t('Натисни {k} — врятуй музикантів', { k: interactKey() }), hold: false };
+            if (pressE) { net.sendUse('barn'); input.justPressed.delete('KeyE'); pressE = false; }
+          }
+        } else if (m.phase === 'build') {
+          m.dest.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.18;
+          if (near(m.dest.x, m.dest.z, m.dest.r)) {
+            this.prompt = { text: t('Тримай {k} — відновлюй музичний центр', { k: interactKey() }), hold: true, progress: m.buildProgress };
+            net.holdE = true;
+          }
+        }
+      } else if (m.type === 'rescue' && !m.opened) {
         const door = level.world.barnDoorCollider;
         if (near(door.x, door.z - 1, 3.2)) {
           this.prompt = { text: t('Натисни {k} — відчини хлів', { k: interactKey() }), hold: false };
@@ -3137,7 +3284,7 @@ export class DynamicMissions {
             break;
           }
         }
-      } else if (m.type === 'defense') {
+      } else if (m.type === 'defense' || m.type === 'fireworks') {
         m.zone.ring.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.2;
         if (m.started && !near(m.zone.x, m.zone.z, m.zone.r)) {
           this.prompt = { text: t('🛡️ Повернись у синє коло — тримайте оборону!'), hold: false };

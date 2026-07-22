@@ -144,6 +144,28 @@ test('evacuation becomes a country-specific rebirth operation', () => {
   }
 });
 
+test('destroyed Spain gets its dedicated recovery stages without changing normal Spain', () => {
+  let front = createFront({ seed: 901, liberated: ['ESP'] });
+  const normalStages = frontViewModel(front).board[0].stages;
+  assert.deepEqual(normalStages, FRONT_TEMPLATES[front.board[0].template].stages);
+
+  front.world.countries.ESP.damage = 3;
+  front = reduce(front, { type: 'START_OPERATION', operationId: front.board[0].id }).front;
+  const presets = [];
+  for (let stage = 0; stage < 3; stage++) {
+    presets.push(frontStageConfig(front).missionPreset);
+    if (stage < 2) {
+      front = reduce(front, { type: 'START_STAGE' }).front;
+      front = reduce(front, { type: 'COMPLETE_STAGE', build: [] }).front;
+    }
+  }
+  assert.deepEqual(presets, [
+    'spain-rebuild-center',
+    'spain-clear-village',
+    'spain-defend-fireworks',
+  ]);
+});
+
 test('operation and cycle rewards are canonical, stable and idempotent', () => {
   let front = createFront({ seed: 505, liberated: ['UKR', 'POL', 'DEU'] });
   const countries = [...new Set(front.board.map((row) => row.country))];

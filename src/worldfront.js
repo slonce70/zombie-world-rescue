@@ -44,7 +44,16 @@ const EVACUATION_STAGES = Object.freeze({
   TUR: Object.freeze(['rescue-ship', 'night-evacuation', 'commander-pursuer']),
 });
 
-function operationStages(operation) {
+const SPAIN_REBUILD_STAGES = Object.freeze([
+  'spain-rebuild-center',
+  'spain-clear-village',
+  'spain-defend-fireworks',
+]);
+
+function operationStages(front, operation) {
+  if (operation.country === 'ESP' && front.world.countries.ESP?.damage >= 3) {
+    return SPAIN_REBUILD_STAGES;
+  }
   if (operation.template === 'evacuation' && EVACUATION_STAGES[operation.country]) {
     return EVACUATION_STAGES[operation.country];
   }
@@ -182,7 +191,7 @@ function specialistId(value, rescuedFriends, enforceAvailability) {
 }
 
 function stageAdapter(front, operation, stage) {
-  const preset = operationStages(operation)[stage];
+  const preset = operationStages(front, operation)[stage];
   let modeId = 'campaign';
   let modeOpts = {};
   if (preset === 'evacuation-zone' || preset === 'night-evacuation') {
@@ -593,7 +602,7 @@ export function frontViewModel(value, save = {}, { previewSpecialist = null } = 
       recommended: operation.id === recommended,
       countryState: frontCountryState(front, operation.country),
       commander: radio >= 1 || scoutIntel ? template.commander : null,
-      stages: operationStages(operation).slice(),
+      stages: operationStages(front, operation).slice(),
       reward: radio >= 3 ? { coins: operationCoins(operation), crystals: 1 + operation.threat } : null,
     };
   });

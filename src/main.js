@@ -130,7 +130,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 600;
+const APP_VERSION = 601;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -156,6 +156,9 @@ const BIOME_EXPOSURE = {
 const FRONT_MISSION_PRESETS = Object.freeze({
   'rescue-group': ['rescue'],
   'rebuild-center': ['rebuild'],
+  'spain-rebuild-center': ['rebuild'],
+  'spain-clear-village': ['villageclear'],
+  'spain-defend-fireworks': ['fireworks'],
   'rescue-train': ['repair'],
   'rescue-ship': ['shiprescue'],
   'destroy-nests': ['nests'],
