@@ -43,13 +43,18 @@
       <button id="camp-quest-chip" type="button" aria-label="Квест табору — забрати нагороду">📌 Квест табору</button>
       <div id="globe-compass" class="player-compass"></div>
       <div class="globe-play-row">
-        <button id="btn-front" class="btn btn-primary globe-play front-btn" hidden>
+        <button id="btn-front" class="btn btn-primary globe-play front-btn">
           <span class="front-threat-dot" aria-hidden="true"></span>
-          <span id="front-cta-label">🛰️ ЖИВИЙ ФРОНТ</span>
+          <span id="front-cta-label">Продовжити порятунок</span>
         </button>
-        <button id="btn-expedition" class="btn globe-play expedition-btn">🧭 ЕКСПЕДИЦІЯ</button>
-        <button id="btn-solo" class="btn btn-primary globe-play">🎮 ГРАТИ</button>
-        <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
+        <details id="globe-other" class="globe-other">
+          <summary class="globe-play">Інші операції</summary>
+          <div class="globe-other-buttons">
+            <button id="btn-expedition" class="btn globe-play expedition-btn">🧭 ЕКСПЕДИЦІЯ</button>
+            <button id="btn-solo" class="btn globe-play">🎮 ГРАТИ</button>
+            <button id="btn-coop" class="btn globe-play coop-btn">🤝 ГРАТИ РАЗОМ</button>
+          </div>
+        </details>
       </div>
       <div id="globe-progress">🌍 Звільнено країн: <span id="liberated-count">0</span> · ⭐ <span id="star-total">0/36</span></div>
       <div id="weekly-goal">
@@ -108,7 +113,7 @@
 
       <section class="front-section" aria-labelledby="front-operations-title">
         <div class="front-section-head">
-          <h3 id="front-operations-title">Обери операцію</h3>
+          <h3 id="front-operations-title">НАСТУПНА ОПЕРАЦІЯ</h3>
           <div class="front-threat-legend" aria-label="Стани країн">
             <span><i class="front-marker threat"></i>загроза</span>
             <span><i class="front-marker rebuilding"></i>відбудова</span>
@@ -138,7 +143,8 @@
       <div id="front-rewards" class="front-rewards"></div>
       </div>
       <div class="front-actions">
-        <button id="btn-front-go" class="btn btn-primary big" type="button">🚀 ПОЧАТИ</button>
+        <button id="btn-front-together" class="btn btn-primary big" type="button">🤝 ПОЧАТИ РАЗОМ</button>
+        <button id="btn-front-solo" class="btn big" type="button">🎮 ГРАТИ СОЛО</button>
         <button id="btn-front-abandon" class="btn front-abandon" type="button" hidden>🏳️ Залишити операцію</button>
       </div>
     </div>
@@ -660,11 +666,11 @@
   </div>
 
   <!-- Кооп: лобі -->
-  <div id="overlay-lobby" class="overlay">
+  <div id="overlay-lobby" class="overlay" role="dialog" aria-modal="true" aria-labelledby="lobby-title" aria-hidden="true" data-escape-close="btn-lobby-leave">
     <div class="overlay-card panel-card coop-card">
       <div class="panel-header">
-        <h2>🛋️ КІМНАТА</h2>
-        <button id="btn-lobby-leave" class="btn-x">✕</button>
+        <h2 id="lobby-title">🛋️ КІМНАТА</h2>
+        <button id="btn-lobby-leave" class="btn-x" type="button" data-dialog-focus aria-label="Залишити кімнату">✕</button>
       </div>
       <div class="lobby-code-box">
         <div class="lobby-code-label">Код кімнати — продиктуй другу:</div>
@@ -674,14 +680,16 @@
           🌍 Кімнату видно всім у списку</label>
       </div>
       <div id="lobby-roster"></div>
+      <div id="lobby-front-summary" class="lobby-front-summary" hidden></div>
       <div class="lobby-section">Моя роль</div>
       <div id="lobby-roles"></div>
-      <div class="lobby-section">Режим</div>
+      <div id="lobby-mode-section" class="lobby-section">Режим</div>
       <div id="lobby-modes"></div>
-      <div class="lobby-section">Країна</div>
+      <div id="lobby-country-section" class="lobby-section">Країна</div>
       <div id="lobby-countries"></div>
       <p id="lobby-hint" class="panel-sub"></p>
       <button id="btn-lobby-front" class="btn btn-front coop-wide" hidden>🛰️ ЖИВИЙ ФРОНТ</button>
+      <button id="btn-lobby-ready" class="btn coop-wide" aria-pressed="false">Готовий до старту</button>
       <button id="btn-lobby-start" class="btn btn-primary big coop-wide">🚀 СТАРТ!</button>
     </div>
   </div>
@@ -706,6 +714,18 @@
       <div class="btn-row">
         <button id="btn-arena-retry" class="btn btn-primary big">👑 Ще раз!</button>
         <button id="btn-arena-globe" class="btn big">🌍 На глобус</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-front-result" class="overlay" data-kind="" role="dialog" aria-modal="true" aria-labelledby="front-result-title" aria-hidden="true">
+    <div class="overlay-card victory-card front-result-card">
+      <h1 id="front-result-title"></h1>
+      <p id="front-result-summary" class="storm-sub"></p>
+      <div id="front-result-change" class="front-result-change"></div>
+      <div class="btn-row">
+        <button id="btn-front-result-primary" class="btn btn-primary big" type="button" data-dialog-focus></button>
+        <button id="btn-front-result-end" class="btn big" type="button"></button>
       </div>
     </div>
   </div>

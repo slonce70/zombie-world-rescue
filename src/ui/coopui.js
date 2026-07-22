@@ -13,6 +13,9 @@ import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defe
 import { RADIATION_UNLOCK_COUNTRIES } from '../radiationmode.js';
 import { TURRETWAR_UNLOCK_COUNTRIES } from '../turretwar.js';
 import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
+import { frontCountryState, frontStageConfig } from '../worldfront.js';
+import { frontStageLabel } from './frontui.js';
+import { frontCountryCopy } from './frontcopy.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -57,6 +60,8 @@ export class CoopUI {
       countries: $('lobby-countries'),
       modes: $('lobby-modes'),
       front: $('btn-lobby-front'),
+      frontSummary: $('lobby-front-summary'),
+      ready: $('btn-lobby-ready'),
       start: $('btn-lobby-start'),
       leave: $('btn-lobby-leave'),
       invite: $('btn-coop-invite'),
@@ -74,6 +79,7 @@ export class CoopUI {
 
     this.el.open.addEventListener('click', () => {
       game.audio.click();
+      this.frontEntry = false;
       this._openCoop();
     });
     document.querySelectorAll('[data-close="overlay-coop"]').forEach((b) =>
@@ -113,8 +119,16 @@ export class CoopUI {
     this.el.start.addEventListener('click', () => {
       if (this.session.role === 'host') {
         game.audio.click();
-        this.session.startLevel();
+        if (this.session.mode === 'front') {
+          const config = frontStageConfig(this.session.frontSnapshot());
+          if (config) this.session.startFrontStage(config.countryId, config.modeOpts, config.operation);
+        } else this.session.startLevel();
       }
+    });
+    this.el.ready.addEventListener('click', () => {
+      game.audio.click();
+      const mine = this.session.roster.get(this.session.myPid);
+      this.session.setMyReady(!(mine && mine.ready));
     });
     this.el.front.addEventListener('click', () => {
       if (this.session.role !== 'host') return;
@@ -138,6 +152,7 @@ export class CoopUI {
     this.session.onCfg = () => this._renderLobby();
     this.session.onStarted = () => {
       game._hideOverlay('overlay-lobby');
+      game._hideOverlay('overlay-net-wait');
       this.updateRoomChip();
       const n = this.session.roster.size;
       if (n > 1) game.hud.toast(t('⚔️ Вас {n} — зомбі сильніші ×{n}! Тримайтесь разом!', { n }));
@@ -291,6 +306,18 @@ export class CoopUI {
     this._showStep(nick.length >= 2 ? 'main' : 'nick');
     this.game._showOverlay('overlay-coop');
     this._syncPolling();
+  }
+
+  openForFront() {
+    this.frontEntry = true;
+    if (this.session.role === 'host' && this.session.state === 'lobby') {
+      this.session.setMode('front');
+      this.session.syncFront(this.game.save.front);
+      this.frontEntry = false;
+      this._openLobby();
+      return;
+    }
+    this._openCoop();
   }
 
   _showStep(step) {
@@ -459,6 +486,11 @@ export class CoopUI {
     this.el.create.textContent = t('⏳ Створюємо…');
     try {
       await this.session.create(nick);
+      if (this.frontEntry) {
+        this.session.mode = 'front';
+        this.session.syncFront(this.game.save.front);
+        this.frontEntry = false;
+      }
       this.game._hideOverlay('overlay-coop');
       this._openLobby();
       this.lobbyNet.refresh(); // публічна кімната одразу в списку
@@ -481,6 +513,7 @@ export class CoopUI {
     this.el.join.textContent = t('⏳ Заходимо…');
     try {
       await this.session.join(code, nick);
+      this.frontEntry = false;
       this.game._hideOverlay('overlay-coop');
       this._openLobby();
       this.game.audio.mission();
@@ -509,7 +542,7 @@ export class CoopUI {
 
   _openLobby() {
     this._renderLobby();
-    this.game._showOverlay('overlay-lobby');
+    this.game._showOverlay('overlay-lobby', this.el.open);
     this._syncPolling();
   }
 
@@ -528,13 +561,27 @@ export class CoopUI {
       html += `<div class="lobby-player ${pid === s.myPid ? 'me' : ''}">
         <span class="lp-skin">${skin}</span>
         <span class="lp-nick">${roleIcon ? roleIcon + ' ' : ''}${this._esc(r.nick || '...')}</span>
-        <span class="lp-role">${pid === 1 ? t('👑 хост') : ''}</span>
+        <span class="lp-role">${r.ready ? '✅' : '○'} ${pid === 1 ? t('👑 хост') : ''}</span>
       </div>`;
     }
     for (let i = s.roster.size; i < 4; i++) {
       html += t('<div class="lobby-player empty"><span class="lp-skin">➕</span><span class="lp-nick">вільне місце</span></div>');
     }
     this.el.roster.innerHTML = html;
+
+    const frontRun = s.mode === 'front' ? s.frontSnapshot() : null;
+    const frontConfig = frontRun ? frontStageConfig(frontRun) : null;
+    const frontOperation = frontRun && frontRun.active
+      ? frontRun.board.find((entry) => entry.id === frontRun.active.operationId) : null;
+    const owner = s.roster.get(1);
+    if (frontConfig && frontOperation) {
+      const country = COUNTRIES[frontConfig.countryId];
+      const countryState = frontCountryCopy(frontCountryState(frontRun, frontConfig.countryId), country?.name || frontConfig.countryId).label;
+      this.el.frontSummary.innerHTML = `<strong>${t('Світ хоста: {n}', { n: this._esc(owner && owner.nick || t('Хост')) })}</strong>`
+        + `<span>${this._esc(country ? `${country.flag} ${country.name}` : frontConfig.countryId)} · ${countryState}</span>`
+        + `<span>${t('Етап {n}/3', { n: frontRun.active.stage + 1 })} · ${t('Ціль: {objective}', { objective: t(frontStageLabel(frontConfig.missionPreset)) })}</span>`;
+    }
+    this.el.frontSummary.hidden = !frontConfig;
 
     // 🎭 ряд вибору ролі (спільний для хоста і гостя): guard/medic/scout + «без ролі»
     this._renderRoles(s);
@@ -569,9 +616,11 @@ export class CoopUI {
         || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
         || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
         || (mid === 'weekly-coop' && !anyLib));
-      mh += `<div class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}">${label}${locked ? ' 🔒' : ''}</div>`;
+      mh += `<button type="button" class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}" aria-pressed="${sel}" ${!isHost || locked ? 'disabled' : ''}>${label}${locked ? ' 🔒' : ''}</button>`;
     }
     this.el.modes.innerHTML = mh;
+    document.getElementById('lobby-mode-section').hidden = s.mode === 'front';
+    this.el.modes.hidden = s.mode === 'front';
     if (isHost) {
       this.el.modes.querySelectorAll('.lobby-mode.pick').forEach((el) => {
         el.addEventListener('click', () => {
@@ -596,8 +645,9 @@ export class CoopUI {
       || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
       || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss' || s.mode === 'expedition'
       || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
-    document.querySelectorAll('#overlay-lobby .lobby-section')[1].style.display = hideCountries ? 'none' : '';
+    document.getElementById('lobby-country-section').hidden = hideCountries || s.mode === 'front';
     this.el.countries.style.display = hideCountries ? 'none' : '';
+    if (s.mode === 'front') this.el.countries.style.display = 'none';
     let ch = '';
     for (const id of CAMPAIGN_ORDER) {
       const c = COUNTRIES[id];
@@ -607,7 +657,7 @@ export class CoopUI {
         : isCountryOpen(save.liberated, id);
       const sel = s.countryId === id;
       const cls = `lobby-country ${sel ? 'sel' : ''} ${isHost && unlocked ? 'pick' : ''} ${!unlocked && isHost ? 'locked' : ''}`;
-      ch += `<div class="${cls}" data-id="${id}">${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</div>`;
+      ch += `<button type="button" class="${cls}" data-id="${id}" aria-pressed="${sel}" ${!isHost || !unlocked ? 'disabled' : ''}>${c.flag}<span>${c.name}</span>${!unlocked && isHost ? '🔒' : ''}</button>`;
     }
     this.el.countries.innerHTML = ch;
     if (isHost) {
@@ -623,8 +673,11 @@ export class CoopUI {
 
     this.el.start.style.display = isHost ? '' : 'none';
     const front = this.game.getFrontViewModel ? this.game.getFrontViewModel() : null;
-    this.el.front.hidden = !(isHost && front && front.unlocked);
-    this.el.start.disabled = false;
+    this.el.front.hidden = !(isHost && s.mode !== 'front' && front && front.unlocked);
+    const mine = s.roster.get(s.myPid);
+    this.el.ready.textContent = mine && mine.ready ? t('Скасувати готовність') : t('Готовий до старту');
+    this.el.ready.setAttribute('aria-pressed', mine && mine.ready ? 'true' : 'false');
+    this.el.start.disabled = ![...s.roster.values()].every((entry) => entry.ready);
     const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : s.mode === 'friendly-knockout' ? t('🤝 ДРУЖНІЙ НОКАУТ') : t('кампанію');
     this.el.hint.textContent = isHost
       ? (s.roster.size > 1 ? t('Усі в зборі? Тисни СТАРТ!') : (this.publicOn
@@ -648,9 +701,8 @@ export class CoopUI {
     let rh = '';
     for (const [id, icon, label] of chips) {
       const sel = cur === id;
-      rh += `<div class="lobby-role ${sel ? 'sel' : ''}" data-role="${id || ''}"`
-        + ` role="button" tabindex="0" aria-pressed="${sel}"`
-        + ` aria-label="${t('Роль: {r}', { r: label })}">${icon}<span>${this._esc(label)}</span></div>`;
+      rh += `<button type="button" class="lobby-role ${sel ? 'sel' : ''}" data-role="${id || ''}"`
+        + ` aria-pressed="${sel}" aria-label="${t('Роль: {r}', { r: label })}">${icon}<span>${this._esc(label)}</span></button>`;
     }
     this.el.roles.innerHTML = rh;
     this.el.roles.querySelectorAll('.lobby-role').forEach((el) => {

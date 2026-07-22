@@ -19,7 +19,7 @@ const preArmGod = (p) => p.evaluate(() => {
 });
 const clearPrearm = (p) => p.evaluate(() => { if (window.__prearm) { clearInterval(window.__prearm); window.__prearm = null; } });
 const roster = (p) => p.evaluate(() => [...window.__game.coop.session.roster.entries()]
-  .map(([pid, r]) => ({ pid, nick: r.nick, role: r.role || null })));
+  .map(([pid, r]) => ({ pid, nick: r.nick, role: r.role || null, ready: r.ready })));
 
 try {
   console.log('▸ Кооп-ролі v1');
@@ -41,6 +41,28 @@ try {
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
   await A.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, { timeout: 20000 * SLOW });
   await B.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, { timeout: 20000 * SLOW });
+
+  // ── готовність: false за замовчуванням, гість змінює лише себе, cfg скидає всіх ──
+  check((await roster(A)).every((x) => x.ready === false), 'готовність ростера за замовчуванням false');
+  await B.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await A.waitForFunction(() => {
+    const r = window.__game.coop.session.roster;
+    return r.get(1)?.ready === false && [...r.values()].find((x) => x.pid !== 1)?.ready === true;
+  }, null, { timeout: 15000 * SLOW });
+  const guestReady = await roster(A);
+  check(guestReady.find((x) => x.pid === 1)?.ready === false && guestReady.find((x) => x.pid !== 1)?.ready === true,
+    'ready-намір гостя змінює лише гостя', JSON.stringify(guestReady));
+  await A.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await B.waitForFunction(() => [...window.__game.coop.session.roster.values()].every((x) => x.ready === true), null, { timeout: 15000 * SLOW });
+  await A.evaluate(() => window.__game.coop.session.setCountry('POL'));
+  await B.waitForFunction(() => [...window.__game.coop.session.roster.values()].every((x) => x.ready === false), null, { timeout: 15000 * SLOW });
+  check((await roster(A)).every((x) => x.ready === false), 'зміна країни скидає готовність усіх');
+  await A.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await B.evaluate(() => window.__game.coop.session.setMyReady(true));
+  await A.waitForFunction(() => [...window.__game.coop.session.roster.values()].every((x) => x.ready === true), null, { timeout: 15000 * SLOW });
+  await A.evaluate(() => window.__game.coop.session.setMode('storm'));
+  await B.waitForFunction(() => [...window.__game.coop.session.roster.values()].every((x) => x.ready === false), null, { timeout: 15000 * SLOW });
+  check((await roster(A)).every((x) => x.ready === false), 'зміна режиму скидає готовність усіх');
 
   // ── (а) вибір ролей у лобі → ростер обох сторін несе ролі ──
   await A.evaluate(() => window.__game.test.coopSetRole('guard'));

@@ -7,6 +7,8 @@ import { GADGETS } from './extras.js';
 import { clamp } from './utils.js';
 import { momentumProgress, momentumTier, MOMENTUM_TIERS } from './combatmomentum.js';
 
+const renderCompactOptional = (mission) => mission.done ? '' : `<div class="mission secondary"><span class="mi">${mission.icon}</span> ${mission.title}</div>`;
+
 // 🪧 черга банерів: мінімальний показ (нижче цього новий низькопріоритетний чекає в черзі)
 // і максимальна довжина черги (переповнення викидає найстаріший низькопріоритетний).
 const BANNER_MIN_SHOW = 1.6;
@@ -464,24 +466,22 @@ export class HUD {
 
     // місії
     const list = level.missions.getHudList();
-    let html = '';
-    const storyObjective = typeof level.missions.currentStoryObjective === 'function'
-      ? level.missions.currentStoryObjective()
+    const primary = list.find((mission) => mission.primary && !mission.done)
+      || list.find((mission) => !mission.done);
+    let html = primary
+      ? `<div class="story-objective"><span class="mi">${primary.icon}</span> ${primary.title}</div>`
       : '';
-    const storyLine = typeof storyObjective === 'string' ? storyObjective.trim() : '';
-    if (storyLine) {
-      html += `<div class="story-objective">${storyLine}</div>`;
-    }
-    for (const m of list) {
-      html += `<div class="mission ${m.done ? 'done' : ''}"><span class="mi">${m.done ? '✅' : m.icon}</span> ${m.title}</div>`;
+    for (const mission of list) {
+      if (mission === primary || (!mission.done && !mission.optional)) continue;
+      if (mission.optional) html += renderCompactOptional(mission);
     }
     // ⭐ R3 вторинна ціль забігу (⭐2) — компактний чип під місіями (лише соло-кампанія)
     const so = level.secondaryObjective;
-    if (so) {
+    if (so && !so.done) {
       // 🎓 перший чип вторинної цілі — разове знайомство
       this.hintOnce('secondary1', t('⭐ ДОДАТКОВА ЦІЛЬ!'), t('Виконай ціль забігу — отримаєш зірку! ⭐'));
-      html += `<div class="mission secondary ${so.done ? 'done' : ''}">`
-        + `<span class="mi">${so.done ? '✅' : '⭐'}</span> ${so.label()} `
+      html += '<div class="mission secondary">'
+        + `<span class="mi">⭐</span> ${so.label()} `
         + `<span class="sec-prog">${Math.min(so.target, so.progress)}/${so.target}</span></div>`;
     }
     if (this.el.missions.innerHTML !== html) this.el.missions.innerHTML = html;

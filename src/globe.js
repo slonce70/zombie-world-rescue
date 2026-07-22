@@ -4,16 +4,22 @@ import { t } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
 import { countryStars, STARS_PER_COUNTRY } from './stars.js';
 import { frontCountryState } from './worldfront.js';
+import { frontCountryCopy } from './ui/frontcopy.js';
 import {
   SPACE_WORLD_ORDER, getSpaceRegion, getSpaceWorld, moonRegionFeatures, spaceRegionList, spaceWorldUnlocked,
 } from './moonregions.js';
 
 const FRONT_GLOBE_COLORS = Object.freeze({
   destroyed: ['#49151f', '#a7353f'],
-  threat: ['#c93455', '#ff7b6d'],
-  restoring: ['#d7a62a', '#ffe08a'],
-  safe: ['#25aeb8', '#79edf2'],
+  attacked: ['#c93455', '#ff7b6d'],
+  rebuilding: ['#d7a62a', '#ffe08a'],
+  saved: ['#25aeb8', '#79edf2'],
+  peaceful: ['#8d86a3', '#6b6485'],
 });
+
+const esc = (value) => String(value == null ? '' : value).replace(/[<>&"']/g, (char) => ({
+  '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;',
+}[char]));
 
 function latLonToVec3(lat, lon, r, out = new THREE.Vector3()) {
   const phi = (lon + 180) * Math.PI / 180;
@@ -101,6 +107,7 @@ export class Globe {
     this.allDone = nextTarget(this.game.save.liberated || {}) === null;
     // 🦖 світ звільнено, але таємний острів ще ні — маяк веде туди
     if (this.allDone && !(this.game.save.liberated || {}).LOST) this.targetId = 'LOST';
+    if (this.game.save.front) this.targetId = this._rescueTarget();
     this.beacon = this._makeBeacon();
     this.group.add(this.beacon);
     this._aimBeaconAt(this.targetId);
@@ -359,17 +366,21 @@ export class Globe {
   _frontState(id) {
     if (!CAMPAIGN_ORDER.includes(id)) return null;
     const state = frontCountryState(this.game.save.front, id);
-    return state && state.state !== 'neutral' ? state : null;
+    return state;
+  }
+
+  _rescueTarget() {
+    const vm = this.game.getFrontViewModel?.();
+    return vm?.board?.find((entry) => entry.id === vm.recommendedOperationId)?.country
+      || nextTarget(this.game.save.liberated || {}) || 'UKR';
   }
 
   _frontStatusLine(id) {
     const state = this._frontState(id);
     if (!state) return '';
-    const label = state.state === 'destroyed' ? t('критичні руйнування')
-      : state.state === 'restoring' ? t('відбудова')
-      : state.state === 'safe' ? t('безпечно') : t('загроза');
-    const threat = ['threat', 'destroyed'].includes(state.state) ? ` ${'⚠️'.repeat(state.threat)}` : '';
-    return `<br>🛰️ ${label}${threat}<br>🧱 ${t('Руйнування')}: ${state.damage}/3 · 👥 ${t('Люди')}: ${state.population}%`;
+    const country = COUNTRIES[id];
+    const copy = frontCountryCopy(state, country ? country.name : id);
+    return `<br>🛰️ <b>${esc(copy.label)}</b><br>${esc(copy.summary)}<br>➡️ ${esc(copy.action)}`;
   }
 
   repaint() {
@@ -578,6 +589,12 @@ export class Globe {
       this.game.audio.click();
       document.getElementById('globe-tooltip').style.display = 'none';
       document.body.style.cursor = 'default';
+      const front = this._frontState(c.id);
+      if ((e.pointerType === 'touch' || document.body.classList.contains('touch-mode')) && front && this.game.save.front) {
+        if (front.operationId) this.game.frontui.selectedOperationId = front.operationId;
+        this.game.openFront();
+        return;
+      }
       this.game.startLevel(c.id);
     } else {
       this.game.audio.denied();
@@ -591,14 +608,24 @@ export class Globe {
     const nt = nextTarget(this.game.save.liberated || {});
     this.allDone = nt === null;
     // 🦖 після звільнення світу ведемо на таємний острів, поки й його не пройдено
-    this.targetId = nt || ((this.game.save.liberated || {}).LOST ? lastTarget : 'LOST');
+    this.targetId = this.game.save.front
+      ? this._rescueTarget()
+      : nt || ((this.game.save.liberated || {}).LOST ? lastTarget : 'LOST');
     this.repaint();
     this._aimBeaconAt(this.targetId);
     this._rotateToCountry(this.targetId);
   }
 
   update(dt) {
-    if (this.ready && this._paintedFront !== this.game.save.front) this.repaint();
+    if (this.ready && this._paintedFront !== this.game.save.front) {
+      const target = this.game.save.front ? this._rescueTarget() : this.targetId;
+      if (target !== this.targetId) {
+        this.targetId = target;
+        this._aimBeaconAt(target);
+        this._rotateToCountry(target);
+      }
+      this.repaint();
+    }
     this.t += dt;
     // плавне обертання до цілі
     this.group.rotation.y += (this.targetRotY - this.group.rotation.y) * Math.min(1, dt * 8);

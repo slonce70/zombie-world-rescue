@@ -60,6 +60,7 @@ import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
 import { FrontUI } from './ui/frontui.js';
+import { frontCountryCopy } from './ui/frontcopy.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
@@ -129,7 +130,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 549;
+const APP_VERSION = 600;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -302,6 +303,10 @@ class Game {
 
     window.addEventListener('keydown', (e) => {
       // у полі вводу літери B/M — це просто літери, а не магазин/звук
+      if (e.code === 'Escape') {
+        const dialog = [...document.querySelectorAll('.overlay.show[role="dialog"][data-escape-close]')].pop();
+        if (dialog) { document.getElementById(dialog.dataset.escapeClose)?.click(); return; }
+      }
       const tgt = e.target;
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
       if (e.code === 'Escape' && this.state === 'hqbase') { this.exitHQBase(); return; }
@@ -515,6 +520,12 @@ class Game {
       if (this.level && this.level.expedition) return this._leaveExpeditionResult('overlay-arena-end');
       this._hideOverlay('overlay-arena-end');
       this.endLevel();
+    });
+    document.getElementById('btn-front-result-primary').addEventListener('click', () => {
+      this._finishFrontResult(document.getElementById('btn-front-result-primary').dataset.action);
+    });
+    document.getElementById('btn-front-result-end').addEventListener('click', () => {
+      this._finishFrontResult(document.getElementById('btn-front-result-end').dataset.action);
     });
     document.getElementById('btn-storm-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-storm-end');
@@ -2425,9 +2436,23 @@ class Game {
     if (tag) tag.textContent = t('🔄 Вийшло оновлення v{v}! Онови сторінку: Ctrl(⌘)+Shift+R', { v });
   }
 
-  _showOverlay(id) { document.getElementById(id).classList.add('show'); }
+  _showOverlay(id, returnFocus = document.activeElement) {
+    const overlay = document.getElementById(id);
+    if (!overlay.classList.contains('show') && overlay.getAttribute('role') === 'dialog') {
+      this._overlayFocus ||= new Map();
+      this._overlayFocus.set(id, returnFocus);
+    }
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.querySelector('[data-dialog-focus]')?.focus({ preventScroll: true });
+  }
   _hideOverlay(id) {
-    document.getElementById(id).classList.remove('show');
+    const overlay = document.getElementById(id);
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+    const trigger = this._overlayFocus && this._overlayFocus.get(id);
+    if (trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
+    if (this._overlayFocus) this._overlayFocus.delete(id);
     // закрили гардероб — гасимо 3D-прев'ю (вигляд героя застосується при вході в рівень)
     if (id === 'overlay-wardrobe') this._stopHeroPreview();
   }
@@ -2460,7 +2485,7 @@ class Game {
     return messages[effect.key] || effect.key;
   }
 
-  _applyFrontTransition(event) {
+  _applyFrontTransition(event, { sync = true } = {}) {
     const previousSecondStarts = (this.save.front && this.save.front.stats && this.save.front.stats.secondStarts) || 0;
     const result = applyFrontEvent(this.save.front, { ...this._frontContext(), ...event });
     if (!result || result.front === undefined) return result;
@@ -2480,7 +2505,7 @@ class Game {
     if (shouldSave) this.saveGame();
     if (shouldSave) {
       const metric = event.type === 'START_OPERATION' ? 'front_start'
-        : event.type === 'CLAIM_OPERATION' ? 'front_complete'
+        : ['CLAIM_OPERATION', 'COMPLETE_OPERATION'].includes(event.type) ? 'front_complete'
         : event.type === 'INIT' && event.opened ? 'front_open'
         : event.type === 'INIT' && event.baseVisited ? 'front_base_visit' : null;
       if (metric) sendFrontMetric(this, metric);
@@ -2489,7 +2514,7 @@ class Game {
       }
     }
     const session = this.coop && this.coop.session;
-    if (session && session.role === 'host' && session.syncFront) session.syncFront(this.save.front, result.effects || []);
+    if (sync && session && session.role === 'host' && session.syncFront) session.syncFront(this.save.front, result.effects || []);
     if (this.frontui) this.frontui.render(this.getFrontViewModel());
     return result;
   }
@@ -2530,6 +2555,19 @@ class Game {
     return front ? frontViewModel(front, this.save, { previewSpecialist }) : null;
   }
 
+  continueRescue() {
+    if (!this._ensureFront()) {
+      this.renderSoloMenu();
+      this._showOverlay('overlay-solo');
+      document.querySelector('.solo-mode[data-mode="campaign"]')?.click();
+      document.querySelector(`#solo-countries [data-id="${nextTarget(this.save.liberated) || 'UKR'}"]`)?.focus();
+      return true;
+    }
+    const vm = this.getFrontViewModel();
+    this.frontui.selectedOperationId = vm && vm.recommendedOperationId;
+    return this.openFront();
+  }
+
   openFront() {
     const front = this._ensureFront();
     if (!front) {
@@ -2552,28 +2590,40 @@ class Game {
     this._applyFrontTransition({ type: 'SELECT_PROJECT', projectId });
   }
 
-  startFrontOperation(operationId, specialist = 'dispatcher') {
+  startFrontOperation(operationId, specialist = 'dispatcher', launch = 'solo') {
     if (!this._ensureFront()) return false;
+    const together = launch === 'together';
     let front = this.save.front;
     if (!front.active) {
-      this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
+      this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist }, { sync: together });
       front = this.save.front;
     }
     if (!front || !front.active || front.active.status !== 'ready') return false;
     const config = frontStageConfig(front);
     if (!config) return false;
-    this._applyFrontTransition({ type: 'START_STAGE' });
     this.frontui.close();
     const session = this.coop && this.coop.session;
-    if (session && session.role === 'host' && session.state === 'lobby' && session.startFrontStage) {
+    if (together) {
+      if (!session || session.role !== 'host' || session.state !== 'lobby' || !session.startFrontStage) return false;
       return session.startFrontStage(config.countryId, config.modeOpts, config.operation);
     }
+    config.operation.attempt = (this._frontAttempt = (this._frontAttempt || 0) + 1);
+    this._applyFrontTransition({ type: 'START_STAGE' }, { sync: false });
     return this.startLevel(config.countryId, {
       ...config.modeOpts,
       operation: config.operation,
       missionPreset: config.missionPreset,
       encounterPlan: config.encounterPlan,
     });
+  }
+
+  prepareFrontTogether(operationId, specialist = 'dispatcher') {
+    if (!this._ensureFront()) return false;
+    if (!this.save.front.active) this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
+    if (!this.save.front.active || this.save.front.active.status !== 'ready') return false;
+    this.frontui.close();
+    this.coop.openForFront();
+    return true;
   }
 
   abandonFrontOperation() {
@@ -2587,16 +2637,60 @@ class Game {
     if (!level || !level.operation || level._frontFinished) return false;
     level._frontFinished = true;
     if (level.net && !level.net.authority) return true;
+    const before = frontCountryState(this.save.front, level.countryId);
     const picked = level.runBuild ? level.runBuild.ids.slice(level._frontBuildStart || 0) : [];
-    this._applyFrontTransition({ type: won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked });
-    if (won && this.save.front && this.save.front.active && this.save.front.active.status === 'completed') {
-      this._applyFrontTransition({ type: 'CLAIM_OPERATION' });
-    }
-    const retry = document.getElementById('btn-arena-retry');
-    const globe = document.getElementById('btn-arena-globe');
-    if (retry) retry.style.display = 'none';
-    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
+    const finalWin = won && this.save.front.active.stage === 2;
+    const transitioned = this._applyFrontTransition({
+      type: finalWin ? 'COMPLETE_OPERATION' : won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked,
+    }, { sync: false });
+    const effects = transitioned.effects || [];
+    const terminal = won && !this.save.front.active;
+    const after = frontCountryState(this.save.front, level.countryId);
+    const result = {
+      id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:a${level.operation.attempt || 0}:${won ? 'win' : 'fail'}`,
+      countryId: level.countryId, won, terminal, before, after,
+    };
+    const session = level.net && level.net.authority && this.coop && this.coop.session;
+    if (session && session.syncFront) session.syncFront(this.save.front, effects, result);
+    return this._showFrontResult(result);
+  }
+
+  _showFrontResult({ won, terminal, before, after, countryId = null, guest = false }) {
+    const kind = won ? (terminal ? 'complete' : 'checkpoint') : 'failed';
+    const primary = document.getElementById('btn-front-result-primary');
+    const end = document.getElementById('btn-front-result-end');
+    const country = COUNTRIES[countryId || (this.level && this.level.countryId)];
+    const beforeCopy = frontCountryCopy(before, country ? country.name : countryId || '');
+    const afterCopy = frontCountryCopy(after, country ? country.name : countryId || '');
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    this.input.exitLock();
+    document.getElementById('front-result-title').textContent = t(won
+      ? (terminal ? '🌟 ОПЕРАЦІЮ ЗАВЕРШЕНО!' : '✅ ЕТАП ПРОЙДЕНО!')
+      : '💀 ОПЕРАЦІЮ ПРОВАЛЕНО');
+    document.getElementById('front-result-summary').textContent = t(guest ? 'Чекаємо на хоста' : won
+      ? (terminal ? 'Країна відбудовується, а проєкт Бази просунувся.' : 'Прогрес збережено. Наступний етап уже готовий.')
+      : 'Етап можна повторити або завершити операцію.');
+    const change = document.getElementById('front-result-change');
+    change.className = 'front-result-change front-status';
+    change.innerHTML = `<span class="front-status-icon">🗺️</span><div><strong>${t('Стан країни')}</strong><span>${beforeCopy.label} → ${afterCopy.label}</span></div>`;
+    primary.textContent = t(guest ? 'ПІДТВЕРДИТИ Й ЧЕКАТИ' : won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
+    primary.dataset.action = guest ? 'wait' : won ? (terminal ? 'globe' : 'continue') : 'retry';
+    end.textContent = t(won ? 'ДО ГЛОБУСА' : 'ЗАВЕРШИТИ ОПЕРАЦІЮ');
+    end.dataset.action = won ? 'globe' : 'end';
+    end.hidden = guest;
+    const overlay = document.getElementById('overlay-front-result');
+    overlay.dataset.kind = kind;
+    this._showOverlay('overlay-front-result');
     return true;
+  }
+
+  _finishFrontResult(action) {
+    this._hideOverlay('overlay-front-result');
+    if (action === 'end') this._applyFrontTransition({ type: 'END_FAILED_OPERATION' });
+    this._frontNextAction = action;
+    this.endLevel();
   }
 
   _initFrontRuntime(level, front) {
@@ -2615,7 +2709,7 @@ class Game {
       level.defense.towerHp = level.defense.towerMaxHp;
     }
     if (level.operation.template === 'evacuation' && level.operation.stage === 1) {
-      this._addFrontEvacuees(level);
+      if (!level.frontEvacuees) this._addFrontEvacuees(level);
       if (level.defense && level.defense.zone) level.defense.timer = Math.min(level.defense.timer, 75);
     }
     this._addFrontSupport(level);
@@ -2632,7 +2726,7 @@ class Game {
     this._enterFrontPhase(level, 0);
   }
 
-  _addFrontOutpost(level, restoredLevel) {
+  _addFrontOutpost(level, restoredLevel, state) {
     const tier = Math.max(0, Math.min(3, restoredLevel | 0));
     if (!tier) return;
     const village = level.world.layout.village || level.world.layout.SPAWN;
@@ -2675,6 +2769,12 @@ class Game {
     group.position.set(x, y, z);
     level.scene.add(group);
     level.frontOutpostDrawCalls = group.children.length;
+    this._addFrontCitizens(level, state, tier, { x, z, group });
+  }
+
+  _addFrontCitizens(level, state, tier = 0, center = null) {
+    const village = level.world.layout.village || level.world.layout.SPAWN;
+    const { x, z, group = null } = center || { x: village.x, z: village.z };
     level.frontLivingCity = { x, z, tier, group, citizens: [] };
     const kinds = ['boy', 'girl', 'granny', 'medic', 'farmer', 'mechanic'];
     const count = 2 + tier * 2;
@@ -2686,7 +2786,8 @@ class Game {
       const cz = z + Math.sin(angle) * radius;
       rig.group.position.set(cx, level.world.groundH(cx, cz), cz);
       rig.group.rotation.y = angle + Math.PI / 2;
-      const job = ['guard', 'builder', 'resident'][i % 3];
+      const job = state === 'saved' ? (i < 2 ? 'guard' : i === 2 ? 'builder' : 'resident')
+        : i < Math.ceil(count / 2) ? 'builder' : 'resident';
       setAnim(rig, job === 'resident' ? 'walk' : 'idle');
       level.scene.add(rig.group);
       level.frontLivingCity.citizens.push({
@@ -2818,9 +2919,22 @@ class Game {
     const labels = {
       quiet: ['🧭 ОЗИРНИСЬ', 'Виконуй задачу — тиск почнеться не одразу.'],
       pressure: ['⚠️ ТИСК', 'Орда наближається!'],
-      spike: ['👑 КОМАНДИР', 'Атаку телеграфовано — тримай дистанцію.'],
       reward: ['🎁 ПЕРЕПОЧИНОК', 'Збери припаси та заверши задачу.'],
     };
+    if (phase.id === 'spike') {
+      const warnings = {
+        charger: 'Ривок: відійди з лінії атаки.',
+        summon: 'Викликає підкріплення: не дай себе оточити.',
+        shield: 'Щит: атакуй з флангу.',
+        invisible: 'Невидимість: стеж за рухом.',
+      };
+      const mechanics = phase.commander && phase.commander.mechanics.map((mechanic) => t(warnings[mechanic])).join(' · ');
+      this.hud.banner(t(phase.commander ? '👑 КОМАНДИР' : '⚠️ Елітна хвиля!'),
+        mechanics || t('Готуйся — йдуть еліти! 👹'), 2, { prio: 1 });
+      this.audio.horde();
+      director.spikeWarning = 2;
+      return;
+    }
     const copy = labels[phase.id];
     if (copy) this.hud.banner(t(copy[0]), t(copy[1]), 2.8);
     const authority = !level.net || level.net.authority;
@@ -2866,7 +2980,12 @@ class Game {
       }
       return;
     }
-    if (phase.id !== 'spike') return;
+  }
+
+  _spawnFrontSpike(level) {
+    const director = level.frontDirector;
+    const phase = director && director.plan.phases[director.phaseIndex];
+    if (!phase || phase.id !== 'spike' || (level.net && !level.net.authority)) return;
     if (level.operation.stage === 2) {
       const a = level.world.layout.arena || level.world.layout.village;
       const commander = director.plan.commander;
@@ -2886,6 +3005,11 @@ class Game {
   _updateFrontDirector(level, dt) {
     const director = level.frontDirector;
     if (!director || director.phaseIndex >= director.plan.phases.length - 1) return;
+    if (director.spikeWarning > 0) {
+      director.spikeWarning -= dt;
+      if (director.spikeWarning <= 0) this._spawnFrontSpike(level);
+      return;
+    }
     director.remaining -= dt;
     if (director.remaining <= 0) this._enterFrontPhase(level, director.phaseIndex + 1);
   }
@@ -2920,25 +3044,12 @@ class Game {
     else this.audio.defeat();
     this.audio.setMode(null);
     this.input.exitLock();
-    if (won && level.net && level.net.authority) level.netEv('vict');
-    this._finishFrontStage(!!won);
-    const retry = document.getElementById('btn-arena-retry');
-    if (retry) retry.style.display = 'none';
-    const globe = document.getElementById('btn-arena-globe');
-    if (globe) globe.textContent = t('🛰️ ДО ФРОНТУ');
-    document.getElementById('arena-league-place').textContent = '';
-    document.querySelector('#overlay-arena-end h1').textContent = won ? t('✅ ЕТАП ПРОЙДЕНО!') : t('💚 СПРОБУЙ ЩЕ РАЗ');
-    document.getElementById('arena-stats').innerHTML = `
-      <div class="stat"><span class="stat-icon">${icon}</span><span class="stat-name">${t(objective)}</span><span class="stat-val">${detail}</span></div>
-      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
-      <div class="stat best"><span class="stat-icon">💾</span><span class="stat-name">${t('Прогрес')}</span><span class="stat-val">${won ? t('збережено') : t('без штрафу')}</span></div>`;
-    this._showOverlay('overlay-arena-end');
+    return this._finishFrontStage(!!won);
   }
 
   _leaveFrontResult(overlay) {
     this._hideOverlay(overlay);
-    this.endLevel();
-    setTimeout(() => this.openFront(), 50);
+    this._finishFrontResult('globe');
   }
 
   // ---------- 🧭 експедиція ----------
@@ -3992,8 +4103,21 @@ class Game {
 
     this.level = level;
     if (savedFront && (level.operation || modeId === 'campaign')) {
-      this._addFrontOutpost(level, savedFront.restored[level.countryId] || 0);
-      this._addFrontDamage(level, level.frontCountryState && level.frontCountryState.damage);
+      const state = level.frontCountryState && level.frontCountryState.state;
+      if (state === 'attacked' || state === 'destroyed') this._addFrontDamage(level, level.frontCountryState.damage);
+      if (state === 'attacked') {
+        const village = level.world.layout.village || level.world.layout.SPAWN;
+        level.frontPressure = level.zombies.list.filter((zombie) =>
+          !zombie.dead && !zombie.gone && !zombie.horde && !zombie.aggroed && zombie.state !== 'chase').slice(0, 3);
+        level.frontPressure.forEach((zombie, index) => {
+          const angle = index * Math.PI * 2 / level.frontPressure.length;
+          zombie.x = village.x + Math.cos(angle) * 12;
+          zombie.z = village.z + Math.sin(angle) * 12;
+          zombie.rig.group.position.set(zombie.x, level.world.groundH(zombie.x, zombie.z), zombie.z);
+        });
+      }
+      if (state === 'rebuilding' || state === 'saved') this._addFrontOutpost(level, level.frontCountryState.restored, state);
+      if (state === 'destroyed') this._addFrontEvacuees(level);
     }
     if (level.operation) this._initFrontRuntime(level, savedFront);
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {
@@ -4001,6 +4125,7 @@ class Game {
     }
     if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
+    this.hud.update(0);
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
     this._nightAnnounced = false;
@@ -4117,6 +4242,9 @@ class Game {
   endLevel() {
     const leavingExpedition = !!(this.level && this.level.expedition);
     const leavingFront = !!(this.level && this.level.operation);
+    const leavingFrontCoop = !!(this.level && this.level.net);
+    const frontNextAction = this._frontNextAction;
+    this._frontNextAction = null;
     if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
@@ -4130,10 +4258,15 @@ class Game {
       setTimeout(() => {
         if (sess.state === 'lobby') {
           if (leavingFront && sess.role === 'host') {
-            this.openFront();
+            const active = this.save.front && this.save.front.active;
+            if ((frontNextAction === 'continue' || frontNextAction === 'retry') && active) {
+              this.startFrontOperation(active.operationId, active.specialist, 'together');
+            } else {
+              this.openFront();
+            }
           } else if (leavingFront) {
-            this._showOverlay('overlay-lobby');
-            this.coop._renderLobby();
+            document.getElementById('net-wait-sub').textContent = t('Чекаємо на хоста');
+            this._showOverlay('overlay-net-wait');
           } else if (leavingExpedition) {
             this.renderExpedition();
             this._showOverlay('overlay-expedition');
@@ -4187,7 +4320,7 @@ class Game {
     if (this.touch && this.touch.resetPointers) this.touch.resetPointers();
     else if (this.input && this.input.resetTransient) this.input.resetTransient();
     // прибираємо всі оверлеї рівня
-    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end']) {
+    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end', 'overlay-front-result']) {
       this._hideOverlay(id);
     }
     if (this.shop.isOpen) this.shop.close();
@@ -4195,6 +4328,12 @@ class Game {
     this._showGlobeUI(true);
     this.audio.setMode(this.audio.ctx ? 'globe' : null);
     this.hud.showBoss(false);
+    if (leavingFront && !leavingFrontCoop && (frontNextAction === 'continue' || frontNextAction === 'retry')) {
+      const active = this.save.front && this.save.front.active;
+      if (active) this.startFrontOperation(active.operationId);
+    } else if (leavingFront && !leavingFrontCoop && (frontNextAction === 'end' || frontNextAction === 'globe')) {
+      this.openFront();
+    }
   }
 
   _onPlayerDied() {
@@ -4215,6 +4354,10 @@ class Game {
     // кнопка реваншу — лише для фінальної соло-гілки кампанії, решта режимів мають свій end-флоу
     const revengeBtn = document.getElementById('btn-death-revenge');
     if (revengeBtn) revengeBtn.style.display = 'none';
+    if (this.level.net && this.level.operation) {
+      this._showCoopDowned();
+      return;
+    }
     if (this.level.bossRush) {
       if (this.level.net) {
         this.deathT = 9999;
@@ -4300,27 +4443,41 @@ class Game {
       return;
     }
     const coop = !!this.level.net;
-    // кооп: лежиш 20с — друг може підняти; соло — швидкий респавн
-    this.deathT = coop ? 20 : 3.5;
+    if (coop) {
+      this._showCoopDowned();
+      return;
+    }
+    // соло: швидкий респавн; кооп вище лишається в чинному revive-потоці
+    this.deathT = 3.5;
     const card = document.querySelector('#overlay-death p');
     if (card) {
-      card.textContent = coop
-        ? t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() })
-        : t('Не хвилюйся — прогрес місій зберігся.');
+      card.textContent = t('Не хвилюйся — прогрес місій зберігся.');
     }
     // 💸 R3 «Поразка теж платить» (solo): показуємо ЗДОБУТЕ за забіг (монети й XP уже збережені)
     const earnedEl = document.getElementById('death-earned');
     if (earnedEl) {
       const earnedCoins = Math.max(0, this.level.stats.coinsEarned | 0);
       const earnedXp = Math.max(0, (this.save.xp | 0) - (this.level._startXp | 0));
-      if (!coop && (earnedCoins > 0 || earnedXp > 0)) {
+      if (earnedCoins > 0 || earnedXp > 0) {
         earnedEl.textContent = t('Ти все одно здобув: 💰{c} · ⚡{x} XP', { c: earnedCoins, x: earnedXp });
         earnedEl.style.display = '';
       } else {
         earnedEl.style.display = 'none';
       }
     }
-    if (revengeBtn) revengeBtn.style.display = coop ? 'none' : '';
+    if (revengeBtn) revengeBtn.style.display = '';
+    this.audio.defeat();
+    this._showOverlay('overlay-death');
+  }
+
+  _showCoopDowned() {
+    this.deathT = 20;
+    const card = document.querySelector('#overlay-death p');
+    if (card) card.textContent = t('💚 Друг може підбігти і підняти тебе ({k})! Або відродишся біля бази.', { k: interactKey() });
+    const earned = document.getElementById('death-earned');
+    if (earned) earned.style.display = 'none';
+    const revenge = document.getElementById('btn-death-revenge');
+    if (revenge) revenge.style.display = 'none';
     this.audio.defeat();
     this._showOverlay('overlay-death');
   }
@@ -5441,7 +5598,7 @@ class Game {
 
   // 🏆 v305: екрани кінця винесено у src/ui/endscreens.js — делегати лишають назви методів
   // (netVictory/_onBossDied/глобус викликають _showVictory/_maybeWorldSaved по цих іменах).
-  _showVictory() { return showVictory(this); }
+  _showVictory() { return this.level && this.level.operation ? this._finishFrontStage(true) : showVictory(this); }
 
   _maybeWorldSaved() { return maybeWorldSaved(this); }
 

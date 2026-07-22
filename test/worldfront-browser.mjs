@@ -43,11 +43,28 @@ try {
     await mod.sendFrontReturns(game);
     const successSent = game.save.front.stats.sent.includes('return_d1')
       && game.save.front.stats.sent.includes('return_d7');
+    const metricEvents = [];
+    window.fetch = async (_url, opts) => {
+      metricEvents.push(JSON.parse(opts.body).event);
+      return { ok: true };
+    };
+    game.save.liberated = { UKR: true };
+    game.save.front = null;
+    game._ensureFront();
+    game._applyFrontTransition({ type: 'START_OPERATION', operationId: game.save.front.board[0].id });
+    for (let stage = 0; stage < 2; stage++) {
+      game._applyFrontTransition({ type: 'START_STAGE' });
+      game._applyFrontTransition({ type: 'COMPLETE_STAGE', build: [] });
+    }
+    game._applyFrontTransition({ type: 'START_STAGE' });
+    game._applyFrontTransition({ type: 'COMPLETE_OPERATION', build: [] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const completeSent = metricEvents.filter((event) => event === 'front_complete').length === 1;
     window.fetch = originalFetch;
     game.params = originalParams;
     game.saveGame = originalSaveGame;
     game.save.front = null;
-    return { zeroDisabled, disabledUnsent, failedUnsent, successSent };
+    return { zeroDisabled, disabledUnsent, failedUnsent, successSent, completeSent };
   });
   check(Object.values(metrics).every(Boolean), 'Front return metrics require explicit opt-in and record only successful sends', JSON.stringify(metrics));
 
@@ -69,7 +86,7 @@ try {
   check(await page.locator('#overlay-front').getAttribute('aria-hidden') === 'false', 'Front overlay opens accessibly');
   check(await page.locator('.front-operation').count() === 3, 'board renders recommended plus alternatives');
   check(await page.locator('.front-operation').first().evaluate((node) => node.classList.contains('recommended')), 'recommended operation leads the board');
-  check(await page.locator('#btn-front-go').isVisible(), 'primary action remains visible at 1280x720');
+  check(await page.locator('#btn-front-together').isVisible(), 'primary action remains visible at 1280x720');
   await screenshot('front-board-1280x720');
 
   await page.locator('[data-specialist-id="POL"]').click();
@@ -93,15 +110,11 @@ try {
     game.selectFrontProject('workshop');
     const vm = game.getFrontViewModel();
     const operation = vm.board.find((item) => item.recommended);
-    return { id: operation.id, threat: operation.threat, coins: game.save.coins, crystals: game.save.crystals };
+    return { id: operation.id, country: operation.country, threat: operation.threat, coins: game.save.coins, crystals: game.save.crystals };
   });
 
+  await page.evaluate(({ operationId }) => window.__game.startFrontOperation(operationId, 'UKR'), { operationId: initial.id });
   for (let stage = 0; stage < 3; stage++) {
-    await page.evaluate(async ({ operationId, first }) => {
-      const game = window.__game;
-      const activeId = game.save.front.active && game.save.front.active.operationId;
-      await game.startFrontOperation(activeId || operationId, first ? 'UKR' : undefined);
-    }, { operationId: initial.id, first: stage === 0 });
     await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.operation, null, { timeout: 30_000 });
     const stageState = await page.evaluate(() => {
       const game = window.__game;
@@ -112,6 +125,7 @@ try {
       game._enterFrontPhase(level, 1);
       const pressure = level.zombies.list.filter((zombie) => zombie.frontEncounter).length - before;
       game._onFrontObjectiveComplete(level);
+      if (level.operation.stage === 2) game._updateFrontDirector(level, 2.01);
       const objectiveAdvanced = level.operation.stage < 2
         ? game.save.front.active && game.save.front.active.stage === level.operation.stage + 1
         : level.zombies.list.some((zombie) => zombie.frontCommander);
@@ -136,7 +150,7 @@ try {
     check(!stageState.campaignBossUnlocked, 'Front stage does not unlock the ordinary campaign boss');
     check(stageState.phases.join(',') === 'quiet,pressure,spike,reward', 'Encounter Director has four deterministic phases');
     check(stageState.objectiveAdvanced,
-      stage === 2 ? 'commander-only finale spawns immediately' : 'objective completion finishes the short stage immediately');
+      stage === 2 ? 'commander-only finale spawns after its warning' : 'objective completion finishes the short stage immediately');
     if (stageState.stage === 0) {
       check(stageState.pressure === stageState.pressureBudget, 'pressure phase executes its deterministic spawn budget');
       check(stageState.rewardDrop, 'reward phase creates a safe supply drop');
@@ -149,20 +163,26 @@ try {
         const commander = game.level.zombies.list.find((zombie) => zombie.frontCommander);
         game.level.bus.emit('zombieKilled', commander);
       });
-      await page.waitForFunction(() => window.__game.victoryShown, null, { timeout: 5_000 });
+      await page.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 5_000 });
       const commanderFinished = await page.evaluate(() => {
         const game = window.__game;
-        return !game.save.front.active && game.save.front.board.some((item) => item.status === 'claimed');
+        return !game.save.front.active && game.save.front.claims.some((id) => id.endsWith(':operation'));
       });
-      check(commanderFinished, 'defeating the final commander completes and claims the operation');
+      check(commanderFinished, 'defeating the final commander completes and claims the operation reward once');
+    } else {
+      await page.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 5_000 });
+      check(await page.evaluate(() => window.__game.victoryShown), 'Front result suspends the completed level');
+      await page.click('#btn-front-result-primary');
+      await page.waitForFunction((nextStage) => window.__game.state === 'level'
+        && window.__game.level && window.__game.level.operation.stage === nextStage, stage + 1, { timeout: 30_000 });
     }
-    await page.evaluate(() => window.__game.endLevel());
-    await page.waitForFunction(() => window.__game.state === 'globe');
   }
+  await page.click('#btn-front-result-primary');
+  await page.waitForFunction(() => window.__game.state === 'globe');
 
-  const completed = await page.evaluate((operationId) => {
+  const completed = await page.evaluate((countryId) => {
     const game = window.__game;
-    const selected = game.save.front.board.find((item) => item.id === operationId);
+    const selected = game.save.front.board.find((item) => item.country === countryId);
     return {
       active: game.save.front.active,
       status: selected && selected.status,
@@ -173,8 +193,8 @@ try {
       crystals: game.save.crystals,
       claims: game.save.front.claims.slice(),
     };
-  }, initial.id);
-  check(completed.active === null && completed.status === 'claimed', 'three stages finish and claim the operation once');
+  }, initial.country);
+  check(completed.active === null && completed.status === 'available', 'three stages finish and reopen the rebuilt country once');
   check(completed.restored === 1 && completed.progress === 1, 'victory changes country and advances locked Base project');
   check(completed.coins === initial.coins + 200 + initial.threat * 50, 'operation coins are canonical');
   check(completed.crystals === initial.crystals + 1 + initial.threat, 'operation crystals are canonical');
@@ -183,18 +203,32 @@ try {
   await screenshot('front-victory-consequence-1280x720');
   await page.evaluate(() => window.__game.frontui.close());
 
-  const retry = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const game = window.__game;
     const op = game.save.front.board.find((item) => item.status === 'available');
     await game.startFrontOperation(op.id, 'DEU');
-    game._finishFrontStage(false);
-    game.endLevel();
-    const afterFail = game.save.front.active && game.save.front.active.status;
-    game.abandonFrontOperation();
-    return { afterFail, active: game.save.front.active, status: game.save.front.board.find((item) => item.id === op.id).status };
   });
-  check(retry.afterFail === 'ready', 'failure restarts current stage without escalation');
-  check(retry.active === null && retry.status === 'available', 'abandon returns operation without penalty');
+  await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.operation);
+  await page.evaluate(() => window.__game._showFrontModeResult(window.__game.level, false, '💀', 'Операцію провалено', ''));
+  await page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 5_000 });
+  const retryStage = await page.evaluate(() => window.__game.save.front.active.stage);
+  await page.click('#btn-front-result-primary');
+  await page.waitForFunction((stage) => window.__game.state === 'level'
+    && window.__game.level && window.__game.level.operation.stage === stage, retryStage, { timeout: 30_000 });
+  check(await page.evaluate(() => window.__game.save.front.active.stage) === retryStage, 'retry keeps the active Front stage');
+  const failedCountry = await page.evaluate(() => {
+    const game = window.__game;
+    return { countryId: game.level.countryId, damage: game.save.front.world.countries[game.level.countryId].damage };
+  });
+  await page.evaluate(() => window.__game._showFrontModeResult(window.__game.level, false, '💀', 'Операцію провалено', ''));
+  await page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 5_000 });
+  await page.click('#btn-front-result-end');
+  await page.waitForFunction(() => window.__game.state === 'globe');
+  const ended = await page.evaluate(({ countryId, damage }) => {
+    const game = window.__game;
+    return { active: game.save.front.active, damage: game.save.front.world.countries[countryId].damage - damage };
+  }, failedCountry);
+  check(ended.active === null && ended.damage <= 1, 'ending a failed operation clears it and worsens the country by at most one step');
 
   await page.evaluate(async () => {
     const game = window.__game;
@@ -211,7 +245,7 @@ try {
   await page.evaluate(() => { window.__game.frontui.render(); window.__game.frontui.open(); });
   const mobile = await page.locator('.front-card').boundingBox();
   check(mobile && mobile.width <= 390, 'Front board fits a 390px portrait viewport');
-  check(await page.locator('#btn-front-go').isVisible(), 'primary touch action remains visible on mobile');
+  check(await page.locator('#btn-front-together').isVisible(), 'primary touch action remains visible on mobile');
   await screenshot('front-board-390x844');
 
   await page.setViewportSize({ width: 1280, height: 720 });

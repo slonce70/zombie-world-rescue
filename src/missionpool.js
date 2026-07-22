@@ -13,6 +13,8 @@ const REPAIR_NAMES = {
   TUR: t('маяк Босфору'), EGY: t('сонячну станцію'), MOON: t('кисневі реле'),
 };
 
+const teamworkPrompt = (text, holders) => holders > 1 ? `${text} · ${t('Разом швидше ×{n}', { n: holders })}` : text;
+
 // ---------- описи типів місій ----------
 // slot: до якого зі слотів карти тип може потрапити
 // (A — хлів/порятунок, B — вежа/пристрій, C — склад/зона)
@@ -797,7 +799,7 @@ export class DynamicMissions {
         }
       }
       const prefix = m.optional ? '⭐ ' : '';
-      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done' });
+      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done', primary: m.state === 'active' && !m.optional, optional: m.optional });
     }
     if (!this.objectiveOnly && this.allDone && !this.bossStarted) {
       out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });
@@ -1340,11 +1342,11 @@ export class DynamicMissions {
     }
     if (d < 3.6) {
       this.prompt = {
-        text: level.countryId === 'MOON'
+        text: teamworkPrompt(level.countryId === 'MOON'
           ? (m.progress > 0 ? t('Тримай {k} — відновлюй кисневе реле', { k: interactKey() }) : t('Тримай {k} — запусти кисневе реле', { k: interactKey() }))
           : m.train
           ? t('Тримай {k} — заведи поїзд', { k: interactKey() })
-          : (m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() })),
+          : (m.progress > 0 ? t('Тримай {k} — ремонт', { k: interactKey() }) : t('Тримай {k} — почни ремонт', { k: interactKey() })), holders),
         hold: true, progress: m.progress,
       };
     }
@@ -1525,9 +1527,9 @@ export class DynamicMissions {
         }
       }
       if (d < 3.8) {
-        this.prompt = { text: bases
+        this.prompt = { text: teamworkPrompt(bases
           ? t('🏚️ Тримай {k} — знищ зомбі-базу', { k: interactKey() })
-          : t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), hold: true, progress: n.progress };
+          : t('🟣 Тримай {k} — знешкодь гніздо', { k: interactKey() }), holders), hold: true, progress: n.progress };
       }
       if (d < 3.8 || holders > 0) {
         if (holders > 0) {
@@ -1705,7 +1707,7 @@ export class DynamicMissions {
       if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
       if (Math.hypot(pl.pos.x - target.x, pl.pos.z - target.z) < 4 && Math.abs(pl.pos.y - target.y) < 2.5) holders++;
     }
-    if (near) this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+    if (near) this.prompt = { text: teamworkPrompt(t('Тримай {k} — звільни людей', { k: interactKey() }), holders), hold: true, progress: m.rescueProgress };
     if (!holders) return;
     m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 3);
     if (m.rescueProgress < 1) return;
@@ -1971,7 +1973,7 @@ export class DynamicMissions {
           if (Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < 3.6) holders++;
         }
       }
-      if (d < 3.6) this.prompt = { text: cfg.prompt, hold: true, progress: p.progress };
+      if (d < 3.6) this.prompt = { text: teamworkPrompt(cfg.prompt, holders), hold: true, progress: p.progress };
       if (holders > 0) {
         p.progress = Math.min(1, p.progress + (dt * holders) / cfg.hold);
         if (Math.random() < dt * 5) {
@@ -2144,7 +2146,7 @@ export class DynamicMissions {
         if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
         if (Math.hypot(pl.pos.x - m.dock.x, pl.pos.z - m.dock.z) < 4) holders++;
       }
-      if (near(m.dock, 4)) this.prompt = { text: t('Тримай {k} — ремонтуй корабель', { k: interactKey() }), hold: true, progress: m.repairProgress };
+      if (near(m.dock, 4)) this.prompt = { text: teamworkPrompt(t('Тримай {k} — ремонтуй корабель', { k: interactKey() }), holders), hold: true, progress: m.repairProgress };
       if (holders > 0) {
         m.repairProgress = Math.min(1, m.repairProgress + (dt * holders) / 30);
         if (m.repairProgress >= 1) {
@@ -2185,7 +2187,7 @@ export class DynamicMissions {
         if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
         if (Math.hypot(pl.pos.x - m.shore.x, pl.pos.z - m.shore.z) < 6) holders++;
       }
-      if (near(m.shore, 6)) this.prompt = { text: t('Тримай {k} — забрати людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+      if (near(m.shore, 6)) this.prompt = { text: teamworkPrompt(t('Тримай {k} — забрати людей', { k: interactKey() }), holders), hold: true, progress: m.rescueProgress };
       if (holders > 0) {
         m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 2);
         if (m.rescueProgress >= 1) { m.phase = 'return-board'; m.title = t('Повернись на корабель із людьми'); }
@@ -2198,7 +2200,7 @@ export class DynamicMissions {
         if (pl.pid === 1 || pl.health <= 0 || !pl.holdE) continue;
         if (Math.hypot(pl.pos.x - m.dock.x, pl.pos.z - m.dock.z) < 6) holders++;
       }
-      if (near(m.dock, 6)) this.prompt = { text: t('Тримай {k} — висадити людей', { k: interactKey() }), hold: true, progress: m.unloadProgress };
+      if (near(m.dock, 6)) this.prompt = { text: teamworkPrompt(t('Тримай {k} — висадити людей', { k: interactKey() }), holders), hold: true, progress: m.unloadProgress };
       if (holders > 0) {
         m.unloadProgress = Math.min(1, m.unloadProgress + (dt * holders) / 2);
         if (m.unloadProgress >= 1) {
@@ -2346,7 +2348,7 @@ export class DynamicMissions {
           if (Math.hypot(pl.pos.x - dungeon.x, pl.pos.z - dungeon.z) < 4.5) holders++;
         }
       }
-      if (near) this.prompt = { text: t('Тримай {k} — звільни людей', { k: interactKey() }), hold: true, progress: m.rescueProgress };
+      if (near) this.prompt = { text: teamworkPrompt(t('Тримай {k} — звільни людей', { k: interactKey() }), holders), hold: true, progress: m.rescueProgress };
       if (holders > 0) {
         m.rescueProgress = Math.min(1, m.rescueProgress + (dt * holders) / 2);
         if (m.rescueProgress >= 1) this._rescueCastlePeople(m);
@@ -2649,7 +2651,7 @@ export class DynamicMissions {
         if (Math.hypot(pl.pos.x - m.dest.x, pl.pos.z - m.dest.z) < m.dest.r) holders++;
       }
     }
-    if (d < m.dest.r) this.prompt = { text: cfg.deliverPrompt, hold: true, progress: m.deliverProgress };
+    if (d < m.dest.r) this.prompt = { text: teamworkPrompt(cfg.deliverPrompt, holders), hold: true, progress: m.deliverProgress };
     if (holders > 0) {
       m.deliverProgress = Math.min(1, m.deliverProgress + (dt * holders) / cfg.hold);
       if (m.deliverProgress >= 1 && !m.delivered) {

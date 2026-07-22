@@ -210,6 +210,7 @@ export class StoryMissions {
       icon: obj.icon,
       title: this._objectiveTitle(obj),
       done: obj.state === 'done',
+      primary: obj.state === 'active',
     }));
     const delegateHud = this.delegate.getHudList();
     for (const mission of this._extraDelegateMissions()) {

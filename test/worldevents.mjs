@@ -57,6 +57,15 @@ test('every operation template selects commander metadata backed by existing mec
   }
 });
 
+test('every spike declares an elite or a commander with runtime mechanics', () => {
+  for (const template of ['evacuation', 'outbreak', 'siege', 'hunt']) {
+    for (const stage of [0, 1, 2]) {
+      const spike = encounterPlan({ seed: 6, template, stage }).phases[2];
+      assert.ok(spike.elite === true || (spike.commander && spike.commander.mechanics.length > 0), `${template}:${stage}`);
+    }
+  }
+});
+
 test('friend countries map exactly to the four specialist roles with dispatcher fallback', () => {
   const expected = {
     medic: ['UKR', 'FRA', 'SWE'],
