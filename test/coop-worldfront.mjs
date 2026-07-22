@@ -22,18 +22,19 @@ try {
     const { CoopSession } = await import('/src/net/coop.js');
     const { HostNet } = await import('/src/net/host.js');
     const { GuestNet } = await import('/src/net/client.js');
-    const { applyFrontEvent } = await import('/src/worldfront.js');
+    const { applyFrontEvent, frontCountryState } = await import('/src/worldfront.js');
 
     const front = {
       v: 1, seed: 123, generation: 7,
       board: [
-        { id: 'g7-UKR-evacuation', country: 'UKR', template: 'evacuation', threat: 2, status: 'active', junk: true },
+        { id: 'g7-UKR-evacuation', country: 'UKR', template: 'evacuation', threat: 2, counterattack: true, status: 'active', junk: true },
         { id: 'g7-POL-hunt', country: 'POL', template: 'hunt', threat: 1, status: 'available' },
         { id: 'g7-DEU-siege', country: 'DEU', template: 'siege', threat: 3, status: 'available' },
       ],
-      active: { operationId: 'g7-UKR-evacuation', stage: 1, specialist: 'UKR', build: ['dmg25', 'dmg25', 'armor'], status: 'active', timer: 999 },
+      active: { operationId: 'g7-UKR-evacuation', stage: 1, specialist: 'UKR', build: ['dmg25', 'dmg25', 'armor'], status: 'ready', timer: 999 },
       projects: { medbay: 2, workshop: 99, radio: -4 }, activeProject: 'medbay', projectProgress: 2,
       restored: { UKR: 2, BAD_KEY: 9 }, claims: ['front:123:g7-UKR-evacuation:operation', 'front:123:g7-UKR-evacuation:operation', '<script>'],
+      world: { day: '2026-07-22', countries: { UKR: { damage: 3, population: 42, junk: true }, BAD_KEY: { damage: 99 } } },
       stats: { opens: 99 }, renderer: { nope: true },
     };
 
@@ -58,11 +59,17 @@ try {
       [2, { pid: 2, nick: 'Guest', ready: false }],
     ]);
     host.transport.broadcast = (msg) => broadcasts.push(structuredClone(msg));
+    let blockedTransitions = 0;
+    hostGame._applyFrontTransition = (event) => {
+      blockedTransitions++;
+      hostGame.save.front = applyFrontEvent(hostGame.save.front, event).front;
+    };
     const blockedStart = host.startFrontStage('UKR', { portal: true }, front.active);
+    const blockedTransitionCount = blockedTransitions;
     host.setMyReady(true);
     host._hostSetGuestReady(2, true);
     const readyStart = host.startFrontStage('UKR', { portal: true }, front.active);
-    host.syncFront(front, [{ type: 'grant', rewardId: 'front:123:g7-UKR-evacuation:operation', coins: 300, crystals: 3, eggs: 0 }, { type: 'toast', key: 'nope' }]);
+    host.syncFront(front, [{ type: 'grant', rewardId: 'front:123:g7-UKR-evacuation:operation', coins: 400, crystals: 3, eggs: 0 }, { type: 'toast', key: 'nope' }]);
 
     let netSawForged = 0;
     host.net = { onMessage: () => { netSawForged++; return false; } };
@@ -77,6 +84,7 @@ try {
     completedFront.active.stage = 2;
     completedFront.active.status = 'completed';
     const claimedFront = applyFrontEvent(completedFront, { type: 'CLAIM_OPERATION' }).front;
+    const claimedStates = [frontCountryState(completedFront, 'UKR').state, frontCountryState(claimedFront, 'UKR').state];
     const personalFront = { marker: 'guest-personal-front' };
     const applied = [];
     const guestGame = {
@@ -178,6 +186,26 @@ try {
     realGame._showFrontModeResult(realGame.level, true, '🛡️', 'Оборона', 'OK');
     realGame._hideOverlay('overlay-arena-end');
 
+    // Explicit solo launch stays local even while this browser owns a lobby.
+    const soloFront = realGame.save.front;
+    const soloOperation = soloFront.board.find((entry) => entry.status === 'available');
+    soloFront.active = null;
+    soloFront.board.forEach((entry) => { entry.status = 'available'; });
+    roomUi.session.role = 'host';
+    roomUi.session.state = 'lobby';
+    roomUi.session.frontRun = structuredClone(soloFront);
+    const lobbyBeforeSolo = JSON.stringify(roomUi.session.frontRun);
+    let soloLocalStarts = 0;
+    let soloLobbyStarts = 0;
+    const previousStartLevel = realGame.startLevel;
+    const previousStartFrontStage = roomUi.session.startFrontStage;
+    realGame.startLevel = () => { soloLocalStarts++; return true; };
+    roomUi.session.startFrontStage = () => { soloLobbyStarts++; return true; };
+    realGame.startFrontOperation(soloOperation.id, 'dispatcher', 'solo');
+    const soloLobbyUnchanged = JSON.stringify(roomUi.session.frontRun) === lobbyBeforeSolo;
+    realGame.startLevel = previousStartLevel;
+    roomUi.session.startFrontStage = previousStartFrontStage;
+
     realGame._showVictory = previousShowVictory;
     realGame._finishFrontStage = previousFinishFrontStage;
     realGame.level = previousLevel;
@@ -185,12 +213,14 @@ try {
 
     return {
       proto: PROTO_VERSION, wire, compact, expanded, badVersion,
-      broadcasts, started, blockedStart, readyStart,
+      broadcasts, started, blockedStart, blockedTransitionCount, blockedTransitions, readyStart,
       forged: { netSawForged, added: broadcasts.length - beforeForged },
       applied, appliedBeforeBadStart, reconnectApplied, captured: captured.frun,
       guestPersonalFront: guestGame.save.front,
+      claimedStates, claimedWorld: claimedFront.world.countries.UKR,
       hostFrontButton, guestFrontButton, openForFrontQueued,
       remoteVictoryAccepted, remoteCompleteFlag, modeVictoryBroadcasts, modeStageFinished,
+      soloLocalStarts, soloLobbyStarts, soloLobbyUnchanged,
     };
   });
 
@@ -200,19 +230,23 @@ try {
   'compact fr keeps generation/operation/stage/specialist/build', JSON.stringify(out.compact));
   check(out.expanded.operationId === out.compact.o && out.expanded.stage === 1, 'fr expands for startLevel operation adapter');
   check(out.wire.projects.workshop === 3 && out.wire.projects.radio === 0
-    && out.wire.stats == null && out.wire.renderer == null && out.wire.restored.BAD_KEY == null,
+    && out.wire.stats == null && out.wire.renderer == null && out.wire.restored.BAD_KEY == null
+    && out.wire.board[0].counterattack === true && out.wire.world.day === '2026-07-22'
+    && out.wire.world.countries.UKR.damage === 3 && out.wire.world.countries.UKR.population === 42
+    && out.wire.world.countries.BAD_KEY == null,
   'frun clamps and strips local/runtime fields', JSON.stringify(out.wire));
   check(out.badVersion === null, 'unknown Front snapshot version fails closed');
 
   const starts = out.broadcasts.filter((m) => m.t === 'start');
   const runs = out.broadcasts.filter((m) => m.t === 'frun');
-  check(out.blockedStart === false && out.readyStart === true && starts.length === 1,
+  check(out.blockedStart === false && out.blockedTransitionCount === 0 && out.blockedTransitions === 1
+    && out.readyStart === true && starts.length === 1,
     'host waits until every current roster entry is ready');
   check(starts[0].fr && starts[0].fr.o === out.compact.o, 'host start sends compact fr');
   check(out.started && out.started.opts.operation.operationId === out.compact.o, 'host starts same canonical operation locally');
   check(JSON.stringify(out.started.opts.coop.spec.fr) === JSON.stringify(out.applied.find((x) => x.kind === 'start')?.spec.fr),
     'host and guest receive the same compact fr start spec');
-  check(runs.length >= 2 && runs.every((message) => message.rw == null),
+  check(runs.length >= 1 && runs.every((message) => message.rw == null),
     'host frun never sends reward amounts');
   check(out.forged.netSawForged === 0 && out.forged.added === 0, 'forged guest state/result/reward is rejected before level net');
 
@@ -220,10 +254,13 @@ try {
   const guestStart = out.applied.find((x) => x.kind === 'start');
   check(rewards.length === 1 && rewards[0].rewards.length === 1
     && rewards[0].rewards[0].rewardId === 'front:123:g7-UKR-evacuation:r2:operation'
-    && rewards[0].rewards[0].coins === 300 && rewards[0].rewards[0].crystals === 3,
+    && rewards[0].rewards[0].coins === 400 && rewards[0].rewards[0].crystals === 3,
   'guest derives canonical reward locally and ignores wire amounts', JSON.stringify(rewards));
   check(out.guestPersonalFront.marker === 'guest-personal-front',
     'host snapshot never replaces guest personal Front progress');
+  check(out.claimedStates.join(',') === 'destroyed,rebuilding'
+    && out.claimedWorld.damage === 2 && out.claimedWorld.population === 54,
+  'counterattack claim preserves destroyed-to-rebuilding world consequences', JSON.stringify(out.claimedWorld));
   check(guestStart && guestStart.operation.generation === 7 && guestStart.operation.build.length === 2,
     'guest start restores generation/operation/stage/specialist/build', JSON.stringify(guestStart && guestStart.operation));
   check(out.applied.length === out.appliedBeforeBadStart, 'malformed Front start is rejected');
@@ -236,8 +273,10 @@ try {
   check(out.openForFrontQueued, 'prepared Front opens the co-op entry flow');
   check(out.remoteCompleteFlag && out.remoteVictoryAccepted,
     'trusted host victory bypasses the guest-only Director clock');
-  check(out.modeVictoryBroadcasts === 1 && out.modeStageFinished,
-    'host Front defense/portal result broadcasts victory before finishing locally');
+  check(out.modeVictoryBroadcasts === 0 && out.modeStageFinished,
+    'Front result uses the canonical snapshot path without a duplicate victory event');
+  check(out.soloLocalStarts === 1 && out.soloLobbyStarts === 0 && out.soloLobbyUnchanged,
+    'explicit Play Solo stays local and does not start or mutate the lobby');
 
   // Real room path: an already prepared host Front becomes authoritative for
   // an ordinary room, survives a guest disconnect + checkpoint, and resumes
@@ -364,6 +403,66 @@ try {
     'same-pid resume restores authoritative frun and current fr checkpoint', JSON.stringify(resumed));
   check(resumed.personalUnchanged && resumed.personalMarker === 'guest-personal-front',
     'real-room reconnect never overwrites guest personal Front', JSON.stringify(resumed));
+
+  // Host alone reduces terminal outcomes; both browsers receive one canonical
+  // result. The guest can only acknowledge it and wait for the host's choice.
+  await page.evaluate(() => window.__game._finishFrontStage(false));
+  await Promise.all([
+    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+  ]);
+  const guestFailure = await guestPage.evaluate(() => ({
+    action: document.getElementById('btn-front-result-primary').dataset.action,
+    endHidden: document.getElementById('btn-front-result-end').hidden,
+    waiting: document.getElementById('front-result-summary').textContent,
+  }));
+  check(guestFailure.action === 'wait' && guestFailure.endHidden && /host/i.test(guestFailure.waiting),
+    'guest failure result is read-only and waits for the host', JSON.stringify(guestFailure));
+  await guestPage.click('#btn-front-result-primary');
+  await page.click('#btn-front-result-primary');
+  await Promise.all([
+    page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 1, null, { timeout: 50000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 1, null, { timeout: 50000 * SLOW }),
+  ]);
+
+  await page.evaluate(() => window.__game._finishFrontStage(true));
+  await Promise.all([
+    page.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 15000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 15000 * SLOW }),
+  ]);
+  await guestPage.click('#btn-front-result-primary');
+  await page.click('#btn-front-result-primary');
+  await Promise.all([
+    page.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 2, null, { timeout: 50000 * SLOW }),
+    guestPage.waitForFunction(() => window.__game.state === 'level' && window.__game.level?.operation?.stage === 2, null, { timeout: 50000 * SLOW }),
+  ]);
+
+  await page.evaluate(() => window.__game._finishFrontStage(true));
+  await Promise.all([
+    page.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 15000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 15000 * SLOW }),
+  ]);
+  const terminal = await Promise.all([
+    page.evaluate(() => ({ run: window.__game.coop.session.frontSnapshot(), kind: document.getElementById('overlay-front-result').dataset.kind })),
+    guestPage.evaluate((before) => ({
+      run: window.__game.coop.session.frontSnapshot(),
+      kind: document.getElementById('overlay-front-result').dataset.kind,
+      personalUnchanged: JSON.stringify(window.__game.save.front) === before,
+      rewardClaims: window.__game.save.frontCoopClaims || [],
+    }), guestPersonalBefore),
+  ]);
+  check(terminal[0].kind === 'complete' && terminal[1].kind === 'complete'
+    && JSON.stringify(terminal[0].run) === JSON.stringify(terminal[1].run),
+  'host and guest show the same terminal victory from one canonical snapshot', JSON.stringify(terminal));
+  const terminalCountry = terminal[0].run.world.countries[prepared.country];
+  check(terminalCountry && terminalCountry.population > 0
+    && terminal[0].run.restored[prepared.country] === 1,
+  'terminal snapshot keeps country population, damage and rebuilding progress', JSON.stringify(terminalCountry));
+  check(terminal[1].personalUnchanged && terminal[1].rewardClaims.length === 1,
+    'guest earns the canonical claim without replacing personal Front', JSON.stringify(terminal[1]));
+  await guestPage.click('#btn-front-result-primary');
+  await page.click('#btn-front-result-primary');
+  await guestPage.waitForSelector('#overlay-net-wait.show', { timeout: 15000 * SLOW });
 
   const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_|favicon/i.test(e));
   check(realErrors.length === 0, 'no browser JS errors', realErrors.join(' | '));

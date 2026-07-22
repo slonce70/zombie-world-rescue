@@ -10,7 +10,7 @@ import { nickIsBad, normNick } from '../../worker/nick.mjs';
 import { chooseExpeditionNode, createExpedition, expeditionLevelConfig, sanitizeExpedition } from '../expedition.js';
 import {
   canonicalFrontRewards, expandFrontSpec, FRONT_GUEST_FORBIDDEN, frontSpecFromState,
-  sanitizeFrontSnapshot, sanitizeFrontSpec,
+  sanitizeFrontResult, sanitizeFrontSnapshot, sanitizeFrontSpec,
 } from './frontsync.js';
 import { sanitizeMapSize, sanitizeMapStyle } from '../mapsize.js';
 
@@ -132,6 +132,8 @@ export class CoopSession {
     this.frontRun = null;      // canonical host snapshot for the current Front room
     this.frontStartedOperationId = null;
     this.frontResumeReady = new Map(); // pid -> { operationId, ready } during relay resume grace
+    this.frontResults = new Set();
+    this.frontResult = null;
 
     this.transport.onMessage = (from, d) => this._onMessage(from, d);
     this.transport.onPeer = (id, on) => this._onPeer(id, on);
@@ -238,6 +240,8 @@ export class CoopSession {
     this.frontRun = null;
     this.frontStartedOperationId = null;
     this.frontResumeReady.clear();
+    this.frontResults.clear();
+    this.frontResult = null;
     if (this.net) { this.net.dispose(); this.net = null; }
   }
 
@@ -412,6 +416,7 @@ export class CoopSession {
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
+    this.frontResult = null;
     if (!transitioned) this.syncFront(run);
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
@@ -434,7 +439,7 @@ export class CoopSession {
 
   // Called after the host has applied applyFrontEvent(). Reward amounts never
   // travel: guests replay the canonical transition from previous → next.
-  syncFront(value, effects = []) {
+  syncFront(value, effects = [], result = null) {
     if (this.role !== 'host') return null;
     const run = sanitizeFrontSnapshot(value);
     if (!run) return null;
@@ -447,11 +452,16 @@ export class CoopSession {
     }
     this.frontRun = run;
     const msg = { t: 'frun', run };
+    const cleanResult = sanitizeFrontResult(result);
+    if (cleanResult) {
+      this.frontResult = cleanResult;
+      msg.result = cleanResult;
+    }
     this.transport.broadcast(msg, true);
     return run;
   }
 
-  applyFrontSnapshot(value) {
+  applyFrontSnapshot(value, result = null) {
     const run = sanitizeFrontSnapshot(value);
     if (!run) return null;
     const rewards = canonicalFrontRewards(this.frontRun, run);
@@ -460,6 +470,11 @@ export class CoopSession {
     // projects or restored countries with another player's snapshot.
     if (rewards.length && typeof this.game.applyFrontNetworkRewards === 'function') {
       this.game.applyFrontNetworkRewards(rewards);
+    }
+    const cleanResult = sanitizeFrontResult(result);
+    if (cleanResult && !this.frontResults.has(cleanResult.id)) {
+      this.frontResults.add(cleanResult.id);
+      this.game._showFrontResult?.({ ...cleanResult, guest: true });
     }
     return run;
   }
@@ -517,6 +532,7 @@ export class CoopSession {
   levelEnded() {
     if (this.net) { this.net.dispose(); this.net = null; }
     if (this.state === 'level') this.state = 'lobby';
+    this.frontResult = null;
     if (this.mode !== 'front') this._resetReady();
   }
 
@@ -551,7 +567,7 @@ export class CoopSession {
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
         if (d.ex) this.game.save.expedition = sanitizeExpedition(d.ex);
-        if (d.frun) this.applyFrontSnapshot(d.frun);
+        if (d.frun) this.applyFrontSnapshot(d.frun, d.result);
         if (this._joinResolve) { this._joinResolve(); this._joinResolve = null; this._joinReject = null; }
         if (this.onRoster) this.onRoster();
       } else if (d.t === 'reject') {
@@ -592,7 +608,7 @@ export class CoopSession {
         }
       } else if (d.t === 'frun') {
         if (from !== 1) return;
-        const run = this.applyFrontSnapshot(d.run);
+        const run = this.applyFrontSnapshot(d.run, d.result);
         if (run && this.state === 'lobby' && this.onRoster) this.onRoster();
       } else if (d.t === 'xpvotes') {
         if (from !== 1) return;
@@ -656,12 +672,13 @@ export class CoopSession {
       inLevel: this.state === 'level',
       ex: this.mode === 'expedition' ? sanitizeExpedition(this.game.save.expedition) : null,
       frun: this.mode === 'front' ? this.frontSnapshot() : null,
+      result: this.mode === 'front' ? this.frontResult : null,
     }, true);
     this._broadcastRoster();
     if (this.onRoster) this.onRoster();
     this.game.hud.toast(t('🤝 {n} приєднався!', { n: nick }));
     this.game.audio.click();
-    if (this.state === 'level' && this.net) {
+    if (this.state === 'level' && this.net && !this.frontResult) {
       // 🔌 тихий реконект уже відомого гостя: рівень у нього вже побудований —
       // повторний 'start' зруйнував би його (екран завантаження + втрата позиції).
       // Покладаємось лише на його lvlready → captureState (свіжий стан долетить).

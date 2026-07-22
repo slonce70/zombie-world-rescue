@@ -23,6 +23,11 @@ try {
     const ids = game.save.front.board.map((operation) => operation.id);
     const countries = game.save.front.board.map((operation) => operation.country);
     const recommendedOperationId = game.getFrontViewModel().recommendedOperationId;
+    const recommendedCountry = game.save.front.board.find((operation) => operation.id === recommendedOperationId).country;
+    game.globe._paintedFront = null;
+    game.globe.update(0);
+    const recommendedBeacon = game.globe.targetId;
+    const sameStateCountries = countries.filter((country) => game.globe._frontState(country)?.state === 'attacked').length;
     game.continueRescue();
     const frontOpened = document.getElementById('overlay-front').classList.contains('show');
     const recommendedSelected = game.frontui.selectedOperationId === recommendedOperationId;
@@ -57,6 +62,9 @@ try {
       campaignTarget,
       frontOpened,
       recommendedSelected,
+      recommendedCountry,
+      recommendedBeacon,
+      sameStateCountries,
       primaryLabel: document.getElementById('front-cta-label').textContent,
       otherButtons: document.querySelectorAll('#globe-other #btn-solo, #globe-other #btn-coop, #globe-other #btn-expedition').length,
       repaintTracked: game.globe._paintedFront === game.save.front,
@@ -66,6 +74,7 @@ try {
   if (result.attacked !== 'attacked' || result.rebuilding !== 'rebuilding' || !result.saved
       || !result.campaignPickerOpen || result.campaignTarget !== 'UKR'
       || !result.frontOpened || !result.recommendedSelected || result.primaryLabel !== 'Продовжити порятунок'
+      || result.sameStateCountries < 2 || result.recommendedBeacon !== result.recommendedCountry
       || result.otherButtons !== 3
       || !result.attackedLine.includes('Під атакою') || !result.attackedLine.includes('Орда атакує')
       || !result.attackedLine.includes('Зупинити атаку')

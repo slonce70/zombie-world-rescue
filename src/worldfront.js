@@ -399,6 +399,18 @@ export function applyFrontEvent(value, event = {}) {
     return changed(front, [], 'front.operationComplete');
   }
 
+  if (event.type === 'COMPLETE_OPERATION') {
+    if (!front.active || front.active.status !== 'active' || front.active.stage !== FRONT_STAGE_COUNT - 1) {
+      return unchanged(sanitized);
+    }
+    const completed = applyFrontEvent(sanitized, { type: 'COMPLETE_STAGE', build: event.build });
+    const claimed = applyFrontEvent(completed.front, { type: 'CLAIM_OPERATION' });
+    return {
+      front: claimed.front,
+      effects: [...completed.effects.filter((effect) => effect.type !== 'save'), ...claimed.effects],
+    };
+  }
+
   if (event.type === 'FAIL_STAGE') {
     if (!front.active || front.active.status !== 'active') return unchanged(sanitized);
     front.active.status = 'ready';

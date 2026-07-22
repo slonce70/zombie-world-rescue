@@ -171,6 +171,23 @@ test('operation and cycle rewards are canonical, stable and idempotent', () => {
   assert.equal(new Set(advanced.board.map((operation) => operation.country)).size, 3);
 });
 
+test('one terminal victory event claims and rewards exactly once', () => {
+  let front = createFront({ seed: 515, liberated: ['UKR'] });
+  front = reduce(front, { type: 'START_OPERATION', operationId: front.board[0].id }).front;
+  for (let stage = 0; stage < 2; stage++) {
+    front = reduce(front, { type: 'START_STAGE' }).front;
+    front = reduce(front, { type: 'COMPLETE_STAGE', build: [] }).front;
+  }
+  front = reduce(front, { type: 'START_STAGE' }).front;
+  const terminal = reduce(front, { type: 'COMPLETE_OPERATION', build: ['armor'] });
+  assert.equal(terminal.front.active, null);
+  assert.equal(terminal.front.restored.UKR, 1);
+  assert.equal(terminal.effects.filter((effect) => effect.type === 'grant').length, 1);
+  const duplicate = reduce(terminal.front, { type: 'COMPLETE_OPERATION', build: ['armor'] });
+  assert.deepEqual(duplicate.front, terminal.front);
+  assert.deepEqual(duplicate.effects, []);
+});
+
 test('view model exposes recommendation, specialists, projects and country consequences', () => {
   let front = createFront({ seed: 506, liberated: ['UKR', 'POL', 'DEU'] });
   front.projects.radio = 3;

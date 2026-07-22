@@ -107,6 +107,7 @@ export class Globe {
     this.allDone = nextTarget(this.game.save.liberated || {}) === null;
     // 🦖 світ звільнено, але таємний острів ще ні — маяк веде туди
     if (this.allDone && !(this.game.save.liberated || {}).LOST) this.targetId = 'LOST';
+    if (this.game.save.front) this.targetId = this._rescueTarget();
     this.beacon = this._makeBeacon();
     this.group.add(this.beacon);
     this._aimBeaconAt(this.targetId);
@@ -368,6 +369,12 @@ export class Globe {
     return state;
   }
 
+  _rescueTarget() {
+    const vm = this.game.getFrontViewModel?.();
+    return vm?.board?.find((entry) => entry.id === vm.recommendedOperationId)?.country
+      || nextTarget(this.game.save.liberated || {}) || 'UKR';
+  }
+
   _frontStatusLine(id) {
     const state = this._frontState(id);
     if (!state) return '';
@@ -601,14 +608,24 @@ export class Globe {
     const nt = nextTarget(this.game.save.liberated || {});
     this.allDone = nt === null;
     // 🦖 після звільнення світу ведемо на таємний острів, поки й його не пройдено
-    this.targetId = nt || ((this.game.save.liberated || {}).LOST ? lastTarget : 'LOST');
+    this.targetId = this.game.save.front
+      ? this._rescueTarget()
+      : nt || ((this.game.save.liberated || {}).LOST ? lastTarget : 'LOST');
     this.repaint();
     this._aimBeaconAt(this.targetId);
     this._rotateToCountry(this.targetId);
   }
 
   update(dt) {
-    if (this.ready && this._paintedFront !== this.game.save.front) this.repaint();
+    if (this.ready && this._paintedFront !== this.game.save.front) {
+      const target = this.game.save.front ? this._rescueTarget() : this.targetId;
+      if (target !== this.targetId) {
+        this.targetId = target;
+        this._aimBeaconAt(target);
+        this._rotateToCountry(target);
+      }
+      this.repaint();
+    }
     this.t += dt;
     // плавне обертання до цілі
     this.group.rotation.y += (this.targetRotY - this.group.rotation.y) * Math.min(1, dt * 8);

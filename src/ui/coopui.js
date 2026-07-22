@@ -13,8 +13,9 @@ import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defe
 import { RADIATION_UNLOCK_COUNTRIES } from '../radiationmode.js';
 import { TURRETWAR_UNLOCK_COUNTRIES } from '../turretwar.js';
 import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
-import { frontStageConfig } from '../worldfront.js';
+import { frontCountryState, frontStageConfig } from '../worldfront.js';
 import { frontStageLabel } from './frontui.js';
+import { frontCountryCopy } from './frontcopy.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -575,7 +576,7 @@ export class CoopUI {
     const owner = s.roster.get(1);
     if (frontConfig && frontOperation) {
       const country = COUNTRIES[frontConfig.countryId];
-      const countryState = ['completed', 'claimed'].includes(frontOperation.status) ? t('відбудова') : t('під атакою');
+      const countryState = frontCountryCopy(frontCountryState(frontRun, frontConfig.countryId), country?.name || frontConfig.countryId).label;
       this.el.frontSummary.innerHTML = `<strong>${t('Світ хоста: {n}', { n: this._esc(owner && owner.nick || t('Хост')) })}</strong>`
         + `<span>${this._esc(country ? `${country.flag} ${country.name}` : frontConfig.countryId)} · ${countryState}</span>`
         + `<span>${t('Етап {n}/3', { n: frontRun.active.stage + 1 })} · ${t('Ціль: {objective}', { objective: t(frontStageLabel(frontConfig.missionPreset)) })}</span>`;

@@ -60,6 +60,7 @@ import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
 import { FrontUI } from './ui/frontui.js';
+import { frontCountryCopy } from './ui/frontcopy.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { TITLES, syncTitles } from './titles.js';
@@ -2484,7 +2485,7 @@ class Game {
     return messages[effect.key] || effect.key;
   }
 
-  _applyFrontTransition(event) {
+  _applyFrontTransition(event, { sync = true } = {}) {
     const previousSecondStarts = (this.save.front && this.save.front.stats && this.save.front.stats.secondStarts) || 0;
     const result = applyFrontEvent(this.save.front, { ...this._frontContext(), ...event });
     if (!result || result.front === undefined) return result;
@@ -2513,7 +2514,7 @@ class Game {
       }
     }
     const session = this.coop && this.coop.session;
-    if (session && session.role === 'host' && session.syncFront) session.syncFront(this.save.front, result.effects || []);
+    if (sync && session && session.role === 'host' && session.syncFront) session.syncFront(this.save.front, result.effects || []);
     if (this.frontui) this.frontui.render(this.getFrontViewModel());
     return result;
   }
@@ -2589,22 +2590,24 @@ class Game {
     this._applyFrontTransition({ type: 'SELECT_PROJECT', projectId });
   }
 
-  startFrontOperation(operationId, specialist = 'dispatcher') {
+  startFrontOperation(operationId, specialist = 'dispatcher', launch = 'solo') {
     if (!this._ensureFront()) return false;
+    const together = launch === 'together';
     let front = this.save.front;
     if (!front.active) {
-      this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist });
+      this._applyFrontTransition({ type: 'START_OPERATION', operationId, specialist }, { sync: together });
       front = this.save.front;
     }
     if (!front || !front.active || front.active.status !== 'ready') return false;
     const config = frontStageConfig(front);
     if (!config) return false;
-    this._applyFrontTransition({ type: 'START_STAGE' });
     this.frontui.close();
     const session = this.coop && this.coop.session;
-    if (session && session.role === 'host' && session.state === 'lobby' && session.startFrontStage) {
+    if (together) {
+      if (!session || session.role !== 'host' || session.state !== 'lobby' || !session.startFrontStage) return false;
       return session.startFrontStage(config.countryId, config.modeOpts, config.operation);
     }
+    this._applyFrontTransition({ type: 'START_STAGE' }, { sync: false });
     return this.startLevel(config.countryId, {
       ...config.modeOpts,
       operation: config.operation,
@@ -2635,20 +2638,29 @@ class Game {
     if (level.net && !level.net.authority) return true;
     const before = frontCountryState(this.save.front, level.countryId);
     const picked = level.runBuild ? level.runBuild.ids.slice(level._frontBuildStart || 0) : [];
-    this._applyFrontTransition({ type: won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked });
-    if (won && this.save.front && this.save.front.active && this.save.front.active.status === 'completed') {
-      this._applyFrontTransition({ type: 'CLAIM_OPERATION' });
-    }
+    const finalWin = won && this.save.front.active.stage === 2;
+    const transitioned = this._applyFrontTransition({
+      type: finalWin ? 'COMPLETE_OPERATION' : won ? 'COMPLETE_STAGE' : 'FAIL_STAGE', build: picked,
+    }, { sync: false });
+    const effects = transitioned.effects || [];
     const terminal = won && !this.save.front.active;
     const after = frontCountryState(this.save.front, level.countryId);
-    return this._showFrontResult({ won, terminal, before, after });
+    const result = {
+      id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:${won ? 'win' : 'fail'}`,
+      countryId: level.countryId, won, terminal, before, after,
+    };
+    const session = level.net && level.net.authority && this.coop && this.coop.session;
+    if (session && session.syncFront) session.syncFront(this.save.front, effects, result);
+    return this._showFrontResult(result);
   }
 
-  _showFrontResult({ won, terminal, before, after }) {
+  _showFrontResult({ won, terminal, before, after, countryId = null, guest = false }) {
     const kind = won ? (terminal ? 'complete' : 'checkpoint') : 'failed';
     const primary = document.getElementById('btn-front-result-primary');
     const end = document.getElementById('btn-front-result-end');
-    const state = { peaceful: 'спокій', attacked: 'під атакою', destroyed: 'зруйновано', rebuilding: 'відбудова', saved: 'врятовано' };
+    const country = COUNTRIES[countryId || (this.level && this.level.countryId)];
+    const beforeCopy = frontCountryCopy(before, country ? country.name : countryId || '');
+    const afterCopy = frontCountryCopy(after, country ? country.name : countryId || '');
     this.victoryShown = true;
     this.deathT = -1;
     this._hideOverlay('overlay-death');
@@ -2656,16 +2668,17 @@ class Game {
     document.getElementById('front-result-title').textContent = t(won
       ? (terminal ? '🌟 ОПЕРАЦІЮ ЗАВЕРШЕНО!' : '✅ ЕТАП ПРОЙДЕНО!')
       : '💀 ОПЕРАЦІЮ ПРОВАЛЕНО');
-    document.getElementById('front-result-summary').textContent = t(won
+    document.getElementById('front-result-summary').textContent = t(guest ? 'Чекаємо на хоста' : won
       ? (terminal ? 'Країна відбудовується, а проєкт Бази просунувся.' : 'Прогрес збережено. Наступний етап уже готовий.')
       : 'Етап можна повторити або завершити операцію.');
     const change = document.getElementById('front-result-change');
     change.className = 'front-result-change front-status';
-    change.innerHTML = `<span class="front-status-icon">🗺️</span><div><strong>${t('Стан країни')}</strong><span>${t(state[before && before.state] || '—')} → ${t(state[after && after.state] || '—')}</span></div>`;
-    primary.textContent = t(won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
-    primary.dataset.action = won ? (terminal ? 'globe' : 'continue') : 'retry';
+    change.innerHTML = `<span class="front-status-icon">🗺️</span><div><strong>${t('Стан країни')}</strong><span>${beforeCopy.label} → ${afterCopy.label}</span></div>`;
+    primary.textContent = t(guest ? 'ПРОДОВЖИТИ ОПЕРАЦІЮ' : won ? (terminal ? 'ПРОДОВЖИТИ ПОРЯТУНОК' : 'ПРОДОВЖИТИ ОПЕРАЦІЮ') : 'ПОВТОРИТИ ФАЗУ');
+    primary.dataset.action = guest ? 'wait' : won ? (terminal ? 'globe' : 'continue') : 'retry';
     end.textContent = t(won ? 'ДО ГЛОБУСА' : 'ЗАВЕРШИТИ ОПЕРАЦІЮ');
     end.dataset.action = won ? 'globe' : 'end';
+    end.hidden = guest;
     const overlay = document.getElementById('overlay-front-result');
     overlay.dataset.kind = kind;
     this._showOverlay('overlay-front-result');
@@ -3030,7 +3043,6 @@ class Game {
     else this.audio.defeat();
     this.audio.setMode(null);
     this.input.exitLock();
-    if (won && level.net && level.net.authority) level.netEv('vict');
     return this._finishFrontStage(!!won);
   }
 
@@ -4247,7 +4259,7 @@ class Game {
           if (leavingFront && sess.role === 'host') {
             const active = this.save.front && this.save.front.active;
             if ((frontNextAction === 'continue' || frontNextAction === 'retry') && active) {
-              this.startFrontOperation(active.operationId);
+              this.startFrontOperation(active.operationId, active.specialist, 'together');
             } else {
               this.openFront();
             }
