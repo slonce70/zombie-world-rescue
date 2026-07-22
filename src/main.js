@@ -130,7 +130,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 605;
+const APP_VERSION = 606;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -159,6 +159,12 @@ const FRONT_MISSION_PRESETS = Object.freeze({
   'spain-rebuild-center': ['rebuild'],
   'spain-clear-village': ['villageclear'],
   'spain-defend-fireworks': ['fireworks'],
+  'pol-light-bonfires': ['bonfire'],
+  'pol-rescue-train': ['repair'],
+  'pol-defeat-pursuer': [],
+  'deu-rescue-mechanics': ['rescue'],
+  'deu-start-convoy': ['convoy'],
+  'deu-defeat-baron': [],
   'rescue-train': ['repair'],
   'rescue-ship': ['shiprescue'],
   'destroy-nests': ['nests'],
@@ -2653,11 +2659,11 @@ class Game {
       id: `front:${level.operation.generation}:${level.operation.operationId}:${level.operation.stage}:a${level.operation.attempt || 0}:${won ? 'win' : 'fail'}`,
       countryId: level.countryId, won, terminal, before, after,
     };
-    const continueSpain = won && !terminal && level.countryId === 'ESP'
-      && level.operation.missionPreset?.startsWith('spain-');
+    const continueCountryOperation = won && !terminal
+      && /^(spain|pol|deu)-/.test(level.operation.missionPreset || '');
     const session = level.net && level.net.authority && this.coop && this.coop.session;
-    if (session && session.syncFront) session.syncFront(this.save.front, effects, continueSpain ? null : result);
-    if (continueSpain) {
+    if (session && session.syncFront) session.syncFront(this.save.front, effects, continueCountryOperation ? null : result);
+    if (continueCountryOperation) {
       this.victoryShown = true;
       this.input.exitLock();
       this._frontNextAction = 'continue';
@@ -2710,6 +2716,7 @@ class Game {
     const teamSize = level.net && this.coop && this.coop.session ? Math.max(1, this.coop.session.roster.size) : 1;
     const plan = encounterPlan({
       seed: front.seed + front.generation,
+      countryId: level.countryId,
       template: level.operation.template,
       stage: level.operation.stage,
       threat: level.operation.threat,

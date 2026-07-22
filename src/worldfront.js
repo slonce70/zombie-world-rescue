@@ -50,10 +50,16 @@ const SPAIN_REBUILD_STAGES = Object.freeze([
   'spain-defend-fireworks',
 ]);
 
+const COUNTRY_OPERATION_STAGES = Object.freeze({
+  POL: Object.freeze(['pol-light-bonfires', 'pol-rescue-train', 'pol-defeat-pursuer']),
+  DEU: Object.freeze(['deu-rescue-mechanics', 'deu-start-convoy', 'deu-defeat-baron']),
+});
+
 function operationStages(front, operation) {
   if (operation.country === 'ESP' && front.world.countries.ESP?.damage >= 3) {
     return SPAIN_REBUILD_STAGES;
   }
+  if (COUNTRY_OPERATION_STAGES[operation.country]) return COUNTRY_OPERATION_STAGES[operation.country];
   if (operation.template === 'evacuation' && EVACUATION_STAGES[operation.country]) {
     return EVACUATION_STAGES[operation.country];
   }
@@ -211,6 +217,7 @@ function stageAdapter(front, operation, stage) {
     missionPreset: preset,
     encounterPlan: encounterPlan({
       seed: front.seed + front.generation,
+      countryId: operation.country,
       template: operation.template,
       stage,
       threat: operation.threat,

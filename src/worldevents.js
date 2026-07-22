@@ -37,6 +37,8 @@ const COMMANDER_BY_TEMPLATE = Object.freeze({
   hunt: 'stalker',
 });
 
+const COMMANDER_BY_COUNTRY = Object.freeze({ POL: 'pursuer', DEU: 'ram' });
+
 const ROLE_BY_FRIEND = Object.freeze({
   UKR: 'medic', FRA: 'medic', SWE: 'medic',
   DEU: 'engineer', JPN: 'engineer', CHN: 'engineer',
@@ -95,7 +97,7 @@ function phase(id, duration, spawnBudget, extra = {}) {
  * Build a deterministic four-phase encounter description.
  * Runtime code owns clocks and spawning; this function only supplies the plan.
  */
-export function encounterPlan({ seed = 0, template = 'evacuation', stage = 0, threat = 1, teamSize = 1 } = {}) {
+export function encounterPlan({ seed = 0, countryId = '', template = 'evacuation', stage = 0, threat = 1, teamSize = 1 } = {}) {
   const cleanSeed = asInt(seed) >>> 0;
   const cleanTemplate = normalizedTemplate(template);
   const cleanStage = clampInt(stage, 0, 2);
@@ -112,7 +114,7 @@ export function encounterPlan({ seed = 0, template = 'evacuation', stage = 0, th
   const spikeAdds = cleanStage === 2
     ? 0
     : 1 + cleanThreat + (cleanTeamSize - 1) + ((roll >>> 16) % 3);
-  const commanderId = COMMANDER_BY_TEMPLATE[cleanTemplate];
+  const commanderId = COMMANDER_BY_COUNTRY[String(countryId).toUpperCase()] || COMMANDER_BY_TEMPLATE[cleanTemplate];
   const commander = COMMANDERS[commanderId];
   const pressureDuration = 30 + cleanStage * 5 + cleanThreat * 3 + ((roll >>> 20) % 6);
   const spikeDuration = 28 + cleanThreat * 4 + cleanStage * 4;
