@@ -211,6 +211,8 @@ export class StoryMissions {
       title: this._objectiveTitle(obj),
       done: obj.state === 'done',
       primary: obj.state === 'active',
+      visible: true,
+      locked: obj.state === 'locked',
     }));
     const delegateHud = this.delegate.getHudList();
     for (const mission of this._extraDelegateMissions()) {

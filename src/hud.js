@@ -474,7 +474,7 @@ export class HUD {
     for (const mission of list) {
       if (mission === primary) continue;
       if (mission.visible) {
-        html += `<div class="mission${mission.done ? ' done' : ''}"><span class="mi">${mission.icon}</span> ${mission.title}</div>`;
+        html += `<div class="mission${mission.done ? ' done' : ''}${mission.locked ? ' locked' : ''}"><span class="mi">${mission.icon}</span> ${mission.title}</div>`;
         continue;
       }
       if (!mission.done && !mission.optional) continue;

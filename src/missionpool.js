@@ -865,7 +865,7 @@ export class DynamicMissions {
         }
       }
       const prefix = m.optional ? '⭐ ' : '';
-      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done', primary: m.state === 'active' && !m.optional, optional: m.optional });
+      out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done', primary: m.state === 'active' && !m.optional, optional: m.optional, visible: !m.optional, locked: m.state === 'locked' });
     }
     const spainStage = {
       'spain-rebuild-center': 0,
@@ -890,6 +890,7 @@ export class DynamicMissions {
         done: index < activeIndex,
         primary: index === activeIndex,
         visible: true,
+        locked: index > activeIndex,
       }));
     }
     if (!this.objectiveOnly && this.allDone && !this.bossStarted) {
