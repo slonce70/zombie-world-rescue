@@ -156,6 +156,9 @@ const BIOME_EXPOSURE = {
 const FRONT_MISSION_PRESETS = Object.freeze({
   'rescue-group': ['rescue'],
   'rebuild-center': ['rebuild'],
+  'spain-rebuild-center': ['rebuild'],
+  'spain-clear-village': ['villageclear'],
+  'spain-defend-fireworks': ['fireworks'],
   'rescue-train': ['repair'],
   'rescue-ship': ['shiprescue'],
   'destroy-nests': ['nests'],
