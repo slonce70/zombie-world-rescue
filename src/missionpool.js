@@ -867,6 +867,33 @@ export class DynamicMissions {
       const prefix = m.optional ? '⭐ ' : '';
       out.push({ icon: m.icon, title: prefix + m.title + extra, done: m.state === 'done', primary: m.state === 'active' && !m.optional, optional: m.optional });
     }
+    const spainStage = {
+      'spain-rebuild-center': 0,
+      'spain-clear-village': 4,
+      'spain-defend-fireworks': 5,
+    }[this.level.operation?.missionPreset];
+    if (this.level.countryId === 'ESP' && spainStage !== undefined && out.length === 1) {
+      const m = this.missions[0];
+      const activeIndex = spainStage === 0
+        ? ({ musicians: 0, tools: 1, resources: 2, build: 3, done: 3 }[m.phase] ?? 0)
+        : spainStage;
+      const titles = [
+        t('Врятуй музикантів'),
+        t('Знайди сокиру й кірку'),
+        t('Добудь 50 заліза, 100 каменю і 55 дерева'),
+        t('Віднови музичний центр 30 секунд'),
+        t('Зачисти село від зомбі'),
+        t('Оборони феєрверки'),
+      ];
+      titles[activeIndex] = out[0].title;
+      return titles.map((title, index) => ({
+        icon: ['🎺', '🪓', '⛏️', '🎵', '🏘️', '🎆'][index],
+        title,
+        done: index < activeIndex,
+        primary: index === activeIndex,
+        visible: true,
+      }));
+    }
     if (!this.objectiveOnly && this.allDone && !this.bossStarted) {
       out.push({ icon: '👑', title: t('Перемоги БОСА на арені!'), done: false });
     } else if (this.bossStarted) {
