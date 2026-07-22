@@ -15,6 +15,22 @@ const REPAIR_NAMES = {
 
 const teamworkPrompt = (text, holders) => holders > 1 ? `${text} · ${t('Разом швидше ×{n}', { n: holders })}` : text;
 
+const COUNTRY_FRONT_CHAINS = Object.freeze({
+  POL: Object.freeze({
+    icons: Object.freeze(['🔥', '🚂', '🧊']),
+    titles: Object.freeze([t('Запали 3 вогнища'), t('Запусти рятувальний поїзд'), t('Зупини Крижаного Переслідувача')]),
+  }),
+  DEU: Object.freeze({
+    icons: Object.freeze(['🔧', '🚚', '👑']),
+    titles: Object.freeze([t('Врятуй механіків'), t('Запусти 3 вантажівки конвою'), t('Здолай Залізного Барона')]),
+  }),
+});
+
+const COUNTRY_FRONT_STAGE = Object.freeze({
+  'pol-light-bonfires': ['POL', 0], 'pol-rescue-train': ['POL', 1], 'pol-defeat-pursuer': ['POL', 2],
+  'deu-rescue-mechanics': ['DEU', 0], 'deu-start-convoy': ['DEU', 1], 'deu-defeat-baron': ['DEU', 2],
+});
+
 // ---------- описи типів місій ----------
 // slot: до якого зі слотів карти тип може потрапити
 // (A — хлів/порятунок, B — вежа/пристрій, C — склад/зона)
@@ -887,6 +903,19 @@ export class DynamicMissions {
       return titles.map((title, index) => ({
         icon: ['🎺', '🎵', '🏘️', '🎆'][index],
         title,
+        done: index < activeIndex,
+        primary: index === activeIndex,
+        visible: true,
+        locked: index > activeIndex,
+      }));
+    }
+    const countryStage = COUNTRY_FRONT_STAGE[this.level.operation?.missionPreset];
+    if (countryStage) {
+      const [countryId, activeIndex] = countryStage;
+      const chain = COUNTRY_FRONT_CHAINS[countryId];
+      return chain.titles.map((title, index) => ({
+        icon: chain.icons[index],
+        title: index === activeIndex && out[0] ? out[0].title : title,
         done: index < activeIndex,
         primary: index === activeIndex,
         visible: true,
