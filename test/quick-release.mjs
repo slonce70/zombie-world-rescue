@@ -7,6 +7,8 @@ const suite = [
   ['node', ['test/version-sync.mjs']],
   ['node', ['test/sw-cache.mjs']],
   ['node', ['test/save-migration.mjs']],
+  ['node', ['--test', 'test/specialists.mjs']],
+  ['node', ['test/fighter-progression-browser.mjs']],
   ['node', ['test/cloudsave.mjs'], { SLOW: process.env.QUICK_RELEASE_CLOUDSAVE_SLOW || process.env.SLOW || '1' }],
   ['node', ['test/smoke.mjs']],
   ['node', ['test/ux-stabilization.mjs']],

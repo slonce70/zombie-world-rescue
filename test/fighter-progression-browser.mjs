@@ -68,6 +68,19 @@ try {
     && bastion.placeholders === 4 && bastion.selectDisabled && bastion.upgradeDisabled,
   'Бастіон видимий без вигаданої бойової механіки або витрати валюти', JSON.stringify(bastion));
 
+  await page.setViewportSize({ width: 375, height: 844 });
+  const mobile = await page.evaluate(() => {
+    const card = document.querySelector('#overlay-fighter .fighter-card').getBoundingClientRect();
+    const buttons = ['btn-fighter-select', 'btn-fighter-upgrade'].map((id) => {
+      const rect = document.getElementById(id).getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    return { card: { top: card.top, bottom: card.bottom, height: card.height }, buttons };
+  });
+  check(mobile.card.top >= 0 && mobile.card.bottom <= 844
+    && mobile.buttons.every(({ width, height }) => width >= 44 && height >= 44),
+  'на 375×844 профіль прокручується у viewport, а кнопки мають touch-зони 44×44', JSON.stringify(mobile));
+
   check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
 } finally {
   await closeTest();
