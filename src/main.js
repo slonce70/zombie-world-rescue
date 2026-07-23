@@ -20,7 +20,8 @@ import {
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
 } from './expedition.js';
 import {
-  SPECIALISTS, claimSpecialistMastery, sanitizeSpecialistClaims, sanitizeSpecialistId,
+  SPECIALISTS, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
+  sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
 import {
@@ -725,6 +726,7 @@ class Game {
       coopRole: null,
       specialistXp: { guard: 0, medic: 0, scout: 0 },
       specialistClaims: [],
+      fighterLevels: { guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1 },
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -878,6 +880,7 @@ class Game {
         if (!Array.isArray(out.medals)) out.medals = [];
         out.specialistXp = sanitizeSpecialistXp(out.specialistXp);
         out.specialistClaims = sanitizeSpecialistClaims(out.specialistClaims);
+        out.fighterLevels = sanitizeFighterLevels(out.fighterLevels);
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])

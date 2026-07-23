@@ -1,13 +1,18 @@
 export const SPECIALIST_IDS = Object.freeze(['guard', 'medic', 'scout']);
+export const EXPEDITION_FIGHTER_IDS = Object.freeze([...SPECIALIST_IDS, 'bastion', 'impulse']);
 
 export const SPECIALISTS = Object.freeze({
   guard: Object.freeze({
-    icon: '🛡️', name: 'Захисник', passive: '+HP', superName: 'Щит', superIcon: '🛡️',
+    icon: '🛡️', name: 'Захисник', role: 'Танк', passive: '+HP',
+    attackName: 'Дробовик', superName: 'Щит', superIcon: '🛡️',
+    gadgets: Object.freeze(['Щит', 'Стіна']), playable: true,
     kit: Object.freeze(['pistol', 'shotgun']), signature: 'shotgun', chargePerHit: 18,
     bias: Object.freeze({ tags: Object.freeze(['tank']), ids: Object.freeze([]), multiplier: 2 }),
   }),
   medic: Object.freeze({
-    icon: '💉', name: 'Медик', passive: 'Сильніше лікування', superName: 'Лікування', superIcon: '💚',
+    icon: '💉', name: 'Медик', role: 'Підтримка', passive: 'Сильніше лікування',
+    attackName: 'Автомат', superName: 'Лікування', superIcon: '💚',
+    gadgets: Object.freeze(['Лікування', 'Тотем лікування']), playable: true,
     kit: Object.freeze(['pistol', 'rifle']), signature: 'rifle', chargePerHit: 8,
     bias: Object.freeze({
       tags: Object.freeze([]),
@@ -16,10 +21,29 @@ export const SPECIALISTS = Object.freeze({
     }),
   }),
   scout: Object.freeze({
-    icon: '🏹', name: 'Розвідник', passive: 'Швидкість і підбір', superName: 'Ривок', superIcon: '🏃',
+    icon: '🏹', name: 'Розвідник', role: 'Мобільність', passive: 'Швидкість і підбір',
+    attackName: 'Швидкостріл', superName: 'Ривок', superIcon: '🏃',
+    gadgets: Object.freeze(['Ривок', 'Телепорт']), playable: true,
     kit: Object.freeze(['pistol', 'smg']), signature: 'smg', chargePerHit: 5,
     bias: Object.freeze({ tags: Object.freeze(['speed']), ids: Object.freeze([]), multiplier: 2 }),
   }),
+  bastion: Object.freeze({
+    icon: '🧱', name: 'Бастіон', role: 'Танк', passive: 'Висока витривалість',
+    attackName: 'Очікує твоєї ідеї', superName: 'Очікує твоєї ідеї', superIcon: '✨',
+    gadgets: Object.freeze(['Очікує твоєї ідеї', 'Очікує твоєї ідеї']), playable: false,
+  }),
+  impulse: Object.freeze({
+    icon: '🌀', name: 'Імпульс', role: 'Контроль', passive: 'Контроль натовпу',
+    attackName: 'Очікує твоєї ідеї', superName: 'Очікує твоєї ідеї', superIcon: '✨',
+    gadgets: Object.freeze(['Очікує твоєї ідеї', 'Очікує твоєї ідеї']), playable: false,
+  }),
+});
+
+export const FIGHTER_UPGRADE_COSTS = Object.freeze({
+  2: Object.freeze({ coins: 250, crystals: 0 }),
+  3: Object.freeze({ coins: 500, crystals: 3 }),
+  4: Object.freeze({ coins: 1000, crystals: 10 }),
+  5: Object.freeze({ coins: 2000, crystals: 25 }),
 });
 
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,
@@ -28,6 +52,40 @@ const clampInt = (value, min, max) => Math.max(min, Math.min(max,
 export function sanitizeSpecialistId(value, fallback = null) {
   if (SPECIALIST_IDS.includes(value)) return value;
   return SPECIALIST_IDS.includes(fallback) ? fallback : null;
+}
+
+export function sanitizeFighterId(value, fallback = null) {
+  if (EXPEDITION_FIGHTER_IDS.includes(value)) return value;
+  return EXPEDITION_FIGHTER_IDS.includes(fallback) ? fallback : null;
+}
+
+export function sanitizeFighterLevels(value) {
+  const src = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(EXPEDITION_FIGHTER_IDS.map((id) => [id, clampInt(src[id], 1, 5)]));
+}
+
+export function fighterLevelMultiplier(level) {
+  return 1 + (clampInt(level, 1, 5) - 1) / 10;
+}
+
+export function buyFighterLevel(state, id) {
+  const fighterLevels = sanitizeFighterLevels(state && state.fighterLevels);
+  const coins = clampInt(state && state.coins, 0, 999999999);
+  const crystals = clampInt(state && state.crystals, 0, 999999999);
+  const cleanId = sanitizeFighterId(id);
+  const level = cleanId ? fighterLevels[cleanId] : 1;
+  const fail = (reason) => ({ ok: false, reason, level, coins, crystals, fighterLevels });
+  if (!cleanId) return fail('unknown');
+  if (!SPECIALISTS[cleanId].playable) return fail('unavailable');
+  if (level >= 5) return fail('max');
+  const cost = FIGHTER_UPGRADE_COSTS[level + 1];
+  if (coins < cost.coins) return fail('coins');
+  if (crystals < cost.crystals) return fail('crystals');
+  fighterLevels[cleanId] = level + 1;
+  return {
+    ok: true, reason: null, level: level + 1,
+    coins: coins - cost.coins, crystals: crystals - cost.crystals, fighterLevels,
+  };
 }
 
 export function sanitizeSpecialistXp(value) {

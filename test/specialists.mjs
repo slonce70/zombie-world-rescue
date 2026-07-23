@@ -5,12 +5,15 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../src/specialists.js', import.meta.url), 'utf8');
 const specialists = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
-  SPECIALIST_IDS, claimSpecialistMastery, sanitizeSpecialistClaims, sanitizeSpecialistXp,
-  specialistBias, specialistMasteryAward, specialistModifiers, specialistRank,
+  EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, buyFighterLevel,
+  claimSpecialistMastery, fighterLevelMultiplier, sanitizeFighterLevels,
+  sanitizeSpecialistClaims, sanitizeSpecialistXp, specialistBias, specialistMasteryAward,
+  specialistModifiers, specialistRank,
 } = specialists;
 
 test('specialist ids, ranks, modifiers and bias are canonical', () => {
   assert.deepEqual(SPECIALIST_IDS, ['guard', 'medic', 'scout']);
+  assert.deepEqual(EXPEDITION_FIGHTER_IDS, ['guard', 'medic', 'scout', 'bastion', 'impulse']);
   assert.deepEqual([0, 99, 100, 299, 300].map(specialistRank), [1, 1, 2, 2, 3]);
   assert.equal(specialistModifiers('guard', 1).maxHealthBonus, 25);
   assert.equal(specialistModifiers('guard', 2).maxHealthBonus, 35);
@@ -18,6 +21,35 @@ test('specialist ids, ranks, modifiers and bias are canonical', () => {
   assert.equal(specialistModifiers('scout', 3).superAmount, 3);
   assert.deepEqual(specialistBias('guard').tags, ['tank']);
   assert.equal(specialistBias('unknown'), null);
+});
+
+test('fighter levels sanitize, scale and buy atomically', () => {
+  assert.deepEqual(FIGHTER_UPGRADE_COSTS, {
+    2: { coins: 250, crystals: 0 },
+    3: { coins: 500, crystals: 3 },
+    4: { coins: 1000, crystals: 10 },
+    5: { coins: 2000, crystals: 25 },
+  });
+  assert.deepEqual(sanitizeFighterLevels({ guard: 9, medic: 2.8, bastion: -1 }), {
+    guard: 5, medic: 2, scout: 1, bastion: 1, impulse: 1,
+  });
+  assert.deepEqual([1, 2, 3, 4, 5].map(fighterLevelMultiplier), [1, 1.1, 1.2, 1.3, 1.4]);
+
+  const bought = buyFighterLevel({ fighterLevels: {}, coins: 250, crystals: 0 }, 'guard');
+  assert.deepEqual(bought, {
+    ok: true, reason: null, level: 2, coins: 0, crystals: 0,
+    fighterLevels: { guard: 2, medic: 1, scout: 1, bastion: 1, impulse: 1 },
+  });
+  assert.deepEqual(buyFighterLevel({ fighterLevels: {}, coins: 249, crystals: 99 }, 'guard').reason, 'coins');
+  assert.deepEqual(buyFighterLevel({
+    fighterLevels: { guard: 2 }, coins: 500, crystals: 2,
+  }, 'guard').reason, 'crystals');
+  assert.deepEqual(buyFighterLevel({
+    fighterLevels: { guard: 5 }, coins: 9999, crystals: 99,
+  }, 'guard').reason, 'max');
+  assert.deepEqual(buyFighterLevel({
+    fighterLevels: {}, coins: 9999, crystals: 99,
+  }, 'bastion').reason, 'unavailable');
 });
 
 test('specialist progress sanitizers isolate malformed values', () => {

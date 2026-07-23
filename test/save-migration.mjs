@@ -57,6 +57,9 @@ async function loadWith(raw) {
   check(errs.length === 0, `порожній {}: без винятків (${errs[0] || 'ok'})`);
   check(save.activeSkin === 'classic' && Array.isArray(save.skins), 'порожній {}: дефолти скінів на місці');
   check(save.crystals === 0, 'порожній {}: crystals = 0');
+  check(JSON.stringify(save.fighterLevels) === JSON.stringify({
+    guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1,
+  }), 'порожній {}: усі бійці починають з рівня 1');
 }
 
 // 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.
@@ -114,11 +117,15 @@ async function loadWith(raw) {
     coins: 777,
     specialistXp: { guard: -1, medic: 12.8, scout: 2e9 },
     specialistClaims: [...claims, claims.at(-1), 'bad'],
+    fighterLevels: { guard: 99, medic: 2.8, bastion: -5 },
   }));
   check(errs.length === 0, `майстерність: без винятків (${errs[0] || 'ok'})`);
   check(save.coins === 777, 'биті поля майстерності не скидають решту профілю');
   check(JSON.stringify(save.specialistXp) === JSON.stringify({ guard: 0, medic: 12, scout: 999999 }), 'XP спеціалістів клампиться');
   check(save.specialistClaims.length === 50 && new Set(save.specialistClaims).size === 50, 'ledger майстерності дедупиться і тримає 50 id');
+  check(JSON.stringify(save.fighterLevels) === JSON.stringify({
+    guard: 5, medic: 2, scout: 1, bastion: 1, impulse: 1,
+  }), 'рівні бійців клампляться до 1..5');
 }
 
 await browser.close();
