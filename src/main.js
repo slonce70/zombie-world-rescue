@@ -20,7 +20,8 @@ import {
   createExpedition, expeditionCard, expeditionLevelConfig, sanitizeExpedition,
 } from './expedition.js';
 import {
-  SPECIALISTS, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
+  EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALISTS,
+  buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
   sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
@@ -530,6 +531,31 @@ class Game {
       this.save.expedition = null;
       this.saveGame();
       this._hideOverlay('overlay-expedition');
+    });
+    document.getElementById('btn-fighter-select').addEventListener('click', () => {
+      if (!this._selectExpeditionSpecialist(this._fighterProfileId)) return;
+      this.audio.click();
+      this._hideOverlay('overlay-fighter');
+    });
+    document.getElementById('btn-fighter-upgrade').addEventListener('click', () => {
+      const next = buyFighterLevel(this.save, this._fighterProfileId);
+      if (!next.ok) {
+        this.audio.denied();
+        const message = next.reason === 'coins' ? 'Не вистачає монет'
+          : next.reason === 'crystals' ? 'Не вистачає кристалів'
+            : 'Бойовий набір ще створюється';
+        this.hud.toast(t(message));
+        return;
+      }
+      this.save.fighterLevels = next.fighterLevels;
+      this.save.coins = next.coins;
+      this.save.crystals = next.crystals;
+      this.saveGame();
+      this.audio.purchase();
+      this.renderExpedition();
+      this._overlayFocus?.set('overlay-fighter',
+        document.querySelector(`[data-specialist="${this._fighterProfileId}"]`));
+      this.renderExpeditionFighter();
     });
     document.getElementById('btn-arena-retry').addEventListener('click', () => {
       this._hideOverlay('overlay-arena-end');
@@ -3162,6 +3188,55 @@ class Game {
     return { id, ...next.result };
   }
 
+  openExpeditionFighter(id, trigger = document.activeElement) {
+    this._fighterProfileId = sanitizeFighterId(id, 'guard');
+    this.renderExpeditionFighter();
+    this._showOverlay('overlay-fighter', trigger);
+    this.audio.click();
+  }
+
+  renderExpeditionFighter() {
+    const id = sanitizeFighterId(this._fighterProfileId, 'guard');
+    const cfg = SPECIALISTS[id];
+    const levels = sanitizeFighterLevels(this.save.fighterLevels);
+    const level = levels[id];
+    const bonus = Math.round((fighterLevelMultiplier(level) - 1) * 100);
+    const run = sanitizeExpedition(this.save.expedition);
+    const locked = !run || run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0;
+    const pending = !cfg.playable;
+    const selected = run && run.specialist === id;
+    const abilities = [
+      ['АТАКА', cfg.attackName],
+      ['SUPER', cfg.superName],
+      ['ГАДЖЕТ 1', cfg.gadgets[0]],
+      ['ГАДЖЕТ 2', cfg.gadgets[1]],
+    ];
+    document.getElementById('fighter-title').textContent = `${cfg.icon} ${t(cfg.name)}`;
+    document.getElementById('fighter-role').textContent = t('Клас: {role}', { role: t(cfg.role) });
+    document.getElementById('fighter-level').textContent = t('Рівень {n}/5', { n: level });
+    document.getElementById('fighter-stats').textContent = t('+{n}% HP · +{n}% шкоди', { n: bonus });
+    document.getElementById('fighter-abilities').innerHTML = abilities.map(([label, value]) =>
+      `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('');
+    document.getElementById('fighter-status').textContent = pending
+      ? t('Додай атаку, Super і гаджети — тоді боєць відкриється для гри.')
+      : locked
+        ? t('Боєць і прокачка зафіксовані до кінця забігу.')
+        : t('Super заряджається влучаннями. На 100% натисни F або кнопку Super.');
+    const select = document.getElementById('btn-fighter-select');
+    select.textContent = selected ? t('✅ Обрано') : t('✅ Обрати');
+    select.disabled = pending || locked || selected;
+    const upgrade = document.getElementById('btn-fighter-upgrade');
+    const cost = FIGHTER_UPGRADE_COSTS[level + 1];
+    upgrade.textContent = level >= 5
+      ? t('⭐ МАКС. РІВЕНЬ')
+      : t('⬆️ Рівень {n}: 🪙 {coins}{crystals}', {
+        n: level + 1,
+        coins: cost.coins,
+        crystals: cost.crystals ? ` · 💎 ${cost.crystals}` : '',
+      });
+    upgrade.disabled = pending || locked || level >= 5;
+  }
+
   renderExpedition() {
     const run = sanitizeExpedition(this.save.expedition);
     if (!run) return;
@@ -3177,12 +3252,18 @@ class Game {
     const mastery = document.getElementById('expedition-mastery');
     const selected = run.coop ? sanitizeSpecialistId(this.save.coopRole, 'guard') : run.specialist;
     const locked = run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0;
-    specialists.innerHTML = Object.entries(SPECIALISTS).map(([id, cfg]) => {
+    const fighterLevels = sanitizeFighterLevels(this.save.fighterLevels);
+    specialists.innerHTML = EXPEDITION_FIGHTER_IDS.map((id) => {
+      const cfg = SPECIALISTS[id];
       const rank = specialistRank(this.save.specialistXp[id]);
-      return `<button class="expedition-specialist${rank === 3 ? ' rank-3' : ''}" data-specialist="${id}" aria-pressed="${id === selected}" ${locked ? 'disabled' : ''}><strong>${cfg.icon} ${t(cfg.name)} · ${t('Ранг')} ${rank}</strong><span>${t(cfg.passive)} · Super: ${t(cfg.superName)}</span></button>`;
+      const upcoming = !cfg.playable;
+      const detail = upcoming
+        ? `${t(cfg.role)} · ${t('Очікує твоєї ідеї')}`
+        : `${t(cfg.passive)} · Super: ${t(cfg.superName)}`;
+      return `<button class="expedition-specialist${rank === 3 ? ' rank-3' : ''}${upcoming ? ' upcoming' : ''}" data-specialist="${id}" aria-pressed="${id === selected}"><strong>${cfg.icon} ${t(cfg.name)} · ${t('Рівень')} ${fighterLevels[id]}</strong><span>${detail}</span></button>`;
     }).join('');
     specialists.querySelectorAll('[data-specialist]').forEach((button) => {
-      button.addEventListener('click', () => this._selectExpeditionSpecialist(button.dataset.specialist));
+      button.addEventListener('click', () => this.openExpeditionFighter(button.dataset.specialist, button));
     });
     lock.textContent = !run.coop && locked ? t('Спеціаліста зафіксовано до кінця забігу') : '';
     mastery.textContent = '';
@@ -3625,13 +3706,20 @@ class Game {
       const rank = specialistRank(this.save.specialistXp[id]);
       const modifiers = specialistModifiers(id, rank);
       const active = !isRadiation;
-      level.specialist = { id, rank, charge: 0, maxCharge: 100, active };
+      const fighterLevel = level.expedition.coop ? null : sanitizeFighterLevels(this.save.fighterLevels)[id];
+      level.specialist = { id, rank, level: fighterLevel, charge: 0, maxCharge: 100, active };
       if (active) {
         level.player.maxHealth += modifiers.maxHealthBonus;
         level.player.health = level.player.maxHealth;
         level.player.healMult *= modifiers.healMult;
         level.player.speedMult *= modifiers.speedMult;
         level.player.pickupMult *= modifiers.pickupMult;
+        if (!level.expedition.coop) {
+          const levelMultiplier = fighterLevelMultiplier(fighterLevel);
+          level.player.maxHealth = Math.round(level.player.maxHealth * levelMultiplier);
+          level.player.health = level.player.maxHealth;
+          level.player.damageMult *= levelMultiplier;
+        }
         const nodeType = level.expedition.current && level.expedition.current.type;
         if (['rescue', 'elite', 'boss'].includes(nodeType)) {
           level.player.weapons = [...SPECIALISTS[id].kit];

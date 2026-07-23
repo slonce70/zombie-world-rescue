@@ -94,6 +94,30 @@
     </div>
   </div>
 
+  <div id="overlay-fighter" class="overlay" role="dialog" aria-modal="true"
+    aria-labelledby="fighter-title" aria-hidden="true" data-escape-close="btn-fighter-close">
+    <div class="overlay-card panel-card fighter-card">
+      <div class="panel-header">
+        <div>
+          <div id="fighter-role" class="fighter-role"></div>
+          <h2 id="fighter-title">БІЄЦЬ</h2>
+        </div>
+        <button id="btn-fighter-close" class="btn-x panel-close" data-close="overlay-fighter"
+          data-dialog-focus aria-label="Закрити">✕</button>
+      </div>
+      <div class="fighter-progress">
+        <strong id="fighter-level"></strong>
+        <span id="fighter-stats"></span>
+      </div>
+      <div id="fighter-abilities" class="fighter-abilities"></div>
+      <p id="fighter-status" class="panel-sub"></p>
+      <div class="btn-row">
+        <button id="btn-fighter-select" class="btn btn-primary">✅ Обрати</button>
+        <button id="btn-fighter-upgrade" class="btn">⬆️ Прокачати</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🛰️ v500: Єдиний цикл операцій, фахівців і проєктів Бази -->
   <div id="overlay-front" class="overlay" role="dialog" aria-modal="true" aria-labelledby="front-title" aria-hidden="true">
     <div class="overlay-card panel-card front-card">

@@ -16,13 +16,18 @@ try {
   const opened = await page.evaluate(() => ({ run: window.__game.save.expedition, text: document.querySelector('#expedition-route').textContent }));
   check(opened.run?.status === 'active' && opened.run?.step === 0, 'нова експедиція відкриває перший етап');
   check(opened.text.includes('Порятунок'), 'маршрут показує тип етапу');
-  check(await page.locator('#expedition-specialists [data-specialist]').count() === 3, 'доступні три спеціалісти');
+  check(await page.locator('#expedition-specialists [data-specialist]').count() === 5, 'доступні профілі п’ятьох бійців');
   const specialistHitArea = await page.locator('[data-specialist="scout"]').evaluate((el) => {
     const rect = el.getBoundingClientRect();
     return { width: rect.width, height: rect.height, pressed: el.getAttribute('aria-pressed') };
   });
   check(specialistHitArea.width >= 44 && specialistHitArea.height >= 44, 'картка спеціаліста має доступну touch-зону', JSON.stringify(specialistHitArea));
   await page.click('[data-specialist="scout"]');
+  await page.click('#btn-fighter-select');
+  await page.evaluate(() => {
+    window.__game.save.fighterLevels.scout = 3;
+    window.__game.saveGame();
+  });
   const selected = await page.evaluate(() => ({ run: window.__game.save.expedition.specialist, last: window.__game.save.coopRole }));
   check(selected.run === 'scout' && selected.last === 'scout', 'вибір спеціаліста зберігається', JSON.stringify(selected));
 
@@ -33,9 +38,13 @@ try {
     build: window.__game.level.runBuild.ids,
     specialist: window.__game.level.specialist,
     weapons: window.__game.level.player.weapons,
+    hp: window.__game.level.player.maxHealth,
+    damage: window.__game.level.player.damageMult,
   }));
   check(first.step === 0 && Array.isArray(first.build), 'етап стартує з серіалізованою збіркою');
   check(first.specialist.id === 'scout' && first.weapons.includes('smg'), 'на рівні застосовано набір Розвідника', JSON.stringify(first));
+  check(first.specialist.level === 3 && first.hp === 120 && first.damage === 1.2,
+    'рівень 3 збільшує HP і шкоду на 20% у соло-Експедиції', JSON.stringify(first));
   const pickup = await page.evaluate(() => {
     window.__game._trySuperPickup(window.__game.level);
     return window.__game.level.superPickup;
@@ -82,7 +91,13 @@ try {
   await page.waitForSelector('#overlay-victory.show');
   await page.click('#btn-victory-next');
   await page.waitForSelector('#overlay-expedition.show');
-  check(await page.locator('#expedition-specialists [data-specialist]:disabled').count() === 3, 'після першої перемоги спеціаліст зафіксований');
+  await page.click('[data-specialist="scout"]');
+  const lockedFighter = await page.evaluate(() => ({
+    select: document.getElementById('btn-fighter-select').disabled,
+    upgrade: document.getElementById('btn-fighter-upgrade').disabled,
+  }));
+  check(lockedFighter.select && lockedFighter.upgrade, 'після першої перемоги вибір і прокачка зафіксовані');
+  await page.keyboard.press('Escape');
   const choiceCount = await page.locator('#expedition-route button.expedition-node').count();
   check(choiceCount === 2, 'після перемоги доступні два маршрути');
   await page.locator('#expedition-route button.expedition-node').first().click();

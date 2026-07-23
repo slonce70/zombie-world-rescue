@@ -415,8 +415,11 @@ export class HUD {
       const specialist = level.specialist;
       const cfg = SPECIALISTS[specialist.id];
       const charge = Math.floor(specialist.charge);
+      const progression = specialist.level
+        ? `${t('Рівень')} ${specialist.level}`
+        : `${t('Ранг')} ${specialist.rank}`;
       gHtml = specialist.active
-        ? `${cfg.icon} ${t(cfg.name)} · ${t('Ранг')} ${specialist.rank} · Super ${charge}%`
+        ? `${cfg.icon} ${t(cfg.name)} · ${progression} · Super ${charge}%`
         : t('☢️ Контракт: спеціаліст вимкнений');
       const btn = document.getElementById('tb-gadget');
       const badge = document.getElementById('tb-gadget-n');
