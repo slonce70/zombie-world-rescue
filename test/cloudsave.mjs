@@ -160,7 +160,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'weeklyCamp',
       // 🌍 v303 «Світ врятовано»
       'worldSaved',
-      'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
+      'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -171,7 +171,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
-      'weeklyCamp', 'worldSaved', 'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
+      'weeklyCamp', 'worldSaved', 'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;

@@ -57,7 +57,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   // 🌍 v303 «Світ врятовано»: одноразовий прапорець фіналу кампанії (усі 12 країн вільні)
   'worldSaved',
   // 🧭 v400: активний маршрут, збірка і незабрана нагорода експедиції
-  'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels',
+  'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget',
   // 🛰️ v500: дошка Живого фронту, активна операція, проєкти та id вже виданих нагород
   'front', 'frontCoopClaims',
   // 🌙 відновлені реле й одноразова нагорода живої місячної бази

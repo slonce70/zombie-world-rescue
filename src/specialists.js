@@ -29,8 +29,10 @@ export const SPECIALISTS = Object.freeze({
   }),
   bastion: Object.freeze({
     icon: '🧱', name: 'Бастіон', role: 'Танк', passive: 'Висока витривалість',
-    attackName: 'Очікує твоєї ідеї', superName: 'Очікує твоєї ідеї', superIcon: '✨',
-    gadgets: Object.freeze(['Очікує твоєї ідеї', 'Очікує твоєї ідеї']), playable: false,
+    attackName: 'Кулаки', superName: 'Суперкулак', superIcon: '👊',
+    gadgets: Object.freeze(['Лікувальні кулаки', 'Провокація']), playable: true,
+    kit: Object.freeze(['fists']), signature: 'fists', chargePerHit: 20,
+    bias: Object.freeze({ tags: Object.freeze(['tank']), ids: Object.freeze([]), multiplier: 2 }),
   }),
   impulse: Object.freeze({
     icon: '🌀', name: 'Імпульс', role: 'Контроль', passive: 'Контроль натовпу',
@@ -46,8 +48,25 @@ export const FIGHTER_UPGRADE_COSTS = Object.freeze({
   5: Object.freeze({ coins: 3000, crystals: 15 }),
 });
 
+export const BASTION_LEVEL_STATS = Object.freeze([
+  null,
+  Object.freeze({ maxHealth: 50, damage: 50 }),
+  Object.freeze({ maxHealth: 65, damage: 75 }),
+  Object.freeze({ maxHealth: 100, damage: 95 }),
+  Object.freeze({ maxHealth: 175, damage: 110 }),
+  Object.freeze({ maxHealth: 215, damage: 125 }),
+]);
+
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,
   Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : min));
+
+export function bastionLevelStats(level) {
+  return BASTION_LEVEL_STATS[clampInt(level, 1, 5)];
+}
+
+export function sanitizeBastionGadget(value) {
+  return value === 'provoke' ? 'provoke' : 'healing-punch';
+}
 
 export function sanitizeSpecialistId(value, fallback = null) {
   if (SPECIALIST_IDS.includes(value)) return value;

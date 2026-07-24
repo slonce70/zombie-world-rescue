@@ -22,6 +22,7 @@ import {
 import {
   EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALISTS,
   buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
+  sanitizeBastionGadget,
   sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
@@ -754,6 +755,7 @@ class Game {
       specialistXp: { guard: 0, medic: 0, scout: 0 },
       specialistClaims: [],
       fighterLevels: { guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1 },
+      bastionGadget: 'healing-punch',
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -908,6 +910,7 @@ class Game {
         out.specialistXp = sanitizeSpecialistXp(out.specialistXp);
         out.specialistClaims = sanitizeSpecialistClaims(out.specialistClaims);
         out.fighterLevels = sanitizeFighterLevels(out.fighterLevels);
+        out.bastionGadget = sanitizeBastionGadget(out.bastionGadget);
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])

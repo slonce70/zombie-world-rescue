@@ -60,6 +60,7 @@ async function loadWith(raw) {
   check(JSON.stringify(save.fighterLevels) === JSON.stringify({
     guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1,
   }), 'порожній {}: усі бійці починають з рівня 1');
+  check(save.bastionGadget === 'healing-punch', 'порожній {}: лікувальні кулаки обрані за замовчуванням');
 }
 
 // 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.
@@ -118,6 +119,7 @@ async function loadWith(raw) {
     specialistXp: { guard: -1, medic: 12.8, scout: 2e9 },
     specialistClaims: [...claims, claims.at(-1), 'bad'],
     fighterLevels: { guard: 99, medic: 2.8, bastion: -5 },
+    bastionGadget: 'bad',
   }));
   check(errs.length === 0, `майстерність: без винятків (${errs[0] || 'ok'})`);
   check(save.coins === 777, 'биті поля майстерності не скидають решту профілю');
@@ -126,6 +128,7 @@ async function loadWith(raw) {
   check(JSON.stringify(save.fighterLevels) === JSON.stringify({
     guard: 5, medic: 2, scout: 1, bastion: 1, impulse: 1,
   }), 'рівні бійців клампляться до 1..5');
+  check(save.bastionGadget === 'healing-punch', 'битий гаджет Бастіона повертається до дефолту');
 }
 
 await browser.close();

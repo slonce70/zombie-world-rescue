@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../src/specialists.js', import.meta.url), 'utf8');
 const specialists = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
-  EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, buyFighterLevel,
+  BASTION_LEVEL_STATS, EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, SPECIALISTS,
+  bastionLevelStats, buyFighterLevel,
   claimSpecialistMastery, fighterLevelMultiplier, sanitizeFighterLevels,
-  sanitizeSpecialistClaims, sanitizeSpecialistXp, specialistBias, specialistMasteryAward,
+  sanitizeBastionGadget, sanitizeSpecialistClaims, sanitizeSpecialistXp, specialistBias, specialistMasteryAward,
   specialistModifiers, specialistRank,
 } = specialists;
 
@@ -47,9 +48,24 @@ test('fighter levels sanitize, scale and buy atomically', () => {
   assert.deepEqual(buyFighterLevel({
     fighterLevels: { guard: 5 }, coins: 9999, crystals: 99,
   }, 'guard').reason, 'max');
-  assert.deepEqual(buyFighterLevel({
-    fighterLevels: {}, coins: 9999, crystals: 99,
-  }, 'bastion').reason, 'unavailable');
+  assert.equal(buyFighterLevel({
+    fighterLevels: {}, coins: 1000, crystals: 0,
+  }, 'bastion').ok, true);
+});
+
+test('Bastion has exact level stats and a valid gadget selection', () => {
+  assert.deepEqual(BASTION_LEVEL_STATS.slice(1), [
+    { maxHealth: 50, damage: 50 },
+    { maxHealth: 65, damage: 75 },
+    { maxHealth: 100, damage: 95 },
+    { maxHealth: 175, damage: 110 },
+    { maxHealth: 215, damage: 125 },
+  ]);
+  assert.deepEqual([1, 2, 3, 4, 5].map(bastionLevelStats), BASTION_LEVEL_STATS.slice(1));
+  assert.equal(sanitizeBastionGadget('provoke'), 'provoke');
+  assert.equal(sanitizeBastionGadget('bad'), 'healing-punch');
+  assert.equal(SPECIALISTS.bastion.playable, true);
+  assert.equal(SPECIALISTS.bastion.chargePerHit, 20);
 });
 
 test('specialist progress sanitizers isolate malformed values', () => {
