@@ -40,10 +40,10 @@ export const SPECIALISTS = Object.freeze({
 });
 
 export const FIGHTER_UPGRADE_COSTS = Object.freeze({
-  2: Object.freeze({ coins: 250, crystals: 0 }),
-  3: Object.freeze({ coins: 500, crystals: 3 }),
-  4: Object.freeze({ coins: 1000, crystals: 10 }),
-  5: Object.freeze({ coins: 2000, crystals: 25 }),
+  2: Object.freeze({ coins: 1000, crystals: 0 }),
+  3: Object.freeze({ coins: 2000, crystals: 5 }),
+  4: Object.freeze({ coins: 2500, crystals: 13 }),
+  5: Object.freeze({ coins: 3000, crystals: 15 }),
 });
 
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,

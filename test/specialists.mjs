@@ -25,24 +25,24 @@ test('specialist ids, ranks, modifiers and bias are canonical', () => {
 
 test('fighter levels sanitize, scale and buy atomically', () => {
   assert.deepEqual(FIGHTER_UPGRADE_COSTS, {
-    2: { coins: 250, crystals: 0 },
-    3: { coins: 500, crystals: 3 },
-    4: { coins: 1000, crystals: 10 },
-    5: { coins: 2000, crystals: 25 },
+    2: { coins: 1000, crystals: 0 },
+    3: { coins: 2000, crystals: 5 },
+    4: { coins: 2500, crystals: 13 },
+    5: { coins: 3000, crystals: 15 },
   });
   assert.deepEqual(sanitizeFighterLevels({ guard: 9, medic: 2.8, bastion: -1 }), {
     guard: 5, medic: 2, scout: 1, bastion: 1, impulse: 1,
   });
   assert.deepEqual([1, 2, 3, 4, 5].map(fighterLevelMultiplier), [1, 1.1, 1.2, 1.3, 1.4]);
 
-  const bought = buyFighterLevel({ fighterLevels: {}, coins: 250, crystals: 0 }, 'guard');
+  const bought = buyFighterLevel({ fighterLevels: {}, coins: 1000, crystals: 0 }, 'guard');
   assert.deepEqual(bought, {
     ok: true, reason: null, level: 2, coins: 0, crystals: 0,
     fighterLevels: { guard: 2, medic: 1, scout: 1, bastion: 1, impulse: 1 },
   });
-  assert.deepEqual(buyFighterLevel({ fighterLevels: {}, coins: 249, crystals: 99 }, 'guard').reason, 'coins');
+  assert.deepEqual(buyFighterLevel({ fighterLevels: {}, coins: 999, crystals: 99 }, 'guard').reason, 'coins');
   assert.deepEqual(buyFighterLevel({
-    fighterLevels: { guard: 2 }, coins: 500, crystals: 2,
+    fighterLevels: { guard: 2 }, coins: 2000, crystals: 4,
   }, 'guard').reason, 'crystals');
   assert.deepEqual(buyFighterLevel({
     fighterLevels: { guard: 5 }, coins: 9999, crystals: 99,

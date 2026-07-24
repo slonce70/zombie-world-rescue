@@ -31,7 +31,7 @@ try {
   }));
   check(initial.title.includes('Захисник') && initial.role.includes('Танк')
     && initial.level.includes('1') && initial.stats.includes('0%')
-    && initial.upgrade.includes('250') && initial.status.includes('C'),
+    && initial.upgrade.includes('1000') && initial.status.includes('C'),
   'картка відкриває профіль рівня 1 і підказує Super на C', JSON.stringify(initial));
 
   await page.click('#btn-fighter-upgrade');
@@ -42,7 +42,7 @@ try {
   check(denied.level === 1 && denied.coins === 50,
     'недостатньо монет не змінює рівень або баланс', JSON.stringify(denied));
 
-  await page.evaluate(() => { window.__game.save.coins = 250; });
+  await page.evaluate(() => { window.__game.save.coins = 1000; });
   await page.click('#btn-fighter-upgrade');
   const bought = await page.evaluate(() => ({
     level: window.__game.save.fighterLevels.guard,
