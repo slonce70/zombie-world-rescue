@@ -21,7 +21,7 @@ import {
 } from './expedition.js';
 import {
   EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALISTS,
-  buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
+  bastionLevelStats, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
   sanitizeBastionGadget,
   sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
@@ -3204,23 +3204,36 @@ class Game {
     const cfg = SPECIALISTS[id];
     const levels = sanitizeFighterLevels(this.save.fighterLevels);
     const level = levels[id];
+    const isBastion = id === 'bastion';
+    const bastionStats = isBastion ? bastionLevelStats(level) : null;
     const bonus = Math.round((fighterLevelMultiplier(level) - 1) * 100);
     const run = sanitizeExpedition(this.save.expedition);
     const locked = !run || run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0;
     const pending = !cfg.playable;
     const selected = run && run.specialist === id;
     const abilities = [
-      ['АТАКА', cfg.attackName],
-      ['SUPER', cfg.superName],
-      ['ГАДЖЕТ 1', cfg.gadgets[0]],
-      ['ГАДЖЕТ 2', cfg.gadgets[1]],
+      ['АТАКА', cfg.attackName, null],
+      ['SUPER', cfg.superName, null],
+      ['ГАДЖЕТ 1', cfg.gadgets[0], isBastion ? 'healing-punch' : null],
+      ['ГАДЖЕТ 2', cfg.gadgets[1], isBastion ? 'provoke' : null],
     ];
     document.getElementById('fighter-title').textContent = `${cfg.icon} ${t(cfg.name)}`;
     document.getElementById('fighter-role').textContent = t('Клас: {role}', { role: t(cfg.role) });
     document.getElementById('fighter-level').textContent = t('Рівень {n}/5', { n: level });
-    document.getElementById('fighter-stats').textContent = t('+{n}% HP · +{n}% шкоди', { n: bonus });
-    document.getElementById('fighter-abilities').innerHTML = abilities.map(([label, value]) =>
-      `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('');
+    document.getElementById('fighter-stats').textContent = isBastion
+      ? t('HP {hp} · {damage} шкоди', { hp: bastionStats.maxHealth, damage: bastionStats.damage })
+      : t('+{n}% HP · +{n}% шкоди', { n: bonus });
+    const abilitiesEl = document.getElementById('fighter-abilities');
+    abilitiesEl.innerHTML = abilities.map(([label, value, gadgetId]) => gadgetId
+      ? `<button type="button" class="fighter-ability fighter-gadget" data-bastion-gadget="${gadgetId}" aria-pressed="${this.save.bastionGadget === gadgetId}" ${locked ? 'disabled' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></button>`
+      : `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('');
+    abilitiesEl.querySelectorAll('[data-bastion-gadget]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.save.bastionGadget = sanitizeBastionGadget(button.dataset.bastionGadget);
+        this.saveGame();
+        this.renderExpeditionFighter();
+      });
+    });
     document.getElementById('fighter-status').textContent = pending
       ? t('Додай атаку, Super і гаджети — тоді боєць відкриється для гри.')
       : locked

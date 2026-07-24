@@ -62,13 +62,28 @@ try {
   const bastion = await page.evaluate(() => ({
     title: document.getElementById('fighter-title').textContent,
     role: document.getElementById('fighter-role').textContent,
+    stats: document.getElementById('fighter-stats').textContent,
+    abilities: document.getElementById('fighter-abilities').textContent,
     placeholders: [...document.querySelectorAll('#fighter-abilities [data-pending]')].length,
+    gadgets: [...document.querySelectorAll('[data-bastion-gadget]')].map((el) => ({
+      id: el.dataset.bastionGadget, pressed: el.getAttribute('aria-pressed'),
+    })),
     selectDisabled: document.getElementById('btn-fighter-select').disabled,
     upgradeDisabled: document.getElementById('btn-fighter-upgrade').disabled,
   }));
   check(bastion.title.includes('Бастіон') && bastion.role.includes('Танк')
-    && bastion.placeholders === 4 && bastion.selectDisabled && bastion.upgradeDisabled,
-  'Бастіон видимий без вигаданої бойової механіки або витрати валюти', JSON.stringify(bastion));
+    && bastion.stats.includes('50') && bastion.abilities.includes('Кулаки')
+    && bastion.abilities.includes('Суперкулак') && bastion.placeholders === 0
+    && bastion.gadgets.length === 2 && !bastion.selectDisabled && !bastion.upgradeDisabled,
+  'Бастіон показує точні характеристики й готовий бойовий набір', JSON.stringify(bastion));
+
+  await page.click('[data-bastion-gadget="provoke"]');
+  const gadget = await page.evaluate(() => ({
+    saved: window.__game.save.bastionGadget,
+    pressed: document.querySelector('[data-bastion-gadget="provoke"]').getAttribute('aria-pressed'),
+  }));
+  check(gadget.saved === 'provoke' && gadget.pressed === 'true',
+    'вибір Провокації зберігається у профілі', JSON.stringify(gadget));
 
   await page.setViewportSize({ width: 375, height: 844 });
   const mobile = await page.evaluate(() => {

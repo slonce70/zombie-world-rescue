@@ -849,6 +849,9 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 .fighter-ability strong, .fighter-ability span { display: block; }
 .fighter-ability strong { margin-bottom: 5px; color: #d8c9ff; font-size: 12px; }
 .fighter-ability[data-pending] { border-style: dashed; opacity: .72; }
+.fighter-gadget { color: #fff; text-align: left; cursor: pointer; font-family: var(--font); }
+.fighter-gadget[aria-pressed="true"] { border-color: #a78bfa; background: rgba(167,139,250,.18); }
+.fighter-gadget:disabled { cursor: default; opacity: .72; }
 .expedition-mastery { min-height: 22px; color: #ffd966; font-weight: 800; }
 .expedition-route { display: grid; gap: 10px; margin: 14px 0; }
 .expedition-node { width: 100%; min-height: 64px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.055); color: #fff; text-align: left; }
