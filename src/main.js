@@ -343,8 +343,9 @@ class Game {
       if (e.code === 'KeyB' && this.state === 'level' && this.deathT < 0 && !this.victoryShown && !this.paused) {
         this.shop.toggle();
       }
-      // 📣 C — колесо пінгів, лише у кооп-рівні (не соло, не на паузі)
-      if (e.code === 'KeyC' && this.state === 'level' && this.coop && this.coop.session.state === 'level' && !this.paused) {
+      // 📣 C — колесо пінгів у коопі, крім Expedition, де C використовує Super.
+      if (e.code === 'KeyC' && this.state === 'level' && !this.level?.specialist
+        && this.coop && this.coop.session.state === 'level' && !this.paused) {
         this.coop.openPingWheel();
       }
       if (e.code === 'KeyM') {
@@ -3221,7 +3222,7 @@ class Game {
       ? t('Додай атаку, Super і гаджети — тоді боєць відкриється для гри.')
       : locked
         ? t('Боєць і прокачка зафіксовані до кінця забігу.')
-        : t('Super заряджається влучаннями. На 100% натисни F або кнопку Super.');
+        : t('Super заряджається влучаннями. На 100% натисни C або кнопку Super.');
     const select = document.getElementById('btn-fighter-select');
     select.textContent = selected ? t('✅ Обрано') : t('✅ Обрати');
     select.disabled = pending || locked || selected;

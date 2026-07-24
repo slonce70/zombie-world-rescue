@@ -733,7 +733,8 @@ export class Gadgets {
       // колізія можлива лише якщо башту поставлено в <2.6м від E-точки місії — рідкісний край.
       input.justPressed.delete('KeyE');
     }
-    if (allowControl && p.health > 0 && input.pressed('KeyF')) this.use();
+    const useKey = level.specialist ? 'KeyC' : 'KeyF';
+    if (allowControl && p.health > 0 && input.pressed(useKey)) this.use();
     this._updateMeteorFires(dt);
 
     // бульбашка щита слідує за героєм і тане з міцністю
@@ -813,7 +814,7 @@ export class Gadgets {
     }
   }
 
-  // F — застосувати обраний гаджет
+  // C — Super спеціаліста, F — звичайний гаджет
   use() {
     const level = this.level;
     const game = level.game;

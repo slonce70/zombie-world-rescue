@@ -50,6 +50,10 @@ try {
     return g.level.specialist.charge;
   }, index ? 20 : 6)));
   check(charges[0] === 100 && charges[1] === 100, 'Super заряджається локально з різною швидкістю', charges.join(' / '));
+  await A.keyboard.press('c');
+  await A.waitForFunction(() => window.__game.level.specialist.charge === 0);
+  check(!await A.locator('#overlay-ping').evaluate((el) => el.classList.contains('show')),
+    'C використовує Super у кооп-Експедиції, не відкриваючи колесо пінгів');
 
   await A.evaluate(() => window.__game._showVictory());
   await Promise.all([A.waitForSelector('#overlay-victory.show'), B.waitForSelector('#overlay-victory.show')]);

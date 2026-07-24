@@ -27,10 +27,12 @@ try {
     level: document.getElementById('fighter-level').textContent,
     stats: document.getElementById('fighter-stats').textContent,
     upgrade: document.getElementById('btn-fighter-upgrade').textContent,
+    status: document.getElementById('fighter-status').textContent,
   }));
   check(initial.title.includes('Захисник') && initial.role.includes('Танк')
     && initial.level.includes('1') && initial.stats.includes('0%')
-    && initial.upgrade.includes('250'), 'картка відкриває профіль рівня 1', JSON.stringify(initial));
+    && initial.upgrade.includes('250') && initial.status.includes('C'),
+  'картка відкриває профіль рівня 1 і підказує Super на C', JSON.stringify(initial));
 
   await page.click('#btn-fighter-upgrade');
   const denied = await page.evaluate(() => ({

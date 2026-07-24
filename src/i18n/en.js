@@ -2776,7 +2776,7 @@ export const EN = {
 "ГАДЖЕТ 2": "GADGET 2",
 "Додай атаку, Super і гаджети — тоді боєць відкриється для гри.": "Add an attack, Super, and gadgets to make this fighter playable.",
 "Боєць і прокачка зафіксовані до кінця забігу.": "The fighter and upgrades are locked for the rest of the run.",
-"Super заряджається влучаннями. На 100% натисни F або кнопку Super.": "Hits charge your Super. At 100%, press F or the Super button.",
+"Super заряджається влучаннями. На 100% натисни C або кнопку Super.": "Hits charge your Super. At 100%, press C or the Super button.",
 "✅ Обрано": "✅ Selected",
 "✅ Обрати": "✅ Select",
 "⭐ МАКС. РІВЕНЬ": "⭐ MAX LEVEL",

@@ -56,11 +56,12 @@ try {
     g.hud.update(0);
     const charged = g.level.specialist.charge;
     const label = document.getElementById('tb-gadget').getAttribute('aria-label');
-    const used = g.level.gadgets.use();
-    return { charged, label, used, after: g.level.specialist.charge, protect: g.level.player.respawnProtect };
+    g.input.justPressed.add('KeyC');
+    g.level.gadgets.update(0, g.input, true);
+    return { charged, label, after: g.level.specialist.charge, protect: g.level.player.respawnProtect };
   });
   check(superState.charged === 100 && /100%/.test(superState.label), 'Super заряджається влучаннями й показується в HUD', JSON.stringify(superState));
-  check(superState.used && superState.after === 0 && superState.protect >= 1, 'Super Розвідника витрачає заряд і дає ривок', JSON.stringify(superState));
+  check(superState.after === 0 && superState.protect >= 1, 'клавіша C використовує Super Розвідника', JSON.stringify(superState));
   const otherSupers = await page.evaluate(() => {
     const g = window.__game;
     const p = g.level.player;
