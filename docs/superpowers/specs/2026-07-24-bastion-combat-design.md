@@ -37,7 +37,7 @@ and damage cards remain useful.
 
 - Activated with `C` on desktop and the existing Super button on touch devices.
 - Hits every zombie inside a rectangle 7 m forward and 2 m wide.
-- Deals exactly 100 damage, unaffected by Bastion level or temporary damage
+- Deals exactly 500 damage, unaffected by Bastion level or temporary damage
   upgrades.
 - Charges by 20% for each basic attack that hits at least one zombie. Hitting
   several zombies with one attack still counts once; a miss gives no charge.
@@ -88,7 +88,7 @@ shield, or stun gadgets.
   additional fighter-level multiplier.
 - Fists use the exact 3×1 m area, 10-attack capacity, 1 s attack interval, and
   1.5 s reload.
-- Super uses `C`, deals 100 damage in the exact 7×2 m area, and becomes ready
+- Super uses `C`, deals 500 damage in the exact 7×2 m area, and becomes ready
   after five successful basic attacks.
 - Both gadgets respect hit counting, cooldowns, non-stacking rules, and their
   desktop/touch controls.
