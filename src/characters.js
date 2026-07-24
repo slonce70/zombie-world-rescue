@@ -3619,7 +3619,9 @@ export function makeGunMesh(kind) {
   const lightM = toonMat(0x99a8c2);
   const accentM = toonMat(0xff8c42, 0xcc5500, 0.15);
   const muzzle = new THREE.Object3D();
-  if (kind === 'rifle') {
+  if (kind === 'fists') {
+    muzzle.position.set(0, -0.08, -0.18);
+  } else if (kind === 'rifle') {
     const body = box(0.07, 0.1, 0.55, midM);
     body.position.z = -0.15;
     const topRail = box(0.05, 0.025, 0.45, lightM);

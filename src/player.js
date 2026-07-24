@@ -7,6 +7,7 @@ import { t } from './i18n.js';
 import { momentumStats } from './combatmomentum.js';
 
 export const WEAPONS = {
+  fists: { name: 'Кулаки', icon: '👊', dmg: 50, rpm: 60, mag: 10, spread: 0, auto: false, reloadT: 1.5, recoil: 0.04, kick: 1, recover: 6, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3, rectWidth: 1, cleave: Infinity },
   pistol: { name: 'Пістолет', icon: '🔫', dmg: 34, rpm: 320, mag: 12, spread: 0.012, auto: false, reloadT: 1.0, recoil: 0.028, kick: 0.65, recover: 11, noise: 18, impact: 1, stagger: 0.08, infinite: true },
   rifle: { name: 'Автомат', icon: '🔥', dmg: 21, rpm: 620, mag: 30, spread: 0.02, auto: true, reloadT: 1.5, recoil: 0.013, kick: 0.72, recover: 8, noise: 30, impact: 1.5, stagger: 0.12, burst: true, infinite: false, reserve: 120, cap: 240 },
   shotgun: { name: 'Дробовик', icon: '💥', dmg: 17, rpm: 95, mag: 6, spread: 0.055, auto: false, reloadT: 2.0, recoil: 0.05, kick: 1.45, recover: 5, noise: 40, impact: 4, stagger: 0.32, infinite: false, pellets: 7, reserve: 24, cap: 60 },
@@ -1098,31 +1099,33 @@ export class Player {
       return;
     }
 
-    const hits = [];
-    for (const zombie of level.zombies?.list || []) {
-      if (zombie.state === 'dead' || Math.abs(zombie.y - this.pos.y) > 1.4) continue;
-      const dx = zombie.x - this.pos.x;
-      const dz = zombie.z - this.pos.z;
-      const distance = Math.hypot(dx, dz);
-      if (distance < 0.2 || distance > range + zombie.rig.radius) continue;
-      if ((dx * dir.x + dz * dir.z) / distance < Math.cos(35 * Math.PI / 180)) continue;
-      const point = new THREE.Vector3(zombie.x, zombie.y + zombie.rig.height * 0.55, zombie.z);
-      const ray = point.clone().sub(origin);
-      const rayLen = ray.length();
-      ray.normalize();
-      if (this.world.shotBlockDist(origin, ray, rayLen) < rayLen - zombie.rig.radius) continue;
-      hits.push({ zombie, point, distance });
-    }
+    const fists = weaponId === 'fists';
+    const hits = fists ? this._bastionRectTargets(range, w.rectWidth) : [];
+    if (!fists) for (const zombie of level.zombies?.list || []) {
+        if (zombie.state === 'dead' || Math.abs(zombie.y - this.pos.y) > 1.4) continue;
+        const dx = zombie.x - this.pos.x;
+        const dz = zombie.z - this.pos.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 0.2 || distance > range + zombie.rig.radius) continue;
+        if ((dx * dir.x + dz * dir.z) / distance < Math.cos(35 * Math.PI / 180)) continue;
+        const point = new THREE.Vector3(zombie.x, zombie.y + zombie.rig.height * 0.55, zombie.z);
+        const ray = point.clone().sub(origin);
+        const rayLen = ray.length();
+        ray.normalize();
+        if (this.world.shotBlockDist(origin, ray, rayLen) < rayLen - zombie.rig.radius) continue;
+        hits.push({ zombie, point, distance });
+      }
     hits.sort((a, b) => a.distance - b.distance);
-    hits.length = Math.min(hits.length, w.cleave || 1);
+    if (!fists) hits.length = Math.min(hits.length, w.cleave || 1);
     if (!hits.length) { this._applyRecoil(w); return; }
 
     const netHits = [];
     const falloff = [1, 0.75, 0.55];
-    const baseDmg = level.soulCollector && weaponId === 'sword' ? 30 : w.dmg;
+    const baseDmg = fists ? (this.bastionDamage || w.dmg)
+      : level.soulCollector && weaponId === 'sword' ? 30 : w.dmg;
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
-      const damage = baseDmg * dmgMult * falloff[i];
+      const damage = baseDmg * dmgMult * (fists ? 1 : falloff[i]);
       const opts = { weaponId, hitZone: 'body', impactForce: w.impact || 4, staggerTime: w.stagger || 0.25 };
       if (level.mirror) netHits.push([hit.zombie.nid, Math.round(damage), 0, 0, 0, 'body', opts.impactForce, opts.staggerTime]);
       else { hit.zombie.lastHitBy = 1; hit.zombie.damage(damage, dir, false, opts); }
@@ -1131,10 +1134,52 @@ export class Player {
     }
     if (level.mirror) level.net.shotReport(weaponId, hits[0].point, netHits, [], [], false);
     else if (level.net) level.net.onLocalShot(weaponId, hits[0].point);
+    if (fists) level.gadgets?.onBastionHit?.();
     level.audio.hit(false);
     level.stats.shotsHit++;
     level.bus.emit('hitmarker', false, weaponId, 'body');
     this._applyRecoil(w);
+  }
+
+  _bastionRectTargets(range, width) {
+    const origin = new THREE.Vector3(this.pos.x, this.pos.y + 1.2, this.pos.z);
+    const dir = this.forwardVec(new THREE.Vector3()).setY(0).normalize();
+    const hits = [];
+    for (const zombie of this.level.zombies?.list || []) {
+      if (zombie.state === 'dead' || zombie.gone || Math.abs(zombie.y - this.pos.y) > 1.4) continue;
+      const dx = zombie.x - this.pos.x;
+      const dz = zombie.z - this.pos.z;
+      const forward = dx * dir.x + dz * dir.z;
+      const side = Math.abs(dx * dir.z - dz * dir.x);
+      const radius = zombie.rig.radius || 0;
+      if (forward < 0.2 || forward > range + radius || side > width / 2 + radius) continue;
+      const point = new THREE.Vector3(zombie.x, zombie.y + zombie.rig.height * 0.55, zombie.z);
+      const ray = point.clone().sub(origin);
+      const rayLen = ray.length();
+      ray.normalize();
+      if (this.world.shotBlockDist(origin, ray, rayLen) < rayLen - radius) continue;
+      hits.push({ zombie, point, distance: Math.hypot(dx, dz) });
+    }
+    return hits;
+  }
+
+  bastionSuperPunch() {
+    if (this.health <= 0) return 0;
+    const dir = this.forwardVec(new THREE.Vector3()).setY(0).normalize();
+    const hits = this._bastionRectTargets(7, 2);
+    for (const hit of hits) {
+      hit.zombie.lastHitBy = 1;
+      hit.zombie.damage(500, dir, false, {
+        weaponId: 'fists', hitZone: 'body', impactForce: 8, staggerTime: 0.4,
+      });
+      this.level.effects.burst(hit.point, 0xffd966, 12, { speed: 3.4, up: 2.4, life: 0.5 });
+      this.level.effects.damageNumber(hit.point, 500, false);
+    }
+    if (hits.length) {
+      this.level.stats.shotsHit++;
+      this.level.audio.hit(false);
+    }
+    return hits.length;
   }
 
   // віддача підкидає приціл ПІСЛЯ пострілу — куля летить туди, куди цілився
@@ -1347,6 +1392,7 @@ export class Player {
       this.level.audio.clang();
       if (amt <= 0) return;
     }
+    if (this.level.gadgets?.bastionProvokeT > 0) amt *= 0.6;
     amt *= this.helmetMult; // ⛑ шолом зменшує всю шкоду
     // 🦺 броня поглинає 60% шкоди, поки не зламається
     if (this.armor > 0) {

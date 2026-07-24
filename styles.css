@@ -1104,6 +1104,8 @@ button.expedition-node:hover, .expedition-node.sel { border-color: #a78bfa; back
 /* 📣 тач-кнопка командних пінгів: показуємо ЛИШЕ у кооп-рівні (клас .avail з hud.js) */
 #tb-ping { display: none; }
 #tb-ping.avail { display: block; }
+#tb-bastion-gadget { display: none; }
+#tb-bastion-gadget.avail { display: block; }
 #tb-shop { display: none; }
 body.touch-mode.in-level:not(.storm-mode):not(.no-shop-mode) #tb-shop { display: block; }
 body.storm-mode .shop-key-hint,

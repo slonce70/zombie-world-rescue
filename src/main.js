@@ -3171,8 +3171,9 @@ class Game {
   _selectExpeditionSpecialist(id) {
     const run = sanitizeExpedition(this.save.expedition);
     if (!run || run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0) return false;
-    run.specialist = sanitizeSpecialistId(id, 'guard');
-    this.save.coopRole = run.specialist;
+    run.specialist = sanitizeFighterId(id, 'guard');
+    const coopRole = sanitizeSpecialistId(run.specialist);
+    if (coopRole) this.save.coopRole = coopRole;
     this.save.expedition = run;
     this.saveGame();
     this.renderExpedition();
@@ -3719,9 +3720,11 @@ class Game {
     if (level.expedition) {
       const id = level.expedition.coop
         ? sanitizeSpecialistId(this.save.coopRole, 'guard')
-        : sanitizeSpecialistId(level.expedition.specialist, 'guard');
+        : sanitizeFighterId(level.expedition.specialist, 'guard');
       const rank = specialistRank(this.save.specialistXp[id]);
-      const modifiers = specialistModifiers(id, rank);
+      const modifiers = id === 'bastion'
+        ? { maxHealthBonus: 0, healMult: 1, speedMult: 1, pickupMult: 1 }
+        : specialistModifiers(id, rank);
       const active = !isRadiation;
       const fighterLevel = level.expedition.coop ? null : sanitizeFighterLevels(this.save.fighterLevels)[id];
       level.specialist = { id, rank, level: fighterLevel, charge: 0, maxCharge: 100, active };
@@ -3731,14 +3734,21 @@ class Game {
         level.player.healMult *= modifiers.healMult;
         level.player.speedMult *= modifiers.speedMult;
         level.player.pickupMult *= modifiers.pickupMult;
-        if (!level.expedition.coop) {
+        if (!level.expedition.coop && id === 'bastion') {
+          const stats = bastionLevelStats(fighterLevel);
+          level.player.maxHealth = stats.maxHealth;
+          level.player.health = stats.maxHealth;
+          level.player.bastionDamage = stats.damage;
+        } else if (!level.expedition.coop) {
           const levelMultiplier = fighterLevelMultiplier(fighterLevel);
           level.player.maxHealth = Math.round(level.player.maxHealth * levelMultiplier);
           level.player.health = level.player.maxHealth;
           level.player.damageMult *= levelMultiplier;
         }
         const nodeType = level.expedition.current && level.expedition.current.type;
-        if (['rescue', 'elite', 'boss'].includes(nodeType)) {
+        if (id === 'bastion') {
+          level.player.weapons = ['fists'];
+        } else if (['rescue', 'elite', 'boss'].includes(nodeType)) {
           level.player.weapons = [...SPECIALISTS[id].kit];
         } else if (nodeType !== 'turretwar') {
           level.player.weapons = [...new Set([...level.player.weapons, SPECIALISTS[id].signature])];

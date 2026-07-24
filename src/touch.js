@@ -66,6 +66,7 @@ export class TouchControls {
       if (this.game.coop && this.game.coop.session.state === 'level') this.game.coop.openPingWheel();
     });
     this._bindButton('tb-gadget', () => this._press(this.game.level?.specialist ? 'KeyC' : 'KeyF'));
+    this._bindButton('tb-bastion-gadget', () => this._press('KeyF'));
     this._bindButton('tb-shop', () => {
       if (this.game.state === 'level') this.game.shop.toggle();
     });

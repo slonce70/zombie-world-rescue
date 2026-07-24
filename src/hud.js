@@ -421,6 +421,9 @@ export class HUD {
       gHtml = specialist.active
         ? `${cfg.icon} ${t(cfg.name)} · ${progression} · Super ${charge}%`
         : t('☢️ Контракт: спеціаліст вимкнений');
+      if (specialist.id === 'bastion' && specialist.active) {
+        gHtml += `<br>${t(this.game.save.bastionGadget === 'provoke' ? 'Провокація · F' : 'Лікувальні кулаки · F')}`;
+      }
       const btn = document.getElementById('tb-gadget');
       const badge = document.getElementById('tb-gadget-n');
       if (btn) {
@@ -451,6 +454,20 @@ export class HUD {
         const badge = document.getElementById('tb-gadget-n');
         if (badge) badge.textContent = gadgets && gadgets.cd > 0 ? Math.ceil(gadgets.cd) : '✓';
       }
+    }
+    const bastionBtn = document.getElementById('tb-bastion-gadget');
+    const bastionBadge = document.getElementById('tb-bastion-gadget-n');
+    const bastionActive = level.specialist?.id === 'bastion' && level.specialist.active;
+    if (bastionBtn) {
+      const provoke = this.game.save.bastionGadget === 'provoke';
+      bastionBtn.classList.toggle('avail', bastionActive);
+      bastionBtn.childNodes[0].textContent = provoke ? '📣' : '🩹';
+      bastionBtn.setAttribute('aria-label', t(provoke ? 'Провокація · F' : 'Лікувальні кулаки · F'));
+    }
+    if (bastionBadge && bastionActive) {
+      bastionBadge.textContent = gadgets.cd > 0
+        ? Math.ceil(gadgets.cd)
+        : gadgets.bastionHealHits > 0 ? gadgets.bastionHealHits : '✓';
     }
 
     // 🔫 тач: на кнопці перемикання показуємо ПОТОЧНУ зброю — дитина бачить, що тримає

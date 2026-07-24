@@ -693,6 +693,8 @@ export class Gadgets {
     this._meteorFires = [];
     this._thunkCd = 0;
     this._gidSeq = 0;
+    this.bastionHealHits = 0;
+    this.bastionProvokeT = 0;
     // 🛡 бульбашка гаджет-щита довкола героя
     this.shieldMesh = new THREE.Mesh(
       new THREE.SphereGeometry(1.25, 18, 14),
@@ -723,6 +725,7 @@ export class Gadgets {
     const level = this.level;
     const p = level.player;
     if (this.cd > 0) this.cd -= dt;
+    if (this.bastionProvokeT > 0) this.bastionProvokeT = Math.max(0, this.bastionProvokeT - dt);
     this._syncWatchtowerPlayer();
     if (allowControl && input.pressed('KeyY')) {
       this._toggleWatchtower();
@@ -733,8 +736,14 @@ export class Gadgets {
       // колізія можлива лише якщо башту поставлено в <2.6м від E-точки місії — рідкісний край.
       input.justPressed.delete('KeyE');
     }
-    const useKey = level.specialist ? 'KeyC' : 'KeyF';
-    if (allowControl && p.health > 0 && input.pressed(useKey)) this.use();
+    if (allowControl && p.health > 0) {
+      if (level.specialist) {
+        if (input.pressed('KeyC')) this.useSpecialistSuper();
+        if (level.specialist.id === 'bastion' && input.pressed('KeyF')) this.useBastionGadget();
+      } else if (input.pressed('KeyF')) {
+        this.use();
+      }
+    }
     this._updateMeteorFires(dt);
 
     // бульбашка щита слідує за героєм і тане з міцністю
@@ -1062,6 +1071,12 @@ export class Gadgets {
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
       level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: Math.round(p.health - before) }));
+    } else if (specialist.id === 'bastion') {
+      const hits = p.bastionSuperPunch();
+      level.audio.powerup();
+      level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xffd966, 7);
+      level.bus.emit('toast', t('👊 Суперкулак: {n} шкоди!', { n: 500 }));
+      if (!hits) level.bus.emit('toast', t('Суперкулак нікого не зачепив'));
     } else {
       const hyper = rank3;
       const sx = p.pos.x;
@@ -1083,6 +1098,49 @@ export class Gadgets {
     }
     specialist.charge = 0;
     return true;
+  }
+
+  useBastionGadget() {
+    const level = this.level;
+    const p = level.player;
+    if (level.specialist?.id !== 'bastion' || !level.specialist.active || this.cd > 0) {
+      if (this.cd > 0) level.bus.emit('toast', t('Гаджет: ще {n}с перезарядки', { n: Math.ceil(this.cd) }));
+      level.game.audio.denied();
+      return false;
+    }
+    const id = level.game.save.bastionGadget;
+    if (id === 'healing-punch') {
+      if (this.bastionHealHits > 0) return false;
+      this.bastionHealHits = 2;
+      level.bus.emit('toast', t('🩹 Наступні 2 влучання відновлять по 30 HP'));
+    } else if (id === 'provoke') {
+      if (this.bastionProvokeT > 0) return false;
+      this.bastionProvokeT = 5;
+      for (const z of level.zombies.list) {
+        if (z.state === 'dead' || z.gone || Math.hypot(z.x - p.pos.x, z.z - p.pos.z) > 12) continue;
+        z.aggroed = true;
+        z.state = 'chase';
+      }
+      level.bus.emit('toast', t('📣 Провокація: 5с, отримана шкода −40%'));
+    } else {
+      return false;
+    }
+    this.cd = 30;
+    level.audio.powerup();
+    level.bus.emit('gadgetUsed', `bastion:${id}`);
+    return true;
+  }
+
+  onBastionHit() {
+    if (this.bastionHealHits <= 0) return;
+    this.bastionHealHits--;
+    const healed = this.level.player.heal(30);
+    if (healed) {
+      this.level.audio.heal();
+      this.level.effects.burst(this.level.player.pos.clone().setY(this.level.player.pos.y + 1.4),
+        0x6dff9c, 8, { speed: 2, up: 3, life: 0.6 });
+      this.level.bus.emit('toast', t('💚 Лікувальний кулак: +30 HP'));
+    }
   }
 
   _frostBlast() {

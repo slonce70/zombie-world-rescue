@@ -1,6 +1,6 @@
 import { CAMPAIGN_ORDER } from './countries.js';
 import { CARD_POOL, cardWeight } from './runbuild.js';
-import { sanitizeSpecialistId, specialistBias } from './specialists.js';
+import { sanitizeFighterId, specialistBias } from './specialists.js';
 
 export const EXPEDITION_VERSION = 2;
 export const EXPEDITION_STEPS = 5;
@@ -83,7 +83,7 @@ export function createExpedition({ seed = Date.now(), countries = CAMPAIGN_ORDER
     v: EXPEDITION_VERSION,
     seed: int(seed),
     coop: !!coop,
-    specialist: coop ? null : sanitizeSpecialistId(specialist, 'guard'),
+    specialist: coop ? null : sanitizeFighterId(specialist, 'guard'),
     countries: cleanCountries(countries),
     step: 0,
     wins: 0,
