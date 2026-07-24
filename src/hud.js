@@ -421,8 +421,14 @@ export class HUD {
       gHtml = specialist.active
         ? `${cfg.icon} ${t(cfg.name)} · ${progression} · Super ${charge}%`
         : t('☢️ Контракт: спеціаліст вимкнений');
-      if (specialist.id === 'bastion' && specialist.active) {
+      if (specialist.id === 'bastion' && specialist.active && specialist.level >= 3
+        && (this.game.save.bastionGadgetsOwned || []).includes(this.game.save.bastionGadget)) {
         gHtml += `<br>${t(this.game.save.bastionGadget === 'provoke' ? 'Провокація · F' : 'Лікувальні кулаки · F')}`;
+        if (specialist.level >= 5 && this.game.save.bastionHyperOwned) {
+          gHtml += `<br>${specialist.hyperActiveT > 0
+            ? t('Гіпер-Super: {n}с · C', { n: Math.ceil(specialist.hyperActiveT) })
+            : t('Гіперзаряд: {n}% · X', { n: Math.floor(specialist.hyperCharge) })}`;
+        }
       }
       const btn = document.getElementById('tb-gadget');
       const badge = document.getElementById('tb-gadget-n');
@@ -458,16 +464,31 @@ export class HUD {
     const bastionBtn = document.getElementById('tb-bastion-gadget');
     const bastionBadge = document.getElementById('tb-bastion-gadget-n');
     const bastionActive = level.specialist?.id === 'bastion' && level.specialist.active;
+    const bastionGadgetActive = bastionActive && level.specialist.level >= 3
+      && (this.game.save.bastionGadgetsOwned || []).includes(this.game.save.bastionGadget);
     if (bastionBtn) {
       const provoke = this.game.save.bastionGadget === 'provoke';
-      bastionBtn.classList.toggle('avail', bastionActive);
+      bastionBtn.classList.toggle('avail', bastionGadgetActive);
       bastionBtn.childNodes[0].textContent = provoke ? '📣' : '🩹';
       bastionBtn.setAttribute('aria-label', t(provoke ? 'Провокація · F' : 'Лікувальні кулаки · F'));
     }
-    if (bastionBadge && bastionActive) {
+    if (bastionBadge && bastionGadgetActive) {
       bastionBadge.textContent = gadgets.cd > 0
         ? Math.ceil(gadgets.cd)
         : gadgets.bastionHealHits > 0 ? gadgets.bastionHealHits : '✓';
+    }
+    const hyperBtn = document.getElementById('tb-bastion-hyper');
+    const hyperBadge = document.getElementById('tb-bastion-hyper-n');
+    const hyperAvailable = bastionActive && level.specialist.level >= 5 && this.game.save.bastionHyperOwned;
+    if (hyperBtn) {
+      hyperBtn.classList.toggle('avail', hyperAvailable);
+      hyperBtn.classList.toggle('super-ready', hyperAvailable && level.specialist.hyperCharge >= 100);
+      hyperBtn.setAttribute('aria-label', `${t('Гіперзаряд Бастіона')} · X`);
+    }
+    if (hyperBadge && hyperAvailable) {
+      hyperBadge.textContent = level.specialist.hyperActiveT > 0
+        ? `${Math.ceil(level.specialist.hyperActiveT)}с`
+        : `${Math.floor(level.specialist.hyperCharge)}%`;
     }
 
     // 🔫 тач: на кнопці перемикання показуємо ПОТОЧНУ зброю — дитина бачить, що тримає

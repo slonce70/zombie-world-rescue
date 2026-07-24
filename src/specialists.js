@@ -31,7 +31,7 @@ export const SPECIALISTS = Object.freeze({
     icon: '🧱', name: 'Бастіон', role: 'Танк', passive: 'Висока витривалість',
     attackName: 'Кулаки', superName: 'Суперкулак', superIcon: '👊',
     gadgets: Object.freeze(['Лікувальні кулаки', 'Провокація']), playable: true,
-    kit: Object.freeze(['fists']), signature: 'fists', chargePerHit: 20,
+    kit: Object.freeze(['fists']), signature: 'fists', chargePerHit: 10, hyperChargePerHit: 2,
     bias: Object.freeze({ tags: Object.freeze(['tank']), ids: Object.freeze([]), multiplier: 2 }),
   }),
   impulse: Object.freeze({
@@ -57,6 +57,12 @@ export const BASTION_LEVEL_STATS = Object.freeze([
   Object.freeze({ maxHealth: 215, damage: 125 }),
 ]);
 
+export const BASTION_UNLOCK_COSTS = Object.freeze({
+  'healing-punch': 1000,
+  provoke: 1000,
+  hyper: 5000,
+});
+
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,
   Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : min));
 
@@ -66,6 +72,29 @@ export function bastionLevelStats(level) {
 
 export function sanitizeBastionGadget(value) {
   return value === 'provoke' ? 'provoke' : 'healing-punch';
+}
+
+export function sanitizeBastionGadgetsOwned(value) {
+  return [...new Set((Array.isArray(value) ? value : [])
+    .filter((id) => id === 'healing-punch' || id === 'provoke'))];
+}
+
+export function buyBastionUnlock(state, id) {
+  const coins = clampInt(state && state.coins, 0, 999999999);
+  const level = sanitizeFighterLevels(state && state.fighterLevels).bastion;
+  const bastionGadgetsOwned = sanitizeBastionGadgetsOwned(state && state.bastionGadgetsOwned);
+  const bastionHyperOwned = state && state.bastionHyperOwned === true;
+  const fail = (reason) => ({ ok: false, reason, coins, bastionGadgetsOwned, bastionHyperOwned });
+  const cost = BASTION_UNLOCK_COSTS[id];
+  if (!cost) return fail('unknown');
+  if (level < (id === 'hyper' ? 5 : 3)) return fail('level');
+  if (id === 'hyper' ? bastionHyperOwned : bastionGadgetsOwned.includes(id)) return fail('owned');
+  if (coins < cost) return fail('coins');
+  return {
+    ok: true, reason: null, coins: coins - cost,
+    bastionGadgetsOwned: id === 'hyper' ? bastionGadgetsOwned : [...bastionGadgetsOwned, id],
+    bastionHyperOwned: id === 'hyper' || bastionHyperOwned,
+  };
 }
 
 export function sanitizeSpecialistId(value, fallback = null) {

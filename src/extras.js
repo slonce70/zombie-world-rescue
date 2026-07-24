@@ -726,6 +726,9 @@ export class Gadgets {
     const p = level.player;
     if (this.cd > 0) this.cd -= dt;
     if (this.bastionProvokeT > 0) this.bastionProvokeT = Math.max(0, this.bastionProvokeT - dt);
+    if (level.specialist?.id === 'bastion' && level.specialist.hyperActiveT > 0) {
+      level.specialist.hyperActiveT = Math.max(0, level.specialist.hyperActiveT - dt);
+    }
     this._syncWatchtowerPlayer();
     if (allowControl && input.pressed('KeyY')) {
       this._toggleWatchtower();
@@ -740,6 +743,7 @@ export class Gadgets {
       if (level.specialist) {
         if (input.pressed('KeyC')) this.useSpecialistSuper();
         if (level.specialist.id === 'bastion' && input.pressed('KeyF')) this.useBastionGadget();
+        if (level.specialist.id === 'bastion' && input.pressed('KeyX')) this.activateBastionHyper();
       } else if (input.pressed('KeyF')) {
         this.use();
       }
@@ -1072,11 +1076,13 @@ export class Gadgets {
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
       level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: Math.round(p.health - before) }));
     } else if (specialist.id === 'bastion') {
-      const hits = p.bastionSuperPunch();
+      const hyper = specialist.hyperActiveT > 0;
+      const hits = p.bastionSuperPunch(hyper);
       level.audio.powerup();
       level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xffd966, 7);
-      level.bus.emit('toast', t('👊 Суперкулак: {n} шкоди!', { n: 500 }));
+      level.bus.emit('toast', t('👊 Суперкулак: {n} шкоди!', { n: hyper ? 750 : 500 }));
       if (!hits) level.bus.emit('toast', t('Суперкулак нікого не зачепив'));
+      if (hyper) specialist.hyperActiveT = 0;
     } else {
       const hyper = rank3;
       const sx = p.pos.x;
@@ -1100,15 +1106,33 @@ export class Gadgets {
     return true;
   }
 
+  activateBastionHyper() {
+    const specialist = this.level.specialist;
+    if (specialist?.id !== 'bastion' || !specialist.active || specialist.level < 5
+      || !this.level.game.save.bastionHyperOwned || specialist.hyperCharge < 100
+      || specialist.hyperActiveT > 0) {
+      this.level.game.audio.denied();
+      return false;
+    }
+    specialist.hyperCharge = 0;
+    specialist.hyperActiveT = 5;
+    this.level.audio.powerup();
+    this.level.effects.ring(this.level.player.pos.clone().setY(this.level.player.pos.y + 0.05), 0xb855ff, 7);
+    this.level.bus.emit('toast', t('⚡ Гіперзаряд: використай Super за 5с!'));
+    return true;
+  }
+
   useBastionGadget() {
     const level = this.level;
     const p = level.player;
-    if (level.specialist?.id !== 'bastion' || !level.specialist.active || this.cd > 0) {
+    const id = level.game.save.bastionGadget;
+    const owned = level.game.save.bastionGadgetsOwned || [];
+    if (level.specialist?.id !== 'bastion' || !level.specialist.active
+      || level.specialist.level < 3 || !owned.includes(id) || this.cd > 0) {
       if (this.cd > 0) level.bus.emit('toast', t('Гаджет: ще {n}с перезарядки', { n: Math.ceil(this.cd) }));
       level.game.audio.denied();
       return false;
     }
-    const id = level.game.save.bastionGadget;
     if (id === 'healing-punch') {
       if (this.bastionHealHits > 0) return false;
       this.bastionHealHits = 2;

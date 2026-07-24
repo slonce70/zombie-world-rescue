@@ -61,6 +61,9 @@ async function loadWith(raw) {
     guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1,
   }), 'порожній {}: усі бійці починають з рівня 1');
   check(save.bastionGadget === 'healing-punch', 'порожній {}: лікувальні кулаки обрані за замовчуванням');
+  check(Array.isArray(save.bastionGadgetsOwned) && save.bastionGadgetsOwned.length === 0,
+    'порожній {}: гаджети Бастіона ще не куплені');
+  check(save.bastionHyperOwned === false, 'порожній {}: Hypercharge Бастіона ще не куплений');
 }
 
 // 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.
@@ -120,6 +123,8 @@ async function loadWith(raw) {
     specialistClaims: [...claims, claims.at(-1), 'bad'],
     fighterLevels: { guard: 99, medic: 2.8, bastion: -5 },
     bastionGadget: 'bad',
+    bastionGadgetsOwned: ['bad', 'provoke', 'provoke'],
+    bastionHyperOwned: 'yes',
   }));
   check(errs.length === 0, `майстерність: без винятків (${errs[0] || 'ok'})`);
   check(save.coins === 777, 'биті поля майстерності не скидають решту профілю');
@@ -129,6 +134,9 @@ async function loadWith(raw) {
     guard: 5, medic: 2, scout: 1, bastion: 1, impulse: 1,
   }), 'рівні бійців клампляться до 1..5');
   check(save.bastionGadget === 'healing-punch', 'битий гаджет Бастіона повертається до дефолту');
+  check(JSON.stringify(save.bastionGadgetsOwned) === JSON.stringify(['provoke']),
+    'куплені гаджети Бастіона очищуються й дедупляться');
+  check(save.bastionHyperOwned === false, 'битий прапорець Hypercharge повертається до false');
 }
 
 await browser.close();

@@ -6,9 +6,10 @@ const source = readFileSync(new URL('../src/specialists.js', import.meta.url), '
 const specialists = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
   BASTION_LEVEL_STATS, EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, SPECIALISTS,
-  bastionLevelStats, buyFighterLevel,
+  bastionLevelStats, buyBastionUnlock, buyFighterLevel,
   claimSpecialistMastery, fighterLevelMultiplier, sanitizeFighterLevels,
-  sanitizeBastionGadget, sanitizeSpecialistClaims, sanitizeSpecialistXp, specialistBias, specialistMasteryAward,
+  sanitizeBastionGadget, sanitizeBastionGadgetsOwned, sanitizeSpecialistClaims, sanitizeSpecialistXp,
+  specialistBias, specialistMasteryAward,
   specialistModifiers, specialistRank,
 } = specialists;
 
@@ -65,7 +66,31 @@ test('Bastion has exact level stats and a valid gadget selection', () => {
   assert.equal(sanitizeBastionGadget('provoke'), 'provoke');
   assert.equal(sanitizeBastionGadget('bad'), 'healing-punch');
   assert.equal(SPECIALISTS.bastion.playable, true);
-  assert.equal(SPECIALISTS.bastion.chargePerHit, 20);
+  assert.equal(SPECIALISTS.bastion.chargePerHit, 10);
+  assert.equal(SPECIALISTS.bastion.hyperChargePerHit, 2);
+  assert.deepEqual(sanitizeBastionGadgetsOwned(['provoke', 'bad', 'provoke']), ['provoke']);
+  assert.equal(buyBastionUnlock({
+    fighterLevels: { bastion: 2 }, coins: 9999,
+  }, 'healing-punch').reason, 'level');
+  const gadget = buyBastionUnlock({
+    fighterLevels: { bastion: 3 }, coins: 1000,
+  }, 'healing-punch');
+  assert.deepEqual(gadget, {
+    ok: true, reason: null, coins: 0,
+    bastionGadgetsOwned: ['healing-punch'], bastionHyperOwned: false,
+  });
+  assert.equal(buyBastionUnlock({
+    fighterLevels: { bastion: 3 }, coins: 999,
+  }, 'provoke').reason, 'coins');
+  assert.equal(buyBastionUnlock({
+    fighterLevels: { bastion: 4 }, coins: 5000,
+  }, 'hyper').reason, 'level');
+  assert.deepEqual(buyBastionUnlock({
+    fighterLevels: { bastion: 5 }, coins: 5000,
+  }, 'hyper'), {
+    ok: true, reason: null, coins: 0,
+    bastionGadgetsOwned: [], bastionHyperOwned: true,
+  });
 });
 
 test('specialist progress sanitizers isolate malformed values', () => {

@@ -21,8 +21,8 @@ import {
 } from './expedition.js';
 import {
   EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALISTS,
-  bastionLevelStats, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
-  sanitizeBastionGadget,
+  bastionLevelStats, buyBastionUnlock, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
+  sanitizeBastionGadget, sanitizeBastionGadgetsOwned,
   sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
@@ -137,7 +137,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 609;
+const APP_VERSION = 610;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -756,6 +756,8 @@ class Game {
       specialistClaims: [],
       fighterLevels: { guard: 1, medic: 1, scout: 1, bastion: 1, impulse: 1 },
       bastionGadget: 'healing-punch',
+      bastionGadgetsOwned: [],
+      bastionHyperOwned: false,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -911,6 +913,8 @@ class Game {
         out.specialistClaims = sanitizeSpecialistClaims(out.specialistClaims);
         out.fighterLevels = sanitizeFighterLevels(out.fighterLevels);
         out.bastionGadget = sanitizeBastionGadget(out.bastionGadget);
+        out.bastionGadgetsOwned = sanitizeBastionGadgetsOwned(out.bastionGadgetsOwned);
+        out.bastionHyperOwned = out.bastionHyperOwned === true;
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
@@ -3212,6 +3216,7 @@ class Game {
     const locked = !run || run.coop || run.status !== 'active' || run.step !== 0 || run.wins !== 0;
     const pending = !cfg.playable;
     const selected = run && run.specialist === id;
+    const bastionGadgetsOwned = sanitizeBastionGadgetsOwned(this.save.bastionGadgetsOwned);
     const abilities = [
       ['АТАКА', cfg.attackName, null],
       ['SUPER', cfg.superName, null],
@@ -3226,14 +3231,42 @@ class Game {
       : t('+{n}% HP · +{n}% шкоди', { n: bonus });
     const abilitiesEl = document.getElementById('fighter-abilities');
     abilitiesEl.innerHTML = abilities.map(([label, value, gadgetId]) => gadgetId
-      ? `<button type="button" class="fighter-ability fighter-gadget" data-bastion-gadget="${gadgetId}" aria-pressed="${this.save.bastionGadget === gadgetId}" ${locked ? 'disabled' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></button>`
-      : `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('');
+      ? `<button type="button" class="fighter-ability fighter-gadget" data-bastion-gadget="${gadgetId}" aria-pressed="${bastionGadgetsOwned.includes(gadgetId) && this.save.bastionGadget === gadgetId}" ${locked || level < 3 ? 'disabled' : ''}><strong>${t(label)}</strong><span>${t(value)} · ${level < 3 ? t('🔒 Рівень 3') : bastionGadgetsOwned.includes(gadgetId) ? t('✅ Куплено') : '🪙 1000'}</span></button>`
+      : `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('')
+      + (isBastion
+        ? `<button type="button" class="fighter-ability fighter-gadget" data-bastion-hyper aria-pressed="${this.save.bastionHyperOwned === true}" ${locked || level < 5 ? 'disabled' : ''}><strong>HYPERCHARGE</strong><span>${level < 5 ? t('🔒 Рівень 5') : this.save.bastionHyperOwned ? t('✅ Куплено · X') : '🪙 5000'}</span></button>`
+        : '');
     abilitiesEl.querySelectorAll('[data-bastion-gadget]').forEach((button) => {
       button.addEventListener('click', () => {
-        this.save.bastionGadget = sanitizeBastionGadget(button.dataset.bastionGadget);
+        const id = sanitizeBastionGadget(button.dataset.bastionGadget);
+        if (!bastionGadgetsOwned.includes(id)) {
+          const next = buyBastionUnlock(this.save, id);
+          if (!next.ok) {
+            this.audio.denied();
+            this.hud.toast(t(next.reason === 'coins' ? 'Не вистачає монет' : '🔒 Потрібен рівень 3'));
+            return;
+          }
+          this.save.coins = next.coins;
+          this.save.bastionGadgetsOwned = next.bastionGadgetsOwned;
+          this.audio.purchase();
+        }
+        this.save.bastionGadget = id;
         this.saveGame();
         this.renderExpeditionFighter();
       });
+    });
+    abilitiesEl.querySelector('[data-bastion-hyper]')?.addEventListener('click', () => {
+      const next = buyBastionUnlock(this.save, 'hyper');
+      if (!next.ok) {
+        this.audio.denied();
+        this.hud.toast(t(next.reason === 'coins' ? 'Не вистачає монет' : '🔒 Потрібен рівень 5'));
+        return;
+      }
+      this.save.coins = next.coins;
+      this.save.bastionHyperOwned = next.bastionHyperOwned;
+      this.saveGame();
+      this.audio.purchase();
+      this.renderExpeditionFighter();
     });
     document.getElementById('fighter-status').textContent = pending
       ? t('Додай атаку, Super і гаджети — тоді боєць відкриється для гри.')
@@ -3727,7 +3760,10 @@ class Game {
         : specialistModifiers(id, rank);
       const active = !isRadiation;
       const fighterLevel = level.expedition.coop ? null : sanitizeFighterLevels(this.save.fighterLevels)[id];
-      level.specialist = { id, rank, level: fighterLevel, charge: 0, maxCharge: 100, active };
+      level.specialist = {
+        id, rank, level: fighterLevel, charge: 0, maxCharge: 100, active,
+        hyperCharge: 0, hyperActiveT: 0,
+      };
       if (active) {
         level.player.maxHealth += modifiers.maxHealthBonus;
         level.player.health = level.player.maxHealth;
@@ -4083,6 +4119,10 @@ class Game {
       if (!specialist || !specialist.active || level.player.health <= 0) return;
       specialist.charge = Math.min(specialist.maxCharge,
         specialist.charge + SPECIALISTS[specialist.id].chargePerHit);
+      if (specialist.id === 'bastion' && specialist.level >= 5 && this.save.bastionHyperOwned) {
+        specialist.hyperCharge = Math.min(100,
+          specialist.hyperCharge + SPECIALISTS.bastion.hyperChargePerHit);
+      }
     });
     level.bus.on('zombieKilled', (z) => {
       if (level.mirror) return;

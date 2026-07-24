@@ -18,6 +18,8 @@ try {
   await page.click('#btn-fighter-select');
   await page.evaluate(() => {
     window.__game.save.fighterLevels.bastion = 5;
+    window.__game.save.bastionGadgetsOwned = ['healing-punch', 'provoke'];
+    window.__game.save.bastionHyperOwned = true;
     window.__game.saveGame();
   });
   await page.click('#btn-expedition-go');
@@ -38,15 +40,18 @@ try {
       reserve: p.ammo.fists?.reserve,
       reload: p.weapon?.reloadT,
       rate: p.weapon?.rpm,
-      chargePerHit: g.level.specialist && 20,
+      chargePerHit: g.level.specialist && 10,
+      hyperChargePerHit: g.level.specialist && 2,
       touchGadget: document.getElementById('tb-bastion-gadget')?.getAttribute('aria-label'),
+      touchHyper: document.getElementById('tb-bastion-hyper')?.getAttribute('aria-label'),
     };
   });
   check(kit.maxHealth === 215 && kit.health === 215 && kit.weapon === 'fists'
     && JSON.stringify(kit.weapons) === JSON.stringify(['fists'])
     && kit.damage === 125 && kit.magazine === 10 && kit.reserve === Infinity
-    && kit.reload === 1.5 && kit.rate === 60 && kit.chargePerHit === 20
-    && kit.touchGadget === 'Лікувальні кулаки · F',
+    && kit.reload === 1.5 && kit.rate === 60 && kit.chargePerHit === 10
+    && kit.hyperChargePerHit === 2 && kit.touchGadget === 'Лікувальні кулаки · F'
+    && /Hypercharge|Гіперзаряд/.test(kit.touchHyper || ''),
   'рівень 5 дає точний HP, шкоду, магазин і перезарядку', JSON.stringify(kit));
 
   const combat = await page.evaluate(() => {
@@ -72,16 +77,18 @@ try {
     const outside = prepare(alive[2], p.pos.x + 2, p.pos.z - 2);
     p.yaw = 0;
     g.level.specialist.charge = 0;
+    g.level.specialist.hyperCharge = 0;
     p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
     const fist = {
       insideA: 2000 - insideA.hp,
       insideB: 2000 - insideB.hp,
       outside: 2000 - outside.hp,
       charge: g.level.specialist.charge,
+      hyperCharge: g.level.specialist.hyperCharge,
     };
 
     g.level.specialist.charge = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       insideA.hp = 2000;
       p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
     }
@@ -101,12 +108,87 @@ try {
     };
   });
   check(combat.fist.insideA === 125 && combat.fist.insideB === 125
-    && combat.fist.outside === 0 && combat.fist.charge === 20,
+    && combat.fist.outside === 0 && combat.fist.charge === 10 && combat.fist.hyperCharge === 2,
   'кулаки б’ють усіх лише в прямокутнику 3×1 м', JSON.stringify(combat));
   check(combat.charged === 100 && combat.after === 0,
-    'п’ять успішних атак заряджають Super, а C витрачає заряд', JSON.stringify(combat));
+    'десять успішних атак заряджають Super, а C витрачає заряд', JSON.stringify(combat));
   check(combat.superInside === 500 && combat.superOutside === 0,
     'Суперкулак завдає рівно 500 у прямокутнику 7×2 м', JSON.stringify(combat));
+
+  const hyper = await page.evaluate(() => {
+    const g = window.__game;
+    const p = g.level.player;
+    const specialist = g.level.specialist;
+    const gs = g.level.gadgets;
+    const alive = g.level.zombies.list.filter((z) => z.state !== 'dead').slice(0, 3);
+    const place = (z, side, forward, hp = 3000) => {
+      z.state = 'chase';
+      z.gone = false;
+      z.x = p.pos.x + side;
+      z.y = p.pos.y;
+      z.z = p.pos.z - forward;
+      z.hp = hp;
+      z.maxHp = hp;
+      z.shieldHp = 0;
+      z.chestHp = 0;
+      z.helmetHp = 0;
+      z.slowT = 0;
+      z.slowMul = 1;
+      z.rig.group.position.set(z.x, z.y, z.z);
+      return z;
+    };
+    const target = place(alive[0], 0, 2);
+    p.yaw = 0;
+
+    specialist.level = 4;
+    specialist.hyperCharge = 0;
+    p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
+    const level4Charge = specialist.hyperCharge;
+
+    specialist.level = 5;
+    specialist.hyperCharge = 0;
+    for (let i = 0; i < 50; i++) {
+      target.hp = 3000;
+      p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
+    }
+    const charged = specialist.hyperCharge;
+    g.input.justPressed.add('KeyX');
+    gs.update(0, g.input, true);
+    g.input.justPressed.delete('KeyX');
+    const activated = { charge: specialist.hyperCharge, time: specialist.hyperActiveT };
+    gs.update(5.1, g.input, false);
+    const expired = specialist.hyperActiveT;
+
+    specialist.hyperCharge = 100;
+    specialist.charge = 100;
+    g.input.justPressed.add('KeyX');
+    gs.update(0, g.input, true);
+    g.input.justPressed.delete('KeyX');
+    const inside = place(alive[0], 1.5, 5);
+    const outside = place(alive[1], 3, 5);
+    g.input.justPressed.add('KeyC');
+    gs.update(0, g.input, true);
+    g.input.justPressed.delete('KeyC');
+    return {
+      level4Charge,
+      charged,
+      activated,
+      expired,
+      activeAfterSuper: specialist.hyperActiveT,
+      superAfter: specialist.charge,
+      insideDamage: 3000 - inside.hp,
+      outsideDamage: 3000 - outside.hp,
+      slowT: inside.slowT,
+      slowMul: inside.slowMul,
+    };
+  });
+  check(hyper.level4Charge === 0 && hyper.charged === 100
+    && hyper.activated.charge === 0 && hyper.activated.time === 5 && hyper.expired === 0,
+  'Hypercharge доступний з рівня 5, заряджається за 50 атак і діє 5 секунд', JSON.stringify(hyper));
+  check(hyper.insideDamage === 750 && hyper.outsideDamage === 0
+    && hyper.slowT === 4 && hyper.slowMul === 0.5
+    && hyper.activeAfterSuper === 0 && hyper.superAfter === 0,
+  'Hyper-Суперкулак має зону 7×4 м, 750 шкоди й сповільнення на 4с', JSON.stringify(hyper));
 
   const gadgets = await page.evaluate(() => {
     const g = window.__game;
@@ -133,6 +215,18 @@ try {
     gs.cd = 0;
     p.health = 100;
     for (const z of alive) place(z, p.pos.x + 30, p.pos.z + 30);
+    g.level.specialist.level = 2;
+    g.input.justPressed.add('KeyF');
+    gs.update(0, g.input, true);
+    g.input.justPressed.delete('KeyF');
+    const level2Activation = gs.bastionHealHits;
+    g.level.specialist.level = 3;
+    g.save.bastionGadgetsOwned = [];
+    g.input.justPressed.add('KeyF');
+    gs.update(0, g.input, true);
+    g.input.justPressed.delete('KeyF');
+    const unownedActivation = gs.bastionHealHits;
+    g.save.bastionGadgetsOwned = ['healing-punch', 'provoke'];
     g.input.justPressed.add('KeyF');
     gs.update(0, g.input, true);
     g.input.justPressed.delete('KeyF');
@@ -163,6 +257,8 @@ try {
     p.takeDamage(100, p.pos.x, p.pos.z + 1);
     return {
       activatedHealing,
+      level2Activation,
+      unownedActivation,
       afterMiss,
       afterFirst,
       afterSecond,
@@ -174,7 +270,8 @@ try {
       damageTaken: p.maxHealth - p.health,
     };
   });
-  check(gadgets.activatedHealing === 2 && gadgets.afterMiss === 2
+  check(gadgets.level2Activation === 0 && gadgets.unownedActivation === 0
+    && gadgets.activatedHealing === 2 && gadgets.afterMiss === 2
     && gadgets.afterFirst.hits === 1 && gadgets.afterFirst.health === 130
     && gadgets.afterSecond.hits === 0 && gadgets.afterSecond.health === 160,
   'Лікувальні кулаки лікують дві успішні атаки по 30 HP', JSON.stringify(gadgets));

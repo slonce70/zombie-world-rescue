@@ -1163,17 +1163,22 @@ export class Player {
     return hits;
   }
 
-  bastionSuperPunch() {
+  bastionSuperPunch(hyper = false) {
     if (this.health <= 0) return 0;
     const dir = this.forwardVec(new THREE.Vector3()).setY(0).normalize();
-    const hits = this._bastionRectTargets(7, 2);
+    const damage = hyper ? 750 : 500;
+    const hits = this._bastionRectTargets(7, hyper ? 4 : 2);
     for (const hit of hits) {
       hit.zombie.lastHitBy = 1;
-      hit.zombie.damage(500, dir, false, {
+      hit.zombie.damage(damage, dir, false, {
         weaponId: 'fists', hitZone: 'body', impactForce: 8, staggerTime: 0.4,
       });
+      if (hyper) {
+        hit.zombie.slowT = Math.max(hit.zombie.slowT || 0, 4);
+        hit.zombie.slowMul = Math.min(hit.zombie.slowMul || 1, 0.5);
+      }
       this.level.effects.burst(hit.point, 0xffd966, 12, { speed: 3.4, up: 2.4, life: 0.5 });
-      this.level.effects.damageNumber(hit.point, 500, false);
+      this.level.effects.damageNumber(hit.point, damage, false);
     }
     if (hits.length) {
       this.level.stats.shotsHit++;

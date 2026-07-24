@@ -66,24 +66,69 @@ try {
     abilities: document.getElementById('fighter-abilities').textContent,
     placeholders: [...document.querySelectorAll('#fighter-abilities [data-pending]')].length,
     gadgets: [...document.querySelectorAll('[data-bastion-gadget]')].map((el) => ({
-      id: el.dataset.bastionGadget, pressed: el.getAttribute('aria-pressed'),
+      id: el.dataset.bastionGadget, pressed: el.getAttribute('aria-pressed'), disabled: el.disabled,
     })),
+    hyper: document.querySelector('[data-bastion-hyper]') && {
+      disabled: document.querySelector('[data-bastion-hyper]').disabled,
+      text: document.querySelector('[data-bastion-hyper]').textContent,
+    },
     selectDisabled: document.getElementById('btn-fighter-select').disabled,
     upgradeDisabled: document.getElementById('btn-fighter-upgrade').disabled,
   }));
   check(bastion.title.includes('Бастіон') && bastion.role.includes('Танк')
     && bastion.stats.includes('50') && bastion.abilities.includes('Кулаки')
     && bastion.abilities.includes('Суперкулак') && bastion.placeholders === 0
-    && bastion.gadgets.length === 2 && !bastion.selectDisabled && !bastion.upgradeDisabled,
+    && bastion.abilities.includes('5') && bastion.gadgets.length === 2
+    && bastion.gadgets.every(({ disabled }) => disabled) && bastion.hyper?.disabled
+    && !bastion.selectDisabled && !bastion.upgradeDisabled,
   'Бастіон показує точні характеристики й готовий бойовий набір', JSON.stringify(bastion));
 
+  await page.evaluate(() => {
+    window.__game.save.fighterLevels.bastion = 3;
+    window.__game.save.coins = 999;
+    window.__game.renderExpeditionFighter();
+  });
+  await page.click('[data-bastion-gadget="healing-punch"]');
+  const deniedGadget = await page.evaluate(() => ({
+    coins: window.__game.save.coins,
+    owned: window.__game.save.bastionGadgetsOwned,
+  }));
+  check(deniedGadget.coins === 999 && deniedGadget.owned.length === 0,
+    'гаджет не купується без 1000 монет', JSON.stringify(deniedGadget));
+
+  await page.evaluate(() => { window.__game.save.coins = 1000; });
+  await page.click('[data-bastion-gadget="healing-punch"]');
+  const boughtHealing = await page.evaluate(() => ({
+    coins: window.__game.save.coins,
+    owned: window.__game.save.bastionGadgetsOwned,
+  }));
+  check(boughtHealing.coins === 0 && boughtHealing.owned.includes('healing-punch'),
+    'Лікувальні кулаки купуються за 1000 монет', JSON.stringify(boughtHealing));
+
+  await page.evaluate(() => { window.__game.save.coins = 1000; });
   await page.click('[data-bastion-gadget="provoke"]');
   const gadget = await page.evaluate(() => ({
+    coins: window.__game.save.coins,
+    owned: window.__game.save.bastionGadgetsOwned,
     saved: window.__game.save.bastionGadget,
     pressed: document.querySelector('[data-bastion-gadget="provoke"]').getAttribute('aria-pressed'),
   }));
-  check(gadget.saved === 'provoke' && gadget.pressed === 'true',
-    'вибір Провокації зберігається у профілі', JSON.stringify(gadget));
+  check(gadget.coins === 0 && gadget.owned.includes('provoke')
+    && gadget.saved === 'provoke' && gadget.pressed === 'true',
+  'Провокація купується за 1000 монет і вибирається', JSON.stringify(gadget));
+
+  await page.evaluate(() => {
+    window.__game.save.fighterLevels.bastion = 5;
+    window.__game.save.coins = 5000;
+    window.__game.renderExpeditionFighter();
+  });
+  await page.click('[data-bastion-hyper]');
+  const boughtHyper = await page.evaluate(() => ({
+    coins: window.__game.save.coins,
+    owned: window.__game.save.bastionHyperOwned,
+  }));
+  check(boughtHyper.coins === 0 && boughtHyper.owned,
+    'Hypercharge купується на рівні 5 за 5000 монет', JSON.stringify(boughtHyper));
 
   await page.setViewportSize({ width: 375, height: 844 });
   const mobile = await page.evaluate(() => {
