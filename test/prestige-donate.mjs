@@ -1,5 +1,5 @@
 // 🌟 «Пожертва рятівника»: нескінченний монетний стік — динамічна ціна ×1.5,
-//    лічильник donations/donStars, титули за донації, XP/passLvl не чіпаються.
+//    лічильник donations, титули за донації, XP/passLvl не чіпаються.
 import { chromium } from 'playwright';
 import { waitFor as waitForAsync, makeCheck } from './_browser.mjs';
 import { ensureWebServer } from './_server.mjs';
@@ -31,14 +31,13 @@ await page.evaluate(() => {
   g.weeklyChallengeId = () => '__none';
 });
 
-console.log('▸ 1. fresh: ціна donate === 2000, купівля → -2000, donations/donStars === 1');
+console.log('▸ 1. fresh: ціна donate === 2000, купівля → -2000, donations === 1');
 let r = await page.evaluate(async () => {
   const g = window.__game;
   const mod = await import('/src/shop.js');
   const donItem = mod.SHOP_ITEMS.find((i) => i.id === 'donate');
   g.save.coins = 20000;
   g.save.donations = 0;
-  g.save.donStars = 0;
   const price0 = g.shop.priceOf(donItem);
   const passLvl0 = g.save.passLvl;
   const xp0 = g.save.xp;
@@ -49,7 +48,6 @@ let r = await page.evaluate(async () => {
     price0, price1,
     dCoins: g.save.coins - c0,
     donations: g.save.donations,
-    donStars: g.save.donStars,
     passLvl0, passLvl1: g.save.passLvl,
     xp0, xp1: g.save.xp,
   };
@@ -57,7 +55,6 @@ let r = await page.evaluate(async () => {
 check(r.price0 === 2000, '1: свіжа ціна donate === 2000', JSON.stringify({ price0: r.price0 }));
 check(r.dCoins === -2000, '1: купівля списала рівно 2000 монет', JSON.stringify({ dCoins: r.dCoins }));
 check(r.donations === 1, '1: donations === 1', JSON.stringify({ donations: r.donations }));
-check(r.donStars === 1, '1: donStars === 1', JSON.stringify({ donStars: r.donStars }));
 
 console.log('▸ 2. Ціна тепер 3000 (2000×1.5); друга покупка → -3000, donations === 2');
 check(r.price1 === 3000, '2: ціна після 1 донації === 3000', JSON.stringify({ price1: r.price1 }));

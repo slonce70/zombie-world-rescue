@@ -143,7 +143,36 @@ try {
     && mobile.buttons.every(({ width, height }) => width >= 44 && height >= 44),
   'на 375×844 профіль прокручується у viewport, а кнопки мають touch-зони 44×44', JSON.stringify(mobile));
 
-  check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
+  console.log('▸ 🌀 Імпульс грабельний');
+const impulse = await page.evaluate(async () => {
+  const g = window.__game;
+  g.openExpedition();
+  const card = document.querySelector('[data-specialist="impulse"]');
+  const state = { exists: !!card, disabled: !!card?.disabled, text: card?.textContent.replace(/\s+/g, ' ').trim() };
+  card?.click();
+  document.getElementById('btn-fighter-select')?.click();
+  document.getElementById('btn-expedition-go')?.click();
+  for (let i = 0; i < 80 && g.state !== 'level'; i++) await new Promise((r) => setTimeout(r, 250));
+  const level = g.level;
+  if (!level?.specialist) return { ...state, started: false };
+  const p = level.player;
+  const alive = level.zombies.list.filter((z) => z.state !== 'dead').slice(0, 3);
+  for (const z of alive) { z.x = p.pos.x + 2; z.z = p.pos.z; z.y = p.pos.y; z.hp = 5000; z.slowT = 0; z.slowMul = 1; }
+  level.specialist.charge = 100;
+  const used = level.gadgets.useSpecialistSuper();
+  return {
+    ...state, started: true, id: level.specialist.id, weapons: [...p.weapons], used,
+    slowed: alive.filter((z) => z.slowT > 0 && z.slowMul < 1).length,
+    damaged: alive.filter((z) => z.hp < 5000).length,
+  };
+});
+check(impulse.exists && !impulse.disabled && !/Очікує/.test(impulse.text || ''),
+  'картка Імпульса доступна для вибору', JSON.stringify(impulse));
+check(impulse.started && impulse.id === 'impulse' && impulse.weapons.includes('staff')
+  && impulse.used && impulse.slowed === 3 && impulse.damaged === 3,
+'🌀 Імпульсна хвиля сповільнює і бʼє всіх поруч', JSON.stringify(impulse));
+
+check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
 } finally {
   await closeTest();
 }

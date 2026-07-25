@@ -193,7 +193,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'cloneSkins',
       'souls', 'stats', 'stormBest', 'titles', 'towerSkins', 'tracers', 'upgrades', 'weaponLoadout',
       'weapons', 'weekly', 'worldBosses', 'xp', 'radiationCoins',
-      'gift', 'weeklyGoal', 'donations', 'donStars',
+      'gift', 'weeklyGoal', 'donations',
       'coopWins', 'coopBonusDay',
       'coopRole',
       // ⭐ R3 «Зірки та милосердя»

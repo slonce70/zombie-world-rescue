@@ -393,7 +393,6 @@ export class Shop {
       case 'donate':
         // 🌟 монети вже списано вище; ростимо лічильник (від нього — нова ціна й титули) і престиж-зірку
         save.donations = (save.donations || 0) + 1;
-        save.donStars = (save.donStars || 0) + 1;
         game.hud.toast(t('🌟 Дякуємо, рятівнику! +1 зірка Рятівника'));
         game.audio.levelUp();
         break;

@@ -60,12 +60,14 @@ const validated = await page.evaluate(() => {
 });
 check(validated >= 1 && validated <= 5, `save.diffStar валідується в 1..5 (got ${validated})`);
 
-// ============ ⭐ СЕЛЕКТОР У ШТАБІ ============
-console.log('▸ M7: ★ селектор у Штабі');
-await page.evaluate(() => { window.__game.save.diffStar = 1; window.__game.hq.render(); });
-const stars = await page.evaluate(() => document.querySelectorAll('#hq-content .hq-star').length);
-check(stars === 5, `у Штабі 5 кнопок зірок (${stars})`);
-await page.evaluate(() => { const b = document.querySelector('#hq-content .hq-star[data-star="4"]'); if (b) b.click(); });
+// ============ ⭐ СЕЛЕКТОР У НАЛАШТУВАННЯХ (v740: складність зібрана в одному екрані) ============
+console.log('▸ M7: ★ селектор у Налаштуваннях');
+await page.evaluate(() => { window.__game.save.diffStar = 1; window.__game._renderDifficultySettings(); });
+const stars = await page.evaluate(() => document.querySelectorAll('#settings-stars [data-star]').length);
+check(stars === 5, `у Налаштуваннях 5 кнопок зірок (${stars})`);
+const hqStars = await page.evaluate(() => { window.__game.hq.render(); return document.querySelectorAll('#hq-content .hq-star').length; });
+check(hqStars === 0, `у Штабі дубля зірок більше немає (${hqStars})`);
+await page.evaluate(() => { const b = document.querySelector('#settings-stars [data-star="4"]'); if (b) b.click(); });
 check((await page.evaluate(() => window.__game.save.diffStar)) === 4, 'клік ★4 ставить save.diffStar=4');
 
 // ============ ПІДСУМОК ============

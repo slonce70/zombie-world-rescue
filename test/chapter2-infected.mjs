@@ -26,8 +26,8 @@ const menu = await page.evaluate((all) => {
     name: after && after.querySelector('.sm-name').textContent,
   };
 }, twelve);
-check(menu.beforeLocked && !menu.afterLocked && menu.tab === 'story' && /ГЛАВА 2/.test(menu.name),
-  'режим Глава 2 є в СЮЖЕТІ і відкривається на 12 країнах', JSON.stringify(menu));
+check(menu.beforeLocked && !menu.afterLocked && menu.tab === 'long' && /ГЛАВА 2/.test(menu.name),
+  'режим Глава 2 живе в «Довгій операції» і відкривається на 12 країнах', JSON.stringify(menu));
 
 console.log('▸ Старт зараженої країни');
 await page.evaluate(async (all) => {

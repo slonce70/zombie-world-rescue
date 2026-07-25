@@ -35,9 +35,11 @@ export const SPECIALISTS = Object.freeze({
     bias: Object.freeze({ tags: Object.freeze(['tank']), ids: Object.freeze([]), multiplier: 2 }),
   }),
   impulse: Object.freeze({
-    icon: '🌀', name: 'Імпульс', role: 'Контроль', passive: 'Контроль натовпу',
-    attackName: 'Очікує твоєї ідеї', superName: 'Очікує твоєї ідеї', superIcon: '✨',
-    gadgets: Object.freeze(['Очікує твоєї ідеї', 'Очікує твоєї ідеї']), playable: false,
+    icon: '🌀', name: 'Імпульс', role: 'Контроль', passive: 'Ворог сповільнюється',
+    attackName: 'Посох', superName: 'Імпульсна хвиля', superIcon: '🌀',
+    gadgets: Object.freeze(['Крижана граната', 'Ланцюгова блискавка']), playable: true,
+    kit: Object.freeze(['pistol', 'staff']), signature: 'staff', chargePerHit: 12,
+    bias: Object.freeze({ tags: Object.freeze([]), ids: Object.freeze([]), multiplier: 1 }),
   }),
 });
 
@@ -56,6 +58,9 @@ export const BASTION_LEVEL_STATS = Object.freeze([
   Object.freeze({ maxHealth: 175, damage: 110 }),
   Object.freeze({ maxHealth: 215, damage: 125 }),
 ]);
+
+// 🌀 Super Імпульса: сповільнює натовп навколо себе. Переюзує наявні slowT/slowMul зомбі.
+export const IMPULSE_WAVE = Object.freeze({ radius: 12, secs: 5, slowMul: 0.45, damage: 40 });
 
 export const BASTION_UNLOCK_COSTS = Object.freeze({
   'healing-punch': 1000,

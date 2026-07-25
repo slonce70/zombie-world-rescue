@@ -74,6 +74,9 @@ export const MODIFIERS = {
   swift: { icon: '⚡', name: () => t('Швидкий тиждень'), zMul: { speed: 1.25 } },
   elite: { icon: '👿', name: () => t('Елітний тиждень'), eliteChance: 0.15 },
 };
+// 🎲 у тижневий пул свідомо йдуть лише «мʼякі» чотири: 'noshop' і 'horde' працюють
+// (rules домержуються в modeRules, horde тікає у _updateHordeWaves) і доступні через
+// тест-хук weeklyModifierId, але цілий тиждень без магазину — задорого для дитини.
 export const WEEKLY_MODIFIER_POOL = ['night', 'tough', 'swift', 'elite'];
 
 export function modeIdFromOpts(opts, worldBossId) {

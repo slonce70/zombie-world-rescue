@@ -6,7 +6,7 @@ const source = readFileSync(new URL('../src/specialists.js', import.meta.url), '
 const specialists = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
   BASTION_LEVEL_STATS, EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, SPECIALISTS,
-  BASTION_STAR_POWERS, BASTION_STAR_POWER_COST, BASTION_STAR_POWER_LEVEL,
+  BASTION_STAR_POWERS, BASTION_STAR_POWER_COST, BASTION_STAR_POWER_LEVEL, IMPULSE_WAVE,
   bastionLevelStats, buyBastionStarPower, buyBastionUnlock, buyFighterLevel,
   claimSpecialistMastery, fighterLevelMultiplier, sanitizeFighterLevels,
   sanitizeBastionGadget, sanitizeBastionGadgetsOwned, sanitizeBastionStarPower,
@@ -153,4 +153,17 @@ test('bastion run does not feed another fighter mastery', () => {
   assert.deepEqual(bastion.specialistClaims, []);
   // спеціалісти зі своєю ранговою системою нараховують як і раніше
   assert.equal(claimSpecialistMastery(state, run, 'scout').specialistXp.scout, 100);
+});
+
+test('impulse is playable and controls the crowd', () => {
+  assert.equal(SPECIALISTS.impulse.playable, true);
+  assert.deepEqual(SPECIALISTS.impulse.kit, ['pistol', 'staff']);
+  assert.equal(SPECIALISTS.impulse.signature, 'staff');
+  assert.equal(SPECIALISTS.impulse.chargePerHit, 12);
+  assert.ok(!/Очікує/.test(SPECIALISTS.impulse.attackName + SPECIALISTS.impulse.superName));
+  assert.ok(SPECIALISTS.impulse.gadgets.every((g) => !/Очікує/.test(g)));
+  assert.ok(IMPULSE_WAVE.radius > 0 && IMPULSE_WAVE.secs > 0 && IMPULSE_WAVE.slowMul < 1);
+  // усі п'ятеро бійців тепер грабельні — жодної картки-заглушки
+  assert.deepEqual(EXPEDITION_FIGHTER_IDS.filter((id) => !SPECIALISTS[id].playable), []);
+  assert.equal(buyFighterLevel({ fighterLevels: {}, coins: 1000, crystals: 0 }, 'impulse').ok, true);
 });

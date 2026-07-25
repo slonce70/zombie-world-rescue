@@ -93,6 +93,18 @@ export function showVictory(game) {
       if (completed >= 4) space.ship.level = Math.min(3, space.ship.level + 1);
       game.save.coins += 300;
       game.hud.toast(t('🚀 Нова колонія заснована! +300 монет'));
+      // 🌍 разова нагорода за ПОВНІСТЮ освоєний світ: раніше 4-й регіон нічим не
+      // відрізнявся від інших, тож MARS і EUROPA не мали фінішу
+      if (completed >= 4) {
+        space.worldClaims = Array.isArray(space.worldClaims) ? space.worldClaims : [];
+        if (!space.worldClaims.includes(worldId)) {
+          space.worldClaims.push(worldId);
+          game.save.crystals = (game.save.crystals || 0) + 25;
+          game.save.eggs = (game.save.eggs || 0) + 1;
+          game.hud.banner(t('🌍 СВІТ ОСВОЄНО!'),
+            t('Усі 4 регіони — 💎 +25 і 🥚 яйце петса'), 5);
+        }
+      }
     }
   }
   const infectedFirstWin = game.level.infected && !(game.save.infected && game.save.infected.cleared && game.save.infected.cleared[country.id]);

@@ -44,7 +44,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'goal', 'hero', 'skins', 'dances', 'tracers', 'titles',
   'souls', 'soulLevel', 'gadgetsOwned', 'gadgetHypers', 'pets',
   'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
-  'gift', 'weeklyGoal', 'donations', 'donStars',
+  'gift', 'weeklyGoal', 'donations',
   'coopWins', 'coopBonusDay',
   // ⭐ R3 «Зірки та милосердя»: зірки країн, видані пороги-нагороди, лічильник милосердя
   'stars', 'starClaims', 'mercyDeaths',

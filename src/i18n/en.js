@@ -2945,4 +2945,13 @@ export const EN = {
 "Герой сезону": "Season Hero",
 "Пройди всі 12 сходинок сезону": "Complete all 12 season steps",
 "Відкривається за останню сходинку сезону": "Unlocked by the final season step",
+"Ворог сповільнюється": "Enemies slow down",
+"Імпульсна хвиля": "Impulse Wave",
+"🌀 Імпульсна хвиля: {n} зомбі сповільнено на {s} с": "🌀 Impulse Wave: {n} zombies slowed for {s}s",
+"🌀 Хвиля нікого не зачепила": "🌀 The wave hit nobody",
+"🏗️ Поселення вже на максимумі — матеріали продано: 🪙 +{n}": "🏗️ Settlement is already maxed — materials sold: 🪙 +{n}",
+"🌍 СВІТ ОСВОЄНО!": "🌍 WORLD SETTLED!",
+"Усі 4 регіони — 💎 +25 і 🥚 яйце петса": "All 4 regions — 💎 +25 and 🥚 a pet egg",
+"⭐ ЗІРКИ ПЕРЕПРОХОДЖЕННЯ ·": "⭐ REPLAY STARS ·",
+"Вище зірка — міцніші вороги й більше монет. Перший прохід країни і кооператив — завжди ★1.": "Higher star — tougher enemies and more coins. A country's first run and co-op are always ★1.",
 };

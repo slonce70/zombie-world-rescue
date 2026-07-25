@@ -6,7 +6,7 @@ import {
   makeHero, updateRig, setAnim, PETS,
 } from './characters.js';
 import { petLevel, PET_LEVEL_SCALE } from './eggs.js';
-import { BASTION_STAR_POWERS, sanitizeBastionStarPower } from './specialists.js';
+import { BASTION_STAR_POWERS, IMPULSE_WAVE, sanitizeBastionStarPower } from './specialists.js';
 import { makeCivilian } from './characters.js';
 import { FRIENDS } from './friends.js';
 import {
@@ -1081,6 +1081,24 @@ export class Gadgets {
       level.audio.heal();
       level.effects.burst(p.pos.clone().setY(p.pos.y + 1.4), 0x6dff9c, 12, { speed: 2, up: 3, life: 0.8 });
       level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: Math.round(p.health - before) }));
+    } else if (specialist.id === 'impulse') {
+      // 🌀 хвиля: сповільнює і легко б'є всіх довкола — контроль, а не бурст
+      let hit = 0;
+      const dir = new THREE.Vector3(0, 0, 1);
+      for (const zb of level.zombies.list) {
+        if (zb.state === 'dead' || zb.gone) continue;
+        if (Math.hypot(zb.x - p.pos.x, zb.z - p.pos.z) > IMPULSE_WAVE.radius) continue;
+        zb.lastHitBy = 1;
+        zb.damage(IMPULSE_WAVE.damage, dir, false, { weaponId: 'staff', hitZone: 'body' });
+        zb.slowT = Math.max(zb.slowT || 0, IMPULSE_WAVE.secs);
+        zb.slowMul = Math.min(zb.slowMul || 1, IMPULSE_WAVE.slowMul);
+        hit++;
+      }
+      level.audio.powerup();
+      level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xb855ff, IMPULSE_WAVE.radius);
+      level.bus.emit('toast', hit
+        ? t('🌀 Імпульсна хвиля: {n} зомбі сповільнено на {s} с', { n: hit, s: IMPULSE_WAVE.secs })
+        : t('🌀 Хвиля нікого не зачепила'));
     } else if (specialist.id === 'bastion') {
       const hyper = specialist.hyperActiveT > 0;
       const star = sanitizeBastionStarPower(level.game.save.bastionStarPower);

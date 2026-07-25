@@ -1968,9 +1968,18 @@ export class DynamicMissions {
       m.buildProgress = Math.min(1, m.buildProgress + dt / m.buildSeconds);
       if (m.buildProgress >= 1) {
         const settlement = level.game.save.settlement || (level.game.save.settlement = { level: 0, wood: 0, stone: 0, survivors: 0 });
+        const maxed = (settlement.level | 0) >= 3;
         settlement.level = Math.min(3, (settlement.level | 0) + 1);
-        settlement.wood = Math.min(999999, (settlement.wood | 0) + m.wood);
-        settlement.stone = Math.min(999999, (settlement.stone | 0) + m.stone);
+        // 🏗️ поселення качається до 3 рівня. Далі дерево й камінь нема куди дівати —
+        // тож надлишок одразу перетворюється на монети замість мертвого лічильника.
+        if (maxed) {
+          const coins = Math.round((m.wood + m.stone) * 2);
+          level.game.save.coins = (level.game.save.coins | 0) + coins;
+          level.bus.emit('toast', t('🏗️ Поселення вже на максимумі — матеріали продано: 🪙 +{n}', { n: coins }));
+        } else {
+          settlement.wood = Math.min(999999, (settlement.wood | 0) + m.wood);
+          settlement.stone = Math.min(999999, (settlement.stone | 0) + m.stone);
+        }
         settlement.survivors = Math.min(9999, (settlement.survivors | 0) + 3);
         level.game.saveGame();
         m.rebuilt = this._makeCityCenter(m);

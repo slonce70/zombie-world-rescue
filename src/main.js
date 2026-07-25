@@ -149,7 +149,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 730;
+const APP_VERSION = 740;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -794,9 +794,9 @@ class Game {
       bastionStarPower: null,
       squad: [],
       season: null,
-      // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
-      // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
-      donations: 0, donStars: 0,
+      // 🌟 «Пожертва рятівника»: donations — скільки разів купив. Від нього росте ціна,
+      // титули і зірки рятівника; окремого donStars не тримаємо — це був дубль 1:1.
+      donations: 0,
       // 🤝 кооп-перемоги: coopWins — лічильник перемог у грі разом (roster>1);
       // coopBonusDay — dayKey останнього виданого щоденного командного кристала (скаляр, НЕ map)
       coopWins: 0, coopBonusDay: '',
@@ -835,7 +835,7 @@ class Game {
       frontCoopClaims: [],
       // 🌙 жива місячна місія: реле, оборона, бос і одноразова нагорода
       moonRescue: { relays: [], defenseDone: false, bossDefeated: false, rewarded: false, done: false,
-        space: { regions: { MARS: {}, EUROPA: {} }, colonies: { MOON: {}, MARS: {}, EUROPA: {} }, ship: { level: 1, parts: 0 } } },
+        space: { regions: { MARS: {}, EUROPA: {} }, colonies: { MOON: {}, MARS: {}, EUROPA: {} }, ship: { level: 1, parts: 0 }, worldClaims: [] } },
       // 🏘️ постійний результат української відбудови
       settlement: { level: 0, wood: 0, stone: 0, survivors: 0 },
     };
@@ -923,7 +923,7 @@ class Game {
         if (typeof out.radiationCoins !== 'number' || !isFinite(out.radiationCoins) || out.radiationCoins < 0) out.radiationCoins = 0;
         out.radiationCoins = Math.floor(out.radiationCoins);
         // 🌟 донації рятівнику: скінченні цілі ≥0 (зіпсоване/чуже → 0)
-        for (const k of ['donations', 'donStars']) {
+        for (const k of ['donations']) {
           if (typeof out[k] !== 'number' || !isFinite(out[k]) || out[k] < 0) out[k] = 0;
           out[k] = Math.floor(out[k]);
         }
@@ -986,6 +986,9 @@ class Game {
               EUROPA: cleanLevels(rawColonies.EUROPA, ['CONAMARA', 'LINEA', 'THERA', 'ARGADNEL']),
             },
             ship: { level: Math.max(1, Math.min(3, Math.trunc(Number(ship.level) || 1))), parts: Math.max(0, Math.min(4, Math.trunc(Number(ship.parts) || 0))) },
+            // 🌍 світи, за повне освоєння яких нагороду вже видано (щоб не дублювалась)
+            worldClaims: [...new Set((Array.isArray(rawSpace.worldClaims) ? rawSpace.worldClaims : [])
+              .filter((id) => ['MOON', 'MARS', 'EUROPA'].includes(id)))],
           },
         };
         const settlement = out.settlement && typeof out.settlement === 'object' && !Array.isArray(out.settlement) ? out.settlement : {};
@@ -1225,6 +1228,25 @@ class Game {
     if (label) label.textContent = DIFFICULTY_LABELS[current];
     document.querySelectorAll('.difficulty-option').forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.difficulty === current));
+    });
+    // ⭐ зірки перепроходження живуть ТУТ, а не в окремому екрані Штабу:
+    // дві незвʼязані системи складності на різних екранах збивали з пантелику
+    const stars = document.getElementById('settings-stars');
+    if (!stars) return;
+    const cur = this.save.diffStar || 1;
+    const starLabel = document.getElementById('settings-star-current');
+    if (starLabel) starLabel.textContent = String(cur);
+    stars.innerHTML = [1, 2, 3, 4, 5].map((n) =>
+      `<button class="btn difficulty-option" type="button" data-star="${n}" aria-pressed="${n === cur}">${'⭐'.repeat(n)}</button>`).join('');
+    stars.querySelectorAll('[data-star]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const n = parseInt(button.dataset.star, 10);
+        if (!(n >= 1 && n <= 5)) return;
+        this.save.diffStar = n;
+        this.audio.click();
+        this.saveGame();
+        this._renderDifficultySettings();
+      });
     });
   }
 
@@ -1772,7 +1794,7 @@ class Game {
     const need = lvl < PASS_MAX_LEVEL ? xpForLevel(lvl) : 0;
     const prestige = this.progress.prestigeStars;
     // 🌟 зірки за пожертви рятівнику — окремим рядком (обчислюваний престиж НЕ чіпаємо)
-    const donStars = this.save.donStars || 0;
+    const donStars = this.save.donations || 0;
     const donLine = donStars > 0 ? `<br>${t('🌟 Зірки пожертв: {n}', { n: donStars })}` : '';
     document.getElementById('pass-progress').innerHTML = (lvl >= PASS_MAX_LEVEL
       ? t('⭐ Рівень {lvl} — МАКСИМУМ! Ти зірка! 🏆', { lvl }) + (prestige > 0 ? `<br>${t('🎖️ Ранг Рятівника: {n} ⭐', { n: prestige })}` : '')
@@ -2722,10 +2744,6 @@ class Game {
     this._applyFrontTransition({ type: 'INIT', opened: true });
     this.frontui.open(this.getFrontViewModel());
     return true;
-  }
-
-  selectFrontSpecialist(id) {
-    return id;
   }
 
   selectFrontProject(projectId) {
@@ -3876,7 +3894,10 @@ class Game {
         ? sanitizeSpecialistId(this.save.coopRole, 'guard')
         : sanitizeFighterId(level.expedition.specialist, 'guard');
       const rank = specialistRank(this.save.specialistXp[id]);
-      const modifiers = id === 'bastion'
+      // 🧱🌀 Бастіон і Імпульс мають власні системи (рівні / хвиля), тож рангові
+      // модифікатори спеціалістів до них не застосовуються — інакше вони схлопнулись
+      // би в 'guard' через sanitizeSpecialistId
+      const modifiers = (id === 'bastion' || id === 'impulse')
         ? { maxHealthBonus: 0, healMult: 1, speedMult: 1, pickupMult: 1 }
         : specialistModifiers(id, rank);
       const active = !isRadiation;

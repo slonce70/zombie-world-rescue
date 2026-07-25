@@ -405,7 +405,6 @@ export class FrontUI {
     if (!button || button.disabled) return;
     this._click();
     this.selectedSpecialistId = button.dataset.specialistId;
-    if (typeof this.game.selectFrontSpecialist === 'function') this.game.selectFrontSpecialist(this.selectedSpecialistId);
     this.render();
   }
 
