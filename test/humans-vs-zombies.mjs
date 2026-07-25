@@ -28,7 +28,7 @@ const menu = await page.evaluate(() => {
     categories,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.categories.some((x) => x.includes('АРКАДА')), 'до 11 країн режим заблокований в Аркаді', JSON.stringify(menu));
+check(menu.beforeExists && !menu.beforeLocked && menu.categories.some((x) => x.includes('5 ХВИЛИН')), 'режим доступний одразу у «5 хвилин»', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ЗОМБІ ПРОТИ ЛЮДЕЙ/i.test(menu.name), 'після 11 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: 30 клонів проти 65 зомбі і робота');

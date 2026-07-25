@@ -34,7 +34,7 @@ try {
       zoneOpen: !!zoneEl && !zoneEl.classList.contains('locked'),
     };
   });
-  check(lobby.locked, 'до 8 країн дружня оборона заблокована', JSON.stringify(lobby));
+  check(!lobby.locked, 'дружня оборона в лобі доступна без звільнених країн', JSON.stringify(lobby));
   check(lobby.open && lobby.zoneOpen, 'після 8 країн доступні оборона і зона', JSON.stringify(lobby));
 
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), lobby.code);

@@ -30,7 +30,7 @@ const menu = await page.evaluate(() => {
     categoriesAfter,
   };
 });
-check(menu.beforeExists && menu.beforeLocked && menu.categoriesBefore.some((x) => x.includes('ОПЕРАЦІЇ')), 'до 9 країн режим заблокований в Операціях', JSON.stringify(menu));
+check(menu.beforeExists && !menu.beforeLocked && menu.categoriesBefore.some((x) => x.includes('5 ХВИЛИН')), 'режим доступний одразу у «5 хвилин»', JSON.stringify(menu));
 check(menu.afterExists && !menu.afterLocked && /ПОРТАЛ/i.test(menu.name), 'після 9 країн режим доступний', JSON.stringify(menu));
 
 console.log('▸ Старт Порталу: 3 портали, хвилі зомбі, перемога після закриття всіх');

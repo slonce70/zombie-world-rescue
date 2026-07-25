@@ -4,25 +4,28 @@ import { t } from './i18n.js';
 import { CAMPAIGN_ORDER } from './countries.js';
 import { hasLiberated } from './net/cloudsave.js';
 import { CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
-import { KNOCKOUT_UNLOCK_LEVEL, OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES } from './knockout.js';
-import { DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
-import { TURRETWAR_UNLOCK_COUNTRIES } from './turretwar.js';
-import { PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
-import { BANK_UNLOCK_COUNTRIES } from './bank.js';
-import { PORTAL_UNLOCK_COUNTRIES } from './portal.js';
-import { MAZE_UNLOCK_COUNTRIES } from './maze.js';
-import { HUMANS_UNLOCK_COUNTRIES, OVERLOADED_HUMANS_UNLOCK_COUNTRIES } from './humans.js';
-import { SOUL_COLLECTOR_UNLOCK_LEVEL } from './souls.js';
-import { WORLD_BOSS_MIN_COUNTRIES } from './worldboss.js';
-import { RADIATION_UNLOCK_COUNTRIES } from './radiationmode.js';
+import { OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES } from './knockout.js';
+import { OVERLOADED_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
+import { OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
+import { OVERLOADED_HUMANS_UNLOCK_COUNTRIES } from './humans.js';
 
-// Чотири категорії каталогу; складні варіанти живуть тумблером 💀 на базовій картці.
+// Дві категорії — за ДОВЖИНОЮ СЕСІЇ, а не за жанром: дитина обирає «скільки в мене часу»,
+// а не «що таке аркада». Складні варіанти живуть тумблером 💀 на базовій картці.
 export const SOLO_MODE_GROUPS = [
-  { id: 'story', title: () => t('СЮЖЕТ'), ids: ['campaign', 'infected', 'chapter3'] },
-  { id: 'operations', title: () => t('ОПЕРАЦІЇ'), ids: ['expedition', 'community', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
-  { id: 'challenges', title: () => t('ВИПРОБУВАННЯ'), ids: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'] },
-  { id: 'arcade', title: () => t('АРКАДА'), ids: ['pvp', 'knockout', 'humans', 'bank'] },
+  {
+    id: 'quick',
+    title: () => t('⏱️ 5 ХВИЛИН'),
+    ids: ['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans'],
+  },
+  {
+    id: 'long',
+    title: () => t('🌍 ДОВГА ОПЕРАЦІЯ'),
+    ids: ['campaign', 'expedition', 'community', 'storm', 'arena', 'worldboss', 'infected', 'chapter3'],
+  },
 ];
+
+// 🤝 режими, які працюють у кооп-лобі — картка отримує бейдж
+export const COOP_MODE_IDS = ['campaign', 'expedition', 'storm', 'radiation', 'turretwar', 'worldboss', 'arena'];
 
 // 💀 базовий режим → його «перегружений» варіант (кнопка на картці)
 export const HARD_VARIANTS = {
@@ -162,46 +165,38 @@ export const SOLO_MODES = [
   },
   {
     id: 'storm', icon: '⛈️', name: () => t('ШТОРМ'), picker: 'storm',
-    locked: ({ libN }) => libN < 1,
-    desc: ({ libN }) => libN < 1 ? t('Відкриється після першої звільненої країни') : t('Виживи у колі, що звужується. Рекорд — у Лігу!'),
+    locked: () => false,
+    desc: () => t('Виживи у колі, що звужується. Рекорд — у Лігу!'),
     start: (game, countryId) => game.startStorm(countryId),
   },
   {
     id: 'arena', icon: '👑', name: () => t('АРЕНА БОСІВ'),
-    locked: ({ libN }) => libN < 2,
-    desc: ({ libN }) => libN < 2 ? t('Відкриється після двох звільнених країн') : t('Усі {n} босів поспіль на час. Час — у Лігу!', { n: CAMPAIGN_ORDER.length }),
+    locked: () => false,
+    desc: () => t('Усі {n} босів поспіль на час. Час — у Лігу!', { n: CAMPAIGN_ORDER.length }),
     start: (game) => game.startArena(),
   },
   {
     id: 'worldboss', icon: '🌋', name: () => t('СВІТОВІ БОСИ'), picker: 'worldboss',
-    locked: ({ libN }) => libN < WORLD_BOSS_MIN_COUNTRIES,
-    desc: ({ libN }) => libN < WORLD_BOSS_MIN_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: WORLD_BOSS_MIN_COUNTRIES, c: libN })
-      : t('Великі боси з окремими механіками і разовими нагородами.'),
+    locked: () => false,
+    desc: () => t('Великі боси з окремими механіками і разовими нагородами.'),
     start: (game, id) => game.startWorldBoss(id),
   },
   {
     id: 'radiation', icon: '☢️', name: () => t('РАДІАЦІЯ'),
-    locked: ({ libN }) => libN < RADIATION_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < RADIATION_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: RADIATION_UNLOCK_COUNTRIES, c: libN })
-      : t('Кімната 50×50: 50 HP, дробовик з 10 патронами, один радіаційний зомбі. Перемога: +50 монет радіації.'),
+    locked: () => false,
+    desc: () => t('Кімната 50×50: 50 HP, дробовик з 10 патронами, один радіаційний зомбі. Перемога: +50 монет радіації.'),
     start: (game) => game.startRadiation(),
   },
   {
     id: 'knockout', icon: '🥊', name: () => t('НОКАУТ'),
-    locked: ({ game }) => game.progress.level < KNOCKOUT_UNLOCK_LEVEL,
-    desc: ({ game }) => game.progress.level < KNOCKOUT_UNLOCK_LEVEL
-      ? t('Відкриється на {n} рівні Зоряного шляху (твій: {c})', { n: KNOCKOUT_UNLOCK_LEVEL, c: game.progress.level })
-      : t('Кімната 33×33, 10 зомбі, тільки пістолет. Перемога може дати Посох!'),
+    locked: () => false,
+    desc: () => t('Кімната 33×33, 10 зомбі, тільки пістолет. Перемога може дати Посох!'),
     start: (game) => game.startKnockout(),
   },
   {
     id: 'soul-collector', icon: '👻', name: () => t('Збирач душ'),
-    locked: ({ game }) => game.progress.level < SOUL_COLLECTOR_UNLOCK_LEVEL,
-    desc: ({ game }) => game.progress.level < SOUL_COLLECTOR_UNLOCK_LEVEL
-      ? t('Відкриється на {n} рівні Зоряного шляху (твій: {c})', { n: SOUL_COLLECTOR_UNLOCK_LEVEL, c: game.progress.level })
-      : t('Кімната 100×100, 20 привидів, тільки посох. Перемога: +3 душі.'),
+    locked: () => false,
+    desc: () => t('Кімната 100×100, 20 привидів, тільки посох. Перемога: +3 душі.'),
     start: (game) => game.startSoulCollector(),
   },
   {
@@ -214,26 +209,20 @@ export const SOLO_MODES = [
   },
   {
     id: 'zone-defense', icon: '⭕', name: () => t('Оборона в зоні'),
-    locked: ({ libN }) => libN < ZONE_DEFENSE_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < ZONE_DEFENSE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES, c: libN })
-      : t('Коло 30 метрів: протримайся 125 секунд із посохом і пістолетом.'),
+    locked: () => false,
+    desc: () => t('Коло 30 метрів: протримайся 125 секунд із посохом і пістолетом.'),
     start: (game) => game.startZoneDefense(),
   },
   {
     id: 'defense', icon: '🛡️', name: () => t('ОБОРОНА'),
-    locked: ({ libN }) => libN < DEFENSE_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < DEFENSE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: DEFENSE_UNLOCK_COUNTRIES, c: libN })
-      : t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
+    locked: () => false,
+    desc: () => t('Кімната 120×120, вежа 250 HP, пістолет і автомат.'),
     start: (game) => game.startDefense(),
   },
   {
     id: 'turretwar', icon: '🗼', name: () => t('ОБОРОНА ТУРЕЛІ'),
-    locked: ({ libN }) => libN < TURRETWAR_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < TURRETWAR_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: TURRETWAR_UNLOCK_COUNTRIES, c: libN })
-      : t('Твоя турель проти зомбі-турелі: роботи 1000 HP, хвилі зомбі, тільки 🔨 молот!'),
+    locked: () => false,
+    desc: () => t('Твоя турель проти зомбі-турелі: роботи 1000 HP, хвилі зомбі, тільки 🔨 молот!'),
     start: (game) => game.startTurretWar(),
   },
   {
@@ -254,34 +243,26 @@ export const SOLO_MODES = [
   },
   {
     id: 'bank', icon: '🏦', name: () => t('БАНК'),
-    locked: ({ libN }) => libN < BANK_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < BANK_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: BANK_UNLOCK_COUNTRIES, c: libN })
-      : t('Кімната 200×50: захисти свій банк і знищ банк зомбі.'),
+    locked: () => false,
+    desc: () => t('Кімната 200×50: захисти свій банк і знищ банк зомбі.'),
     start: (game) => game.startBank(),
   },
   {
     id: 'portal', icon: '🌀', name: () => t('ПОРТАЛ'),
-    locked: ({ libN }) => libN < PORTAL_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < PORTAL_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: PORTAL_UNLOCK_COUNTRIES, c: libN })
-      : t('Закрий 3 портали, поки вони випускають хвилі зомбі.'),
+    locked: () => false,
+    desc: () => t('Закрий 3 портали, поки вони випускають хвилі зомбі.'),
     start: (game) => game.startPortal(),
   },
   {
     id: 'maze', icon: '🧩', name: () => t('ЛАБІРИНТ'),
-    locked: ({ libN }) => libN < MAZE_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < MAZE_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: MAZE_UNLOCK_COUNTRIES, c: libN })
-      : t('Знайди 3 ключі, відкрий вихід і виживи у коридорах.'),
+    locked: () => false,
+    desc: () => t('Знайди 3 ключі, відкрий вихід і виживи у коридорах.'),
     start: (game) => game.startMaze(),
   },
   {
     id: 'humans', icon: '⚔️', name: () => t('ЗОМБІ ПРОТИ ЛЮДЕЙ'),
-    locked: ({ libN }) => libN < HUMANS_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < HUMANS_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: HUMANS_UNLOCK_COUNTRIES, c: libN })
-      : t('30 клонів проти 65 зомбі і робота. Командуй армією!'),
+    locked: () => false,
+    desc: () => t('30 клонів проти 65 зомбі і робота. Командуй армією!'),
     start: (game) => game.startHumans(),
   },
   {
@@ -294,10 +275,8 @@ export const SOLO_MODES = [
   },
   {
     id: 'pvp', icon: '⚔️', name: () => t('ПВП'),
-    locked: ({ libN }) => libN < PVP_UNLOCK_COUNTRIES,
-    desc: ({ libN }) => libN < PVP_UNLOCK_COUNTRIES
-      ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: PVP_UNLOCK_COUNTRIES, c: libN })
-      : t('Дуель 30×30: посох проти зомбі на 250 HP.'),
+    locked: () => false,
+    desc: () => t('Дуель 30×30: посох проти зомбі на 250 HP.'),
     start: (game) => game.startPvp(),
   },
 ];

@@ -44,22 +44,22 @@ import { StormMode } from './storm.js';
 import { Sandstorm } from './sandstorm.js';
 import { BossRush } from './bossrush.js';
 import {
-  KnockoutMode, KNOCKOUT_UNLOCK_LEVEL, KNOCKOUT_STAFF_CHANCE,
+  KnockoutMode, KNOCKOUT_STAFF_CHANCE,
   OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES,
 } from './knockout.js';
-import { DefenseMode, DEFENSE_UNLOCK_COUNTRIES, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
-import { TurretWarMode, TURRETWAR_UNLOCK_COUNTRIES } from './turretwar.js';
-import { PvpMode, PVP_UNLOCK_COUNTRIES, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
-import { BankMode, BANK_UNLOCK_COUNTRIES } from './bank.js';
-import { PortalMode, PORTAL_UNLOCK_COUNTRIES } from './portal.js';
-import { MazeMode, MAZE_UNLOCK_COUNTRIES } from './maze.js';
-import { HumansMode, HUMANS_UNLOCK_COUNTRIES, OVERLOADED_HUMANS_UNLOCK_COUNTRIES } from './humans.js';
-import { SoulCollectorMode, SOUL_COLLECTOR_UNLOCK_LEVEL, SOUL_LEVEL_COST, SOUL_WIN_REWARD } from './souls.js';
+import { DefenseMode, OVERLOADED_DEFENSE_UNLOCK_COUNTRIES } from './defense.js';
+import { TurretWarMode } from './turretwar.js';
+import { PvpMode, OVERLOADED_PVP_UNLOCK_COUNTRIES } from './pvp.js';
+import { BankMode } from './bank.js';
+import { PortalMode } from './portal.js';
+import { MazeMode } from './maze.js';
+import { HumansMode, OVERLOADED_HUMANS_UNLOCK_COUNTRIES } from './humans.js';
+import { SoulCollectorMode, SOUL_LEVEL_COST, SOUL_WIN_REWARD } from './souls.js';
 import {
   WorldBossMode, WORLD_BOSSES, WORLD_BOSS_BY_ID, WORLD_BOSS_MIN_COUNTRIES,
   worldBossUnlocked,
 } from './worldboss.js';
-import { RadiationMode, RADIATION_UNLOCK_COUNTRIES, RADIATION_WIN_COINS } from './radiationmode.js';
+import { RadiationMode, RADIATION_WIN_COINS } from './radiationmode.js';
 import {
   HERO_SKINS, DANCES, TRACERS, HERO_PALETTE, HERO_HATS, HERO_FACES,
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
@@ -74,6 +74,7 @@ import { FrontUI } from './ui/frontui.js';
 import { frontCountryCopy } from './ui/frontcopy.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
+import { todaySlots } from './rotation.js';
 import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
@@ -104,7 +105,7 @@ import {
 } from './rewards.js';
 import {
   SOLO_MODE_GROUPS, HARD_VARIANTS, MODE_RULES, MODIFIERS, WEEKLY_MODIFIER_POOL,
-  modeIdFromOpts, MODE_START_OPTS, SOLO_MODES, DAILY_CHALLENGE_POOL, MODE_MILESTONES,
+  modeIdFromOpts, MODE_START_OPTS, SOLO_MODES, DAILY_CHALLENGE_POOL, MODE_MILESTONES, COOP_MODE_IDS,
 } from './modes.js';
 import { renderAlbum, skinHint, petHint } from './ui/album.js';
 import {
@@ -146,7 +147,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 701;
+const APP_VERSION = 710;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1604,22 +1605,24 @@ class Game {
         <div class="sm-ico">${m.icon}</div>
         <div class="sm-body"><div class="sm-name">${m.name}${m.locked ? ' 🔒' : ''}${!m.locked && m.id === daily ? ' <span class="sm-daily">🎯 ×2</span>' : ''}${!m.locked && m.id === weekly ? ' <span class="sm-daily sm-weekly">🗓️ ×3</span>' : ''}${!m.locked && m.id === 'campaign' && wkMod ? ` <span class="sm-daily sm-weekly">${wkMod.icon} ${wkMod.name()}</span>` : ''}</div>
         <div class="sm-desc">${m.desc}</div>
+        ${!m.locked && COOP_MODE_IDS.includes(m.id) ? `<div class="sm-coop">🤝 ${t('Можна разом')}</div>` : ''}
         ${!m.locked && this.save.modeBest && this.save.modeBest[m.id] != null ? `<div class="sm-best">🏆 ${t('Рекорд: {t}', { t: fmtBest(this.save.modeBest[m.id]) })}</div>` : ''}
         ${hardBtn(m)}</div>
         <div class="sm-go">${m.locked ? '' : '▶'}</div>
       </button>`;
+    // 🎡 слоти дня: детерміновані від дати, однакові в усіх гравців, нічого не запирають
     const catalogOrder = groups.flatMap((g) => g.ids);
     const recommendedIds = [];
     const addRecommendation = (id) => {
       const mode = byId.get(id);
-      if (mode && !mode.locked && !recommendedIds.includes(id) && recommendedIds.length < 3) recommendedIds.push(id);
+      if (mode && !mode.locked && !recommendedIds.includes(id) && recommendedIds.length < 4) recommendedIds.push(id);
     };
-    [daily, weekly, 'expedition'].forEach(addRecommendation);
-    ['campaign', 'storm', 'defense', 'knockout', ...catalogOrder].forEach(addRecommendation);
+    todaySlots(this._dayIndex()).forEach(addRecommendation);
+    [daily, weekly, ...catalogOrder].forEach(addRecommendation);
     root.innerHTML = `
       ${this._playerCompassHtml()}
       <section class="solo-recommended" aria-labelledby="solo-recommended-title">
-        <h3 id="solo-recommended-title">${t('РЕКОМЕНДОВАНО ЗАРАЗ')}</h3>
+        <h3 id="solo-recommended-title">${t('СЬОГОДНІ')}</h3>
         ${recommendedIds.map((id) => modeHtml(byId.get(id))).join('')}
       </section>
       ${groups.map((g) => `
@@ -2292,12 +2295,6 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < RADIATION_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('☢️ Радіація відкриється після {n} звільнених країн!', { n: RADIATION_UNLOCK_COUNTRIES }));
-      return;
-    }
     this.audio.click();
     return this.startMode('radiation');
   }
@@ -2307,11 +2304,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('🥊🤝 Нокаут поки доступний тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    if (this.progress.level < KNOCKOUT_UNLOCK_LEVEL) {
-      this.audio.denied();
-      this.hud.toast(t('🥊 Нокаут відкриється на {n} рівні Зоряного шляху!', { n: KNOCKOUT_UNLOCK_LEVEL }));
       return;
     }
     this.audio.click();
@@ -2341,12 +2333,6 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < DEFENSE_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('🛡️ Оборона відкриється після {n} звільнених країн!', { n: DEFENSE_UNLOCK_COUNTRIES }));
-      return;
-    }
     this.audio.click();
     return this.startMode('defense');
   }
@@ -2356,12 +2342,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('🗼🤝 Оборона турелі поки доступна тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < TURRETWAR_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('🗼 Оборона турелі відкриється після {n} звільнених країн!', { n: TURRETWAR_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2390,12 +2370,6 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < ZONE_DEFENSE_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('⭕ Оборона в зоні відкриється після {n} звільнених країн!', { n: ZONE_DEFENSE_UNLOCK_COUNTRIES }));
-      return;
-    }
     this.audio.click();
     return this.startMode('zone-defense');
   }
@@ -2405,12 +2379,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('⚔️🤝 ПВП поки доступний тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < PVP_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('⚔️ ПВП відкриється після {n} звільнених країн!', { n: PVP_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2440,12 +2408,6 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < BANK_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('🏦 Банк відкриється після {n} звільнених країн!', { n: BANK_UNLOCK_COUNTRIES }));
-      return;
-    }
     this.audio.click();
     return this.startMode('bank');
   }
@@ -2455,12 +2417,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('🌀🤝 Портал поки доступний тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < PORTAL_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('🌀 Портал відкриється після {n} звільнених країн!', { n: PORTAL_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2474,12 +2430,6 @@ class Game {
       this.audio.denied();
       return;
     }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < MAZE_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('🧩 Лабіринт відкриється після {n} звільнених країн!', { n: MAZE_UNLOCK_COUNTRIES }));
-      return;
-    }
     this.audio.click();
     return this.startMode('maze');
   }
@@ -2489,12 +2439,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('⚔️🤝 Зомбі проти людей поки доступний тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    const lib = liberatedCount(this.save.liberated);
-    if (lib < HUMANS_UNLOCK_COUNTRIES) {
-      this.audio.denied();
-      this.hud.toast(t('⚔️ Зомбі проти людей відкриється після {n} звільнених країн!', { n: HUMANS_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2522,11 +2466,6 @@ class Game {
     if (this.coop && this.coop.session.state !== 'idle') {
       this.hud.toast(t('👻🤝 Збирач душ поки доступний тільки у соло.'));
       this.audio.denied();
-      return;
-    }
-    if (this.progress.level < SOUL_COLLECTOR_UNLOCK_LEVEL) {
-      this.audio.denied();
-      this.hud.toast(t('👻 Збирач душ відкриється на {n} рівні Зоряного шляху!', { n: SOUL_COLLECTOR_UNLOCK_LEVEL }));
       return;
     }
     this.audio.click();
@@ -5021,10 +4960,14 @@ class Game {
   }
 
   // 🎯 режим «випробування дня» — детерміновано від локальної дати
-  dailyChallengeId() {
+  // 📅 локальний індекс дня (НЕ UTC) — спільний для випробування дня і слотів «СЬОГОДНІ»
+  _dayIndex() {
     const d = new Date();
-    const key = d.getFullYear() * 372 + d.getMonth() * 31 + (d.getDate() - 1);
-    return DAILY_CHALLENGE_POOL[key % DAILY_CHALLENGE_POOL.length];
+    return d.getFullYear() * 372 + d.getMonth() * 31 + (d.getDate() - 1);
+  }
+
+  dailyChallengeId() {
+    return DAILY_CHALLENGE_POOL[this._dayIndex() % DAILY_CHALLENGE_POOL.length];
   }
 
   // 🎁 модалка подарунка дня: грід 7 клітинок поточного тижня, підсвічений сьогоднішній день

@@ -32,23 +32,21 @@ const catalog = await page.evaluate(() => ({
   expeditionLocked: document.querySelector('.solo-category [data-mode="expedition"]').classList.contains('locked'),
 }));
 const expectedGroups = {
-  story: ['campaign', 'infected', 'chapter3'],
-  operations: ['expedition', 'community', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'],
-  challenges: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'],
-  arcade: ['pvp', 'knockout', 'humans', 'bank'],
+  quick: ['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans'],
+  long: ['campaign', 'expedition', 'community', 'storm', 'arena', 'worldboss', 'infected', 'chapter3'],
 };
 check(catalog.role === 'dialog' && catalog.title === '🎮 РЕЖИМИ', 'каталог є діалогом РЕЖИМИ', JSON.stringify(catalog));
-check(catalog.recommended.length >= 1 && catalog.recommended.length <= 3
+check(catalog.recommended.length === 4
   && new Set(catalog.recommended.map((mode) => mode.id)).size === catalog.recommended.length
   && catalog.recommended.every((mode) => !mode.locked),
-'рекомендації унікальні, доступні та обмежені трьома', JSON.stringify(catalog.recommended));
+'слоти «СЬОГОДНІ» — 4 унікальні доступні режими', JSON.stringify(catalog.recommended));
 check(catalog.open === 0 && JSON.stringify(catalog.groups) === JSON.stringify(expectedGroups) && !catalog.expeditionLocked,
-'чотири категорії згорнуті, містять усі 19 режимів, Expedition доступна', JSON.stringify(catalog.groups));
+'дві категорії згорнуті, містять усі 19 режимів, Expedition доступна', JSON.stringify(catalog.groups));
 
-await page.locator('.solo-category[data-category="story"] > summary').click();
-await page.locator('.solo-category[data-category="operations"] > summary').click();
+await page.locator('.solo-category[data-category="quick"] > summary').click();
+await page.locator('.solo-category[data-category="long"] > summary').click();
 check(await page.locator('.solo-category[open]').count() === 1
-  && await page.locator('.solo-category[data-category="operations"][open]').count() === 1,
+  && await page.locator('.solo-category[data-category="long"][open]').count() === 1,
 'accordion тримає відкритою лише одну категорію');
 await page.keyboard.press('Escape');
 check(!await page.locator('#overlay-solo').evaluate((el) => el.classList.contains('show'))

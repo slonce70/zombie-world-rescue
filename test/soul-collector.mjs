@@ -32,8 +32,8 @@ const menu = await page.evaluate(async () => {
     soulPathButton: !!document.getElementById('btn-souls'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до рівня анлоку режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && /Збирач душ/i.test(menu.name), 'на рівні анлоку режим доступний', JSON.stringify(menu));
+check(menu.beforeExists && !menu.beforeLocked, 'режим доступний на 1 рівні Зоряного шляху', JSON.stringify(menu));
+check(menu.afterExists && !menu.afterLocked && /Збирач душ/i.test(menu.name), 'режим лишається доступним і далі', JSON.stringify(menu));
 check(menu.soulPathButton, 'у меню є кнопка Шлях душ', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: кімната 100x100, 20 білих привидів, 50 HP і тільки посох');

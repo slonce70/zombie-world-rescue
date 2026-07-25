@@ -10,8 +10,8 @@ try {
   await page.goto(`${BASE}/?test&fresh&seed=400`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__game?.state === 'globe');
   await page.click('#btn-solo');
-  await page.locator('.solo-category[data-category="operations"] > summary').click();
-  await page.click('.solo-category[data-category="operations"] .solo-mode[data-mode="expedition"]');
+  await page.locator('.solo-category[data-category="long"] > summary').click();
+  await page.click('.solo-category[data-category="long"] .solo-mode[data-mode="expedition"]');
   await page.waitForSelector('#overlay-expedition.show');
   const opened = await page.evaluate(() => ({ run: window.__game.save.expedition, text: document.querySelector('#expedition-route').textContent }));
   check(opened.run?.status === 'active' && opened.run?.step === 0, 'нова експедиція відкриває перший етап');

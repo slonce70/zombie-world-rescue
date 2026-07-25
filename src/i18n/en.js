@@ -2904,4 +2904,8 @@ export const EN = {
 "Швидкий супер": "Fast Super",
 "Суперкулак відкидає зомбі на 7 м і б'є на 20 сильніше": "Superpunch knocks zombies back 7 m and hits 20 harder",
 "Після Суперкулака 3 с швидкості, а Super заряджається на 5% швидше": "After Superpunch: 3s of speed, and Super charges 5% faster",
+"СЬОГОДНІ": "TODAY",
+"⏱️ 5 ХВИЛИН": "⏱️ 5 MINUTES",
+"🌍 ДОВГА ОПЕРАЦІЯ": "🌍 LONG OPERATION",
+"Можна разом": "Playable together",
 };

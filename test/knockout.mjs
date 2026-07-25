@@ -30,9 +30,9 @@ const menuLock = await page.evaluate(async () => {
     passLevel: g.progress.level,
   };
 });
-check(menuLock.beforeExists && menuLock.beforeLocked, 'до 20 рівня режим у меню заблокований', JSON.stringify(menuLock));
+check(menuLock.beforeExists && !menuLock.beforeLocked, 'режим доступний на 1 рівні Зоряного шляху', JSON.stringify(menuLock));
 check(menuLock.afterExists && !menuLock.afterLocked && menuLock.passLevel >= 20,
-  'на 20 рівні режим у меню доступний', JSON.stringify(menuLock));
+  'режим лишається доступним і на 20 рівні', JSON.stringify(menuLock));
 
 console.log('▸ Тумблер 💀 Перегруженого Нокауту зʼявляється після 8 звільнених країн');
 const overloadedMenu = await page.evaluate(() => {

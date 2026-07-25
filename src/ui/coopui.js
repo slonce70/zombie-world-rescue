@@ -8,11 +8,6 @@ import { LobbyClient } from '../net/lobby.js';
 import { COUNTRIES, CAMPAIGN_ORDER, isCountryOpen } from '../countries.js';
 import { HERO_SKINS } from '../characters.js';
 import { liberatedCount, hasLiberated } from '../net/cloudsave.js';
-import { FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES } from '../knockout.js';
-import { DEFENSE_UNLOCK_COUNTRIES, ZONE_DEFENSE_UNLOCK_COUNTRIES } from '../defense.js';
-import { RADIATION_UNLOCK_COUNTRIES } from '../radiationmode.js';
-import { TURRETWAR_UNLOCK_COUNTRIES } from '../turretwar.js';
-import { WORLD_BOSS_MIN_COUNTRIES } from '../worldboss.js';
 import { frontCountryState, frontStageConfig } from '../worldfront.js';
 import { frontStageLabel } from './frontui.js';
 import { frontCountryCopy } from './frontcopy.js';
@@ -591,7 +586,6 @@ export class CoopUI {
     const save = this.game.save;
     const anyLib = liberatedCount(save.liberated) > 0;
     let mh = '';
-    const libCount = liberatedCount(save.liberated);
     // 🗓️ командне випробування тижня: реальний режим цього тижня — у назві рядка
     const wkCoopMode = this.game.weeklyCoopModeId ? this.game.weeklyCoopModeId() : null;
     for (const [mid, label] of [
@@ -608,15 +602,10 @@ export class CoopUI {
       ['weekly-coop', t('🗓️ Командний тиждень: {i} 💎', { i: MODE_ICON[wkCoopMode] || '🎲' })],
     ]) {
       const sel = s.mode === mid;
-      const locked = isHost && ((mid === 'storm' && !anyLib)
-        || (mid === 'arena' && libCount < 2)
-        || (mid === 'friendly-knockout' && libCount < FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES)
-        || (mid === 'friendly-defense' && libCount < DEFENSE_UNLOCK_COUNTRIES)
-        || (mid === 'friendly-zone-defense' && libCount < ZONE_DEFENSE_UNLOCK_COUNTRIES)
-        || (mid === 'radiation' && libCount < RADIATION_UNLOCK_COUNTRIES)
-        || (mid === 'turretwar' && libCount < TURRETWAR_UNLOCK_COUNTRIES)
-        || (mid === 'worldboss' && libCount < WORLD_BOSS_MIN_COUNTRIES)
-        || (mid === 'weekly-coop' && !anyLib));
+      // 🔓 доступ до режимів більше не залежить від кількості звільнених країн —
+      // соло-каталог і лобі мусять збігатися, інакше режим «є соло, але закритий разом».
+      // Лишається тільки тижнева нагорода: вона прив'язана до першої перемоги.
+      const locked = isHost && mid === 'weekly-coop' && !anyLib;
       mh += `<button type="button" class="lobby-mode ${sel ? 'sel' : ''} ${isHost && !locked ? 'pick' : ''} ${locked ? 'locked' : ''}" data-mode="${mid}" aria-pressed="${sel}" ${!isHost || locked ? 'disabled' : ''}>${label}${locked ? ' 🔒' : ''}</button>`;
     }
     this.el.modes.innerHTML = mh;

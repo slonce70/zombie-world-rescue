@@ -35,7 +35,7 @@ try {
     const openEl = document.querySelector('.lobby-mode[data-mode="worldboss"]');
     return { code, locked, open: !!openEl && openEl.classList.contains('pick') && !openEl.classList.contains('locked') };
   });
-  check(lobby.locked, 'до 4 країн світовий бос у лобі заблокований', JSON.stringify(lobby));
+  check(!lobby.locked, 'світовий бос у лобі доступний без звільнених країн', JSON.stringify(lobby));
   check(lobby.open, 'після 4 країн світовий бос доступний', JSON.stringify(lobby));
 
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), lobby.code);

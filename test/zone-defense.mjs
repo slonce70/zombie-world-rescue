@@ -23,8 +23,8 @@ const menu = await page.evaluate(() => {
     afterLocked: after && after.classList.contains('locked'),
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 6 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked, 'після 6 країн режим доступний', JSON.stringify(menu));
+check(menu.beforeExists && !menu.beforeLocked, 'режим доступний без звільнених країн', JSON.stringify(menu));
+check(menu.afterExists && !menu.afterLocked, 'режим лишається доступним і далі', JSON.stringify(menu));
 
 console.log('▸ Старт режиму: зона, зброя, заборони');
 await page.evaluate(() => window.__game.test.startZoneDefense());

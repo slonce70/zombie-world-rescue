@@ -20,7 +20,7 @@ const lock = await page.evaluate(() => {
   const started = g.startTurretWar();
   return { exists: !!card, locked: card && card.classList.contains('locked'), started: started === undefined, state: g.state };
 });
-check(lock.exists && lock.locked && lock.state === 'globe', 'до 12 країн режим заблоковано', JSON.stringify(lock));
+check(lock.exists && !lock.locked, 'режим доступний без звільнених країн', JSON.stringify(lock));
 
 await page.evaluate(async () => {
   const g = window.__game;

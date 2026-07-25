@@ -29,7 +29,7 @@ try {
       text: openEl?.textContent || '',
     };
   });
-  check(lobby.locked, 'до 8 країн режим заблокований у лобі', JSON.stringify(lobby));
+  check(!lobby.locked, 'режим доступний у лобі без звільнених країн', JSON.stringify(lobby));
   check(lobby.open && /Дружній нокаут/.test(lobby.text), 'після 8 країн режим доступний у лобі', JSON.stringify(lobby));
 
   await B.evaluate((code) => window.__game.test.coopJoin(code, 'Влад'), lobby.code);

@@ -104,8 +104,8 @@ console.log('▸ UX polish: clickable menu items are native buttons');
     (await page.evaluate(() => window.__game && window.__game.state)) === 'globe',
   30000, 'globe');
   await page.click('#btn-solo');
-  await page.click('.solo-category[data-category="story"] > summary');
-  await page.click('.solo-category[data-category="story"] .solo-mode[data-mode="campaign"]');
+  await page.click('.solo-category[data-category="long"] > summary');
+  await page.click('.solo-category[data-category="long"] .solo-mode[data-mode="campaign"]');
   const menu = await page.evaluate(() => ({
     soloModesAreButtons: [...document.querySelectorAll('.solo-mode')].every((el) => el.tagName === 'BUTTON'),
     countriesAreButtons: [...document.querySelectorAll('#country-list .country-item')].every((el) => el.tagName === 'BUTTON'),

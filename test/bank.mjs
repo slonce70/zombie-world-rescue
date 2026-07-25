@@ -26,8 +26,8 @@ const menu = await page.evaluate(() => {
     afterName: after && after.querySelector('.sm-name').textContent,
   };
 });
-check(menu.beforeExists && menu.beforeLocked, 'до 7 країн режим заблокований', JSON.stringify(menu));
-check(menu.afterExists && !menu.afterLocked && /БАНК/i.test(menu.afterName), 'після 7 країн режим доступний', JSON.stringify(menu));
+check(menu.beforeExists && !menu.beforeLocked, 'режим доступний без звільнених країн', JSON.stringify(menu));
+check(menu.afterExists && !menu.afterLocked && /БАНК/i.test(menu.afterName), 'режим лишається доступним і далі', JSON.stringify(menu));
 
 console.log('▸ Старт Банку: кімната 200x50, банк гравця + банк зомбі, посох+пістолет, заборони');
 await page.evaluate(() => window.__game.test.startBank());

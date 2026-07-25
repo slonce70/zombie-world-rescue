@@ -33,7 +33,7 @@ try {
     const openEl = document.querySelector('.lobby-mode[data-mode="radiation"]');
     return { code, locked, open: !!openEl && openEl.classList.contains('pick') && !openEl.classList.contains('locked') };
   });
-  check(lobby.locked, 'до 12 країн радіація в лобі заблокована', JSON.stringify(lobby));
+  check(!lobby.locked, 'радіація в лобі доступна без звільнених країн', JSON.stringify(lobby));
   check(lobby.open, 'після 12 країн радіація доступна', JSON.stringify(lobby));
 
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), lobby.code);

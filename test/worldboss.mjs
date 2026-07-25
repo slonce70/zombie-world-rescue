@@ -112,8 +112,8 @@ const menuInfo = await page.evaluate(() => {
     text: open?.textContent || '',
   };
 });
-check(menuInfo.locked && menuInfo.open && menuInfo.text.includes('СВІТОВІ БОСИ'),
-  'меню світових босів закрите до 4 країн і відкрите після 4', JSON.stringify(menuInfo));
+check(!menuInfo.locked && menuInfo.open && menuInfo.text.includes('СВІТОВІ БОСИ'),
+  'меню світових босів відкрите незалежно від кількості країн', JSON.stringify(menuInfo));
 
 await page.evaluate(() => {
   const g = window.__game;
