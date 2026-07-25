@@ -58,7 +58,7 @@ export const SAVE_PROGRESS_KEYS = Object.freeze([
   'worldSaved',
   // 🧭 v400: активний маршрут, збірка і незабрана нагорода експедиції
   'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget',
-  'bastionGadgetsOwned', 'bastionHyperOwned', 'bastionStarPower',
+  'bastionGadgetsOwned', 'bastionHyperOwned', 'bastionStarPower', 'squad',
   // 🛰️ v500: дошка Живого фронту, активна операція, проєкти та id вже виданих нагород
   'front', 'frontCoopClaims',
   // 🌙 відновлені реле й одноразова нагорода живої місячної бази
@@ -138,6 +138,7 @@ export function saveHasProgress(s) {
     || (Array.isArray(s.bastionGadgetsOwned) && s.bastionGadgetsOwned.length > 0)
     || s.bastionHyperOwned === true
     || !!s.bastionStarPower                                // ⭐ куплена Зоряна сила Бастіона
+    || (Array.isArray(s.squad) && s.squad.length > 0)      // 🎒 зібраний загін друзів
     || !!s.front                                           // 🛰️ операції, проєкти Бази та незабраний прогрес Front
     || !!(s.customMap && Array.isArray(s.customMap.objects) && s.customMap.objects.length)
     || !!(s.customMap2 && Array.isArray(s.customMap2.objects) && s.customMap2.objects.length)

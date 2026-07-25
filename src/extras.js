@@ -7,6 +7,11 @@ import {
 } from './characters.js';
 import { petLevel, PET_LEVEL_SCALE } from './eggs.js';
 import { BASTION_STAR_POWERS, sanitizeBastionStarPower } from './specialists.js';
+import { makeCivilian } from './characters.js';
+import { FRIENDS } from './friends.js';
+import {
+  SQUAD_ARCHETYPES, SQUAD_DOWN_SECS, SQUAD_FOLLOW_DIST, SQUAD_LEASH_DIST, SQUAD_MAX_HP,
+} from './squad.js';
 import { disposeObject } from './utils.js';
 
 const CLONE_FOOT_LIFT = 0.16;
@@ -1419,6 +1424,66 @@ export class Gadgets {
     return Math.max(this.level.world.groundH(x, z), this.level.world.floorAt(x, z, fromY));
   }
 
+  // 🎒 Загін: врятований друг іде поруч. Об'єкт має ту саму форму, що клон гаджета,
+  // тож ним керує наявний _updateClones — інший тільки прапорець squad і хук здібності.
+  spawnSquad(countryIds) {
+    const p = this.level.player;
+    for (let i = 0; i < countryIds.length; i++) {
+      const cid = countryIds[i];
+      const friend = FRIENDS[cid];
+      const archetype = friend && SQUAD_ARCHETYPES[friend.squad];
+      if (!archetype) continue;
+      const off = (i - (countryIds.length - 1) / 2) * 1.4;
+      const x = p.pos.x + Math.cos(p.yaw) * off;
+      const z = p.pos.z - Math.sin(p.yaw) * off;
+      const y = this._floorY(x, z, p.pos.y) + CLONE_FOOT_LIFT;
+      const rig = makeCivilian(friend.kind, {
+        f: Math.random, next: Math.random,
+        range: (a, b) => a + (b - a) * Math.random(),
+        int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+        chance: (q) => Math.random() < q,
+        pick: (arr) => arr[Math.floor(Math.random() * arr.length) % arr.length],
+      });
+      rig.group.position.set(x, y, z);
+      this.level.scene.add(rig.group);
+      const member = {
+        x, z, y, hp: SQUAD_MAX_HP, hitT: 0, rig, mesh: rig.group,
+        squad: friend.squad, countryId: cid, downT: 0, abilityT: 0,
+      };
+      member.syncToFloor = () => {
+        member.y = this._floorY(member.x, member.z, member.y) + CLONE_FOOT_LIFT;
+        member.mesh.position.set(member.x, member.y, member.z);
+      };
+      member.takeDamage = (dmg) => {
+        if (member.downT > 0) return;
+        member.hp -= dmg;
+      };
+      this.clones.push(member);
+      this.level.bus.emit('toast', t('{n} йде з тобою!', { n: friend.name() }));
+    }
+  }
+
+  // здібність архетипу — раз на секунду, поки напарник на ногах
+  _squadAbility(member, dt) {
+    const level = this.level;
+    member.abilityT -= dt;
+    if (member.abilityT > 0) return;
+    member.abilityT = 1;
+    const cfg = SQUAD_ARCHETYPES[member.squad];
+    if (!cfg) return;
+    if (member.squad === 'heal') {
+      const p = level.player;
+      if (p.health > 0 && p.health < p.maxHealth
+        && Math.hypot(p.pos.x - member.x, p.pos.z - member.z) <= cfg.radius) {
+        p.heal(cfg.healPerSec);
+        level.effects.burst(member.mesh.position.clone().setY(member.y + 1.4), 0x6dff9c, 6,
+          { speed: 1.6, up: 2, life: 0.5 });
+      }
+      return;
+    }
+    // 🎈 lure не має тика: він працює пасивно — зомбі обирають його ціллю у zombies.js
+  }
+
   _spawnClone() {
     const pos = this._placePos(1.8);
     if (!pos) {
@@ -1711,15 +1776,37 @@ export class Gadgets {
         if (c.takeDamage) c.takeDamage(pressure * dt * 0.85);
         else c.hp -= pressure * dt * 0.85;
       }
-      if (c.hp <= 0) { this._removeClone(i, true); continue; }
+      // 🎒 напарник загону не гине назавжди: падає і встає через 20 с
+      if (c.squad) {
+        if (c.downT > 0) {
+          c.downT -= dt;
+          if (c.downT <= 0) { c.hp = SQUAD_MAX_HP; setAnim(c.rig, 'idle'); }
+          updateRig(c.rig, dt);
+          continue;
+        }
+        if (c.hp <= 0) {
+          c.downT = SQUAD_DOWN_SECS;
+          setAnim(c.rig, 'idle');
+          level.bus.emit('toast', t('Напарник упав — встане за {n} с', { n: SQUAD_DOWN_SECS }));
+          updateRig(c.rig, dt);
+          continue;
+        }
+        this._squadAbility(c, dt);
+      } else if (c.hp <= 0) { this._removeClone(i, true); continue; }
 
-      const target = this._nearestZombie(c.x, c.z);
+      const nearest = this._nearestZombie(c.x, c.z);
+      // далеко від бою — повертаємось до гравця, щоб напарник не губився на карті
+      const far = !nearest || Math.hypot(nearest.x - c.x, nearest.z - c.z) > SQUAD_LEASH_DIST;
+      const target = (c.squad && far)
+        ? { x: level.player.pos.x, z: level.player.pos.z, follow: true }
+        : nearest;
       if (!target) { setAnim(c.rig, 'idle'); updateRig(c.rig, dt); continue; }
       const dx = target.x - c.x, dz = target.z - c.z;
       const dist = Math.hypot(dx, dz);
       c.mesh.rotation.y = Math.atan2(-dx, -dz);
-      if (dist > 2.0) {
-        const step = Math.min(dist - 1.8, 5.5 * dt);
+      const stopAt = target.follow ? SQUAD_FOLLOW_DIST : 2.0;
+      if (dist > stopAt) {
+        const step = Math.min(dist - stopAt * 0.9, 5.5 * dt);
         const solved = level.world.collide(c.x + (dx / dist) * step, c.z + (dz / dist) * step, 0.45, c.y);
         c.x = solved.x; c.z = solved.z;
         if (c.syncToFloor) c.syncToFloor();
@@ -1750,13 +1837,14 @@ export class Gadgets {
         }
       }
       c.hitT -= dt;
-      if (c.hitT <= 0 && dist <= 16) {
+      if (c.hitT <= 0 && dist <= 16 && !target.follow && (!c.squad || c.squad === 'fighter')) {
         const melee = dist <= 2.1;
         const visible = melee || level.world.shotBlockDist(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(dx, 0, dz).normalize(), dist) >= dist - 0.2;
         if (!visible) { c.hitT = 0.25; updateRig(c.rig, dt); continue; }
         c.hitT = melee ? 0.7 : 0.9;
         target.lastHitBy = 1;
-        target.damage(melee ? 10 : 5, new THREE.Vector3(dx, 0, dz).normalize(), false);
+        const dmg = c.squad === 'fighter' ? SQUAD_ARCHETYPES.fighter.damage : (melee ? 10 : 5);
+        target.damage(melee ? dmg : Math.round(dmg * 0.5), new THREE.Vector3(dx, 0, dz).normalize(), false);
         setAnim(c.rig, melee ? 'attack' : 'aim');
         if (!melee) {
           level.effects.tracer(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(target.x, target.y + target.rig.height * 0.6, target.z));

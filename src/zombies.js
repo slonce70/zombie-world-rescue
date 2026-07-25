@@ -1,5 +1,6 @@
 // Зомбі: AI (блукання/охорона/погоня/атака/смерть), орди, бос
 import * as THREE from 'three';
+import { SQUAD_LURE_RADIUS } from './squad.js';
 import { makeZombie, makeBoss, makeShieldMesh, makeBurnFx, makeEliteAura, makeIconSprite, updateRig, setAnim, toonMat, disposeRigSkeleton } from './characters.js';
 
 import { clamp, damp, dampAngle, closestRaySeg, RNG, disposeObject } from './utils.js';
@@ -1207,7 +1208,11 @@ export class Zombies {
           if (!pl.clone && pl.invisibleT > 0) continue;
           const pp = pl.pos;
           if (z.zone === 'castle-dungeon' && pp.y >= this.world.castleDungeon.surfaceY - 1.5) continue;
-          const d = Math.hypot(pp.x - z.x, pp.z - z.z);
+          // 🎈 напарник-приманка в межах свого радіуса перехоплює увагу зомбі
+          const raw = Math.hypot(pp.x - z.x, pp.z - z.z);
+          const lure = pl.clone && pl.clone.squad === 'lure' && pl.clone.downT <= 0
+            && raw <= SQUAD_LURE_RADIUS;
+          const d = lure ? 0 : raw;
           if (d < distP) { distP = d; tgt = pl; }
         }
       }

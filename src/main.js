@@ -75,6 +75,7 @@ import { frontCountryCopy } from './ui/frontcopy.js';
 import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { todaySlots } from './rotation.js';
+import { sanitizeSquad } from './squad.js';
 import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
@@ -147,7 +148,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 711;
+const APP_VERSION = 720;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -790,6 +791,7 @@ class Game {
       bastionGadgetsOwned: [],
       bastionHyperOwned: false,
       bastionStarPower: null,
+      squad: [],
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -947,6 +949,7 @@ class Game {
         out.bastionGadgetsOwned = sanitizeBastionGadgetsOwned(out.bastionGadgetsOwned);
         out.bastionHyperOwned = out.bastionHyperOwned === true;
         out.bastionStarPower = sanitizeBastionStarPower(out.bastionStarPower);
+        out.squad = sanitizeSquad(out);
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
@@ -3977,6 +3980,12 @@ class Game {
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
+    // 🎒 Загін: врятовані друзі йдуть у бій. СОЛО і лише там, де дозволені гаджети —
+    // кімнатні режими з noGadgets свідомо про обмеження спорядження.
+    if (!coop && !isGuest && !isPlayground && !level.noGadgets) {
+      const squad = sanitizeSquad(this.save);
+      if (squad.length) level.gadgets.spawnSquad(squad);
+    }
     level.pet = (isCustomEditor || isPvp || isBank || isHumans || isSoulCollector || isTurretWar || isRadiation) ? null : this.save.activePet ? new Pet(level, this.save.activePet) : null;
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 

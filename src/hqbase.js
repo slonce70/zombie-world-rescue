@@ -10,6 +10,7 @@ import {
   rescuedFriendIds, friendFor, campTier, friendThanksUnlocked, friendThanksPending, FRIEND_THANKS_COINS,
 } from './friends.js';
 import { weeklyCampState } from './weeklycamp.js';
+import { SQUAD_ARCHETYPES, squadSlots, sanitizeSquad, toggleSquadMember } from './squad.js';
 
 // маленький rng для makeCivilian (потрібні .pick/.f) — детермінізм тут не критичний
 function campRng() {
@@ -842,6 +843,7 @@ export class LivingHQ {
     if (!f) return '';
     let msg = f.greeting();
     const save = this.game.save;
+    // 🎁 спершу денна нагорода табору — вона не має губитись через перемикання загону
     if (friendThanksUnlocked(save)) {
       const key = this.game.gift.dayKey();
       if (friendThanksPending(save, key)) {
@@ -850,6 +852,20 @@ export class LivingHQ {
         this.game.saveGame();
         if (this.game.audio && this.game.audio.coin) this.game.audio.coin();
         msg = t('💰 Щоденне дякую табору: +{n} монет!', { n: FRIEND_THANKS_COINS }) + ' ' + f.greeting();
+      }
+    }
+    // 🎒 той самий клік перемикає «йде зі мною / лишається в таборі»
+    if (squadSlots(save)) {
+      const before = sanitizeSquad(save);
+      const next = toggleSquadMember(save, cid);
+      if (JSON.stringify(before) !== JSON.stringify(next)) {
+        save.squad = next;
+        this.game.saveGame();
+        const archetype = SQUAD_ARCHETYPES[f.squad];
+        msg += ' ' + (next.includes(cid)
+          ? t('{i} {n} йде з тобою · {a}', { i: '🎒', n: f.name(), a: archetype ? archetype.name() : '' })
+          : t('{n} лишається в таборі', { n: f.name() }));
+        this._updateSquadCounter();
       }
     }
     if (this.game.hud) this.game.hud.toast(`${f.emoji} ${msg}`);
@@ -1036,6 +1052,13 @@ export class LivingHQ {
     };
   }
 
+  _updateSquadCounter() {
+    const el = document.getElementById('hqbase-squad-count');
+    if (!el) return;
+    const save = this.game.save;
+    el.textContent = `${sanitizeSquad(save).length}/${squadSlots(save)}`;
+  }
+
   _ensureUi() {
     let ui = document.getElementById('hqbase-ui');
     if (!ui) {
@@ -1054,6 +1077,7 @@ export class LivingHQ {
         <span>🏆 ${t('Зал')}: <b id="hqbase-hall-count">0</b></span>
         <span>🎯 ${t('Мішені')}: <b id="hqbase-hit-count">0</b></span>
         <span>💥 ${t('Шкода')}: <b id="hqbase-damage-count">0</b></span>
+        <span>🎒 ${t('Загін')}: <b id="hqbase-squad-count">0/0</b></span>
       </div><div id="hqbase-mega-list" class="hqbase-mini"></div><div id="moonbase-status" class="hqbase-mini"></div>`;
       document.body.appendChild(ui);
       document.getElementById('btn-hqbase-exit').addEventListener('click', () => this.game.exitHQBase());
@@ -1087,6 +1111,7 @@ export class LivingHQ {
     if (dmg) dmg.textContent = '0';
     const next = document.getElementById('hqbase-next-action');
     if (next) next.textContent = this.game._nextActionInfo().text;
+    this._updateSquadCounter();
     const save = this.game.save;
     const saved = save.liberated || {};
     const bestiary = save.bestiary || {};

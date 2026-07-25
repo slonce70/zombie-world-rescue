@@ -2909,4 +2909,12 @@ export const EN = {
 "🌍 ДОВГА ОПЕРАЦІЯ": "🌍 LONG OPERATION",
 "Можна разом": "Playable together",
 "40% 50 монет · 40% 3 кристали · 10% Кактус · 4% Мандрівник · 3% Веселковий · 1% Садівник · 1% Зомбі": "40% 50 coins · 40% 3 crystals · 10% Cactus · 4% Traveler · 3% Rainbow · 1% Gardener · 1% Zombie",
+"Загін": "Squad",
+"Лікує": "Heals",
+"Відволікає": "Distracts",
+"Б'ється": "Fights",
+"{n} йде з тобою!": "{n} joins you!",
+"{i} {n} йде з тобою · {a}": "{i} {n} joins you · {a}",
+"{n} лишається в таборі": "{n} stays at camp",
+"Напарник упав — встане за {n} с": "Buddy is down — back up in {n}s",
 };
