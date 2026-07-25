@@ -10,6 +10,11 @@ import { WebSocketServer } from 'ws';
 import { cleanNickSrv, cleanCountrySrv } from '../worker/nick.mjs';
 import { cleanProfileSrv, safeInt } from '../worker/profile.mjs';
 import { routeBatch } from '../worker/route.mjs';
+import {
+  COMMUNITY_CID_RE,
+  COMMUNITY_PUBLISH_BODY_BYTES,
+  MemoryCommunity,
+} from '../worker/community.mjs';
 
 const PORT = parseInt(process.env.PORT || '8742', 10);
 const HOST = process.env.RELAY_HOST || '127.0.0.1';
@@ -18,9 +23,16 @@ const MAX_PLAYERS = 4;
 const HOST_GRACE_MS = 30_000;
 const MAX_WS_BYTES = 65536;
 const MAX_BATCH_ITEMS = 128;
-const MAX_BODY_BYTES = 4096;
+const MAX_BODY_BYTES = 4 * 1024;
+const SAVE_MAX_BYTES = 64 * 1024;
+const SAVE_BODY_BYTES = 96 * 1024;
 
 const rooms = new Map(); // code -> { sockets: Map<id, ws>, nextId, hostTimer }
+const community = new MemoryCommunity({
+  adminKey: process.env.ADMIN_KEY || '',
+  cooldownMs: process.env.COMMUNITY_PUBLISH_COOLDOWN_MS == null
+    ? undefined : Number(process.env.COMMUNITY_PUBLISH_COOLDOWN_MS),
+});
 
 // 🏆 локальна Ліга в пам'яті — щоб розробка повністю працювала офлайн
 const league = new Map(); // `${cid}|${mode}|${country}` -> {nick, score, team, ts}
@@ -36,6 +48,8 @@ const savePutIp = new Map();   // ip -> {n,t0}
 
 // 🟢 локальне Лобі в пам'яті (дзеркало Lobby DO з воркера)
 const LOBBY_TTL = 40_000;
+const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
+  'front', 'community-map', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 const lobbyPlayers = new Map(); // cid -> {nick, ts}
 const lobbyProfiles = new Map(); // cid -> {nick, countries, coins, crystals, kills, star, prestige, title, ts}
 const lobbyRooms = new Map();   // code -> {cid, host, mode, country, n, state, build, ts}
@@ -103,13 +117,12 @@ function lobbyPing(d) {
   }
   if (d.room && d.room.code) {
     const code = String(d.room.code).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    const mode = LOBBY_MODES.has(d.room.mode) ? d.room.mode : 'campaign';
     const existing = lobbyRooms.get(code);
     if (code && (!existing || existing.cid === cid)) {
       lobbyRooms.set(code, {
-        cid, host: nick,
-        mode: ['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss', 'friendly-knockout',
-          'friendly-defense', 'friendly-zone-defense', 'weekly-coop'].includes(d.room.mode) ? d.room.mode : 'campaign',
-        country: cleanCountrySrv(d.room.country), // видно всьому лобі — латиниця + фільтр лайки
+        cid, host: nick, mode,
+        country: mode === 'community-map' ? 'CUSTOM' : cleanCountrySrv(d.room.country),
         n: Math.min(4, Math.max(1, d.room.n | 0)),
         state: d.room.state === 'game' ? 'game' : 'lobby',
         build: d.room.build | 0, ts: now,
@@ -136,26 +149,35 @@ function leagueTop(mode, country, cid) {
   return { top: rows, me };
 }
 
-function readBody(req, cb, res) {
-  let body = '';
+function readBody(req, limit, cb, res) {
+  const chunks = [];
+  let bytes = 0;
   let tooBig = false;
-  req.on('data', (ch) => {
+  req.on('data', (chunk) => {
     if (tooBig) return;
-    body += ch;
-    if (body.length > MAX_BODY_BYTES) {
+    bytes += chunk.length;
+    if (bytes > limit) {
       tooBig = true;
       res.writeHead(413, CORS);
-      res.end('{"error":"too_big"}');
+      res.end('{"error":"big"}');
       req.destroy();
+      return;
     }
+    chunks.push(chunk);
   });
   req.on('end', () => {
     if (tooBig) return;
-    try { cb(JSON.parse(body)); } catch (e) {
+    const raw = Buffer.concat(chunks).toString('utf8');
+    try { cb(JSON.parse(raw), raw); } catch (e) {
       res.writeHead(400, CORS);
       res.end('{"error":"bad"}');
     }
   });
+}
+
+async function fetchRes(res, response) {
+  res.writeHead(response.status, Object.fromEntries(response.headers));
+  res.end(await response.text());
 }
 
 function jsonRes(res, obj, status = 200) {
@@ -171,13 +193,33 @@ function savePutAllowed(ip) {
   return ++r.n <= SAVE_PUT_IP_MAX;
 }
 
-const httpServer = createServer((req, res) => {
+const httpServer = createServer(async (req, res) => {
   if (req.url && req.url.startsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, pid: process.pid, boot: BOOT_TOKEN }));
     return;
   }
   const url = new URL(req.url, 'http://x');
+  if (url.pathname.startsWith('/community/')) {
+    const headers = new Headers({
+      'CF-Connecting-IP': req.socket.remoteAddress || 'x',
+    });
+    if (req.headers.origin) headers.set('Origin', req.headers.origin);
+    if (req.method !== 'POST') {
+      await fetchRes(res, await community.fetch(new Request(`http://local${url.pathname}`, {
+        method: req.method, headers,
+      })));
+      return;
+    }
+    readBody(req, COMMUNITY_PUBLISH_BODY_BYTES, (_body, raw) => {
+      headers.set('Content-Type', req.headers['content-type'] || 'application/json');
+      headers.set('Content-Length', String(Buffer.byteLength(raw)));
+      void community.fetch(new Request(`http://local${url.pathname}`, {
+        method: req.method, headers, body: raw,
+      })).then((response) => fetchRes(res, response));
+    }, res);
+    return;
+  }
   if (!url.pathname.startsWith('/league/') && !url.pathname.startsWith('/lobby/') && !url.pathname.startsWith('/save/')) {
     res.writeHead(200, CORS);
     res.end('zr-dev-relay ok');
@@ -185,11 +227,12 @@ const httpServer = createServer((req, res) => {
   }
   // 💾 хмарний сейв (як SaveVault у воркері)
   if (url.pathname === '/save/put' && req.method === 'POST') {
-    readBody(req, (d) => {
+    readBody(req, SAVE_BODY_BYTES, (d) => {
       const ip = req.socket.remoteAddress || 'x';
       if (!savePutAllowed(ip)) return jsonRes(res, { error: 'rate' }, 429);
-      const cid = String(d.cid || '').slice(0, 40);
-      if (cid.length < 8 || typeof d.data !== 'string' || !d.data) return jsonRes(res, { error: 'bad' }, 400);
+      const cid = typeof d.cid === 'string' && COMMUNITY_CID_RE.test(d.cid) ? d.cid : '';
+      if (!cid || typeof d.data !== 'string' || !d.data
+        || Buffer.byteLength(d.data, 'utf8') > SAVE_MAX_BYTES) return jsonRes(res, { error: 'bad' }, 400);
       try { JSON.parse(d.data); } catch (e) { return jsonRes(res, { error: 'bad' }, 400); }
       const now = Date.now();
       const last = saveLastPut.get(cid) || 0;
@@ -202,15 +245,18 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/save/get') {
-    const cid = String(url.searchParams.get('cid') || '');
+    const rawCid = url.searchParams.get('cid') || '';
+    const cid = COMMUNITY_CID_RE.test(rawCid) ? rawCid : '';
+    if (!cid) return jsonRes(res, { error: 'bad' }, 400);
     const s = saves.get(cid);
     if (!s) return jsonRes(res, { error: 'none' }, 404);
     jsonRes(res, { data: s.data, ts: s.ts });
     return;
   }
   if (url.pathname === '/save/link' && req.method === 'POST') {
-    readBody(req, (d) => {
-      const cid = String(d.cid || '');
+    readBody(req, SAVE_BODY_BYTES, (d) => {
+      const cid = typeof d.cid === 'string' && COMMUNITY_CID_RE.test(d.cid) ? d.cid : '';
+      if (!cid) return jsonRes(res, { error: 'bad' }, 400);
       if (!saves.has(cid)) return jsonRes(res, { error: 'none' }, 404);
       for (const [code, c] of saveLinks) if (c === cid) return jsonRes(res, { code });
       let code = '';
@@ -226,7 +272,7 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/save/claim' && req.method === 'POST') {
-    readBody(req, (d) => {
+    readBody(req, SAVE_BODY_BYTES, (d) => {
       const code = String(d.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
       const cid = saveLinks.get(code);
       const s = cid && saves.get(cid);
@@ -246,7 +292,7 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/lobby/ping' && req.method === 'POST') {
-    readBody(req, (d) => {
+    readBody(req, MAX_BODY_BYTES, (d) => {
       const view = lobbyPing(d);
       if (!view) { res.writeHead(400, CORS); res.end('{"error":"bad"}'); return; }
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
@@ -261,7 +307,7 @@ const httpServer = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/league/submit' && req.method === 'POST') {
-    readBody(req, (d) => {
+    readBody(req, MAX_BODY_BYTES, (d) => {
       // клампимо так само, як League DO у воркері (тести шлють сюди сміття свідомо)
       const mode = String(d.mode || '');
       const country = String(d.country || '').slice(0, 4).toUpperCase();

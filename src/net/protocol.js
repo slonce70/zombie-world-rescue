@@ -2,13 +2,24 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 23; // v607: Expedition v2 specialist and roster rank
+export const PROTO_VERSION = 24; // v700: community snapshot + runId у start spec
 
 export const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {
   let s = '';
   for (let i = 0; i < n; i++) s += ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)];
   return s;
+}
+
+// 🆔 v700: спільний ідентифікатор забігу. Хост кладе його в кожен start spec,
+// гості віддають той самий рядок у /community/complete — так кожен учасник
+// отримує власне зарахування, а reconnect із тим самим rid не перебудовує рівень.
+export function makeRunId() {
+  const bytes = new Uint8Array(8);
+  const c = globalThis.crypto;
+  if (c && typeof c.getRandomValues === 'function') c.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const r2 = (v) => Math.round(v * 100) / 100;

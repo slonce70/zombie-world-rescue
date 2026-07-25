@@ -130,7 +130,7 @@ export class Progress {
   }
 
   addXp(n) {
-    if (n <= 0) return;
+    if (n <= 0 || this.game.level?.noProgress) return;
     const game = this.game;
     const prestigeBefore = this.prestigeStars; // ДО додавання XP (до зміни save.xp)
     const before = this.level;
@@ -504,6 +504,7 @@ export class DailyQuests {
 
   // подія з гри: просуваємо відповідні завдання
   onEvent(ev, data = {}) {
+    if (this.game.level?.noProgress) return;
     this.ensureToday();
     this.ensureMegaQuests();
     let changed = false;

@@ -22,12 +22,12 @@ const menu = await page.evaluate((all) => {
   return {
     beforeLocked: before && before.classList.contains('locked'),
     afterLocked: after && after.classList.contains('locked'),
-    tab: after && after.closest('.solo-section')?.dataset.tabId,
+    tab: after && after.closest('.solo-section')?.dataset.category,
     name: after && after.querySelector('.sm-name').textContent,
   };
 }, twelve);
-check(menu.beforeLocked && !menu.afterLocked && menu.tab === 'campaign' && /ГЛАВА 2/.test(menu.name),
-  'режим Глава 2 є в Кампанії і відкривається на 12 країнах', JSON.stringify(menu));
+check(menu.beforeLocked && !menu.afterLocked && menu.tab === 'story' && /ГЛАВА 2/.test(menu.name),
+  'режим Глава 2 є в СЮЖЕТІ і відкривається на 12 країнах', JSON.stringify(menu));
 
 console.log('▸ Старт зараженої країни');
 await page.evaluate(async (all) => {

@@ -41,7 +41,7 @@ export class Chapter {
   stepDone(step) { return (this.state.p[step.id] || 0) >= step.target; }
   get allDone() { return CHAPTER1.steps.every((st) => this.stepDone(st)); }
   onEvent(ev, n = 1) {
-    if (this.state.done) return;
+    if (this.game.level?.noProgress || this.state.done) return;
     // 🎖️ F14: глава просувається ЛИШЕ в кампанії. У Шторм/Арені вбивства, вхід
     // у рівень тощо не зараховуються — інакше дитина «майже проходить» главу
     // поза кампанією (крок «бос» там не настає, тож вона ніколи б не завершилась чесно).

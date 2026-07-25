@@ -69,8 +69,8 @@ try {
       })),
     };
   });
-  check('18 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
-    fresh.modes === 18 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
+  check('19 карток; спецрежими замкнені, тумблерів 💀 на фреші нема, Кампанія відкрита',
+    fresh.modes === 19 && fresh.stormLocked && fresh.arenaLocked && fresh.worldbossLocked
       && fresh.knockoutLocked && fresh.zoneDefenseLocked && fresh.defenseLocked
       && fresh.bankLocked && fresh.portalLocked && fresh.mazeLocked && fresh.humansLocked && fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
@@ -84,7 +84,7 @@ try {
       && fresh.recommended.every((x) => !x.locked)
       && JSON.stringify(fresh.sections) === JSON.stringify([
         { title: 'СЮЖЕТ', modes: ['campaign', 'infected', 'chapter3'] },
-        { title: 'ОПЕРАЦІЇ', modes: ['expedition', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
+        { title: 'ОПЕРАЦІЇ', modes: ['expedition', 'community', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
         { title: 'ВИПРОБУВАННЯ', modes: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'] },
         { title: 'АРКАДА', modes: ['pvp', 'knockout', 'humans', 'bank'] },
       ]),

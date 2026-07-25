@@ -12,7 +12,7 @@ import { hasLiberated } from '../net/cloudsave.js';
 
 export function showVictory(game) {
   if (!game.level || game.victoryShown) return;
-  if (game.level.playground) return;
+  if (game.level.playground || game.level.noProgress) return;
   if (game.level.operation && !game._frontCanComplete(game.level)) {
     game.level.frontObjectiveComplete = true;
     return;
@@ -75,6 +75,10 @@ export function showVictory(game) {
   }
   const wasLiberated = !!game.save.liberated[country.id];
   game.save.liberated[country.id] = true;
+  if (!wasLiberated && !(game.save.upgrades.mapeditor > 0)) {
+    game.save.upgrades.mapeditor = 1;
+    game.hud.toast(t('🧱 Створювач карт відкрито! Повернися на глобус → Меню.'));
+  }
   if (game.level.moonRegion) {
     const worldId = game.level.spaceWorld?.id || 'MOON';
     const space = game.save.moonRescue.space;

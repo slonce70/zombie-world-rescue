@@ -1,20 +1,22 @@
 // Розмір карти задається в зрозумілих гравцю метрах. Поточна карта = 750 м.
 // Масштабуємо весь просторовий конфіг разом, щоб межа не відрізала сюжетні місця.
-export const MAP_SIZE_MODES = Object.freeze(['small', 'standard', 'large', 'huge']);
-export const MAP_SIZE_METERS = Object.freeze({ small: 500, standard: 750, large: 950, huge: 1250 });
-export const MAP_STYLE_MODES = Object.freeze(['classic', 'forest', 'lakes', 'stone']);
+import {
+  MAP_SIZE_MODES,
+  MAP_SIZE_METERS,
+  MAP_STYLE_MODES,
+  sanitizeMapSize,
+  sanitizeMapStyle,
+  mapSizeScale,
+} from '../worker/community-schema.mjs';
 
-export function sanitizeMapSize(value) {
-  return MAP_SIZE_MODES.includes(value) ? value : 'standard';
-}
-
-export function sanitizeMapStyle(value) {
-  return MAP_STYLE_MODES.includes(value) ? value : 'classic';
-}
-
-export function mapSizeScale(value) {
-  return MAP_SIZE_METERS[sanitizeMapSize(value)] / MAP_SIZE_METERS.standard;
-}
+export {
+  MAP_SIZE_MODES,
+  MAP_SIZE_METERS,
+  MAP_STYLE_MODES,
+  sanitizeMapSize,
+  sanitizeMapStyle,
+  mapSizeScale,
+};
 
 const SCALED_NUMBER_KEYS = new Set(['bound', 'x', 'z', 'r', 'w', 'd', 'width', 'sigma', 'from', 'to']);
 const COORDINATE_ARRAY_KEYS = new Set(['roads', 'pts', 'spots', 'barrels']);

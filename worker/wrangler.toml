@@ -22,6 +22,10 @@ class_name = "SaveVault"
 name = "METRICS"
 class_name = "FrontMetrics"
 
+[[durable_objects.bindings]]
+name = "COMMUNITY"
+class_name = "Community"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
@@ -41,3 +45,7 @@ new_sqlite_classes = ["SaveVault"]
 [[migrations]]
 tag = "v5"
 new_sqlite_classes = ["FrontMetrics"]
+
+[[migrations]]
+tag = "v6"
+new_sqlite_classes = ["Community"]

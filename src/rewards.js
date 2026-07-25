@@ -45,6 +45,7 @@ const SUPER_POWERS = {
 // (і хост, і гість по ev `ewc`) нараховує собі локально ті самі числа, що соло,
 // але без блокуючої церемонії (рішення v294): неблокуючий банер зі складом.
 export function grantEliteChestCoop(game) {
+  if (game.level?.noProgress) return;
   const { coins, crystals, eggChance } = CHEST_REWARDS.elite;
   game.level.addCoins(coins);
   game.save.crystals = (game.save.crystals || 0) + crystals;
@@ -56,6 +57,7 @@ export function grantEliteChestCoop(game) {
 
 // 🤝 v296: золота скриня в коопі — той самий локальний, неблокуючий шлях (числа соло: 144🪙+5💎).
 export function grantGoldenChestCoop(game) {
+  if (game.level?.noProgress) return;
   const { coins, crystals, eggChance } = CHEST_REWARDS.golden;
   game.level.addCoins(coins);
   game.save.crystals = (game.save.crystals || 0) + crystals;
@@ -75,6 +77,7 @@ export function rollChestEgg(game, chance) {
 
 // 🤝 R5: друга врятовано → кожен 3-й дарує яйце (ретро-безпечно через friendEggClaims).
 export function onFriendRescued(game, cid) {
+  if (game.level?.noProgress) return;
   game._bumpCamp('rescue', 1); // 🏕️ звільнений друг — теж «врятована людина» для квесту табору
   const granted = claimFriendEggs(game.save);
   if (granted > 0) {
@@ -89,6 +92,7 @@ export function onFriendRescued(game, cid) {
 // САМЕ виконано — теплий банер + чип-нагадування на глобусі + сейв. Проміжний прогрес
 // не пише сейв на кожній події (як _bumpWeeklyGoal) — його підхопить наступний saveGame.
 export function bumpCamp(game, metric, amount = 1) {
+  if (game.level?.noProgress) return false;
   const done = bumpWeeklyCamp(game.save, game._weekIndex(), metric, amount);
   if (done) {
     game.hud.banner(t('🏕️ КВЕСТ ТАБОРУ ВИКОНАНО!'), t('Забери 🥚 у таборі бази!'), 4.5);
@@ -466,7 +470,7 @@ export function spawnChestConfetti(game, root) {
 export function unlockWeapon(game, id) {
   if (!id) return; // 🛡 ESP/PRT/ITA більше не мають weaponReward — гард від unlockWeapon(undefined)
   if (!game.level) return;
-  if (game.level.playground) {
+  if (game.level.playground || game.level.noProgress) {
     game.level.player.giveWeapon(id);
     return;
   }

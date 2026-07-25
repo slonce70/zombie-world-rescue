@@ -1,7 +1,7 @@
 // Сесія кооперативу: кімната, ростер, лобі. Живе на рівні гри (глобуса),
 // на кожен рівень створює HostNet або GuestNet.
 import { Transport } from './transport.js';
-import { makeRoomCode, PROTO_VERSION } from './protocol.js';
+import { makeRoomCode, makeRunId, PROTO_VERSION } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
@@ -13,6 +13,7 @@ import {
   sanitizeFrontResult, sanitizeFrontSnapshot, sanitizeFrontSpec,
 } from './frontsync.js';
 import { sanitizeMapSize, sanitizeMapStyle } from '../mapsize.js';
+import { sanitizeCommunitySnapshot } from '../../worker/community-schema.mjs';
 import { SPECIALIST_IDS, SPECIALISTS, sanitizeSpecialistId, specialistModifiers, specialistRank } from '../specialists.js';
 
 const NICK_KEY = 'zr-nick';
@@ -131,6 +132,7 @@ export class CoopSession {
     this.onStarted = null;     // () => {} — рівень стартував (закрити лобі)
     this.expeditionVotes = new Map();
     this.frontRun = null;      // canonical host snapshot for the current Front room
+    this.communityMap = null;  // 🏘️ точний знімок карти спільноти цієї кімнати
     this.frontStartedOperationId = null;
     this.frontResumeReady = new Map(); // pid -> { operationId, ready } during relay resume grace
     this.frontResults = new Set();
@@ -242,6 +244,7 @@ export class CoopSession {
     this.state = 'idle';
     this.roster.clear();
     this.frontRun = null;
+    this.communityMap = null;
     this.frontStartedOperationId = null;
     this.frontResumeReady.clear();
     this.frontResults.clear();
@@ -257,7 +260,7 @@ export class CoopSession {
       this._resetReady();
     }
     this.countryId = countryId;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode }, true);
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode, cm: this.communityMap }, true);
   }
 
   setMode(mode) {
@@ -267,7 +270,8 @@ export class CoopSession {
     }
     this.mode = mode;
     if (mode !== 'front') this.frontStartedOperationId = null;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode }, true);
+    if (mode !== 'community-map') this.communityMap = null;
+    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode, cm: this.communityMap }, true);
   }
 
   // 🎭 моя кооп-роль (лобі): зберігаємо у сейв, оновлюємо ростер і синхронізуємо кімнату.
@@ -366,11 +370,37 @@ export class CoopSession {
     // (не шторм/арена/нокаут/оборона/радіація/турель/світовий бос). Той самий сід-патерн, що соло.
     const isPlainCampaign = !storm && !arena && !knockout && !defense && !radiation && !turretwar && !wb;
     const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3) : null;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle) };
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, rid: makeRunId(), ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle) };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
     game.startLevel(realCountry, { coop: { session: this, role: 'host', spec }, storm, arena, knockout, defense, radiation, turretwar, worldBoss: wb, weekly, mut });
+  }
+
+  // 🏘️ v700: хост веде кімнату в чужу карту. Повний знімок їде у spec (`cm`) —
+  // ані в запрошенні, ані в публічному Лобі його немає. Гість будує рівень
+  // ЛИШЕ зі знімка хоста: локальний слот не підміняє його ніколи.
+  startCommunityMap(value) {
+    if (this.role !== 'host') return false;
+    const cm = sanitizeCommunitySnapshot(value);
+    if (!cm) return false;
+    const spec = {
+      countryId: 'CUSTOM', seed: this.game.seed, runIndex: 0,
+      cm, rid: makeRunId(), ms: cm.mapSize, mt: cm.mapStyle,
+    };
+    this.mode = 'community-map';
+    this.countryId = 'CUSTOM';
+    this.communityMap = cm;
+    this.transport.broadcast({ t: 'start', ...spec }, true);
+    this.state = 'level';
+    if (this.onStarted) this.onStarted();
+    this.game._hideOverlay('overlay-community');
+    if (this.game.state === 'level') this.game.endLevel();
+    this.game.startLevel('CUSTOM', {
+      coop: { session: this, role: 'host', spec },
+      customMap: 'community', communityMap: cm, communityRunId: spec.rid,
+    });
+    return true;
   }
 
   startExpeditionNode(value) {
@@ -383,6 +413,7 @@ export class CoopSession {
       countryId: cfg.countryId, seed: this.game.seed, runIndex: run.step,
       defense: opts.defense || null, radiation: !!opts.radiation, turretwar: !!opts.turretwar,
       wb: opts.worldBoss || null, portal: !!opts.portal, ex: run,
+      rid: makeRunId(),
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
@@ -420,6 +451,7 @@ export class CoopSession {
       wb: opts.worldBoss || null,
       portal: !!opts.portal,
       fr,
+      rid: makeRunId(),
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
     };
@@ -566,6 +598,9 @@ export class CoopSession {
         }
       }
     } else {
+      // 🛡️ гість слухає сесійні команди ЛИШЕ від хоста (pid=1): підроблений
+      // welcome/cfg/start/lvlend/end від сусіда-гостя не будує рівень і не закриває кімнату
+      if (from !== 1) return;
       if (d.t === 'welcome') {
         const assignedPid = validPid(d.pid);
         if (!assignedPid) return;
@@ -574,6 +609,7 @@ export class CoopSession {
         for (const r of d.roster || []) { const c = sanitizeRosterEntry(r); if (c) this.roster.set(c.pid, c); }
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
+        this.communityMap = d.cm == null ? null : sanitizeCommunitySnapshot(d.cm);
         if (d.ex) {
           this.game.save.expedition = sanitizeExpedition(d.ex);
           this.game._claimExpeditionMastery(this.game.save.expedition);
@@ -592,17 +628,24 @@ export class CoopSession {
       } else if (d.t === 'cfg') {
         this.countryId = d.countryId;
         if (d.mode) this.mode = d.mode;
+        this.communityMap = d.cm == null ? null : sanitizeCommunitySnapshot(d.cm);
         if (this.onCfg) this.onCfg(d.countryId);
       } else if (d.t === 'start') {
         const fr = d.fr == null ? null : sanitizeFrontSpec(d.fr);
         if (d.fr != null && !fr) return; // malformed Front start is fail-closed
-        // 🔌 гард реконекту: якщо ми ВЖЕ в рівні з живим мережевим шаром — це повторний
-        // start після тихого переприєднання. Перебудова зруйнувала б бій (екран завантаження
-        // + втрата позиції). Ігноруємо: свіжий стан долетить через lvlready → captureState.
+        // 🏘️ карта спільноти: зіпсований знімок теж fail-closed — жодного відкату
+        // на локальний слот, інакше гість грав би зовсім іншу карту, ніж хост
+        const cm = d.cm == null ? null : sanitizeCommunitySnapshot(d.cm);
+        if (d.cm != null && !cm) return;
+        // 🔌 гард реконекту (спільний для кампанії, Експедиції, Фронту й спільноти):
+        // той самий rid — це повторний start після тихого переприєднання, перебудова
+        // зруйнувала б бій. Інший rid — хост уже в НОВОМУ забігу, тож будуємо заново.
         if (this.state === 'level' && this.game?.state === 'level' && this.net) {
+          const currentRid = this.net.spec && this.net.spec.rid;
+          if (d.rid && currentRid && d.rid === currentRid) return;
           const current = this.game.level && this.game.level.operation;
-          if (!fr || (current && current.operationId === fr.o && current.stage === fr.s)) return;
-          this.game.endLevel(); // missed lvlend while offline: rebuild the host's current Front phase
+          if (!d.rid && !currentRid && (!fr || (current && current.operationId === fr.o && current.stage === fr.s))) return;
+          this.game.endLevel(); // новий забіг хоста: старий рівень завершуємо і будуємо свіжий
         }
         this.state = 'level';
         if (this.onStarted) this.onStarted();
@@ -611,7 +654,8 @@ export class CoopSession {
           this.game._claimExpeditionMastery(this.game.save.expedition);
           this.game.saveGame();
         }
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null });
+        this.communityMap = cm;
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr, cm } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null, customMap: cm ? 'community' : undefined, communityMap: cm, communityRunId: cm ? d.rid : null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'xprun') {
@@ -685,6 +729,7 @@ export class CoopSession {
     this.frontResumeReady.delete(from);
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
+      cm: this.mode === 'community-map' ? this.communityMap : null,
       roster: this._rosterList(),
       inLevel: this.state === 'level',
       ex: this.mode === 'expedition' ? sanitizeExpedition(this.game.save.expedition) : null,

@@ -19,7 +19,7 @@ import { RADIATION_UNLOCK_COUNTRIES } from './radiationmode.js';
 // Чотири категорії каталогу; складні варіанти живуть тумблером 💀 на базовій картці.
 export const SOLO_MODE_GROUPS = [
   { id: 'story', title: () => t('СЮЖЕТ'), ids: ['campaign', 'infected', 'chapter3'] },
-  { id: 'operations', title: () => t('ОПЕРАЦІЇ'), ids: ['expedition', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
+  { id: 'operations', title: () => t('ОПЕРАЦІЇ'), ids: ['expedition', 'community', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'] },
   { id: 'challenges', title: () => t('ВИПРОБУВАННЯ'), ids: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'] },
   { id: 'arcade', title: () => t('АРКАДА'), ids: ['pvp', 'knockout', 'humans', 'bank'] },
 ];
@@ -128,6 +128,13 @@ export const SOLO_MODES = [
     locked: () => false,
     desc: () => t('Особлива багаторівнева операція з власним маршрутом і збіркою.'),
     start: (game) => game.openExpedition(),
+  },
+  {
+    // 🏘️ v700: карти гравців доступні всім — редактор для проходження не потрібен
+    id: 'community', icon: '🏘️', name: () => t('ОПЕРАЦІЇ СПІЛЬНОТИ'),
+    locked: () => false,
+    desc: () => t('Карти інших гравців: тиждень, нові, популярні — і твої власні.'),
+    start: (game) => game.community.open(),
   },
   {
     id: 'campaign', icon: '🎯', name: () => t('КАМПАНІЯ'), picker: 'campaign',
