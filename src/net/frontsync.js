@@ -161,7 +161,7 @@ export function sanitizeFrontResult(value) {
   };
 }
 
-export function sanitizeFrontRewards(effects) {
+function sanitizeFrontRewards(effects) {
   const rewards = [];
   for (const raw of Array.isArray(effects) ? effects : []) {
     const row = object(raw);
@@ -178,7 +178,7 @@ export function sanitizeFrontRewards(effects) {
   return rewards.slice(0, 4);
 }
 
-export function expandFrontRewards(value) {
+function expandFrontRewards(value) {
   return (Array.isArray(value) ? value : []).map((row) => ({
     type: 'grant', rewardId: row[0], coins: row[1], crystals: row[2], eggs: row[3],
   }));

@@ -25,8 +25,6 @@ export class BossRush {
   }
 
   // --- Missions API ---
-  get(id) { void id; return null; }
-
   _bossCfg(i) {
     return COUNTRIES[CAMPAIGN_ORDER[i]].boss;
   }

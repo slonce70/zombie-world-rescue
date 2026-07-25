@@ -12,9 +12,9 @@ import { rescuedFriendCount } from './friends.js';
 
 // 🌟 Пороги зірок, що дарують яйце (кожні 6 сумарних зірок). ОКРЕМИЙ список claim'ів —
 // НЕ чіпає наявні v289-пороги 12/24/36 (монети/кристали/титул) у stars.js STAR_THRESHOLDS.
-export const EGG_STAR_MILESTONES = [6, 12, 18, 24, 30, 36];
+const EGG_STAR_MILESTONES = [6, 12, 18, 24, 30, 36];
 // 🤝 Кожен 3-й врятований друг дарує яйце (з теплим тостом від друга).
-export const EGG_FRIEND_MILESTONES = [3, 6, 9, 12];
+const EGG_FRIEND_MILESTONES = [3, 6, 9, 12];
 // 🎁 Шанс, що церемонія скрині включить яйце (solo-only чести).
 export const ELITE_CHEST_EGG_CHANCE = 0.10;
 export const GOLDEN_CHEST_EGG_CHANCE = 0.15;
@@ -23,7 +23,7 @@ export const GOLDEN_CHEST_EGG_CHANCE = 0.15;
 // ексклюзивом своїх джерел (Глава 3 / Розділ Радіація). Ціни в магазині у решти майже
 // однакові (dog 350, решта 1500), тож тиримо тематично «за крутизною» — так дитина
 // відчуває рідкість. Шанси друкуються на яйці (eggOddsText).
-export const EGG_TIERS = [
+const EGG_TIERS = [
   { id: 'common', pct: 60, label: () => t('звичайний'), pets: ['dog', 'cat', 'bunny', 'penguin', 'turtle', 'frog'] },
   { id: 'rare', pct: 30, label: () => t('рідкісний'), pets: ['fox', 'panda', 'parrot', 'robo'] },
   { id: 'epic', pct: 10, label: () => t('епічний'), pets: ['dino', 'dragon', 'unicorn'] },
@@ -37,11 +37,11 @@ export function eggOddsText() {
 // ---------- Ріст петсів ----------
 export const PET_MAX_LEVEL = 3;
 // Вартість наступного рівня у кормі: Рів.1→2 = 3 🍖, Рів.2→3 = 6 🍖.
-export const PET_FEED_COST = { 2: 3, 3: 6 };
+const PET_FEED_COST = { 2: 3, 3: 6 };
 // Візуальний масштаб моделі за рівнем (×1.12 / ×1.25) + іскри на Рів.3.
 export const PET_LEVEL_SCALE = { 1: 1, 2: 1.12, 3: 1.25 };
 // Дрібний баф: радіус магніту монет ×1.05 (Рів.2) / ×1.10 (Рів.3). Супер-магніт (v288) виграє.
-export const PET_MAGNET_BONUS = { 1: 1, 2: 1.05, 3: 1.10 };
+const PET_MAGNET_BONUS = { 1: 1, 2: 1.05, 3: 1.10 };
 
 export function petLevel(save, id) {
   const lv = save && save.petLevels && save.petLevels[id];
@@ -115,7 +115,7 @@ export function claimBacklogEggs(save) {
 }
 
 // Обираємо петса з тир-пулу за шансами. rng: () => [0,1).
-export function pickEggPet(rng = Math.random) {
+function pickEggPet(rng = Math.random) {
   const r = rng() * 100;
   let acc = 0;
   let tier = EGG_TIERS[EGG_TIERS.length - 1];

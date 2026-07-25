@@ -2,12 +2,10 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
-export const DEFENSE_UNLOCK_COUNTRIES = 8;
 export const OVERLOADED_DEFENSE_UNLOCK_COUNTRIES = 8;
-export const ZONE_DEFENSE_UNLOCK_COUNTRIES = 6;
-export const DEFENSE_ROOM_SIZE = 120;
-export const DEFENSE_TOWER_HP = 250;
-export const DEFENSE_ZOMBIES = 20;
+const DEFENSE_ROOM_SIZE = 120;
+const DEFENSE_TOWER_HP = 250;
+const DEFENSE_ZOMBIES = 20;
 
 const DEFENSE_CONFIGS = {
   normal: {
@@ -76,8 +74,6 @@ export class DefenseMode {
     } else this._buildRoom();
     this._spawnZombies();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     if (this.zone) {

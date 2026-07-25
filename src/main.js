@@ -91,10 +91,7 @@ import {
 import { submitScore } from './net/league.js';
 import { CloudSave, SAVE_KEY, DEFAULT_HERO, NEW_SAVE_COINS, liberatedIds, liberatedCount, hasLiberated } from './net/cloudsave.js';
 import { frontMetricsEnabled, sendFrontMetric, sendFrontReturns, setFrontMetricsEnabled } from './net/frontmetrics.js';
-import {
-  MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES,
-  sanitizeMapSize, sanitizeMapStyle, scaleMap,
-} from './mapsize.js';
+import { scaleMap } from './mapsize.js';
 
 // v305: розпил main.js — таблиці режимів, нагороди, альбом, енд-скріни й тест-хуки
 // переїхали у власні модулі; тут лишились тонкі делегати (тіла з this→game).
@@ -120,6 +117,8 @@ import {
   deriveCustomMapTier,
   sanitizeCommunitySnapshot,
   validateCustomMap,
+  MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES,
+  sanitizeMapSize, sanitizeMapStyle,
 } from '../worker/community-schema.mjs';
 
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
@@ -149,7 +148,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 740;
+const APP_VERSION = 741;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -5326,6 +5325,31 @@ class Game {
   // 🏁 спільний фінал кімнатних режимів: перемоги, віхи, рекорд часу, множник дня.
   // Викликати ДО нарахування нагород; mult множить монети/XP режиму.
   // Кооп-варіанти (friendly-нокаут) рекорди/віхи не чіпають — це соло-прогрес.
+  // ⏱️ рядок часу в підсумку забігу — один формат на всі кімнатні режими
+  _timeStat(timeMs, badge = '') {
+    const mins = Math.floor(timeMs / 60000);
+    const secs = Math.floor((timeMs % 60000) / 1000);
+    return `<div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${badge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`;
+  }
+
+  // 🏁 однакова «обгортка» фіналу кімнатного режиму: прапорці, звук, курсор, кнопка «Ще раз».
+  // Була дослівно скопійована в 10 обробників _end*Run — правка в одному місці замість десяти.
+  _endRunChrome(level, won, retryLabel) {
+    level.bossDefeated = !!won;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+    this.input.exitLock();
+    const retryBtn = document.getElementById('btn-arena-retry');
+    if (retryBtn) {
+      retryBtn.style.display = '';
+      retryBtn.textContent = retryLabel;
+    }
+  }
+
   _soloModeFinish(modeId, won, timeMs = null) {
     const out = { mult: 1, recBadge: '', bestRow: '' };
     if (this.level && (this.level.net || this.level.expedition)) return out;
@@ -5528,19 +5552,7 @@ class Game {
     this._grantWeeklyCoop(level, !!won);
     // 🤝 v279-бонус «за перемогу разом» — у ВСІХ кооп-перемогах, не лише в кампанії
     if (won && level.net) this._grantCoopWin();
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🥊 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🥊 Ще раз!'));
 
     const koModeId = level.knockout.variant === 'overloaded' ? 'overloaded-knockout' : 'knockout';
     const fin = this._soloModeFinish(koModeId, !!won, res.timeMs);
@@ -5570,12 +5582,10 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'knockout';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🥊 НОКАУТ ПРОЙДЕНО!') : t('💀 НОКАУТ ПРОГРАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.knockout.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Ящик зі зброєю')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5598,19 +5608,7 @@ class Game {
     if (level.net && level.net.authority) level.netEv('dfend', won ? 1 : 0);
     this._grantWeeklyCoop(level, !!won);
     if (won && level.net && !level.expedition) this._grantCoopWin(); // 🤝 бонус «разом» і в дружній обороні
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🛡️ Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🛡️ Ще раз!'));
     const isZone = level.defense.variant === 'zone';
     const defModeId = isZone ? 'zone-defense' : level.defense.variant === 'overloaded' ? 'overloaded-defense' : 'defense';
     const fin = this._soloModeFinish(defModeId, !!won, isZone ? null : res.timeMs);
@@ -5620,8 +5618,6 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = defModeId;
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = isZone
       ? (won ? t('🛡️ ЗОНУ ВТРИМАНО!') : t('💀 ЗОНУ ВТРАЧЕНО'))
@@ -5629,11 +5625,11 @@ class Game {
     document.getElementById('arena-stats').innerHTML = isZone ? `
       <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Залишилось')}</span><span class="stat-val">${res.timeLeft} ${t('с')}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>`
+      ${this._timeStat(res.timeMs)}`
       : `
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('HP вежі')}</span><span class="stat-val">${res.towerHp} / ${level.defense.towerMaxHp}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.defense.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}`;
     this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
@@ -5649,19 +5645,7 @@ class Game {
     level.turretwar.completed = !!won;
     const res = level.turretwar.results();
     level.turretwar.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🗼 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🗼 Ще раз!'));
     const fin = this._soloModeFinish('turretwar', !!won, res.timeMs);
     if (won && !level.expedition) {
       this.progress.addXp(100 * fin.mult);
@@ -5669,8 +5653,6 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'turretwar';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won
       ? t('🗼 ЗОМБІ-ТУРЕЛЬ ЗНЕСЕНО!')
@@ -5679,7 +5661,7 @@ class Game {
       <div class="stat"><span class="stat-icon">🗼</span><span class="stat-name">${t('Твоя турель')}</span><span class="stat-val">${res.playerHp} / 500</span></div>
       <div class="stat"><span class="stat-icon">💀</span><span class="stat-name">${t('Зомбі-турель')}</span><span class="stat-val">${res.enemyHp} / 500</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}`;
     this._finishExpeditionNode(won);
     this._showOverlay('overlay-arena-end');
@@ -5691,19 +5673,7 @@ class Game {
     level.pvp.completed = !!won;
     const res = level.pvp.results();
     level.pvp.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('⚔️ Ще раз!');
-    }
+    this._endRunChrome(level, won, t('⚔️ Ще раз!'));
 
     const pvpModeId = level.pvp.variant === 'overloaded' ? 'overloaded-pvp' : 'pvp';
     const fin = this._soloModeFinish(pvpModeId, !!won, res.timeMs);
@@ -5724,13 +5694,11 @@ class Game {
       }
     }
     this._lastEndMode = 'pvp';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('⚔️ ПВП ПЕРЕМОГА!') : t('💀 ПВП ПРОГРАНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.pvp.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5742,19 +5710,7 @@ class Game {
     const res = level.bank.results();
     level.bank.completed = !!won;
     level.bank.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🏦 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🏦 Ще раз!'));
     const fin = this._soloModeFinish('bank', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
@@ -5764,14 +5720,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'bank';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🏦 БАНК ЗАХИЩЕНО!') : t('💀 БАНК ВТРАЧЕНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🏦</span><span class="stat-name">${t('Банків лишилось')}</span><span class="stat-val">${res.safesLeft} / 2</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5787,19 +5741,7 @@ class Game {
       this._showFrontModeResult(level, won, '🌀', 'Портали закрито', `${res.closed} / 3`);
       return;
     }
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🌀 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🌀 Ще раз!'));
     const fin = this._soloModeFinish('portal', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won && !level.expedition) {
@@ -5809,14 +5751,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'portal';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🌀 ПОРТАЛИ ЗАКРИТО!') : t('💀 ПОРТАЛИ ПРОРВАЛИСЯ');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🌀</span><span class="stat-name">${t('Портали закрито')}</span><span class="stat-val">${res.closed} / 3</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._finishExpeditionNode(won);
@@ -5829,19 +5769,7 @@ class Game {
     const res = level.maze.results();
     level.maze.completed = !!won;
     level.maze.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('🧩 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('🧩 Ще раз!'));
     const fin = this._soloModeFinish('maze', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
@@ -5851,14 +5779,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'maze';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🧩 ЛАБІРИНТ ПРОЙДЕНО!') : t('💀 ЛАБІРИНТ НЕ ПРОЙДЕНО');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🔑</span><span class="stat-name">${t('Ключі знайдено')}</span><span class="stat-val">${res.keys} / 3</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5870,19 +5796,7 @@ class Game {
     const res = level.humans.results();
     level.humans.completed = !!won;
     level.humans.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('⚔️ Ще раз!');
-    }
+    this._endRunChrome(level, won, t('⚔️ Ще раз!'));
     const humansModeId = level.humans.variant === 'overloaded' ? 'overloaded-humans' : 'humans';
     const fin = this._soloModeFinish(humansModeId, !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
@@ -5892,14 +5806,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = humansModeId;
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('⚔️ ЛЮДИ ПЕРЕМОГЛИ!') : t('💀 ЗОМБІ ПЕРЕМОГЛИ');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі лишилось')}</span><span class="stat-val">${res.remaining} / ${res.target}</span></div>
       <div class="stat"><span class="stat-icon">🧍</span><span class="stat-name">${t('Клони живі')}</span><span class="stat-val">${res.clones} / ${res.cloneTotal}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Наслідок')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5911,19 +5823,7 @@ class Game {
     const res = level.soulCollector.results();
     level.soulCollector.completed = !!won;
     level.soulCollector.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('👻 Ще раз!');
-    }
+    this._endRunChrome(level, won, t('👻 Ще раз!'));
     const fin = this._soloModeFinish('soul-collector', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won) {
@@ -5933,14 +5833,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'soul-collector';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('👻 ДУШІ ЗІБРАНО!') : t('💀 ДУШІ ВТЕКЛИ');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">👻</span><span class="stat-name">${t('Привидів лишилось')}</span><span class="stat-val">${res.remaining} / ${res.target}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._showOverlay('overlay-arena-end');
@@ -5955,19 +5853,7 @@ class Game {
     level.radiation.completed = !!won;
     const res = level.radiation.results();
     level.radiation.over = true;
-    level.bossDefeated = !!won;
-    this.victoryShown = true;
-    this.deathT = -1;
-    this._hideOverlay('overlay-death');
-    if (won) this.audio.victory();
-    else this.audio.defeat();
-    this.audio.setMode(null);
-    this.input.exitLock();
-    const retryBtn = document.getElementById('btn-arena-retry');
-    if (retryBtn) {
-      retryBtn.style.display = '';
-      retryBtn.textContent = t('☢️ Ще раз!');
-    }
+    this._endRunChrome(level, won, t('☢️ Ще раз!'));
     const fin = this._soloModeFinish('radiation', !!won, res.timeMs);
     let rewardTitle = t('Без нагороди');
     if (won && !level.expedition) {
@@ -5978,14 +5864,12 @@ class Game {
       this.saveGame();
     }
     this._lastEndMode = 'radiation';
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('☢️ РАДІАЦІЮ ОЧИЩЕНО!') : t('💀 РАДІАЦІЯ ПЕРЕМОГЛА');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">☢️</span><span class="stat-name">${t('Радіаційний зомбі')}</span><span class="stat-val">${won ? t('переможено') : t('вижив')}</span></div>
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${res.kills} / ${level.radiation.target}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}${fin.recBadge}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs, fin.recBadge)}
       ${fin.bestRow}
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${rewardTitle}</span></div>`;
     this._finishExpeditionNode(won);
@@ -6053,13 +5937,11 @@ class Game {
     this._lastEndMode = 'worldboss';
     this._lastWorldBossId = mode.id;
     const res = mode.results();
-    const mins = Math.floor(res.timeMs / 60000);
-    const secs = Math.floor((res.timeMs % 60000) / 1000);
     document.getElementById('arena-league-place').textContent = '';
     document.querySelector('#overlay-arena-end h1').textContent = won ? t('🌋 СВІТОВОГО БОСА ПЕРЕМОЖЕНО!') : t('💀 БОС СИЛЬНІШИЙ ЦЬОГО РАЗУ');
     document.getElementById('arena-stats').innerHTML = `
       <div class="stat"><span class="stat-icon">${mode.cfg.icon}</span><span class="stat-name">${t('Бос')}</span><span class="stat-val">${mode.cfg.shortName()}</span></div>
-      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${mins}:${String(secs).padStart(2, '0')}</span></div>
+      ${this._timeStat(res.timeMs)}
       <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
       <div class="stat best"><span class="stat-icon">🎁</span><span class="stat-name">${t('Нагорода')}</span><span class="stat-val">${won ? rewardTitle : t('Без нагороди')}</span></div>`;
     this._finishExpeditionNode(won);

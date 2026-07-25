@@ -1,11 +1,10 @@
 import { t } from './i18n.js';
 import { buildRectArena, clampActorToRect, clampZombieToRect } from './roomkit.js';
 
-export const PVP_UNLOCK_COUNTRIES = 8;
 export const OVERLOADED_PVP_UNLOCK_COUNTRIES = 8;
-export const PVP_ROOM_SIZE = 30;
-export const PVP_ZOMBIE_HP = 250;
-export const PVP_ZOMBIE_DMG = 10;
+const PVP_ROOM_SIZE = 30;
+const PVP_ZOMBIE_HP = 250;
+const PVP_ZOMBIE_DMG = 10;
 
 const PVP_CONFIGS = {
   normal: {
@@ -51,8 +50,6 @@ export class PvpMode {
     this._buildRoom();
     this._spawnZombie();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

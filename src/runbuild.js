@@ -3,7 +3,7 @@
 // apply() мутує лише поля player (перестворюється на старті рівня) — save.json НЕ чіпаємо.
 // Рідкість: common (сірі, часто) / rare (сині, рідше) / epic (золоті, рідко і потужно).
 
-export const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1 };
+const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1 };
 
 export function cardWeight(card, bias = null) {
   const base = RARITY_WEIGHT[card.rarity] || RARITY_WEIGHT.common;

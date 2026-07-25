@@ -62,7 +62,7 @@ export const BASTION_LEVEL_STATS = Object.freeze([
 // 🌀 Super Імпульса: сповільнює натовп навколо себе. Переюзує наявні slowT/slowMul зомбі.
 export const IMPULSE_WAVE = Object.freeze({ radius: 12, secs: 5, slowMul: 0.45, damage: 40 });
 
-export const BASTION_UNLOCK_COSTS = Object.freeze({
+const BASTION_UNLOCK_COSTS = Object.freeze({
   'healing-punch': 1000,
   provoke: 1000,
   hyper: 5000,
@@ -84,7 +84,7 @@ export const BASTION_STAR_POWERS = Object.freeze({
     speedSecs: 3, chargeMultiplier: 1.05,
   }),
 });
-export const BASTION_STAR_POWER_IDS = Object.freeze(Object.keys(BASTION_STAR_POWERS));
+const BASTION_STAR_POWER_IDS = Object.freeze(Object.keys(BASTION_STAR_POWERS));
 
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,
   Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : min));
@@ -227,7 +227,7 @@ export function specialistMasteryAward(run) {
   return run.status === 'failed' ? 15 * clampInt(run.wins, 0, 5) : 0;
 }
 
-export function specialistClaimId(run) {
+function specialistClaimId(run) {
   if (!run || !Number.isFinite(Number(run.seed))) return null;
   return `expedition:${Math.trunc(Number(run.seed))}:${run.coop ? 'coop' : 'solo'}`;
 }

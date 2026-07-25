@@ -602,7 +602,7 @@ const METEOR_DOWN = new THREE.Vector3(0, -1, 0);
 
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
-export const TURRET_HYPER = { hp: 100, dmg: 25 };
+const TURRET_HYPER = { hp: 100, dmg: 25 };
 const WATCHTOWER_HP = 200;
 
 // 🗼 скіни башти: id → кольори (metal — ноги/щаблі, dark — платформа) + метадані для UI

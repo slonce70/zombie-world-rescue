@@ -74,8 +74,6 @@ export class StormMode {
   }
 
   // --- Missions API ---
-  get(id) { void id; return null; }
-
   getHudList() {
     const out = [
       { icon: '⛈️', title: t('ШТОРМ — хвиля {n}', { n: this.wave }), done: false },

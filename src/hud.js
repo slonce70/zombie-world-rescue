@@ -796,7 +796,8 @@ export class HUD {
     ctx.restore();
 
     // охоронці складу — помаранчеві точки навіть здалека, поки місія активна
-    const wh = level.missions.get('warehouse');
+    // ?. — склад є лише в кампанійському missionpool; кімнатні режими метод не мають
+    const wh = level.missions.get?.('warehouse');
     if (wh && wh.state === 'active' && !level.missions.crateReady) {
       for (const z of level.zombies.list) {
         if (z.zone !== 'warehouse' || z.state === 'dead') continue;

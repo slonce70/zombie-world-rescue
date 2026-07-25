@@ -8,7 +8,7 @@ import { ensureCid } from './league.js';
 
 const PUSH_DELAY_MS = 25_000;
 export const SAVE_KEY = 'zr-save-v1';
-export const SAVE_CONFLICT_KEY = 'zr-save-conflict-v1';
+const SAVE_CONFLICT_KEY = 'zr-save-conflict-v1';
 const SHIPPED_ORIGIN = 'https://slonce70.github.io';
 
 export function cloudSaveEnabled({ origin = '', testMode = false, cloudParam = false } = {}) {

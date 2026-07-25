@@ -59,7 +59,7 @@ function groupToBone(grp) {
 // Rigid-bind: кожна вершина частини повністю належить своїй кістці (weight=[1,0,0,0]).
 // Геометрія печеться у ПРОСТОРІ group (root-local, bind-поза), boneInverses з тієї ж пози —
 // статичний зомбі ідентичний до-скінінговому, анімований рухає частинами так само.
-export function bakeRigSkinned(rig) {
+function bakeRigSkinned(rig) {
   const outline = 0.028 / Math.max(0.7, rig.spec ? rig.spec.scale : 1);
   const group = rig.group;
   const body = rig.body;
@@ -217,7 +217,7 @@ export function cloneRig(tpl) {
 // Гуманоїд. Стоїть на y=0, дивиться у бік -Z.
 // Конвенції: rotation.x > 0 — кінцівка вперед (-Z); тіло падає назад при rotation.x > 0.
 // ============================================================
-export function makeHumanoid(spec) {
+function makeHumanoid(spec) {
   const s = Object.assign({
     scale: 1, skin: 0xffc9a3, shirt: 0x4a90d9, pants: 0x3b4252, shoes: 0x6b4f3a,
     belly: 1, headR: 0.27, armsForward: 0, lean: 0,
@@ -4005,7 +4005,7 @@ export function makeFPArms(gunKind) {
 // ============================================================
 // 🐶 Песик Дружок — компаньйон героя
 // ============================================================
-export function makeDog() {
+function makeDog() {
   const root = new THREE.Group();
   const furM = toonMat(0xc98f4e);
   const darkM = toonMat(0xa06a32);
@@ -4089,7 +4089,7 @@ function petEyes(headG, dx, dy, dz, r = 0.028, color = 0x141414) {
 }
 
 // 🐱 кошеня: струнке, трикутні вушка, вуса, довгий хвіст
-export function makeCat() {
+function makeCat() {
   const root = new THREE.Group();
   const furM = toonMat(0x9aa0a6), darkM = toonMat(0x6f757b), pinkM = toonMat(0xe79aa6);
   const body = capsule(0.12, 0.28, furM); body.rotation.x = Math.PI / 2; body.position.y = 0.3; body.castShadow = true; root.add(body);
@@ -4119,7 +4119,7 @@ export function makeCat() {
 }
 
 // 🦊 лисеня: руде, біла грудка, великі вуха, пухнастий хвіст із білим кінчиком
-export function makeFox() {
+function makeFox() {
   const root = new THREE.Group();
   const furM = toonMat(0xe08234), whiteM = toonMat(0xf4ece0), darkM = toonMat(0x2b2622);
   const body = capsule(0.12, 0.28, furM); body.rotation.x = Math.PI / 2; body.position.y = 0.3; body.castShadow = true; root.add(body);
@@ -4149,7 +4149,7 @@ export function makeFox() {
 }
 
 // 🐼 панда: округла, чорні лапи/вуха/плями навколо очей
-export function makePanda() {
+function makePanda() {
   const root = new THREE.Group();
   const whiteM = toonMat(0xf2f2ee), blackM = toonMat(0x2a2a2e);
   const body = capsule(0.18, 0.2, whiteM); body.rotation.x = Math.PI / 2; body.position.y = 0.34; body.castShadow = true; root.add(body);
@@ -4175,7 +4175,7 @@ export function makePanda() {
 }
 
 // 🐰 зайчик: довгі вуха, пухнастий хвостик, великі задні лапи (рух hop)
-export function makeBunny() {
+function makeBunny() {
   const root = new THREE.Group();
   const furM = toonMat(0xe9e2d6), pinkM = toonMat(0xeaa6b0), darkM = toonMat(0x4a4038);
   const body = capsule(0.12, 0.16, furM); body.position.y = 0.26; body.castShadow = true; root.add(body);
@@ -4201,7 +4201,7 @@ export function makeBunny() {
 }
 
 // 🐸 жабка: широкий рот, опуклі очі зверху, перетинчасті лапи (рух hop)
-export function makeFrog() {
+function makeFrog() {
   const root = new THREE.Group();
   const skinM = toonMat(0x6fbf4a), bellyM = toonMat(0xd6e8a8), darkM = toonMat(0x2c2c2c);
   const body = sphere(0.18, skinM, 16, 12); body.position.y = 0.18; body.scale.set(1, 0.8, 1.05); body.castShadow = true; root.add(body);
@@ -4222,7 +4222,7 @@ export function makeFrog() {
 }
 
 // 🐧 пінгвін: чорна спинка, біле черевце, дзьоб і ластами (waddle = quad)
-export function makePenguin() {
+function makePenguin() {
   const root = new THREE.Group();
   const blackM = toonMat(0x2b3138), whiteM = toonMat(0xf4f4f0), orangeM = toonMat(0xf2912e);
   const body = capsule(0.15, 0.18, blackM); body.position.y = 0.32; body.castShadow = true; root.add(body);
@@ -4243,7 +4243,7 @@ export function makePenguin() {
 }
 
 // 🐢 черепашка: купол-панцир із візерунком, коротенькі лапки
-export function makeTurtle() {
+function makeTurtle() {
   const root = new THREE.Group();
   const shellM = toonMat(0x4f7c3a), shellD = toonMat(0x3a5e2a), skinM = toonMat(0xb6c46a);
   const shell = sphere(0.22, shellM, 14, 8); shell.position.y = 0.26; shell.scale.set(1, 0.6, 1.2); shell.castShadow = true; root.add(shell);
@@ -4267,7 +4267,7 @@ export function makeTurtle() {
 }
 
 // 🦜 папуга: яскравий, гнутий дзьоб, чубчик, кольорові крила (рух bird)
-export function makeParrot() {
+function makeParrot() {
   const root = new THREE.Group();
   const redM = toonMat(0xe8403a), blueM = toonMat(0x2f7fe0), yellowM = toonMat(0xf4c430), darkM = toonMat(0x222222);
   const body = capsule(0.1, 0.2, redM); body.position.y = 0.34; body.castShadow = true; root.add(body);
@@ -4296,7 +4296,7 @@ export function makeParrot() {
 }
 
 // 🦖 динозаврик: зелений Т-рекс, велика голова з зубами, шипи, довгий хвіст
-export function makeDino(skin = 0x5bbf6a, belly = 0xcfe89a, dark = 0x214a2a, eyeColor = 0xf2c20a) {
+function makeDino(skin = 0x5bbf6a, belly = 0xcfe89a, dark = 0x214a2a, eyeColor = 0xf2c20a) {
   const root = new THREE.Group();
   const skinM = toonMat(skin), bellyM = toonMat(belly), darkM = toonMat(dark);
   const body = capsule(0.14, 0.22, skinM); body.rotation.x = Math.PI / 2 - 0.3; body.position.y = 0.34; body.castShadow = true; root.add(body);
@@ -4326,7 +4326,7 @@ export function makeDino(skin = 0x5bbf6a, belly = 0xcfe89a, dark = 0x214a2a, eye
   return { group: root, head: headG, legs, tail, phase: Math.random() * 6 };
 }
 
-export function makeRadiationLizard() {
+function makeRadiationLizard() {
   const rig = makeDino(0x77ff55, 0xd6ff48, 0x1e3528, 0x77ff55);
   rig.group.scale.set(0.82, 0.82, 0.82);
   const glow = sphere(0.045, toonMat(0xd6ff48, 0x77ff55, 0.8), 8, 6);
@@ -4336,7 +4336,7 @@ export function makeRadiationLizard() {
 }
 
 // 🐉 дракончик: роги, крильця (легкий мах), шипи, лусочка
-export function makeDragon() {
+function makeDragon() {
   const root = new THREE.Group();
   const skinM = toonMat(0x8e44d6), bellyM = toonMat(0xe4c0ff), hornM = toonMat(0xf4e3b0), darkM = toonMat(0x5a2a8a);
   const body = capsule(0.13, 0.22, skinM); body.rotation.x = Math.PI / 2; body.position.y = 0.34; body.castShadow = true; root.add(body);
@@ -4371,7 +4371,7 @@ export function makeDragon() {
 }
 
 // 🦄 єдиноріг: білий, золотий ріг, веселкова грива і хвіст
-export function makeUnicorn() {
+function makeUnicorn() {
   const root = new THREE.Group();
   const bodyM = toonMat(0xf6f0fb), hornM = toonMat(0xf4c430, 0xf4c430, 0.3), hoofM = toonMat(0xd9b3e0);
   const RB = [0xff5e7a, 0xffa64d, 0xf4d03f, 0x6bd47a, 0x4db3ff, 0xb06bff];
@@ -4400,7 +4400,7 @@ export function makeUnicorn() {
 }
 
 // 🤖 робо-пес: металевий, світні очі, антена, боксова форма
-export function makeRoboPet() {
+function makeRoboPet() {
   const root = new THREE.Group();
   const metalM = toonMat(0x9aa7b4), darkM = toonMat(0x4a5560), eyeM = toonMat(0x33e0ff, 0x33e0ff, 0.9);
   const body = box(0.3, 0.2, 0.42, metalM); body.position.y = 0.36; body.castShadow = true; root.add(body);
@@ -4428,7 +4428,7 @@ export function makeRoboPet() {
 
 // реєстр улюбленців (id → метадані + білдер + тип руху для Pet.update)
 // 🧪 Доктор Слизняк: маленька весела зелена клякса в окулярах (стрибає — hop)
-export function makeSlimePet() {
+function makeSlimePet() {
   const root = new THREE.Group();
   const jellyM = new THREE.MeshToonMaterial({
     color: 0x5fe07a, emissive: 0x2ecf5a, emissiveIntensity: 0.5,

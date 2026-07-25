@@ -40,7 +40,7 @@ export function setLang(l) {
 // 📱 Чи зараз сенсорне керування (телефон/планшет або ?touch).
 // Читаємо ЖИВИЙ стан гри, бо словники й описи будуються при завантаженні
 // модулів, коли input ще не існує — тому перевірка має бути у момент показу.
-export function isTouchUI() {
+function isTouchUI() {
   try {
     if (window.__game && window.__game.input) return !!window.__game.input.touchMode;
   } catch (e) { /* ignore */ }

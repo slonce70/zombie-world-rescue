@@ -1,10 +1,8 @@
 import { t } from './i18n.js';
 import { buildRectArena, clampActorToRect, clampZombieToRect } from './roomkit.js';
 
-export const KNOCKOUT_UNLOCK_LEVEL = 20;
 export const OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES = 8;
-export const FRIENDLY_KNOCKOUT_UNLOCK_COUNTRIES = 8;
-export const KNOCKOUT_ROOM_SIZE = 33;
+const KNOCKOUT_ROOM_SIZE = 33;
 export const KNOCKOUT_STAFF_CHANCE = 0.12;
 
 const KNOCKOUT_CONFIGS = {
@@ -50,8 +48,6 @@ export class KnockoutMode {
     this._buildRoom();
     this._spawnZombies();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     const left = this.remaining();

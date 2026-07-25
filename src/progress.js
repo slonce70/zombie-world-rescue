@@ -251,7 +251,7 @@ const QUEST_POOL = [
 ];
 const QUEST_REWARD_COINS = 120;
 export const MEGA_QUEST_REFRESH_MS = 2 * 24 * 60 * 60 * 1000;
-export const MEGA_QUESTS = [
+const MEGA_QUESTS = [
   {
     id: 'damage10000', icon: '⚡', ev: 'damage', target: 10000,
     title: () => t('МЕГА: нанеси {n} шкоди', { n: 10000 }),

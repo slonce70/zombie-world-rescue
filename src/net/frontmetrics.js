@@ -25,7 +25,7 @@ function platformClass() {
   return Math.min(screen.width || innerWidth, screen.height || innerHeight) >= 600 ? 'tablet' : 'mobile';
 }
 
-export function frontMetricPayload(game, event) {
+function frontMetricPayload(game, event) {
   if (!FRONT_METRIC_EVENTS.has(event)) return null;
   const firstSeen = game && game.save && game.save.front && game.save.front.stats && game.save.front.stats.firstSeenDay;
   const cohort = /^\d{4}-\d{2}-\d{2}$/.test(firstSeen || '') ? firstSeen : new Date().toISOString().slice(0, 10);

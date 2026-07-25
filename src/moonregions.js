@@ -4,7 +4,7 @@ const regions = (world, rows) => Object.freeze(Object.fromEntries(rows.map((row)
   return [id, Object.freeze({ id, world, name, flag, lat, lon, seed, missions, story })];
 })));
 
-export const SPACE_WORLDS = Object.freeze({
+const SPACE_WORLDS = Object.freeze({
   MOON: Object.freeze({
     id: 'MOON', name: 'Місяць', icon: '🌙', unlockAfter: null,
     bossName: '🌙 МІСЯЧНИЙ ТИТАН',
@@ -61,7 +61,6 @@ export const spaceWorldUnlocked = (save, worldId) => {
   return spaceRegionList(world.unlockAfter).every((region) => done[region.id]);
 };
 
-export const MOON_REGIONS = SPACE_WORLDS.MOON.regions;
 export const MOON_REGION_LIST = Object.freeze(spaceRegionList('MOON'));
 export const getMoonRegion = (id, worldId = 'MOON') => getSpaceRegion(worldId, id);
 

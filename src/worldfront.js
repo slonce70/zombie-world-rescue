@@ -3,15 +3,15 @@ import { encounterPlan } from './worldevents.js';
 import { CARD_POOL } from './runbuild.js';
 
 export const FRONT_VERSION = 1;
-export const FRONT_STAGE_COUNT = 3;
+const FRONT_STAGE_COUNT = 3;
 
 const CAMPAIGN_COUNTRIES = Object.freeze([
   'UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN',
 ]);
 
-export const FRONT_PROJECTS = Object.freeze(['medbay', 'workshop', 'radio']);
+const FRONT_PROJECTS = Object.freeze(['medbay', 'workshop', 'radio']);
 
-export const SPECIALIST_ROLES = Object.freeze({
+const SPECIALIST_ROLES = Object.freeze({
   UKR: 'medic', FRA: 'medic', SWE: 'medic',
   DEU: 'engineer', JPN: 'engineer', CHN: 'engineer',
   POL: 'scout', ESP: 'scout', TUR: 'scout',

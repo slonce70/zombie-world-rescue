@@ -10,7 +10,6 @@ import { makeZombie, updateRig, setAnim } from './characters.js';
 import { RNG, disposeObject } from './utils.js';
 import { clampActorToRect, clampZombieToRect } from './roomkit.js';
 
-export const TURRETWAR_UNLOCK_COUNTRIES = 12;
 const TURRET_HP = 500;
 const TURRET_DMG = 50;       // раз на секунду
 const TURRET_ZONE = 25;      // половина квадрата 50×50
@@ -55,8 +54,6 @@ export class TurretWarMode {
     this._buildRoom();
     this._spawnEnemyRobot();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

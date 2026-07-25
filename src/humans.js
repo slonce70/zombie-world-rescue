@@ -3,9 +3,8 @@ import { makeHero, cloneRig, setAnim, updateRig } from './characters.js';
 import { disposeObject } from './utils.js';
 import { t } from './i18n.js';
 
-export const HUMANS_UNLOCK_COUNTRIES = 11;
 export const OVERLOADED_HUMANS_UNLOCK_COUNTRIES = 12;
-export const HUMANS_ROOM_SIZE = 750;
+const HUMANS_ROOM_SIZE = 750;
 const HUMANS_ROOM_CENTER = { x: 1400, z: 0 };
 const CLONE_FOOT_LIFT = 0.16;
 const HUMANS_CFG = {
@@ -38,8 +37,6 @@ export class HumansMode {
     this._spawnClones();
     this._spawnZombies();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

@@ -1,22 +1,6 @@
 // Розмір карти задається в зрозумілих гравцю метрах. Поточна карта = 750 м.
 // Масштабуємо весь просторовий конфіг разом, щоб межа не відрізала сюжетні місця.
-import {
-  MAP_SIZE_MODES,
-  MAP_SIZE_METERS,
-  MAP_STYLE_MODES,
-  sanitizeMapSize,
-  sanitizeMapStyle,
-  mapSizeScale,
-} from '../worker/community-schema.mjs';
-
-export {
-  MAP_SIZE_MODES,
-  MAP_SIZE_METERS,
-  MAP_STYLE_MODES,
-  sanitizeMapSize,
-  sanitizeMapStyle,
-  mapSizeScale,
-};
+import { sanitizeMapSize, mapSizeScale } from '../worker/community-schema.mjs';
 
 const SCALED_NUMBER_KEYS = new Set(['bound', 'x', 'z', 'r', 'w', 'd', 'width', 'sigma', 'from', 'to']);
 const COORDINATE_ARRAY_KEYS = new Set(['roads', 'pts', 'spots', 'barrels']);

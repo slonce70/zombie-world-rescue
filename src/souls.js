@@ -3,9 +3,9 @@ import { t } from './i18n.js';
 import { clampActorToRect, clampZombieToRect, clearRectBlockers } from './roomkit.js';
 
 export const SOUL_COLLECTOR_UNLOCK_LEVEL = 15;
-export const SOUL_ROOM_SIZE = 100;
-export const SOUL_GHOSTS = 20;
-export const SOUL_GHOST_HP = 125;
+const SOUL_ROOM_SIZE = 100;
+const SOUL_GHOSTS = 20;
+const SOUL_GHOST_HP = 125;
 export const SOUL_WIN_REWARD = 3;
 export const SOUL_LEVEL_COST = 5;
 
@@ -32,8 +32,6 @@ export class SoulCollectorMode {
     this._buildRoom();
     this._spawnGhosts();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

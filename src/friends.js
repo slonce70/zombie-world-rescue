@@ -140,7 +140,7 @@ export function campTier(count) {
 
 // «Щоденне дякую»: відкривається, коли врятовано ≥3 друзів. Ключ дня — той самий формат
 // YYYY-MM-DD, що DailyGift.dayKey (локальний, НЕ UTC). save.friendThanks = день останньої видачі.
-export const FRIEND_THANKS_MIN = 3;
+const FRIEND_THANKS_MIN = 3;
 export const FRIEND_THANKS_COINS = 20;
 
 export function friendThanksUnlocked(save) {
@@ -157,7 +157,7 @@ export function friendThanksPending(save, dayKey) {
 // карти, подалі від старту. Це і тримає перф-бюджет (далекий кут фрустум-калиться на
 // кадрі-заміру спавну), і прибирає клітку зі стартового поля бою. Стабільно між забігами;
 // Швеція на карті Польщі працює автоматично (читаємо country.map).
-export function pickCageSite(country, rng) {
+function pickCageSite(country, rng) {
   const map = country && country.map;
   if (!map) return null;
   const sites = map.storySites || map.sites || {};

@@ -86,8 +86,6 @@ export class WorldBossMode {
     this._spawned = false;
   }
 
-  get(id) { void id; return null; }
-
   // 🌐 кооп: гість шукає боса живим у списку (state-ресинк заміняє об'єкт на puppet
   // із прапором o.wb); host/solo — прямий this.boss
   _liveBoss() {

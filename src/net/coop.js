@@ -12,8 +12,7 @@ import {
   canonicalFrontRewards, expandFrontSpec, FRONT_GUEST_FORBIDDEN, frontSpecFromState,
   sanitizeFrontResult, sanitizeFrontSnapshot, sanitizeFrontSpec,
 } from './frontsync.js';
-import { sanitizeMapSize, sanitizeMapStyle } from '../mapsize.js';
-import { sanitizeCommunitySnapshot } from '../../worker/community-schema.mjs';
+import { sanitizeCommunitySnapshot, sanitizeMapSize, sanitizeMapStyle } from '../../worker/community-schema.mjs';
 import { SPECIALIST_IDS, SPECIALISTS, sanitizeSpecialistId, specialistModifiers, specialistRank } from '../specialists.js';
 
 const NICK_KEY = 'zr-nick';
@@ -24,12 +23,12 @@ const JOIN_WELCOME_TIMEOUT_MS = 30000;
 // Бафи скромні: guard — +25 maxHealth; medic — швидший ревайв друга (3с→1.8с);
 // scout — швидкість ×1.08 + радіус підбору ×1.25. У radiation/pvp/соло ролі НЕ діють.
 export const COOP_ROLE_IDS = SPECIALIST_IDS;
-export const COOP_ROLES = Object.fromEntries(SPECIALIST_IDS.map((id) => [id, {
+const COOP_ROLES = Object.fromEntries(SPECIALIST_IDS.map((id) => [id, {
   icon: SPECIALISTS[id].icon,
   ...specialistModifiers(id, 1),
 }]));
 // клампимо будь-яку вхідну роль (сейв/мережа) у whitelist — інакше null (без ролі)
-export function sanitizeCoopRole(r) {
+function sanitizeCoopRole(r) {
   return sanitizeSpecialistId(r, null);
 }
 export function coopRoleIcon(r) {

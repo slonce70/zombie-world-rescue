@@ -7,3 +7,4 @@ worker/.dev.vars
 graphify-out/
 .superpowers/
 .worktrees/
+test-results/

@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { clampActorToRect, clampZombieToRect, clearRectBlockers } from './roomkit.js';
 
-export const PORTAL_UNLOCK_COUNTRIES = 9;
-export const PORTAL_HP = 1222;
-export const PORTAL_ROOM_SIZE = 70;
+const PORTAL_HP = 1222;
+const PORTAL_ROOM_SIZE = 70;
 
 export class PortalMode {
   constructor(level) {
@@ -29,8 +28,6 @@ export class PortalMode {
     this._clearRoomBlockers();
     this._buildRoom();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

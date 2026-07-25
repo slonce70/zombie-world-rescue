@@ -39,7 +39,7 @@ export const STAR_THRESHOLDS = [
 // ⭐2: вторинні цілі забігу — 1 випадкова на забіг, data-driven.
 // Усі досяжні З бафами драфту й супер-пікапом (v288) — не «pistol only» тощо.
 // target(country) масштабує ціль монет за складністю країни (counts).
-export const SECONDARY_OBJECTIVES = [
+const SECONDARY_OBJECTIVES = [
   { id: 'elites', ev: 'elite', icon: '👹', target: () => 2, label: (n) => t('Убий {n} елітних зомбі', { n }) },
   { id: 'megabox', ev: 'megabox', icon: '📦', target: () => 1, label: () => t('Відкрий мегабокс') },
   {

@@ -7,7 +7,7 @@ const FRIEND_ORDER = Object.freeze([
   'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN',
 ]);
 
-export const COMMANDERS = Object.freeze({
+const COMMANDERS = Object.freeze({
   pursuer: Object.freeze({
     id: 'pursuer',
     zombieType: 'gladiator',

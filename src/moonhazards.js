@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const METEOR_TYPES = Object.freeze({
+const METEOR_TYPES = Object.freeze({
   small: Object.freeze({ size: 5, damage: 35, color: 0xd6d2cb }),
   medium: Object.freeze({ size: 10, damage: 55, color: 0xaaa7a2 }),
   large: Object.freeze({ size: 19, damage: 75, color: 0x777672 }),

@@ -2,7 +2,7 @@ import { CAMPAIGN_ORDER } from './countries.js';
 import { CARD_POOL, cardWeight } from './runbuild.js';
 import { sanitizeFighterId, specialistBias } from './specialists.js';
 
-export const EXPEDITION_VERSION = 2;
+const EXPEDITION_VERSION = 2;
 export const EXPEDITION_STEPS = 5;
 
 export const EXPEDITION_NODE_TYPES = Object.freeze({

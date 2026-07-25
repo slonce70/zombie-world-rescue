@@ -1,8 +1,7 @@
 import { t } from './i18n.js';
 import { buildRectArena, clampActorToRect, clampZombieToRect } from './roomkit.js';
 
-export const RADIATION_UNLOCK_COUNTRIES = 12;
-export const RADIATION_ROOM_SIZE = 50;
+const RADIATION_ROOM_SIZE = 50;
 export const RADIATION_WIN_COINS = 50;
 
 export class RadiationMode {
@@ -25,8 +24,6 @@ export class RadiationMode {
     this._buildRoom();
     this._spawnZombie();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     // живий пошук: у коопі state-ресинк гостя заміняє об'єкт боса на puppet

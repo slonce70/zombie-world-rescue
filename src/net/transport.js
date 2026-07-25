@@ -9,7 +9,7 @@
 const DEFAULT_RELAY = 'wss://zr-relay.slonce70.workers.dev';
 const BATCH_MS = 100;
 
-export function relayUrl() {
+function relayUrl() {
   const p = new URLSearchParams(location.search).get('relay');
   if (p) return p;
   try {

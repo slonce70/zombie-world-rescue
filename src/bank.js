@@ -2,10 +2,9 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { clampActorToRect, clampZombieToRect, clearRectBlockers } from './roomkit.js';
 
-export const BANK_UNLOCK_COUNTRIES = 7;
-export const BANK_ROOM_W = 200;
-export const BANK_ROOM_D = 50;
-export const BANK_SAFE_HP = 500;
+const BANK_ROOM_W = 200;
+const BANK_ROOM_D = 50;
+const BANK_SAFE_HP = 500;
 const BANK_ZOMBIE_DMG = 10;
 const BANK_ZOMBIE_HIT_CD = 0.9;
 
@@ -35,8 +34,6 @@ export class BankMode {
     this._clearRoomBlockers();
     this._buildRoom();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

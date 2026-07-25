@@ -3,7 +3,6 @@ import { t, interactKey } from './i18n.js';
 import { clamp } from './utils.js';
 import { toonMat } from './renderkit.js';
 import { makeCivilian, makeGunMesh } from './characters.js';
-import { mapSizeScale } from './mapsize.js';
 import {
   CUSTOM_MAP_TYPES,
   CUSTOM_MAP_QUESTS,
@@ -14,6 +13,7 @@ import {
   sanitizeCustomMap,
   validateCustomPlacement,
   deriveCustomMapTier,
+  mapSizeScale,
 } from '../worker/community-schema.mjs';
 
 export { CUSTOM_MAP_TYPES, sanitizeCustomMap };

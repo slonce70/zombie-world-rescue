@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { t } from './i18n.js';
 import { clampActorToRect, clearRectBlockers } from './roomkit.js';
 
-export const MAZE_UNLOCK_COUNTRIES = 11;
-export const MAZE_ROOM_SIZE = 76;
+const MAZE_ROOM_SIZE = 76;
 
 export class MazeMode {
   constructor(level) {
@@ -29,8 +28,6 @@ export class MazeMode {
     this._buildRoom();
     this._spawnZombies();
   }
-
-  get(id) { void id; return null; }
 
   getHudList() {
     return [

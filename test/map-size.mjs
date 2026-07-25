@@ -10,7 +10,8 @@ await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe');
 
 const profiles = await page.evaluate(async () => {
-  const { MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES, mapSizeScale, sanitizeMapStyle, scaleMap } = await import('/src/mapsize.js');
+  const { MAP_SIZE_MODES, MAP_SIZE_METERS, MAP_STYLE_MODES, mapSizeScale, sanitizeMapStyle } = await import('/worker/community-schema.mjs');
+  const { scaleMap } = await import('/src/mapsize.js');
   const sample = {
     bound: 200,
     spawn: { x: 0, z: 170 },

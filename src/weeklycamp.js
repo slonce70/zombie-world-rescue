@@ -10,8 +10,8 @@
 // щоб тести могли підмінити тиждень тест-хуком (g._weekIndex = () => N).
 import { t } from './i18n.js';
 
-export const WEEKLY_CAMP_EGGS = 1;
-export const WEEKLY_CAMP_FOOD = 2;
+const WEEKLY_CAMP_EGGS = 1;
+const WEEKLY_CAMP_FOOD = 2;
 
 // Пул із 3 квестів; вибір за (номер тижня % 3). Числа зважені під ~2-3 дитячі сесії.
 // metric — тег локальної події гравця, яким тікає прогрес (див. bumpWeeklyCamp).
@@ -40,7 +40,7 @@ export function weeklyCampQuestFor(weekIndex) {
   return WEEKLY_CAMP_QUESTS[((wk % n) + n) % n];
 }
 
-export function weeklyCampQuestById(id) {
+function weeklyCampQuestById(id) {
   return WEEKLY_CAMP_QUESTS.find((q) => q.id === id) || null;
 }
 
@@ -50,7 +50,7 @@ function freshCamp(weekIndex) {
 }
 
 // Приводить поля до безпечних типів. Ретро-безпека: відсутність/сміття → чистий старт.
-export function sanitizeWeeklyCamp(wc, weekIndex) {
+function sanitizeWeeklyCamp(wc, weekIndex) {
   if (!wc || typeof wc !== 'object') return freshCamp(weekIndex);
   const wk = Number.isFinite(wc.wk) ? Math.floor(wc.wk) : (Number.isFinite(weekIndex) ? Math.floor(weekIndex) : 0);
   const known = weeklyCampQuestById(wc.q);

@@ -28,7 +28,7 @@ export function ensureCid(game) {
   return game.save.cid;
 }
 
-export function leagueNick(game) {
+function leagueNick(game) {
   return loadNick() || (game.coop && game.coop.session.nick) || t('Гравець');
 }
 
