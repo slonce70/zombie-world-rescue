@@ -410,6 +410,59 @@
     </div>
   </div>
 
+  <div id="overlay-community-result" class="overlay" role="dialog" aria-modal="true"
+    aria-labelledby="community-result-title" aria-hidden="true" data-escape-close="btn-community-result-globe">
+    <div class="overlay-card victory-card community-result-card">
+      <h1 id="community-result-title">🏆 КАРТУ ПРОЙДЕНО!</h1>
+      <p id="community-result-sub" class="victory-sub">Усі завдання виконано.</p>
+      <div id="community-result-stats"></div>
+      <div id="community-result-community" class="community-result-extra" hidden>
+        <p id="community-result-note" class="victory-sub" aria-live="polite"></p>
+        <div class="community-reactions" role="group" aria-label="Реакція на карту">
+          <button class="btn" data-reaction="fun" aria-pressed="false">😄 Весело</button>
+          <button class="btn" data-reaction="challenging" aria-pressed="false">🔥 Складно</button>
+          <button class="btn" data-reaction="beautiful" aria-pressed="false">🎨 Красиво</button>
+        </div>
+        <div class="community-reports" role="group" aria-label="Поскаржитися на карту">
+          <button class="btn" data-report="inappropriate">🚫 Недоречне</button>
+          <button class="btn" data-report="broken">🧩 Зламана карта</button>
+          <button class="btn" data-report="spam">📢 Спам</button>
+        </div>
+      </div>
+      <div class="victory-actions">
+        <button id="btn-community-result-publish" class="btn btn-primary" hidden>🌍 Опублікувати</button>
+        <button id="btn-community-result-share" class="btn" hidden>🔗 Поділитися</button>
+        <button id="btn-community-result-room" class="btn" hidden>🤝 Кімната</button>
+        <button id="btn-community-result-catalog" class="btn" hidden>🏘️ Каталог карт</button>
+        <button id="btn-community-result-retry" class="btn" data-dialog-focus>🔁 Ще раз</button>
+        <button id="btn-community-result-globe" class="btn btn-primary big">🌍 На глобус</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🏘️ v700: каталог карт спільноти (тиждень / нові / популярні / мої) -->
+  <div id="overlay-community" class="overlay" role="dialog" aria-modal="true"
+    aria-labelledby="community-title" aria-hidden="true" data-escape-close="btn-community-close">
+    <div class="overlay-card panel-card community-card">
+      <div class="panel-header">
+        <h2 id="community-title">🏘️ ОПЕРАЦІЇ СПІЛЬНОТИ</h2>
+        <button id="btn-community-close" class="btn-x panel-close" data-close="overlay-community"
+          data-dialog-focus aria-label="Закрити">✕</button>
+      </div>
+      <div id="community-tabs" class="community-tabs" role="tablist">
+        <button class="community-tab on" data-community-tab="weekly" role="tab" aria-selected="true">🗓️ Тиждень</button>
+        <button class="community-tab" data-community-tab="new" role="tab" aria-selected="false">🆕 Нові</button>
+        <button class="community-tab" data-community-tab="popular" role="tab" aria-selected="false">🔥 Популярні</button>
+        <button class="community-tab" data-community-tab="my" role="tab" aria-selected="false">🧱 Мої</button>
+      </div>
+      <p id="community-status" class="panel-sub" aria-live="polite"></p>
+      <div id="community-list" class="community-list"></div>
+      <div class="btn-row">
+        <button id="btn-community-retry" class="btn" hidden>🔄 Спробувати ще раз</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🌍 Фінал кампанії: церемонія «Світ врятовано» (усі 12 країн вільні) -->
   <div id="overlay-worldsaved" class="overlay">
     <div id="worldsaved-confetti"></div>
@@ -735,6 +788,7 @@
       </div>
       <div id="lobby-roster"></div>
       <div id="lobby-front-summary" class="lobby-front-summary" hidden></div>
+      <p id="lobby-community" class="panel-sub" aria-live="polite" hidden></p>
       <div class="lobby-section">Моя роль</div>
       <div id="lobby-roles"></div>
       <div id="lobby-mode-section" class="lobby-section">Режим</div>
@@ -811,6 +865,7 @@
       <button class="btn map-fly" data-map-fly="down">⬇️ Вниз</button>
       <button id="map-editor-undo" class="btn">↩️ Скасувати останнє</button>
       <button id="map-editor-save" class="btn btn-primary">💾 Зберегти</button>
+      <button id="map-editor-publish" class="btn">🌍 Перевірити й опублікувати</button>
       <button id="map-editor-exit" class="btn">🚪 Вийти</button>
     </div>
     <div class="map-editor-hint">W — вперед · S — назад · A — вліво · D — вправо · Space/Ctrl — вгору/вниз · 1–9 — предмет · E — поставити · повторний вибір змінює завдання/зомбі</div>

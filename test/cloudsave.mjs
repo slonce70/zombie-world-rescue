@@ -61,6 +61,52 @@ console.log('▸ SaveVault REST');
   check('put приймає сейв', r.ok);
   r = await (await fetch(`${API}/save/get?cid=${cid}`)).json();
   check('get повертає той самий сейв', r.data === data);
+
+  const packedMap = (quest, biome) => {
+    const objects = [{ type: 'task', x: -250, z: -250, ry: 0, quest }];
+    for (let z = -220; objects.length < 140; z += 5) {
+      for (let x = -220; x <= 220 && objects.length < 140; x += 5) {
+        objects.push({ type: 'tree', x, z, ry: 0 });
+      }
+    }
+    return { biome, objects };
+  };
+  const maxCid = 'test-max-save-0123456789';
+  const maxSave = {
+    cid: maxCid,
+    customMap: packedMap('rescue', 'summer'),
+    customMap2: packedMap('rebuild', 'snow'),
+    customMapSlot: 1,
+    padding: '',
+  };
+  const targetBytes = 63 * 1024;
+  maxSave.padding = 'x'.repeat(Math.max(0, targetBytes - Buffer.byteLength(JSON.stringify(maxSave))));
+  const maxData = JSON.stringify(maxSave);
+  const maxWrapper = JSON.stringify({ cid: maxCid, data: maxData });
+  check('максимальний сейв із двома 140-object maps ≤ 64 KiB', Buffer.byteLength(maxData) <= 64 * 1024,
+    `${Buffer.byteLength(maxData)} bytes`);
+  check('SaveVault wrapper максимального сейва ≤ 96 KiB', Buffer.byteLength(maxWrapper) <= 96 * 1024,
+    `${Buffer.byteLength(maxWrapper)} bytes`);
+  const maxPut = await fetch(`${API}/save/put`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: maxWrapper,
+  });
+  const maxGet = await (await fetch(`${API}/save/get?cid=${maxCid}`)).json();
+  check('SaveVault round-trip двох максимальних карт', maxPut.ok && maxGet.data === maxData,
+    JSON.stringify({ put: maxPut.status, got: typeof maxGet.data === 'string' ? Buffer.byteLength(maxGet.data) : 0 }));
+
+  const oversizedData = JSON.stringify({ padding: 'x'.repeat(64 * 1024) });
+  const oversizedPut = await fetch(`${API}/save/put`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cid: 'test-save-over-64k', data: oversizedData }),
+  });
+  check('SaveVault відхиляє payload > 64 KiB', oversizedPut.status === 400, `status=${oversizedPut.status}`);
+  const oversizedWrapper = await fetch(`${API}/save/put`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cid: 'test-wrapper-over-96k', data: JSON.stringify({ padding: 'x'.repeat(96 * 1024) }) }),
+  }).catch(() => null);
+  check('SaveVault відхиляє wrapper > 96 KiB', oversizedWrapper?.status === 413,
+    `status=${oversizedWrapper?.status || 'network'}`);
+
   r = await (await fetch(`${API}/save/link`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cid }),

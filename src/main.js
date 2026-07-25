@@ -63,6 +63,8 @@ import {
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
 } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
+import { CommunityUI } from './ui/communityui.js';
+import { parseCommunityLink, makeRunId } from './net/community.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
@@ -109,6 +111,11 @@ import {
 } from './ui/endscreens.js';
 import { buildTestApi } from './testapi.js';
 import { CUSTOM_COUNTRY, CustomMapMode, sanitizeCustomMap } from './custommap.js';
+import {
+  deriveCustomMapTier,
+  sanitizeCommunitySnapshot,
+  validateCustomMap,
+} from '../worker/community-schema.mjs';
 
 // 🌍 статичний HTML перекладається ОДРАЗУ — до того, як гравець щось побачить
 translateHtml(document.body);
@@ -137,7 +144,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 610;
+const APP_VERSION = 700;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -286,6 +293,7 @@ class Game {
     this.draft = new Draft(this);
     this.globe = new Globe(this);
     this.coop = new CoopUI(this);
+    this.community = new CommunityUI(this);
     this.league = new LeagueUI(this);
     this.saveui = new SaveUI(this);
     this.frontui = new FrontUI(this);
@@ -409,6 +417,26 @@ class Game {
       this.endLevel();
       this.startLevel(nid);
     });
+    document.getElementById('btn-community-result-retry').addEventListener('click', () => {
+      const context = this.level?.customMapContext;
+      if (!context || this.level.net) return;
+      const opts = context.snapshot
+        ? { customMap: 'community', communityMap: context.snapshot }
+        : {
+          customMap: context.kind === 'verify' ? 'verify' : 'play',
+          customMapData: context.data,
+          customMapSlot: context.slot,
+          mapSize: context.mapSize,
+          mapStyle: context.mapStyle,
+        };
+      this._hideOverlay('overlay-community-result');
+      this.endLevel();
+      this.startLevel('CUSTOM', opts);
+    });
+    document.getElementById('btn-community-result-globe').addEventListener('click', () => {
+      this._hideOverlay('overlay-community-result');
+      this.endLevel();
+    });
     document.getElementById('btn-death-revenge').addEventListener('click', () => {
       if (!this.level || this.level.net || this.deathT < 0) return;
       const cid = this.level.countryId;
@@ -470,7 +498,7 @@ class Game {
     document.getElementById('btn-map-editor').addEventListener('click', () => {
       if (!(this.save.upgrades.mapeditor > 0)) {
         this.audio.denied();
-        this.hud.toast(t('🔒 Зайди в країну → відкрий магазин {k} → Режими → Створювач карт', { k: keyHint('🛒', 'B') }), 6);
+        this.hud.toast(t('🔒 Спершу звільни першу країну — Створювач карт відкриється автоматично.'), 6);
         return;
       }
       this.audio.click();
@@ -817,7 +845,6 @@ class Game {
         out = Object.assign(defaults, s);
         out.customMap = sanitizeCustomMap(out.customMap);
         out.customMap2 = sanitizeCustomMap(out.customMap2);
-        out.customMapSlot = out.upgrades.mapeditorplus > 0 && out.customMapSlot === 1 ? 1 : 0;
         // F26: глибокий merge дефолтів для вкладених об'єктів (stats/hero/chapter…).
         // Поверхневий Object.assign замінює весь вкладений об'єкт цілком — тож якщо
         // старий сейв має stats БЕЗ нового під-поля, воно лишилось би undefined → NaN.
@@ -1001,7 +1028,10 @@ class Game {
         if (!out.liberated || typeof out.liberated !== 'object') out.liberated = {};
         for (const id of Object.keys(out.liberated)) if (!out.liberated[id]) delete out.liberated[id];
         if (!out.records || typeof out.records !== 'object') out.records = {};
-        if (!out.upgrades || typeof out.upgrades !== 'object') out.upgrades = {};
+        if (!out.upgrades || typeof out.upgrades !== 'object' || Array.isArray(out.upgrades)) out.upgrades = {};
+        if (liberatedCount(out.liberated) > 0) out.upgrades.mapeditor = 1;
+        out.customMapSlot = out.upgrades.mapeditorplus > 0 && out.customMapSlot === 1 ? 1 : 0;
+        if (out.goal === 'mapeditor') out.goal = null;
         if (typeof out.coins !== 'number' || !isFinite(out.coins)) out.coins = 0;
         if (typeof out.crystals !== 'number' || !isFinite(out.crystals)) out.crystals = 0;
         if (!out.hints || typeof out.hints !== 'object') out.hints = {}; // 🎓 старий сейв без hints
@@ -1318,6 +1348,15 @@ class Game {
       this._lastRaf = performance.now();
       this._frame(false);
     });
+    // 🔗 boot-маршрут: coopjoin > community > country. Кооп-лінк веде в кімнату
+    // (його підхоплює CoopUI), точний лінк спільноти — у чужу карту, і лише потім
+    // автозапуск країни з ?country=.
+    const joiningRoom = this.params.has('coophost') || !!this.params.get('coopjoin');
+    const communityLink = joiningRoom ? null : parseCommunityLink(this.params);
+    if (communityLink) {
+      this.community.playMap(communityLink.mapId, communityLink.revision);
+      return;
+    }
     const c = this.params.get('country');
     if (c && COUNTRIES[c]) this.startLevel(c);
   }
@@ -3473,10 +3512,32 @@ class Game {
     const spaceWorld = countryId === 'MOON' ? getSpaceWorld(opts.spaceWorld) : null;
     const moonRegion = countryId === 'MOON' ? getMoonRegion(opts.moonRegion, spaceWorld.id) : null;
     const isCustomEditor = opts.customMap === 'edit';
-    const isCustomPlay = opts.customMap === 'play';
+    const isCustomVerify = opts.customMap === 'verify';
+    const isCommunityMap = opts.customMap === 'community';
+    const isCustomPlay = opts.customMap === 'play' || isCustomVerify || isCommunityMap;
     const isCustom = isCustomEditor || isCustomPlay;
-    const customMapSlot = this.save.upgrades.mapeditorplus > 0 && opts.customMapSlot === 1 ? 1 : 0;
-    const customMapData = opts.customMapData || (customMapSlot ? this.save.customMap2 : this.save.customMap);
+    const communitySnapshot = isCommunityMap ? sanitizeCommunitySnapshot(opts.communityMap) : null;
+    if (isCommunityMap && !communitySnapshot) throw new Error('invalid community map');
+    const customMapSlot = !isCommunityMap && this.save.upgrades.mapeditorplus > 0 && opts.customMapSlot === 1 ? 1 : 0;
+    const mapSize = communitySnapshot
+      ? communitySnapshot.mapSize
+      : sanitizeMapSize(opts.mapSize || (opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
+    const mapStyle = communitySnapshot
+      ? communitySnapshot.mapStyle
+      : sanitizeMapStyle(opts.mapStyle || (opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
+    const localCustomMap = customMapSlot ? this.save.customMap2 : this.save.customMap;
+    const rawCustomMap = opts.customMapData || localCustomMap;
+    let customMapData = null;
+    if (communitySnapshot) {
+      customMapData = communitySnapshot.data;
+    } else if (isCustomVerify) {
+      const checked = validateCustomMap(rawCustomMap, { profile: 'publication', mapSize });
+      if (!checked.ok) throw new Error(`invalid verification map: ${checked.code}`);
+      customMapData = { biome: checked.value.biome, objects: checked.value.objects };
+    } else if (isCustom) {
+      customMapData = sanitizeCustomMap(rawCustomMap);
+    }
+    const customMapTier = communitySnapshot ? communitySnapshot.tier : deriveCustomMapTier(customMapData);
     const rawCountry = isCustom ? CUSTOM_COUNTRY : (COUNTRIES[countryId] || COUNTRIES.UKR);
     const baseCountry = moonRegion ? {
       ...rawCountry,
@@ -3486,8 +3547,6 @@ class Game {
       banner: t(spaceWorld.banner),
       boss: { ...rawCountry.boss, name: t(spaceWorld.bossName) },
     } : rawCountry;
-    const mapSize = sanitizeMapSize((opts.coop && opts.coop.spec && opts.coop.spec.ms) || this.save.mapSize);
-    const mapStyle = sanitizeMapStyle((opts.coop && opts.coop.spec && opts.coop.spec.mt) || this.save.mapStyle);
     const country = { ...baseCountry, map: { ...scaleMap(baseCountry.map, mapSize), mapStyle } };
     const coopFront = opts.operation && opts.coop && opts.coop.role === 'guest'
       ? opts.coop.session.frontRun : null;
@@ -3536,7 +3595,7 @@ class Game {
     const baseRules = MODE_RULES[modeId] || MODE_RULES.campaign;
     const isPlayground = !!opts.playground;
     const coop = opts.coop || null;
-    const soloWeeklyModId = (!coop && !isPlayground) ? this.weeklyModifierId() : null;
+    const soloWeeklyModId = (!coop && !isPlayground && !isCustom) ? this.weeklyModifierId() : null;
     // 🗓️ мутатор тижня: соло-реплеї кампанії ВЖЕ звільнених країн (перші проходження —
     // без сюрпризів); у коопі — лише зі spec хоста (opts.mut), а НЕ з локального
     // календаря гостя (границя тижня опівночі не розсинхронить команду)
@@ -3551,7 +3610,9 @@ class Game {
     const mutatorSrcId = coop ? (opts.mut || null) : soloWeeklyModId;
     const weeklyMutator = this._buildWeeklyMutator(mutatorSrcId, { coop, isPlayground });
     const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
-    document.body.classList.toggle('no-shop-mode', !!modeRules.noShop);
+    const noProgress = isCustom;
+    const noShop = noProgress || !!modeRules.noShop;
+    document.body.classList.toggle('no-shop-mode', noShop);
     const isGuest = !!(coop && coop.role === 'guest');
     const isArena = !!opts.arena;
     // екран завантаження рівня з порадою
@@ -3594,7 +3655,7 @@ class Game {
           : `${country.flag} ${country.name.toUpperCase()}`;
     const tips = buildTips();
     // у noShop-режимах не радимо магазин, якого нема
-    const tipPool = modeRules.noShop ? tips.filter((s) => !/🛒|магазин|shop/i.test(s)) : tips;
+    const tipPool = noShop ? tips.filter((s) => !/🛒|магазин|shop/i.test(s)) : tips;
     document.getElementById('ll-tip').textContent = '💡 ' + tipPool[Math.floor(Math.random() * tipPool.length)];
     this._showOverlay('overlay-level-loading');
     this._showGlobeUI(false);
@@ -3658,15 +3719,31 @@ class Game {
       operation,
       frontCountryState: frontCountryState(savedFront, countryId),
       encounterPlan: operation ? (opts.encounterPlan || null) : null,
+      noProgress,
       noGadgets: isCustomEditor || !!modeRules.noGadgets,
       modeShield: pvpVariant === 'overloaded' ? { hp: 1000, cd: 45 } : null,
-      noShop: isCustomEditor || !!modeRules.noShop,
+      noShop,
       noBuffs: !!modeRules.noBuffs,
       noPickups: !!modeRules.noPickups,
       noZombiePickups: !!modeRules.noZombiePickups,
-      noCoinDrops: !!modeRules.noCoinDrops,
+      noCoinDrops: noProgress || !!modeRules.noCoinDrops,
       customEditor: isCustomEditor,
       customPlay: isCustomPlay,
+      customVerify: isCustomVerify,
+      communityMap: isCommunityMap,
+      customMapContext: isCustom ? {
+        kind: opts.customMap,
+        slot: customMapSlot,
+        tier: customMapTier,
+        mapSize,
+        mapStyle,
+        data: customMapData,
+        snapshot: communitySnapshot,
+        // спільний ідентифікатор забігу: у коопі його дає хост через spec.rid
+        runId: isCommunityMap
+          ? (opts.communityRunId || (coop && coop.spec && coop.spec.rid) || makeRunId())
+          : null,
+      } : null,
     };
     // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
     // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
@@ -3684,7 +3761,7 @@ class Game {
     level._startXp = this.save.xp || 0;
     // ⭐ R3 зірки/милосердя (solo-only, лише країни кампанії) виставляються нижче після вибору місій
     level.addCoins = (n) => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       this.save.coins += n;
       level.stats.coinsEarned += n;
       this._bumpSecondary(level, 'coins', n); // ⭐2 «Збери N монет за забіг»
@@ -3801,7 +3878,11 @@ class Game {
 
     level.zombies = new Zombies(level, this.seed + 2);
     if (isCustom) {
-      level.customMap = new CustomMapMode(level, customMapData, isCustomEditor, customMapSlot);
+      level.customMap = new CustomMapMode(level, customMapData, {
+        editor: isCustomEditor,
+        slot: customMapSlot,
+        tier: customMapTier,
+      });
       level.missions = level.customMap;
       document.body.classList.toggle('map-editor-mode', isCustomEditor);
     } else if (isKnockout) {
@@ -3928,7 +4009,7 @@ class Game {
     level.effects.tracerStyle = this.save.activeTracer === 'classic' ? null : this.save.activeTracer;
 
     // 🎲 лут у будинках перемішується ЩОЗАБІГУ — ніколи не знаєш, що знайдеш
-    if (!isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isGuest && !isPlayground) {
+    if (!isCustom && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isGuest && !isPlayground) {
       const LOOT_POOL = [
         'coins', 'coins', 'coins', 'medkit', 'ammo', 'ammo', 'grenade',
         'armor', 'food', 'speed', 'rage', 'bubble', 'magnet',
@@ -3940,7 +4021,7 @@ class Game {
       }
     }
     // лут і зомбі-сюрпризи всередині будинків (вічний лут — не зникає)
-    for (const ls of ((isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isPlayground) ? [] : level.world.lootSpots)) {
+    for (const ls of ((isCustom || isGuest || isArena || isKnockout || isDefense || isPvp || isBank || isPortal || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isPlayground) ? [] : level.world.lootSpots)) {
       if (ls.type === 'coins') {
         for (let i = 0; i < 5; i++) {
           level.effects.spawnCoin(ls.x + (Math.random() - 0.5) * 0.8, ls.z + (Math.random() - 0.5) * 0.8, 10, 9999, ls.y);
@@ -3993,7 +4074,7 @@ class Game {
         this.hud.toast(t('У цьому режимі пікапи вимкнені'));
         return;
       }
-      if (!level.playground && type !== 'coin') this.quests.onEvent('pickup');
+      if (!level.playground && !level.noProgress && type !== 'coin') this.quests.onEvent('pickup');
       if (type === 'spacesuit') {
         level.player.equipSpacesuit();
         this.audio.powerup();
@@ -4138,9 +4219,9 @@ class Game {
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('playerRevived', () => this._onPlayerRevivedFx());
-    level.bus.on('bossDied', () => this._onBossDied());
+    level.bus.on('bossDied', (boss) => this._onBossDied(boss));
     level.bus.on('hordeEnd', () => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       level.addCoins(60);
       this.progress.addXp(XP_VALUES.horde);
       this.quests.onEvent('horde');
@@ -4149,7 +4230,7 @@ class Game {
     // 🤝 v296: у коопі кожен гравець нараховує собі локально неблокуючим банером
     // (без fullscreen-церемонії — рішення v294). Хост шле `ewc` решті і кредитує себе.
     level.bus.on('eliteWaveCleared', (pos) => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       if (level.net) {
         // v300 (PROTO 14): seq — щоб повторно доставлена пачка не кредитувала двічі
         if (level.net.authority) {
@@ -4176,7 +4257,7 @@ class Game {
     // 🤝 v296: у коопі кожен гравець нараховує собі локально (ті самі числа) банером.
     // Хост шле `gch` решті і кредитує себе.
     level.bus.on('goldenChest', (pos) => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       if (level.net) {
         if (level.net.authority) {
           level._chestEvSeq = (level._chestEvSeq || 0) + 1;
@@ -4197,7 +4278,7 @@ class Game {
     level.bus.on('friendRescued', (cid) => this._onFriendRescued(cid));
     // 🏕️ тижневий квест «Врятуй N людей»: хлів рятунку = 3 людини (medic/granny/kid).
     // Гачок кіл-кредитований господарем (у гостя _complete не бігає) — рахуємо локально.
-    level.bus.on('missionDone', (m) => { if (m && m.type === 'rescue') this._bumpCamp('rescue', 3); });
+    level.bus.on('missionDone', (m) => { if (!level.noProgress && m && m.type === 'rescue') this._bumpCamp('rescue', 3); });
     // ⭐ зірковий досвід і щоденні завдання
     level.bus.on('zombieKilled', (z) => {
       if (level.playground) return;
@@ -4210,6 +4291,7 @@ class Game {
         lp.maxHealth += lp.lifeSteal;
         lp.health += lp.lifeSteal;
       }
+      if (level.noProgress) return;
       this.save.stats.killed++;
       // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
       // лічильник елітів рахує окремий уникредитований гачок нижче (еліт, убитий будь-ким).
@@ -4243,11 +4325,11 @@ class Game {
     // НЕЗАЛЕЖНО від кіл-кредиту — еліт, убитий будь-ким (у т.ч. гостем), помирає у хостовій
     // симуляції. Кредитований гачок вище лишається СОЛО-only, тож подвійного тіку нема.
     level.bus.on('zombieKilled', (z) => {
-      if (!level.net || !level.net.authority) return; // соло/гість тут не рахують
+      if (level.noProgress || !level.net || !level.net.authority) return; // соло/гість тут не рахують
       if (z.elite) this._bumpSecondary(level, 'elite');
     });
     level.bus.on('zombieDamaged', (n, z) => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       if (level.net && level.net.authority && (z.lastHitBy || 1) !== 1) return;
       this.save.stats.damageDealt += Math.round(n);
       this.quests.onEvent('damage', { n: Math.round(n), weapon: level.player.cur });
@@ -4256,7 +4338,7 @@ class Game {
       }
     });
     level.bus.on('missionDone', () => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       this.progress.addXp(XP_VALUES.mission);
       if (!level.infected && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.radiation && !level.worldBoss) this.chapter.onEvent('mission');
       // 🎲 кампанія: місію здано → драфт «Прокачки» (лише соло; Шторм відкриває свій після хвилі).
@@ -4280,7 +4362,7 @@ class Game {
       this.hud.toast(t('Суперсила скінчилась'));
     });
     level.bus.on('gadgetUsed', (id) => {
-      if (!level.playground) {
+      if (!level.playground && !level.noProgress) {
         this.save.stats.gadgetUses++;
         if (id === 'clone') this.save.stats.cloneUses++;
         this.quests.onEvent('gadget');
@@ -4292,16 +4374,16 @@ class Game {
       ch.progress = Math.min(ch.target, ch.progress + 1);
       ch.done = ch.progress >= ch.target;
     });
-    level.bus.on('hitmarker', (crit) => { if (!level.playground && crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; this._bumpSecondary(level, 'headshot'); } }); // ⭐2 «Зроби N хедшотів»
-    level.bus.on('shieldBroken', () => { if (!level.playground) this.quests.onEvent('shield'); });
+    level.bus.on('hitmarker', (crit) => { if (!level.playground && !level.noProgress && crit) { this.quests.onEvent('headshot'); this.save.stats.headshots++; this._bumpSecondary(level, 'headshot'); } }); // ⭐2 «Зроби N хедшотів»
+    level.bus.on('shieldBroken', () => { if (!level.playground && !level.noProgress) this.quests.onEvent('shield'); });
     level.bus.on('megaboxOpened', () => {
-      if (level.playground) return;
+      if (level.playground || level.noProgress) return;
       this.progress.addXp(XP_VALUES.megabox);
       this.quests.onEvent('megabox');
       this.save.stats.megaboxes++;
       this._bumpSecondary(level, 'megabox'); // ⭐2 «Відкрий мегабокс»
     });
-    level.bus.on('dance', () => { if (!level.playground) this.quests.onEvent('dance'); });
+    level.bus.on('dance', () => { if (!level.playground && !level.noProgress) this.quests.onEvent('dance'); });
     // комбо за серії вбивств
     level.bus.on('zombieKilled', (z) => {
       if (level.playground || level.knockout || level.defense || level.pvp || level.bank || level.portal || level.maze || level.humans || level.soulCollector || level.radiation || level.worldBoss) return;
@@ -4309,7 +4391,7 @@ class Game {
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
       const momentum = advanceMomentum(c);
-      if (c.best > this.save.stats.bestCombo) this.save.stats.bestCombo = c.best;
+      if (!level.noProgress && c.best > this.save.stats.bestCombo) this.save.stats.bestCombo = c.best;
       if (c.n >= 3) this.hud.comboPop(c.n);
       if (momentum.tierUp) {
         const titles = [null, '🔥 РОЗІГРІВ!', '⚔️ НАТИСК!', '☄️ НЕСТРИМНИЙ!'];
@@ -4433,8 +4515,11 @@ class Game {
     if (level.expedition && level.expedition.current && level.expedition.current.type === 'elite' && (!level.net || level.net.authority)) {
       level.zombies.spawnEliteWave(4);
     }
-    if (this.chapter && !level.infected && !level.playground && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
+    if (this.chapter && !level.infected && !level.playground && !level.noProgress && !level.knockout && !level.defense && !level.pvp && !level.bank && !level.portal && !level.maze && !level.humans && !level.soulCollector && !level.turretwar && !level.radiation && !level.worldBoss) this.chapter.onEvent('enterLevel');
     this.state = 'level';
+    // 🏘️ забіг чужою картою реєструється, коли рівень уже стоїть: соло, хост і гість
+    // шлють власний run/start із тим самим runId, тож кожен отримує своє зарахування
+    if (isCommunityMap) this.community.onRunStarted(level);
     this.hud.update(0);
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
     this.victoryShown = false;
@@ -4485,6 +4570,10 @@ class Game {
   // 🤝 гість: перемога (подія від хоста)
   netVictory() {
     if (!this.level || this.victoryShown) return;
+    if (this.level.customMap) {
+      this._endCommunityMap(true);
+      return;
+    }
     if (this.level.operation && this.level.net && !this.level.net.authority) {
       // `vict` already passed GuestNet's trusted-host boundary. A guest's local
       // Director clock (and non-serialized commander flag) must not veto it.
@@ -4557,6 +4646,9 @@ class Game {
     this._frontNextAction = null;
     if (this.hud) this.hud.clearBanners(); // 🪧 черга банерів не переживає зміну стану гри
     if (this.draft) this.draft.close(); // кооп: оверлей драфту міг лишитись відкритим
+    // 🧪 доказ перевірки живе рівно стільки, скільки перевірочний рівень:
+    // смерть, вихід і перезавантаження стирають його разом із забігом
+    if (this.community) this.community.clearPending();
     // 🤝 кооп: рівень завершено — всі назад у лобі (кімната жива)
     if (this.level && this.level.net && this.coop) {
       const sess = this.coop.session;
@@ -4630,7 +4722,7 @@ class Game {
     if (this.touch && this.touch.resetPointers) this.touch.resetPointers();
     else if (this.input && this.input.resetTransient) this.input.resetTransient();
     // прибираємо всі оверлеї рівня
-    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end', 'overlay-front-result']) {
+    for (const id of ['overlay-death', 'overlay-pause', 'overlay-victory', 'overlay-community-result', 'overlay-start', 'overlay-storm-end', 'overlay-arena-end', 'overlay-front-result']) {
       this._hideOverlay(id);
     }
     if (this.shop.isOpen) this.shop.close();
@@ -4646,11 +4738,46 @@ class Game {
     }
   }
 
+  _endCommunityMap(won) {
+    const level = this.level;
+    if (!level?.customMap || level._communityEnded) return;
+    level._communityEnded = true;
+    this.victoryShown = true;
+    this.deathT = -1;
+    this._hideOverlay('overlay-death');
+    this._hideOverlay('overlay-start');
+    this._hideOverlay('overlay-pause');
+    this.input.exitLock();
+    if (won) this.audio.victory();
+    else this.audio.defeat();
+    this.audio.setMode(null);
+
+    document.getElementById('community-result-title').textContent = won
+      ? t('🏆 КАРТУ ПРОЙДЕНО!')
+      : t('💀 КАРТУ НЕ ПРОЙДЕНО');
+    document.getElementById('community-result-sub').textContent = won
+      ? t('Усі твої завдання виконано.')
+      : t('Спробуй ще раз — карта чекатиме.');
+    const seconds = Math.max(0, Math.floor(level.stats.time || 0));
+    const tasksDone = level.customMap.tasks.filter((task) => task.done).length;
+    document.getElementById('community-result-stats').innerHTML = `
+      <div class="stat"><span class="stat-icon">⏱️</span><span class="stat-name">${t('Час')}</span><span class="stat-val">${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}</span></div>
+      <div class="stat"><span class="stat-icon">🧟</span><span class="stat-name">${t('Зомбі переможено')}</span><span class="stat-val">${level.stats.kills}</span></div>
+      <div class="stat"><span class="stat-icon">⭐</span><span class="stat-name">${t('Завдання')}</span><span class="stat-val">${tasksDone}/${level.customMap.tasks.length}</span></div>`;
+    document.getElementById('btn-community-result-retry').style.display = level.net ? 'none' : '';
+    this.community.onResult(level, won);
+    this._showOverlay('overlay-community-result');
+  }
+
   _onPlayerDied() {
     // ⭐3 (v298 «Зірки разом»): stats.deaths — це ОСОБИСТІ падіння цього клієнта за забіг.
     // У коопі кожен рахує СВОЇ (хост — свій player, гість — свій), і ⭐3 отримує лише той,
     // у кого 0 падінь. Тебе піднімає друг — це і є «милосердя» коопу (mercy нижче — соло-only).
     this.level.stats.deaths++;
+    if (this.level.customMap && !this.level.customMap.editor && !this.level.net) {
+      this._endCommunityMap(false);
+      return;
+    }
     // 🕊️ R3 невидиме милосердя: смерті ПОСПІЛЬ на одній країні кампанії (solo). БЕЗ жодного UI.
     // Наступний забіг цієї країни при n≥2 дістане тихі послаблення (див. створення рівня).
     // secondaryObjective виставляється для соло- І кооп-забігу кампанії, тож гейт milości —
@@ -4960,6 +5087,7 @@ class Game {
   // 🗓️ ціль тижня «300 зомбі → 💎 25». Forward-only reset нового тижня; переведені
   // назад години морозять лічильник. Викликається з zombieKilled одразу після stats.killed++.
   _bumpWeeklyGoal() {
+    if (this.level?.noProgress) return;
     const w = this._weekIndex();
     let wg = this.save.weeklyGoal;
     if (!wg || typeof wg !== 'object') wg = this.save.weeklyGoal = { week: -1, n: 0, claimed: false };
@@ -4981,6 +5109,7 @@ class Game {
   // інкремента save.bestiary в zombieKilled; лічба дешева (Object.keys), а видача — одноразова
   // через прапорці save.bestiaryGoals.
   _checkBestiaryGoals() {
+    if (this.level?.noProgress) return;
     const bg = this.save.bestiaryGoals || (this.save.bestiaryGoals = { b10: false, b20: false, all: false });
     if (bg.b10 && bg.b20 && bg.all) return; // усе видано — не рахувати види на кожному кілі
     let granted = false;
@@ -5084,7 +5213,7 @@ class Game {
   // одноразова недільна нагорода за командну перемогу; кожен клієнт нараховує
   // собі ЛОКАЛЬНО (патерн нагород кооп-Шторму), ключ тижня w — зі spec хоста
   _grantWeeklyCoop(level, won) {
-    if (!won || !level || !level.weekly || level.weekly.w == null) return;
+    if (!won || !level || level.noProgress || !level.weekly || level.weekly.w == null) return;
     const wk = 'W' + level.weekly.w + ':coop';
     if (this.save.weekly[wk]) return;
     this.save.weekly[wk] = true;
@@ -5098,7 +5227,7 @@ class Game {
   // командний бонус монет ЗАВЖДИ, а щоденний кристал — раз на день (coopBonusDay = dayKey).
   _grantCoopWin() {
     const level = this.level;
-    if (!level || !level.net) return;             // тільки кооп-перемоги
+    if (!level || level.noProgress || !level.net) return; // тільки кооп-перемоги з прогресією
     const roster = this.coop && this.coop.session && this.coop.session.roster;
     if (!roster || roster.size <= 1) return;      // грали разом (не сам-один у кімнаті)
     this.save.coopWins = (this.save.coopWins || 0) + 1;
@@ -5858,7 +5987,8 @@ class Game {
     this._showOverlay('overlay-arena-end');
   }
 
-  _onBossDied() {
+  _onBossDied(boss) {
+    if (this.level?.customMap?.onBossDied(boss)) return;
     if (this.level && this.level.bossRush) {
       this.level.bossRush.onBossDied();
       return;

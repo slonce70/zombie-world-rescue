@@ -10,13 +10,20 @@ await page.evaluate(() => { window.__game.save.coins = 15000; window.__game.shop
 await page.locator('.shop-tab[data-cat="Режими"]').click();
 await page.locator('.shop-item[data-id="mapeditorplus"]').click();
 const locked = await page.evaluate(() => ({ coins: window.__game.save.coins, plus: window.__game.save.upgrades.mapeditorplus || 0 }));
-await page.evaluate(() => { window.__game.save.coins = 25000; window.__game.shop.render(); });
-await page.locator('.shop-item[data-id="mapeditor"]').click();
-await page.evaluate(() => { window.__game.shop.activeTab = 'Режими'; window.__game.shop.render(); });
+await page.evaluate(() => {
+  const g = window.__game;
+  g.shop.close();
+  g._showVictory();
+  g.save.coins = 15000;
+  g._hideOverlay('overlay-victory');
+  g.shop.open();
+});
+await page.waitForFunction(() => window.__game.save.upgrades.mapeditor === 1);
+await page.locator('.shop-tab[data-cat="Режими"]').click();
 await page.locator('.shop-item[data-id="mapeditorplus"]').click();
 const bought = await page.evaluate(() => ({ coins: window.__game.save.coins, base: window.__game.save.upgrades.mapeditor || 0, plus: window.__game.save.upgrades.mapeditorplus || 0 }));
 check(locked.coins === 15000 && locked.plus === 0 && bought.coins === 0 && bought.base === 1 && bought.plus === 1,
-  'Plus коштує 15 000 і відкривається лише після базового редактора', JSON.stringify({ locked, bought }));
+  'Plus коштує 15 000 і відкривається після безкоштовного базового редактора за першу країну', JSON.stringify({ locked, bought }));
 
 await page.evaluate(() => {
   const g = window.__game;
@@ -75,13 +82,20 @@ const finale = await page.evaluate(() => {
   for (let i = 0; i < 20; i++) g.level.zombies.update(0.1);
   const after = Math.hypot(mode.boss.x - g.level.player.pos.x, mode.boss.z - g.level.player.pos.z);
   const boss = { started: mode.bossStarted, hp: mode.boss?.hp, maxHp: mode.boss?.maxHp, aggroed: mode.boss?.aggroed, noLeash: mode.boss?.noLeash, before, after, mapDoneBeforeKill: mode.done };
-  mode.boss.state = 'dead'; mode.update(0.1, g.input, true);
-  return { taskDone: task.done, tools: task.tools.map((tool) => tool.done), boss, mapDone: mode.done };
+  mode.boss.damage(99999, null, false);
+  return {
+    taskDone: task.done,
+    tools: task.tools.map((tool) => tool.done),
+    boss,
+    mapDone: mode.done,
+    communityResult: document.getElementById('overlay-community-result').classList.contains('show'),
+    campaignResult: document.getElementById('overlay-victory').classList.contains('show'),
+  };
 });
 check(finale.taskDone && finale.tools.every(Boolean) && finale.boss.started && finale.boss.hp === 5500
   && finale.boss.maxHp === 5500 && finale.boss.aggroed && finale.boss.noLeash && finale.boss.after < finale.boss.before
-  && !finale.boss.mapDoneBeforeKill && finale.mapDone,
-  'інструменти й відбудова запускають фінального боса рівно з 5500 HP', JSON.stringify(finale));
+  && !finale.boss.mapDoneBeforeKill && finale.mapDone && finale.communityResult && !finale.campaignResult,
+  'справжня смерть боса відкриває custom-result без campaign victory', JSON.stringify(finale));
 
 await page.evaluate(() => { window.__game.endLevel(); window.confirm = () => true; });
 await page.waitForFunction(() => window.__game?.state === 'globe');

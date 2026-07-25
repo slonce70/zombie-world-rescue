@@ -8,6 +8,8 @@ import { cleanNickSrv, cleanCountrySrv } from './nick.mjs';
 import { cleanProfileSrv, safeInt } from './profile.mjs';
 import { routeBatch } from './route.mjs';
 import { sanitizeFrontMetric } from './frontmetrics.mjs';
+import { COMMUNITY_BODY_BYTES, COMMUNITY_PUBLISH_BODY_BYTES, Community } from './community.mjs';
+export { Community };
 
 const MAX_PLAYERS = 4;
 const MAX_WS_BYTES = 65536;   // ліміт одного ws-повідомлення (звичайна пачка — сотні байт)
@@ -15,6 +17,14 @@ const MAX_BATCH_ITEMS = 128;  // ліміт елементів у пачці
 const MAX_BODY_BYTES = 4096;  // ліміт тіла POST для Ліги/Лобі
 const RATE_WINDOW_MS = 10_000;
 const RATE_MAX_MSGS = 400;    // ~40 повідомлень/с — у 4 рази більше за чесний максимум
+const utf8Bytes = (value) => new TextEncoder().encode(value).byteLength;
+const utf8Decoder = new TextDecoder();
+async function readJsonBody(request, limit) {
+  const bytes = await request.arrayBuffer();
+  return bytes.byteLength > limit
+    ? { tooBig: true }
+    : { tooBig: false, value: JSON.parse(utf8Decoder.decode(bytes)) };
+}
 
 // CORS: гра живе на github.io, Ліга — тут
 const CORS = {
@@ -27,6 +37,7 @@ const SAVE_CORS = {
   'Access-Control-Allow-Origin': 'https://slonce70.github.io',
 };
 const FRONT_METRICS_CORS = SAVE_CORS;
+const COMMUNITY_CORS = SAVE_CORS;
 
 export default {
   async fetch(request, env) {
@@ -50,6 +61,22 @@ export default {
       if (request.method === 'OPTIONS') return new Response(null, { headers: SAVE_CORS });
       const id = env.SAVE.idFromName('save');
       return env.SAVE.get(id).fetch(request);
+    }
+    // 🗺️ Каталог пользовательских карт: один глобальный SQLite DO.
+    if (url.pathname.startsWith('/community/')) {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== COMMUNITY_CORS['Access-Control-Allow-Origin']) {
+        return new Response('forbidden origin', { status: 403 });
+      }
+      if (request.method === 'OPTIONS') return new Response(null, { headers: COMMUNITY_CORS });
+      const limit = url.pathname === '/community/publish' ? COMMUNITY_PUBLISH_BODY_BYTES : COMMUNITY_BODY_BYTES;
+      if ((parseInt(request.headers.get('content-length'), 10) || 0) > limit) {
+        return new Response('{"error":"big"}', {
+          status: 413, headers: { 'Content-Type': 'application/json', ...COMMUNITY_CORS },
+        });
+      }
+      const id = env.COMMUNITY.idFromName('community');
+      return env.COMMUNITY.get(id).fetch(request);
     }
     // 🛰️ Opt-in Front metrics: only aggregate counters, no cid/nick/free text/time/location.
     if (url.pathname.startsWith('/front-metrics/')) {
@@ -299,7 +326,7 @@ const LOBBY_TTL = 40_000;
 // повний перелік режимів, які хост реально анонсує (MODE_ICON у src/ui/coopui.js);
 // невідомий режим коерситься в 'campaign' — радіація більше не прикидається кампанією
 const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
-  'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
+  'front', 'community-map', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 
 export class Lobby {
   constructor(state) {
@@ -469,7 +496,7 @@ export class Lobby {
           if (code && (!existing || existing.cid === cid)) {
             this.rooms.set(code, {
               cid, host: cleanNickSrv(d.nick), mode,
-              country: cleanCountrySrv(d.room.country), // видно всьому лобі — латиниця + фільтр лайки
+              country: mode === 'community-map' ? 'CUSTOM' : cleanCountrySrv(d.room.country),
               n: Math.min(4, Math.max(1, d.room.n | 0)),
               state: d.room.state === 'game' ? 'game' : 'lobby',
               build: d.room.build | 0, ts: now,
@@ -492,8 +519,8 @@ export class Lobby {
 // cid є ПОСТІЙНИЙ код відновлення (8 знаків): запиши його раз — і повернеш
 // прогрес на будь-якому пристрої навіть після чищення браузера.
 // ============================================================
-const SAVE_MAX_BYTES = 24 * 1024;   // сейв ~2-3 КБ, стеля з запасом
-const SAVE_BODY_BYTES = 32 * 1024;
+const SAVE_MAX_BYTES = 64 * 1024;
+const SAVE_BODY_BYTES = 96 * 1024;
 const SAVE_PUT_COOLDOWN = 15_000;
 const CLAIM_MAX_PER_MIN = 10;       // анти-перебір кодів з однієї IP
 const LINK_ALPHABET = 'ABCDEFHJKLMNPRSTUVWXYZ23456789'; // без схожих O/0, I/1, G/6, Q
@@ -560,10 +587,12 @@ export class SaveVault {
       if (url.pathname === '/save/put' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'x';
         if (!this._putAllowed(ip)) return this.json({ error: 'rate' }, 429);
-        const d = await request.json();
+        const body = await readJsonBody(request, SAVE_BODY_BYTES);
+        if (body.tooBig) return this.json({ error: 'big' }, 413);
+        const d = body.value;
         const cid = this._cid(d.cid);
         const data = typeof d.data === 'string' ? d.data : '';
-        if (!cid || !data || data.length > SAVE_MAX_BYTES) return this.json({ error: 'bad' }, 400);
+        if (!cid || !data || utf8Bytes(data) > SAVE_MAX_BYTES) return this.json({ error: 'bad' }, 400);
         JSON.parse(data); // не-JSON не приймаємо (кине → catch → 400)
         const last = this._lastPut.get(cid) || 0;
         if (now - last < SAVE_PUT_COOLDOWN) return this.json({ error: 'slow' }, 429);
@@ -586,7 +615,9 @@ export class SaveVault {
       }
       // постійний код відновлення: {cid} → {code} (один на гравця, не згорає)
       if (url.pathname === '/save/link' && request.method === 'POST') {
-        const d = await request.json();
+        const body = await readJsonBody(request, SAVE_BODY_BYTES);
+        if (body.tooBig) return this.json({ error: 'big' }, 413);
+        const d = body.value;
         const cid = this._cid(d.cid);
         if (!cid) return this.json({ error: 'bad' }, 400);
         const has = this.sql.exec('SELECT cid FROM saves WHERE cid = ?', cid).toArray();
@@ -608,7 +639,9 @@ export class SaveVault {
       if (url.pathname === '/save/claim' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'x';
         if (!this._claimAllowed(ip)) return this.json({ error: 'slow' }, 429);
-        const d = await request.json();
+        const body = await readJsonBody(request, SAVE_BODY_BYTES);
+        if (body.tooBig) return this.json({ error: 'big' }, 413);
+        const d = body.value;
         const code = String(d.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
         if (code.length !== 8) return this.json({ error: 'bad' }, 400);
         const rows = this.sql.exec('SELECT cid FROM links WHERE code = ?', code).toArray();

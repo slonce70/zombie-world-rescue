@@ -113,5 +113,43 @@ check(runtime.mode === 'small' && Math.abs(runtime.bound - 133.3333333) < 0.001,
 check(runtime.castleEdge < runtime.bound,
 'замок повністю залишається всередині маленької карти', JSON.stringify(runtime));
 
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  g.save.upgrades.mapeditor = 1;
+  g.save.mapSize = 'small';
+  await g.startLevel('CUSTOM', { customMap: 'edit' });
+});
+await page.waitForFunction(() => window.__game?.level?.customMap?.editor && window.__game.level.mapSize === 'small');
+const smallEditor = await page.evaluate(() => {
+  const g = window.__game;
+  const mode = g.level.customMap;
+  return {
+    spawnZ: g.level.player.pos.z,
+    oldSpawnAllowed: mode.place('tree', { x: 0, z: 55 }),
+    scaledSpawnRejected: mode.place('rock', { x: 0, z: 55 * 500 / 750 }),
+  };
+});
+check(Math.abs(smallEditor.spawnZ - 55 * 500 / 750) < 0.001
+  && smallEditor.oldSpawnAllowed && !smallEditor.scaledSpawnRejected,
+'редактор маленької карти масштабує spawn і placement clearance', JSON.stringify(smallEditor));
+
+await page.evaluate(async () => {
+  const g = window.__game;
+  g.endLevel();
+  g.save.mapSize = 'huge';
+  await g.startLevel('CUSTOM', { customMap: 'edit' });
+});
+await page.waitForFunction(() => window.__game?.level?.customMap?.editor && window.__game.level.mapSize === 'huge');
+const hugeEditor = await page.evaluate(() => {
+  const g = window.__game;
+  const mode = g.level.customMap;
+  const placed = mode.place('tree', { x: 220, z: 0 });
+  mode.save();
+  return { placed, spawnZ: g.level.player.pos.z, savedX: g.save.customMap.objects[0]?.x };
+});
+check(hugeEditor.placed && Math.abs(hugeEditor.spawnZ - 55 * 1250 / 750) < 0.001 && hugeEditor.savedX === 220,
+'редактор великої карти дозволяє й зберігає координати далі старої межі 170', JSON.stringify(hugeEditor));
+
 await closeTest();
 process.exit(failed ? 1 : 0);

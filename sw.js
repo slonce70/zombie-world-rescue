@@ -1,7 +1,7 @@
 // Service Worker: гра встановлюється на телефон і працює ОФЛАЙН.
 // Стратегія: network-first з кеш-фолбеком — онлайн завжди свіже
 // (авто-оновлення через version.json не ламається), офлайн — з кеша.
-const CACHE = 'zr-cache-v610';
+const CACHE = 'zr-cache-v700';
 
 const SHELL = [
   './',
@@ -96,7 +96,10 @@ const SHELL = [
   './src/net/cloudsave.js',
   './src/net/frontsync.js',
   './src/net/frontmetrics.js',
+  './src/net/community.js',
   './src/ui/coopui.js',
+  './src/ui/communityui.js',
+  './src/ui/share.js',
   './src/ui/leagueui.js',
   './src/ui/saveui.js',
   './src/ui/hq.js',
@@ -109,6 +112,7 @@ const SHELL = [
   './src/i18n/en.js',
   './src/i18n/ru.js',
   './worker/nick.mjs',
+  './worker/community-schema.mjs',
   // 🎙️ озвучка Лесі трьома мовами (Gemini TTS): assets/voice/<мова>/<id>.m4a
   // явні літерали — test/sw-cache.mjs звіряє кожен шлях з диском
   './assets/voice/uk/wave.m4a',

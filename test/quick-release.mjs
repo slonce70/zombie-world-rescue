@@ -6,6 +6,10 @@ const BETWEEN_TESTS_MS = Number(process.env.QUICK_RELEASE_BETWEEN_TESTS_MS || 20
 const suite = [
   ['node', ['test/version-sync.mjs']],
   ['node', ['test/sw-cache.mjs']],
+  ['node', ['test/community-schema.mjs']],
+  ['node', ['test/community-api.mjs']],
+  ['node', ['test/custom-no-progress.mjs']],
+  ['node', ['test/community-browser.mjs']],
   ['node', ['test/save-migration.mjs']],
   ['node', ['--test', 'test/specialists.mjs']],
   ['node', ['test/fighter-progression-browser.mjs']],

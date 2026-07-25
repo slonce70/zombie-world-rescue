@@ -491,7 +491,9 @@ body.banner-active #toasts { bottom: 12%; }
 }
 .victory-sub { font-size: 18px; }
 .victory-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; }
-#victory-stats { display: flex; flex-direction: column; gap: 7px; margin: 26px auto 8px; max-width: 380px; }
+#victory-stats, #community-result-stats { display: flex; flex-direction: column; gap: 7px; margin: 26px auto 8px; max-width: 380px; }
+.community-result-card .btn { min-height: 44px; min-width: 44px; }
+.community-result-card .btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .stat {
   display: flex; align-items: center; background: rgba(0,0,0,.3);
   border-radius: 12px; padding: 9px 18px; font-weight: 800; font-size: 17px;
@@ -2023,3 +2025,35 @@ body.touch-mode #touch-coach.show { display: block; }
 .chest-item .ci-val { font-size: clamp(22px, 4vw, 34px); font-weight: 900; color: #fff; }
 .chest-skip { margin-top: 12px; color: #9fb6cf; font-weight: 700; font-size: 13px; opacity: .8; }
 .chest-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+/* 🏘️ v700 Операції спільноти: каталог карт і дії результату */
+.community-card { max-width: 620px; }
+.community-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+.community-tab {
+  min-height: 44px; padding: 8px 16px; border-radius: 12px; border: 2px solid var(--ui-border);
+  background: rgba(255,255,255,0.06); color: #cfe0f5; font-weight: 800; font-size: 14px;
+  cursor: pointer; font-family: var(--font);
+}
+.community-tab:hover { border-color: var(--accent); }
+.community-tab.on { background: rgba(255, 210, 63, 0.16); border-color: var(--accent); color: var(--accent); }
+.community-tab:focus-visible, .community-item .btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.community-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; text-align: left; }
+.community-item {
+  padding: 12px 14px; border: 1px solid rgba(120, 170, 220, .28); border-radius: 14px;
+  background: rgba(12, 24, 40, .55);
+}
+.community-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.community-item-title { color: #edf6ff; font-size: 15px; font-weight: 900; }
+.community-item-tier { color: var(--accent); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.community-item-meta { margin-top: 4px; color: #9fb8d4; font-size: 13px; font-weight: 700; }
+.community-item-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.community-item-actions .btn { min-height: 44px; }
+.community-result-extra { margin: 14px auto 4px; max-width: 460px; }
+.community-reactions, .community-reports { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.community-reactions .btn[aria-pressed="true"] {
+  background: rgba(255, 210, 63, .18); border-color: var(--accent); color: var(--accent);
+}
+@media (max-width: 700px) {
+  .community-item-title { font-size: 14px; }
+  .community-item-meta { font-size: 12px; }
+}

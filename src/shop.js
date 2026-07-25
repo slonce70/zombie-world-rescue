@@ -14,7 +14,6 @@ export const SHOP_ITEMS = [
   { id: 'coins1000', icon: '💰', name: t('1000 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 21, coinBundle: 1000, max: Infinity, cat: t('Ресурси') },
   { id: 'coins5100', icon: '💰', name: t('5100 монет'), desc: t('Обмін кристалів на монети'), price: 0, crystalPrice: 100, coinBundle: 5100, max: Infinity, cat: t('Ресурси') },
   { id: 'passxp1000', icon: '⭐', name: t('1000 XP'), desc: t('Досвід для Зоряного шляху'), price: 0, crystalPrice: 100, passXp: 1000, max: Infinity, cat: t('Ресурси') },
-  { id: 'mapeditor', icon: '🧱', name: t('Створювач карт'), desc: t('Політ, будинки, дерева, озера, каміння, зомбі й власні завдання'), price: 10000, max: 1, cat: t('Режими') },
   { id: 'mapeditorplus', icon: '🏗️', name: t('Створювач карт+'), desc: t('+1 карта, сніг або літо, різні зомбі, +20 обʼєктів, аірдропи, церква, відбудова міста й бос 5500 HP'), price: 15000, max: 1, cat: t('Режими'), needsUpgrade: 'mapeditor' },
   // 🌟 повторюваний стік монет: віддай монети рятівникам → отримай престиж-зірку. Ціна росте геометрично (×1.5)
   //    до стелі 25000: без стелі 25-та пожертва коштувала б ~34 млн монет і титул «Легенда фонду» був би недосяжним.
@@ -253,7 +252,7 @@ export class Shop {
       const desc = locked ? t('Спершу знайди базуку в аеродропі! 🪂')
         : lockedGadget ? t('Спершу купи базовий гаджет')
         : lockedSkin ? t('Спершу купи скін Радіаційний')
-        : lockedUpgrade ? t('Спершу купи звичайний Створювач карт')
+        : lockedUpgrade ? t('Спершу звільни першу країну')
         : lockedChain ? t('Спершу купи попередню акцію')
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
@@ -378,9 +377,6 @@ export class Shop {
         player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1);
         break;
       case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
-      case 'mapeditor':
-        game.hud.toast(t('🧱 Створювач карт відкрито! Повернися на глобус → Меню.'));
-        break;
       case 'mapeditorplus':
         game.hud.toast(t('🏗️ Створювач карт+ відкрито: друга карта, нові обʼєкти, біоми й бос!'));
         break;

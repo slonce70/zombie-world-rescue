@@ -146,7 +146,7 @@ export class HUD {
     if (!save || !save.hints) return;
     if (save.hints[key]) return;
     if (this._hintPending.has(key)) return;
-    if (this.game.level && this.game.level.playground) return;
+    if (this.game.level && (this.game.level.playground || this.game.level.noProgress)) return;
     this._hintPending.add(key);
     this.banner(title, sub, 4.5, {
       onShow: () => {

@@ -358,6 +358,8 @@ export function buildTestApi(game) {
     coopSetMode: (mo) => g.coop.session.setMode(mo),
     coopSetRole: (r) => g.coop.session.setMyRole(r),
     coopStartLevel: () => g.coop.session.startLevel(),
+    // 🏘️ кооп на карті спільноти: хост тягне точний знімок і веде кімнату в нього
+    coopStartCommunity: (mapId, revision) => g.community.playMap(mapId, revision, { coop: true }),
     coopState: () => {
       const s = g.coop.session;
       const net = g.level && g.level.net;

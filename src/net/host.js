@@ -326,6 +326,9 @@ export class HostNet {
     const near = (x, z, r) => Math.hypot(rp.pos.x - x, rp.pos.z - z) < r;
     const ms = level.missions;
     switch (d.kind) {
+      // 🏘️ карта спільноти: єдиний вид взаємодії гостя. Хост сам звіряє індекси,
+      // фазу, одноразовість і відстань — координатам гостя тут не вірять.
+      case 'cmap': if (ms.useCmap) ms.useCmap(from, near, d); break;
       case 'barn': if (ms.useBarn) ms.useBarn(from, near); break;
       case 'crate': if (ms.useCrate) ms.useCrate(from, near); break;
       case 'supply': if (ms.useSupply) ms.useSupply(from, d.i, near); break;

@@ -3,25 +3,36 @@ import { t, interactKey } from './i18n.js';
 import { clamp } from './utils.js';
 import { toonMat } from './renderkit.js';
 import { makeCivilian, makeGunMesh } from './characters.js';
+import { mapSizeScale } from './mapsize.js';
+import {
+  CUSTOM_MAP_TYPES,
+  CUSTOM_MAP_QUESTS,
+  CUSTOM_MAP_ZOMBIES,
+  CUSTOM_MAP_RADII,
+  CUSTOM_MAP_TYPE_LIMITS,
+  CUSTOM_MAP_LIMITS,
+  sanitizeCustomMap,
+  validateCustomPlacement,
+  deriveCustomMapTier,
+} from '../worker/community-schema.mjs';
 
-export const CUSTOM_MAP_TYPES = Object.freeze(['house', 'tree', 'lake', 'zombie', 'rock', 'task', 'airdrop', 'church', 'largehouse']);
+export { CUSTOM_MAP_TYPES, sanitizeCustomMap };
+
 const TYPE_SET = new Set(CUSTOM_MAP_TYPES);
-const BASE_MAX_OBJECTS = 120;
-const PLUS_MAX_OBJECTS = 140;
+const BASE_MAX_OBJECTS = CUSTOM_MAP_LIMITS.baseObjects;
+const PLUS_MAX_OBJECTS = CUSTOM_MAP_LIMITS.plusObjects;
 const TYPE_INFO = Object.freeze({
-  house: { icon: '🏠', name: 'Дім', radius: 4.5 },
-  tree: { icon: '🌲', name: 'Дерево', radius: 0.8 },
-  lake: { icon: '💧', name: 'Озеро', radius: 6.5 },
-  zombie: { icon: '🧟', name: 'Зомбі', radius: 1 },
-  rock: { icon: '🪨', name: 'Камінь', radius: 1.5 },
-  task: { icon: '⭐', name: 'Завдання', radius: 8 },
-  airdrop: { icon: '🪂', name: 'Аірдроп', radius: 2.5, plus: true, max: 2 },
-  church: { icon: '⛪', name: 'Церква', radius: 7, plus: true, max: 1 },
-  largehouse: { icon: '🏘️', name: 'Велика хата', radius: 8, max: 5 },
+  house: { icon: '🏠', name: 'Дім', radius: CUSTOM_MAP_RADII.house },
+  tree: { icon: '🌲', name: 'Дерево', radius: CUSTOM_MAP_RADII.tree },
+  lake: { icon: '💧', name: 'Озеро', radius: CUSTOM_MAP_RADII.lake },
+  zombie: { icon: '🧟', name: 'Зомбі', radius: CUSTOM_MAP_RADII.zombie },
+  rock: { icon: '🪨', name: 'Камінь', radius: CUSTOM_MAP_RADII.rock },
+  task: { icon: '⭐', name: 'Завдання', radius: CUSTOM_MAP_RADII.task },
+  airdrop: { icon: '🪂', name: 'Аірдроп', radius: CUSTOM_MAP_RADII.airdrop, plus: true, max: CUSTOM_MAP_TYPE_LIMITS.airdrop },
+  church: { icon: '⛪', name: 'Церква', radius: CUSTOM_MAP_RADII.church, plus: true, max: CUSTOM_MAP_TYPE_LIMITS.church },
+  largehouse: { icon: '🏘️', name: 'Велика хата', radius: CUSTOM_MAP_RADII.largehouse, max: CUSTOM_MAP_TYPE_LIMITS.largehouse },
 });
-const SPAWN_CLEAR_RADIUS = 10;
-const MAX_TASKS = 3;
-const QUEST_TYPES = Object.freeze(['rescue', 'collect', 'repair', 'lights', 'elites', 'warehouse', 'rebuild']);
+const QUEST_TYPES = CUSTOM_MAP_QUESTS;
 const QUEST_INFO = Object.freeze({
   rescue: { icon: '🆘', title: 'Врятуй людей у хліві', total: 1 },
   collect: { icon: '📦', title: 'Збери 4 ящики припасів', total: 4 },
@@ -32,7 +43,8 @@ const QUEST_INFO = Object.freeze({
   rebuild: { icon: '🏗️', title: 'Знайди сокиру й кірку та віднови центр міста', total: 3, plus: true },
 });
 const QUEST_SET = new Set(QUEST_TYPES);
-const ZOMBIE_TYPES = Object.freeze(['walker', 'runner', 'tank', 'spitter', 'shield', 'moonbrute']);
+export { QUEST_INFO as CUSTOM_QUEST_INFO }; // назви карт спільноти будуються з тих самих enum
+const ZOMBIE_TYPES = CUSTOM_MAP_ZOMBIES;
 const ZOMBIE_NAMES = Object.freeze({
   walker: 'Звичайний зомбі', runner: 'Зомбі-бігун', tank: 'Зомбі-танк',
   spitter: 'Зомбі-плювака', shield: 'Зомбі-щитоносець', moonbrute: 'Місячний громила',
@@ -56,35 +68,18 @@ export const CUSTOM_COUNTRY = Object.freeze({
   },
 });
 
-export function sanitizeCustomMap(raw) {
-  const objects = Array.isArray(raw && raw.objects) ? raw.objects : [];
-  let taskCount = 0;
-  return {
-    biome: raw && raw.biome === 'snow' ? 'snow' : 'summer',
-    objects: objects.slice(0, PLUS_MAX_OBJECTS).flatMap((item) => {
-      if (!item || !TYPE_SET.has(item.type)) return [];
-      if (item.type === 'task' && taskCount >= MAX_TASKS) return [];
-      const x = Number(item.x), z = Number(item.z), ry = Number(item.ry) || 0;
-      if (!Number.isFinite(x) || !Number.isFinite(z)) return [];
-      const clean = { type: item.type, x: clamp(x, -170, 170), z: clamp(z, -170, 170), ry: clamp(ry, -Math.PI, Math.PI) };
-      if (item.type === 'task') {
-        clean.quest = QUEST_SET.has(item.quest) ? item.quest : QUEST_TYPES[taskCount % QUEST_TYPES.length];
-        taskCount++;
-      }
-      if (item.type === 'zombie') clean.zombieType = ZOMBIE_SET.has(item.zombieType) ? item.zombieType : 'walker';
-      return [clean];
-    }),
-  };
-}
-
 export class CustomMapMode {
-  constructor(level, raw, editor = false, slot = 0) {
+  constructor(level, raw, { editor = false, slot = 0, tier = null } = {}) {
     this.level = level;
     this.editor = editor;
     this.slot = slot === 1 ? 1 : 0;
-    this.plus = level.game.save.upgrades.mapeditorplus > 0;
-    this.maxObjects = this.plus ? PLUS_MAX_OBJECTS : BASE_MAX_OBJECTS;
+    this.editorPlus = level.game.save.upgrades.mapeditorplus > 0;
     this.data = sanitizeCustomMap(raw);
+    this.tier = tier === 'plus' || tier === 'base' ? tier : deriveCustomMapTier(this.data);
+    this.plus = this.editor ? this.editorPlus : this.tier === 'plus';
+    this.authority = !level.mirror;
+    this.mirror = !this.authority;
+    this.maxObjects = this.editorPlus ? PLUS_MAX_OBJECTS : BASE_MAX_OBJECTS;
     this.prompt = null;
     this.tasks = [];
     this.civilians = [];
@@ -93,7 +88,7 @@ export class CustomMapMode {
     this.done = false;
     this.flyY = 0;
     this.selected = null;
-    this.questTypes = this.plus ? QUEST_TYPES : QUEST_TYPES.filter((quest) => !QUEST_INFO[quest].plus);
+    this.questTypes = this.editorPlus ? QUEST_TYPES : QUEST_TYPES.filter((quest) => !QUEST_INFO[quest].plus);
     this.questIndex = this.data.objects.filter((item) => item.type === 'task').length % this.questTypes.length;
     this.zombieIndex = 0;
     this.bossStarted = false;
@@ -101,8 +96,8 @@ export class CustomMapMode {
     this.spawned = Object.fromEntries(CUSTOM_MAP_TYPES.map((type) => [type, 0]));
     for (const item of this.data.objects) this._spawn(item);
     level.world._buildGrid();
-    if (editor) {
-      level.player.pos.set(0, 14, 55);
+    if (this.editor) {
+      level.player.pos.set(0, 14, CUSTOM_MAP_LIMITS.spawnZ * mapSizeScale(level.mapSize));
       level.player.camera.position.copy(level.player.pos);
       this.preview = new THREE.Mesh(
         new THREE.RingGeometry(1.05, 1.35, 24),
@@ -143,9 +138,11 @@ export class CustomMapMode {
       object.position.set(item.x, y + 0.9, item.z); scene.add(object);
       world._addCollider(item.x, item.z, 1.3, y + 1.8, 1.1);
     } else if (item.type === 'zombie') {
-      const zombieType = this.plus && ZOMBIE_SET.has(item.zombieType) ? item.zombieType : 'walker';
-      object = level.zombies.spawn(zombieType, item.x, item.z, { horde: false });
-      object.customPlaced = true;
+      if (this.editor || this.authority) {
+        const zombieType = this.plus && ZOMBIE_SET.has(item.zombieType) ? item.zombieType : 'walker';
+        object = level.zombies.spawn(zombieType, item.x, item.z, { horde: false });
+        object.customPlaced = true;
+      }
     } else if (item.type === 'task') {
       object = this._spawnTask(item, y);
       this.tasks.push(object);
@@ -229,18 +226,18 @@ export class CustomMapMode {
           return { x, z, mesh, lamp, done: false };
         });
       } else if (quest === 'elites') {
-        task.enemies = [0, 1, 2].map((i) => {
+        task.enemies = this.authority ? [0, 1, 2].map((i) => {
           const a = i * Math.PI * 2 / 3;
           const zombie = level.zombies.spawn(i === 1 ? 'tank' : 'walker', item.x + Math.cos(a) * 9, item.z + Math.sin(a) * 9, { elite: true, horde: false });
           zombie.hp = zombie.maxHp = Math.round(zombie.maxHp * 2.2); zombie.customTask = true; return zombie;
-        });
+        }) : [];
       } else if (quest === 'warehouse') {
         task.prop = level.world._makeHouse(item.x, item.z, item.ry, { w: 12, d: 9, h: 4.2 });
-        task.enemies = Array.from({ length: 8 }, (_, i) => {
+        task.enemies = this.authority ? Array.from({ length: 8 }, (_, i) => {
           const a = i * Math.PI / 4;
           const zombie = level.zombies.spawn(i % 4 === 0 ? 'runner' : 'walker', item.x + Math.cos(a) * 10, item.z + Math.sin(a) * 10, { horde: false });
           zombie.customTask = true; return zombie;
-        });
+        }) : [];
       } else if (quest === 'rebuild') {
         task.tools = ['axe', 'pickaxe'].map((kind, i) => {
           const mesh = makeGunMesh(kind).group;
@@ -260,9 +257,9 @@ export class CustomMapMode {
 
   select(type) {
     if (!this.editor || !TYPE_SET.has(type)) return false;
-    if (TYPE_INFO[type].plus && !this.plus) return false;
+    if (TYPE_INFO[type].plus && !this.editorPlus) return false;
     if (type === 'task' && this.selected === 'task') this.questIndex = (this.questIndex + 1) % this.questTypes.length;
-    if (type === 'zombie' && this.selected === 'zombie' && this.plus) this.zombieIndex = (this.zombieIndex + 1) % ZOMBIE_TYPES.length;
+    if (type === 'zombie' && this.selected === 'zombie' && this.editorPlus) this.zombieIndex = (this.zombieIndex + 1) % ZOMBIE_TYPES.length;
     this.selected = type;
     this._renderTools();
     this._syncPreview();
@@ -275,22 +272,30 @@ export class CustomMapMode {
     return { x: player.pos.x - Math.sin(player.yaw) * 18, z: player.pos.z - Math.cos(player.yaw) * 18 };
   }
 
-  _placementError(type, x, z) {
-    if (TYPE_INFO[type].plus && !this.plus) return t('Потрібен Створювач карт+');
-    const radius = TYPE_INFO[type].radius;
-    if (Math.abs(x) > 170 - radius || Math.abs(z) > 170 - radius) return t('Тут край карти');
-    if (type === 'task' && this.data.objects.filter((item) => item.type === 'task').length >= MAX_TASKS) return t('На карті може бути максимум 3 завдання');
-    const typeMax = TYPE_INFO[type].max;
-    if (typeMax && this.data.objects.filter((item) => item.type === type).length >= typeMax) {
-      return t(type === 'airdrop' ? 'На карті може бути максимум 2 аірдропи'
-        : type === 'church' ? 'На карті може бути максимум 1 церква' : 'На карті може бути максимум 5 великих хат');
+  _candidate(type, x, z) {
+    const yaw = this.level.player.yaw;
+    const item = { type, x, z, ry: Math.atan2(Math.sin(yaw), Math.cos(yaw)) };
+    if (type === 'task') item.quest = this.questTypes[this.questIndex];
+    if (type === 'zombie') item.zombieType = this.editorPlus ? ZOMBIE_TYPES[this.zombieIndex] : 'walker';
+    return item;
+  }
+
+  _placementError(candidate) {
+    const result = validateCustomPlacement(this.data, candidate, {
+      plus: this.editorPlus,
+      mapSize: this.level.mapSize,
+    });
+    if (result.ok) return '';
+    if (result.code === 'plus_required') return t('Потрібен Створювач карт+');
+    if (result.code === 'object_limit') return t('Ліміт карти: {n} обʼєктів', { n: this.maxObjects });
+    if (result.code === 'task_limit') return t('На карті може бути максимум 3 завдання');
+    if (result.code === 'type_limit') {
+      return t(candidate.type === 'airdrop' ? 'На карті може бути максимум 2 аірдропи'
+        : candidate.type === 'church' ? 'На карті може бути максимум 1 церква' : 'На карті може бути максимум 5 великих хат');
     }
-    const spawn = CUSTOM_COUNTRY.map.spawn;
-    if (Math.hypot(x - spawn.x, z - spawn.z) < SPAWN_CLEAR_RADIUS + radius) return t('Залиш місце для появи гравця');
-    for (const item of this.data.objects) {
-      if (Math.hypot(x - item.x, z - item.z) < radius + TYPE_INFO[item.type].radius + 0.5) return t('Тут уже стоїть інший обʼєкт');
-    }
-    return '';
+    if (result.code === 'spawn') return t('Залиш місце для появи гравця');
+    if (result.code === 'overlap') return t('Тут уже стоїть інший обʼєкт');
+    return t('Тут край карти');
   }
 
   _syncPreview() {
@@ -302,7 +307,7 @@ export class CustomMapMode {
     const radius = TYPE_INFO[this.selected].radius;
     this.preview.position.set(point.x, y + 0.08, point.z);
     this.preview.scale.setScalar(Math.max(0.8, radius / 1.35));
-    this.preview.material.color.setHex(this._placementError(this.selected, point.x, point.z) ? 0xff5d5d : 0x5ad465);
+    this.preview.material.color.setHex(this._placementError(this._candidate(this.selected, point.x, point.z)) ? 0xff5d5d : 0x5ad465);
   }
 
   placeSelected() {
@@ -314,21 +319,15 @@ export class CustomMapMode {
   }
 
   place(type, point = null) {
-    if (!this.editor || !TYPE_SET.has(type) || this.data.objects.length >= this.maxObjects) {
-      if (this.data.objects.length >= this.maxObjects) this.level.game.hud.toast(t('Ліміт карти: {n} обʼєктів', { n: this.maxObjects }));
-      return false;
-    }
-    const player = this.level.player;
+    if (!this.editor || !TYPE_SET.has(type)) return false;
     const target = point || this._targetPoint();
-    const error = this._placementError(type, target.x, target.z);
+    const item = this._candidate(type, target.x, target.z);
+    const error = this._placementError(item);
     if (error) {
       this.level.game.audio.denied();
       this.level.game.hud.toast(error);
       return false;
     }
-    const item = { type, x: target.x, z: target.z, ry: player.yaw };
-    if (type === 'task') item.quest = this.questTypes[this.questIndex];
-    if (type === 'zombie') item.zombieType = this.plus ? ZOMBIE_TYPES[this.zombieIndex] : 'walker';
     this.data.objects.push(item);
     this._spawn(item);
     this.level.world._buildGrid();
@@ -374,6 +373,7 @@ export class CustomMapMode {
       if (event.target.closest('#map-editor-place')) this.placeSelected();
       if (event.target.closest('#map-editor-undo')) this.undo();
       if (event.target.closest('#map-editor-save')) this.save();
+      if (event.target.closest('#map-editor-publish')) this.level.game.community.startVerify(this.level);
       if (event.target.closest('#map-editor-exit')) this.exit();
       if (type || event.target.closest('#map-editor-place')) this.level.game.input.request();
     };
@@ -385,7 +385,7 @@ export class CustomMapMode {
     for (const [i, type] of CUSTOM_MAP_TYPES.entries()) {
       const button = el.querySelector(`[data-map-object="${type}"]`);
       if (button) {
-        button.hidden = !!TYPE_INFO[type].plus && !this.plus;
+        button.hidden = !!TYPE_INFO[type].plus && !this.editorPlus;
         button.textContent = `${i + 1} ${TYPE_INFO[type].icon} ${t(TYPE_INFO[type].name)}`;
       }
     }
@@ -403,7 +403,7 @@ export class CustomMapMode {
     const selected = document.getElementById('map-editor-selected');
     if (selected) selected.textContent = this.selected === 'task'
       ? `${QUEST_INFO[this.questTypes[this.questIndex]].icon} ${t(QUEST_INFO[this.questTypes[this.questIndex]].title)}`
-      : (this.selected === 'zombie' && this.plus
+      : (this.selected === 'zombie' && this.editorPlus
         ? `🧟 ${t(ZOMBIE_NAMES[ZOMBIE_TYPES[this.zombieIndex]])}`
         : (this.selected ? `${TYPE_INFO[this.selected].icon} ${t(TYPE_INFO[this.selected].name)}` : t('нічого')));
     const undo = document.getElementById('map-editor-undo');
@@ -411,7 +411,7 @@ export class CustomMapMode {
     for (const button of document.querySelectorAll('[data-map-object]')) {
       button.classList.toggle('on', button.dataset.mapObject === this.selected);
       if (button.dataset.mapObject === 'task') button.textContent = `6 ${QUEST_INFO[this.questTypes[this.questIndex]].icon} ${t(QUEST_INFO[this.questTypes[this.questIndex]].title)}`;
-      if (button.dataset.mapObject === 'zombie' && this.plus) button.textContent = `4 🧟 ${t(ZOMBIE_NAMES[ZOMBIE_TYPES[this.zombieIndex]])}`;
+      if (button.dataset.mapObject === 'zombie' && this.editorPlus) button.textContent = `4 🧟 ${t(ZOMBIE_NAMES[ZOMBIE_TYPES[this.zombieIndex]])}`;
     }
   }
 
@@ -427,8 +427,9 @@ export class CustomMapMode {
     const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
     const rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
     const y = clamp(player.pos.y + vertical * speed, 3, 80);
-    const x = clamp(player.pos.x + (fx * forward + rx * side) * speed, -175, 175);
-    const z = clamp(player.pos.z + (fz * forward + rz * side) * speed, -175, 175);
+    const flyBound = 175 * mapSizeScale(this.level.mapSize);
+    const x = clamp(player.pos.x + (fx * forward + rx * side) * speed, -flyBound, flyBound);
+    const z = clamp(player.pos.z + (fz * forward + rz * side) * speed, -flyBound, flyBound);
     const solved = this.level.world.collide(x, z, 0.45, y - 1.6);
     player.pos.set(solved.x, y, solved.z);
     player.camera.position.copy(player.pos);
@@ -456,6 +457,134 @@ export class CustomMapMode {
     this.level.game.hud.toast(t(message || '⭐ Завдання виконано!'));
   }
 
+  // 🤝 скільки віддалених гравців тримають E у радіусі точки (лише в авторитета)
+  _remoteHolders(x, z, radius) {
+    const players = this.level.players;
+    if (!players) return 0;
+    let holders = 0;
+    for (const player of players) {
+      if (player.pid === 1 || player.health <= 0 || !player.holdE) continue;
+      if (Math.hypot(player.pos.x - x, player.pos.z - z) < radius) holders++;
+    }
+    return holders;
+  }
+
+  // аірдроп custom-карти дає ЛИШЕ run-local патрони і лікування — жодних монет і прогресу
+  _openAirdrop(drop, { local = true } = {}) {
+    if (drop.opened) return false;
+    drop.opened = true;
+    drop.canopy.visible = false;
+    drop.crate.rotation.x = -0.3;
+    if (local) {
+      this.level.player.addAmmo(30);
+      this.level.player.heal(30);
+      this.level.audio.pickup();
+      this.level.game.hud.toast(t('🪂 Аірдроп: +30 патронів · +30 здоровʼя'));
+    }
+    return true;
+  }
+
+  // 🛡️ єдина точка входу для взаємодій гостя (HostNet._onUse → kind 'cmap').
+  // Хост перевіряє індекси, фазу, одноразовість і відстань сам — координати гостя
+  // тут не використовуються, лише його позиція в снапшоті через near().
+  useCmap(from, near, d) {
+    if (this.editor || !this.authority || this.done || !d) return;
+    const index = Number.isInteger(d.i) ? d.i : -1;
+    const sub = Number.isInteger(d.s) ? d.s : -1;
+    const level = this.level;
+    if (d.a === 'airdrop') {
+      const drop = this.airdrops[index];
+      // ефекти аірдропа лишаються в гостя (він застосував їх локально) —
+      // авторитет лише фіксує сам факт відкриття у спільному стані
+      if (drop && !drop.opened && near(drop.x, drop.z, 3.5)) this._openAirdrop(drop, { local: false });
+      return;
+    }
+    const task = this.tasks[index];
+    if (!task || task.done) return;
+    if (d.a === 'rescue' && task.quest === 'rescue') {
+      if (!near(task.action.x, task.action.z, 3.5)) return;
+      task.people.forEach((person) => { person.visible = true; });
+      this._finishTask(task, '🆘 Людей врятовано!');
+    } else if (d.a === 'collect' && task.quest === 'collect') {
+      const target = task.targets[sub];
+      if (!target || target.done || !near(target.x, target.z, 3.5)) return;
+      target.done = true; task.progress++; level.scene.remove(target.mesh);
+      if (task.progress >= QUEST_INFO.collect.total) this._finishTask(task, '📦 Усі 4 ящики зібрано!');
+    } else if (d.a === 'lights' && task.quest === 'lights') {
+      const target = task.targets[sub];
+      if (!target || target.done || !near(target.x, target.z, 3.5)) return;
+      target.done = true; task.progress++; target.lamp.material.color.setHex(0xffe066);
+      if (task.progress >= QUEST_INFO.lights.total) this._finishTask(task, '🔦 Усі 3 ліхтарі світять!');
+    } else if (d.a === 'tool' && task.quest === 'rebuild') {
+      const tool = task.tools[sub];
+      if (!tool || tool.done || !near(tool.x, tool.z, 3.5)) return;
+      tool.done = true; task.progress++; level.scene.remove(tool.mesh);
+    }
+  }
+
+  // --- гість: дзеркальний цикл — підказки, маяки, наміри до хоста ---
+  _updateMirror(dt, input, allowControl) {
+    const level = this.level;
+    const player = level.player;
+    const net = level.net;
+    if (net) net.holdE = false;
+    const near = (target, radius = 3.5) => target && Math.hypot(player.pos.x - target.x, player.pos.z - target.z) < radius;
+    let pressE = allowControl && input.pressed('KeyE');
+    const send = (a, extra = {}) => {
+      if (net) net.sendUse('cmap', { a, ...extra });
+      input.justPressed.delete('KeyE');
+      pressE = false;
+    };
+    for (const [index, task] of this.tasks.entries()) {
+      if (task.done) continue;
+      task.beam.update(dt);
+      if (task.quest === 'rescue' && near(task.action)) {
+        this.prompt = { text: t('Натисни {k} — врятувати людей', { k: interactKey() }), hold: false };
+        if (pressE) send('rescue', { i: index });
+      } else if (task.quest === 'collect') {
+        const sub = task.targets.findIndex((crate) => !crate.done && near(crate));
+        if (sub >= 0) {
+          this.prompt = { text: t('Натисни {k} — підібрати ящик', { k: interactKey() }), hold: false };
+          if (pressE) send('collect', { i: index, s: sub });
+        }
+      } else if (task.quest === 'repair' && near(task.action)) {
+        this.prompt = { text: t('Тримай {k} — полагодити радіовежу', { k: interactKey() }), hold: true, progress: task.progress };
+        if (net) net.holdE = true;
+      } else if (task.quest === 'lights') {
+        const sub = task.targets.findIndex((lamp) => !lamp.done && near(lamp));
+        if (sub >= 0) {
+          this.prompt = { text: t('Натисни {k} — засвітити ліхтар', { k: interactKey() }), hold: false };
+          if (pressE) send('lights', { i: index, s: sub });
+        }
+      } else if (task.quest === 'rebuild') {
+        const sub = task.tools.findIndex((candidate) => !candidate.done && near(candidate));
+        if (sub >= 0) {
+          const tool = task.tools[sub];
+          this.prompt = { text: t('Натисни {k} — взяти {item}', { k: interactKey(), item: tool.kind === 'axe' ? t('сокиру') : t('кірку') }), hold: false };
+          if (pressE) {
+            player.giveWeapon(tool.kind); // інструмент — особистий предмет гостя, не спільний стан
+            level.audio.pickup();
+            send('tool', { i: index, s: sub });
+          }
+        } else if (task.tools.every((candidate) => candidate.done) && near(task.action, 6)) {
+          this.prompt = { text: t('Тримай {k} — відновити центр міста', { k: interactKey() }), hold: true, progress: task.buildProgress };
+          if (net) net.holdE = true;
+        }
+      }
+    }
+    for (const [index, drop] of this.airdrops.entries()) {
+      if (drop.opened || !near(drop, 3.5)) continue;
+      this.prompt = { text: t('Натисни {k} — відкрити аірдроп', { k: interactKey() }), hold: false };
+      if (pressE) {
+        player.addAmmo(30);
+        player.heal(30);
+        level.audio.pickup();
+        level.game.hud.toast(t('🪂 Аірдроп: +30 патронів · +30 здоровʼя'));
+        send('airdrop', { i: index });
+      }
+    }
+  }
+
   _updateTask(task, dt, input, allowControl) {
     const { level } = this;
     const player = level.player;
@@ -477,10 +606,15 @@ export class CustomMapMode {
           input.justPressed.delete('KeyE');
         }
       }
-    } else if (task.quest === 'repair' && near(task.action)) {
-      this.prompt = { text: t('Тримай {k} — полагодити радіовежу', { k: interactKey() }), hold: true, progress: task.progress };
-      if (allowControl && input.down('KeyE')) {
-        task.progress = Math.min(1, task.progress + dt / 6);
+    } else if (task.quest === 'repair') {
+      // кооп: рахуємо всіх, хто тримає E біля вежі — разом швидше (патерн місій кампанії)
+      let holders = this._remoteHolders(task.action.x, task.action.z, 3.5);
+      if (near(task.action)) {
+        this.prompt = { text: t('Тримай {k} — полагодити радіовежу', { k: interactKey() }), hold: true, progress: task.progress };
+        if (allowControl && input.down('KeyE')) holders++;
+      }
+      if (holders > 0) {
+        task.progress = Math.min(1, task.progress + (dt * holders) / 6);
         if (task.progress >= 1) this._finishTask(task, '📡 Радіовежу полагоджено!');
       }
     } else if (task.quest === 'lights') {
@@ -505,10 +639,14 @@ export class CustomMapMode {
           player.giveWeapon(tool.kind);
           input.justPressed.delete('KeyE');
         }
-      } else if (task.tools.every((candidate) => candidate.done) && near(task.action, 6)) {
-        this.prompt = { text: t('Тримай {k} — відновити центр міста', { k: interactKey() }), hold: true, progress: task.buildProgress };
-        if (allowControl && input.down('KeyE')) {
-          task.buildProgress = Math.min(1, task.buildProgress + dt / 12);
+      } else if (task.tools.every((candidate) => candidate.done)) {
+        let holders = this._remoteHolders(task.action.x, task.action.z, 6);
+        if (near(task.action, 6)) {
+          this.prompt = { text: t('Тримай {k} — відновити центр міста', { k: interactKey() }), hold: true, progress: task.buildProgress };
+          if (allowControl && input.down('KeyE')) holders++;
+        }
+        if (holders > 0) {
+          task.buildProgress = Math.min(1, task.buildProgress + (dt * holders) / 12);
           if (task.buildProgress >= 1) {
             task.prop = level.world._makeHouse(task.x, task.z, task.ry, { w: 16, d: 11, h: 6.5 });
             this._finishTask(task, '🏛️ Центр міста відновлено!');
@@ -532,6 +670,10 @@ export class CustomMapMode {
       this._syncPreview();
       return;
     }
+    if (!this.authority) {
+      this._updateMirror(dt, input, allowControl);
+      return;
+    }
     for (const task of this.tasks) {
       if (task.done) continue;
       task.beam.update(dt);
@@ -541,8 +683,7 @@ export class CustomMapMode {
       if (drop.opened || Math.hypot(this.level.player.pos.x - drop.x, this.level.player.pos.z - drop.z) >= 3.5) continue;
       this.prompt = { text: t('Натисни {k} — відкрити аірдроп', { k: interactKey() }), hold: false };
       if (allowControl && input.pressed('KeyE')) {
-        drop.opened = true; drop.canopy.visible = false; drop.crate.rotation.x = -0.3; this.level.game.save.coins += 100;
-        this.level.game.saveGame(); this.level.audio.pickup(); this.level.game.hud.toast(t('🪂 Аірдроп: +100 монет'));
+        this._openAirdrop(drop);
         input.justPressed.delete('KeyE');
       }
     }
@@ -556,15 +697,90 @@ export class CustomMapMode {
         this.level.game.hud.banner(t('👑 ФІНАЛЬНИЙ БОС!'), t('Переможи володаря карти — 5500 HP'));
       } else this._completeMap();
     }
-    if (!this.done && this.bossStarted && (!this.boss || this.boss.state === 'dead' || this.boss.gone)) {
-      this._completeMap();
-    }
+  }
+
+  onBossDied(boss) {
+    if (this.editor || !this.authority || this.done || !this.bossStarted || boss !== this.boss) return false;
+    this.boss = null;
+    this._completeMap();
+    return true;
   }
 
   _completeMap() {
     if (this.done) return;
     this.done = true;
-    this.level.game.hud.banner(t('🏆 КАРТУ ПРОЙДЕНО!'), t('Усі твої завдання виконано.'));
+    this.level.game._endCommunityMap(true);
+  }
+
+  netState() {
+    const mask = (items) => items.reduce((bits, item, index) => bits | (item.done ? (1 << index) : 0), 0);
+    return {
+      d: this.done ? 1 : 0,
+      b: this.bossStarted ? 1 : 0,
+      a: mask(this.airdrops),
+      t: this.tasks.map((task) => ({
+        d: task.done ? 1 : 0,
+        p: Number.isFinite(task.progress) ? task.progress : 0,
+        g: Number.isFinite(task.buildProgress) ? task.buildProgress : 0,
+        x: mask(task.targets || []),
+        o: mask(task.tools || []),
+      })),
+    };
+  }
+
+  netFullState() {
+    return this.netState();
+  }
+
+  applyNet(state) {
+    if (!state || typeof state !== 'object' || !Array.isArray(state.t)) return;
+    for (let index = 0; index < this.tasks.length; index++) {
+      const task = this.tasks[index];
+      const next = state.t[index];
+      if (!next || typeof next !== 'object') continue;
+      const targetMask = Number.isInteger(next.x) && next.x >= 0 ? next.x : 0;
+      const toolMask = Number.isInteger(next.o) && next.o >= 0 ? next.o : 0;
+      for (let i = 0; i < task.targets.length; i++) {
+        const target = task.targets[i];
+        if (!(targetMask & (1 << i)) || target.done) continue;
+        target.done = true;
+        if (task.quest === 'lights' && target.lamp) target.lamp.material.color.setHex(0xffe066);
+        else if (target.mesh) this.level.scene.remove(target.mesh);
+      }
+      for (let i = 0; i < task.tools.length; i++) {
+        const tool = task.tools[i];
+        if (!(toolMask & (1 << i)) || tool.done) continue;
+        tool.done = true;
+        if (tool.mesh) this.level.scene.remove(tool.mesh);
+      }
+      if (Number.isFinite(next.p)) task.progress = Math.max(task.progress || 0, next.p);
+      if (Number.isFinite(next.g)) task.buildProgress = Math.max(task.buildProgress || 0, Math.min(1, next.g));
+      if (next.d && !task.done) {
+        task.done = true;
+        if (task.quest === 'rescue') task.people.forEach((person) => { person.visible = true; });
+        if (task.quest === 'rebuild' && !task.prop) {
+          task.prop = this.level.world._makeHouse(task.x, task.z, task.ry, { w: 16, d: 11, h: 6.5 });
+        }
+        task.beam.remove();
+      }
+    }
+    const airdropMask = Number.isInteger(state.a) && state.a >= 0 ? state.a : 0;
+    for (let i = 0; i < this.airdrops.length; i++) {
+      const drop = this.airdrops[i];
+      if (!(airdropMask & (1 << i)) || drop.opened) continue;
+      drop.opened = true;
+      drop.canopy.visible = false;
+      drop.crate.rotation.x = -0.3;
+    }
+    if (state.b) this.bossStarted = true;
+    if (state.d && !this.done) {
+      this.done = true;
+      this.level.game._endCommunityMap(true);
+    }
+  }
+
+  applyNetFull(state) {
+    this.applyNet(state);
   }
 
   getHudList() {

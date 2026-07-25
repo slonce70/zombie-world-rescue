@@ -17,6 +17,7 @@ import { frontCountryState, frontStageConfig } from '../worldfront.js';
 import { frontStageLabel } from './frontui.js';
 import { frontCountryCopy } from './frontcopy.js';
 import { specialistRank } from '../specialists.js';
+import { shareLink } from './share.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -203,24 +204,12 @@ export class CoopUI {
   async _shareInvite() {
     const code = this.session && this.session.room;
     if (!code) return; // нема кімнати → нічого не робимо
-    const url = this._inviteUrl(code);
-    const text = t('Гайда грати разом проти зомбі! 🧟 Тисни — і ти в моїй грі:');
     this.game.audio.click();
-    try {
-      if (navigator.share) { await navigator.share({ title: t('Операція: Порятунок Світу'), text, url }); return; }
-    } catch (e) {
-      // скасування користувачем — тихо виходимо; інші фейли share (WebView,
-      // NotAllowedError поза жестом) — падаємо на буфер обміну нижче
-      if (e && e.name === 'AbortError') return;
-    }
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(url);
-        this.game.hud.toast(t('🔗 Посилання скопійовано — надішли другу!'));
-        return;
-      }
-    } catch (e) { /* clipboard заблоковано — покажемо посилання */ }
-    this.game.hud.toast(t('🔗 Посилання: {u}', { u: url }));
+    // спільний фолбек share → clipboard → тост живе в ui/share.js
+    await shareLink(this.game, {
+      text: t('Гайда грати разом проти зомбі! 🧟 Тисни — і ти в моїй грі:'),
+      url: this._inviteUrl(code),
+    });
   }
 
   // ---------- публічність ----------
@@ -585,6 +574,16 @@ export class CoopUI {
     }
     this.el.frontSummary.hidden = !frontConfig;
 
+    // 🏘️ карта спільноти: кімната бачить лише ID і ревізію — ні карти, ні автора
+    const communityLine = document.getElementById('lobby-community');
+    if (communityLine) {
+      const cm = s.mode === 'community-map' ? s.communityMap : null;
+      communityLine.textContent = cm
+        ? t('🏘️ Карта спільноти #{id} · ревізія {r}', { id: cm.id, r: cm.revision })
+        : '';
+      communityLine.hidden = !cm;
+    }
+
     // 🎭 ряд вибору ролі (спільний для хоста і гостя): guard/medic/scout + «без ролі»
     this._renderRoles(s);
 
@@ -646,6 +645,7 @@ export class CoopUI {
     const hideCountries = s.mode === 'arena' || s.mode === 'friendly-knockout'
       || s.mode === 'friendly-defense' || s.mode === 'friendly-zone-defense'
       || s.mode === 'radiation' || s.mode === 'turretwar' || s.mode === 'worldboss' || s.mode === 'expedition'
+      || s.mode === 'community-map'
       || (s.mode === 'weekly-coop' && wkCoopMode !== 'storm');
     document.getElementById('lobby-country-section').hidden = hideCountries || s.mode === 'front';
     this.el.countries.style.display = hideCountries ? 'none' : '';

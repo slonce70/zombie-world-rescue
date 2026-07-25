@@ -64,6 +64,7 @@ async function loadWith(raw) {
   check(Array.isArray(save.bastionGadgetsOwned) && save.bastionGadgetsOwned.length === 0,
     'порожній {}: гаджети Бастіона ще не куплені');
   check(save.bastionHyperOwned === false, 'порожній {}: Hypercharge Бастіона ще не куплений');
+  check(!(save.upgrades.mapeditor > 0), 'порожній {}: редактор не відкритий до першої країни');
 }
 
 // 5. F26: глибокий merge вкладених об'єктів — старий сейв із НЕПОВНИМИ stats/hero/chapter.
@@ -137,6 +138,30 @@ async function loadWith(raw) {
   check(JSON.stringify(save.bastionGadgetsOwned) === JSON.stringify(['provoke']),
     'куплені гаджети Бастіона очищуються й дедупляться');
   check(save.bastionHyperOwned === false, 'битий прапорець Hypercharge повертається до false');
+}
+
+// 10. v700: ветеран с первой освобождённой страной получает базовый редактор бесплатно.
+{
+  const { save, errs } = await loadWith(JSON.stringify({
+    liberated: { UKR: true }, upgrades: {}, goal: 'mapeditor', coins: 777,
+  }));
+  check(errs.length === 0, `v700 editor unlock: без винятків (${errs[0] || 'ok'})`);
+  check(save.upgrades.mapeditor === 1, 'v700: редактор відкрито ветерану після першої країни');
+  check(save.goal === null && save.coins === 777, 'v700: застаріла ціль mapeditor очищена без списання монет');
+}
+
+// 11. Пошкоджений upgrades не має скидати профіль або ламати вибір slot.
+{
+  const broken = await loadWith(JSON.stringify({ coins: 654, liberated: {}, upgrades: null, customMapSlot: 1 }));
+  check(broken.errs.length === 0, `v700 upgrades:null: без винятків (${broken.errs[0] || 'ok'})`);
+  check(broken.save.coins === 654 && broken.save.customMapSlot === 0,
+    'v700: upgrades:null не скидає профіль, а недоступний slot повертається до 0');
+
+  const plus = await loadWith(JSON.stringify({
+    liberated: { UKR: true }, upgrades: { mapeditorplus: 1 }, customMapSlot: 1,
+  }));
+  check(plus.save.upgrades.mapeditor === 1 && plus.save.customMapSlot === 1,
+    'v700: Plus-ветеран зберігає другий slot і отримує базовий unlock');
 }
 
 await browser.close();

@@ -33,7 +33,7 @@ const catalog = await page.evaluate(() => ({
 }));
 const expectedGroups = {
   story: ['campaign', 'infected', 'chapter3'],
-  operations: ['expedition', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'],
+  operations: ['expedition', 'community', 'defense', 'zone-defense', 'portal', 'turretwar', 'worldboss'],
   challenges: ['storm', 'arena', 'radiation', 'maze', 'soul-collector'],
   arcade: ['pvp', 'knockout', 'humans', 'bank'],
 };
@@ -43,7 +43,7 @@ check(catalog.recommended.length >= 1 && catalog.recommended.length <= 3
   && catalog.recommended.every((mode) => !mode.locked),
 'рекомендації унікальні, доступні та обмежені трьома', JSON.stringify(catalog.recommended));
 check(catalog.open === 0 && JSON.stringify(catalog.groups) === JSON.stringify(expectedGroups) && !catalog.expeditionLocked,
-'чотири категорії згорнуті, містять усі 18 режимів, Expedition доступна', JSON.stringify(catalog.groups));
+'чотири категорії згорнуті, містять усі 19 режимів, Expedition доступна', JSON.stringify(catalog.groups));
 
 await page.locator('.solo-category[data-category="story"] > summary').click();
 await page.locator('.solo-category[data-category="operations"] > summary').click();

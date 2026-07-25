@@ -9,24 +9,37 @@ await page.waitForFunction(() => window.__game?.state === 'level', null, { timeo
 
 await page.evaluate(() => {
   const g = window.__game;
-  g.save.coins = 9999;
+  g.save.coins = 10000;
   g.shop.open();
 });
 await page.locator('.shop-tab[data-cat="Режими"]').click();
-await page.locator('.shop-item[data-id="mapeditor"]').click();
-const denied = await page.evaluate(() => ({ coins: window.__game.save.coins, owned: window.__game.save.upgrades.mapeditor || 0 }));
-await page.evaluate(() => { window.__game.save.coins = 10000; window.__game.shop.render(); });
-await page.locator('.shop-item[data-id="mapeditor"]').click();
-const bought = await page.evaluate(() => ({ coins: window.__game.save.coins, owned: window.__game.save.upgrades.mapeditor || 0 }));
-await page.evaluate(() => { window.__game.save.coins = 10000; window.__game.shop.render(); });
-await page.locator('.shop-item[data-id="mapeditor"]').click();
-const afterSecond = await page.evaluate(() => window.__game.save.coins);
-const purchase = { denied, bought, afterSecond };
-check(purchase.denied.coins === 9999 && purchase.denied.owned === 0
-  && purchase.bought.coins === 0 && purchase.bought.owned === 1 && purchase.afterSecond === 10000,
-  'доступ купується через справжню вкладку «Режими» рівно один раз за 10 000', JSON.stringify(purchase));
+const before = {
+  baseSku: await page.locator('.shop-item[data-id="mapeditor"]').count(),
+  plusLocked: await page.locator('.shop-item[data-id="mapeditorplus"]').evaluate((el) => el.classList.contains('maxed')),
+};
+await page.locator('.shop-item[data-id="mapeditorplus"]').click();
+const locked = await page.evaluate(() => ({
+  coins: window.__game.save.coins,
+  base: window.__game.save.upgrades.mapeditor || 0,
+  plus: window.__game.save.upgrades.mapeditorplus || 0,
+}));
+await page.evaluate(() => {
+  const g = window.__game;
+  g.shop.close();
+  g._showVictory();
+});
+await page.waitForFunction(() => window.__game.save.upgrades.mapeditor === 1);
+const unlocked = await page.evaluate(() => ({
+  coins: window.__game.save.coins,
+  base: window.__game.save.upgrades.mapeditor,
+  liberated: !!window.__game.save.liberated.UKR,
+}));
+check(before.baseSku === 0 && before.plusLocked && locked.coins === 10000 && locked.base === 0 && locked.plus === 0
+  && unlocked.coins >= locked.coins && unlocked.base === 1 && unlocked.liberated,
+  'базового SKU немає: редактор безкоштовно відкривається після першої перемоги, Plus до неї заблокований',
+  JSON.stringify({ before, locked, unlocked }));
 
-await page.evaluate(() => { window.__game.shop.close(); window.__game.endLevel(); });
+await page.evaluate(() => { window.__game.endLevel(); });
 await page.waitForFunction(() => window.__game?.state === 'globe');
 const menu = await page.evaluate(() => ({
   editor: document.getElementById('btn-map-editor').textContent,

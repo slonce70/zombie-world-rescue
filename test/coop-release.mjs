@@ -24,6 +24,7 @@ const BASE_SLOW = {
   'coop-turretwar.mjs': 2,
   'coop-bonus.mjs': 2,
   'coop-worldboss.mjs': 2,
+  'coop-community.mjs': 2,
 };
 
 if (!Number.isInteger(SHARD_TOTAL) || SHARD_TOTAL < 1
