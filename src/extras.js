@@ -6,6 +6,7 @@ import {
   makeHero, updateRig, setAnim, PETS,
 } from './characters.js';
 import { petLevel, PET_LEVEL_SCALE } from './eggs.js';
+import { BASTION_STAR_POWERS, sanitizeBastionStarPower } from './specialists.js';
 import { disposeObject } from './utils.js';
 
 const CLONE_FOOT_LIFT = 0.16;
@@ -1077,11 +1078,20 @@ export class Gadgets {
       level.bus.emit('toast', t('💚 +{n} здоров\'я!', { n: Math.round(p.health - before) }));
     } else if (specialist.id === 'bastion') {
       const hyper = specialist.hyperActiveT > 0;
-      const hits = p.bastionSuperPunch(hyper);
+      const star = sanitizeBastionStarPower(level.game.save.bastionStarPower);
+      const push = star === 'push-super';
+      const hits = p.bastionSuperPunch(hyper, push);
       level.audio.powerup();
-      level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), 0xffd966, 7);
-      level.bus.emit('toast', t('👊 Суперкулак: {n} шкоди!', { n: hyper ? 750 : 500 }));
+      level.effects.ring(p.pos.clone().setY(p.pos.y + 0.05), push ? 0x8fd3ff : 0xffd966, 7);
+      level.bus.emit('toast', t('👊 Суперкулак: {n} шкоди!', {
+        n: (hyper ? 750 : 500) + (push ? BASTION_STAR_POWERS['push-super'].bonusDamage : 0),
+      }));
       if (!hits) level.bus.emit('toast', t('Суперкулак нікого не зачепив'));
+      if (star === 'fast-super') {
+        const secs = BASTION_STAR_POWERS['fast-super'].speedSecs;
+        p.buffs.speed = Math.max(p.buffs.speed, secs);
+        level.bus.emit('toast', t('⚡ Швидкість на {n} с!', { n: secs }));
+      }
       if (hyper) specialist.hyperActiveT = 0;
     } else {
       const hyper = rank3;

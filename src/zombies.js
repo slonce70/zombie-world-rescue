@@ -887,7 +887,8 @@ export class Zombies {
       const mass = (z.type === 'tank' || z.type === 'robot' || z.type === 'ironclad') ? 0.3
         : z.type === 'imp' ? 1.7 : 1;
       const requested = Number(opts && opts.impactForce) || 0;
-      const kb = (requested > 0 ? Math.min(12, requested) : Math.min(3.5, amt * 0.04)) * mass;
+      // стеля 45: зброя дає щонайбільше 8, запас — для Зоряної сили Бастіона (7 м × 6)
+      const kb = (requested > 0 ? Math.min(45, requested) : Math.min(3.5, amt * 0.04)) * mass;
       z.kbX = (z.kbX || 0) + dir.x * kb;
       z.kbZ = (z.kbZ || 0) + dir.z * kb;
     }

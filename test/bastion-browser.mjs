@@ -190,6 +190,60 @@ try {
     && hyper.activeAfterSuper === 0 && hyper.superAfter === 0,
   'Hyper-Суперкулак має зону 7×4 м, 750 шкоди й сповільнення на 4с', JSON.stringify(hyper));
 
+  // ⭐ Зоряні сили: обидві живуть на save.bastionStarPower, обрати можна лише одну
+  const star = await page.evaluate(() => {
+    const g = window.__game;
+    const p = g.level.player;
+    const specialist = g.level.specialist;
+    const target = g.level.zombies.list.find((z) => z.state !== 'dead');
+    const place = (z, hp) => {
+      z.state = 'chase';
+      z.gone = false;
+      z.x = p.pos.x;
+      z.y = p.pos.y;
+      z.z = p.pos.z - 3;
+      z.hp = hp; z.maxHp = hp;
+      z.shieldHp = 0; z.chestHp = 0; z.helmetHp = 0;
+      z.kbX = 0; z.kbZ = 0;
+      z.rig.group.position.set(z.x, z.y, z.z);
+      return z;
+    };
+    p.yaw = 0;
+    specialist.hyperActiveT = 0;
+    specialist.hyperCharge = 0;
+
+    g.save.bastionStarPower = 'push-super';
+    place(target, 5000);
+    specialist.charge = 100;
+    g.level.gadgets.useSpecialistSuper();
+    const push = { damage: 5000 - target.hp, kb: Math.hypot(target.kbX || 0, target.kbZ || 0) };
+
+    g.save.bastionStarPower = 'fast-super';
+    place(target, 5000);
+    p.buffs.speed = 0;
+    specialist.charge = 0;
+    p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
+    const fastCharge = specialist.charge;
+    target.hp = 5000; // прибираємо шкоду від пробного удару, лишаємо чистий Super
+    specialist.charge = 100;
+    g.level.gadgets.useSpecialistSuper();
+    const fast = { damage: 5000 - target.hp, speed: p.buffs.speed, charge: fastCharge };
+
+    g.save.bastionStarPower = null;
+    place(target, 5000);
+    specialist.charge = 0;
+    p._resolveMeleeSwing({ weaponId: 'fists', dmgMult: 1 });
+    const plainCharge = specialist.charge;
+    target.hp = 5000;
+    specialist.charge = 100;
+    g.level.gadgets.useSpecialistSuper();
+    return { push, fast, plain: { damage: 5000 - target.hp, charge: plainCharge } };
+  });
+  check(star.push.damage === 520 && star.push.kb > 20 && star.plain.damage === 500,
+    '💨 Відштовхуючий супер: 520 шкоди й сильний імпульс відкидання', JSON.stringify(star));
+  check(star.fast.speed === 3 && star.fast.charge === 10.5 && star.plain.charge === 10,
+    '⚡ Швидкий супер: 3 с швидкості та +5% до заряду Super', JSON.stringify(star));
+
   const gadgets = await page.evaluate(() => {
     const g = window.__game;
     const p = g.level.player;

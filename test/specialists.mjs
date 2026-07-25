@@ -6,9 +6,11 @@ const source = readFileSync(new URL('../src/specialists.js', import.meta.url), '
 const specialists = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const {
   BASTION_LEVEL_STATS, EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALIST_IDS, SPECIALISTS,
-  bastionLevelStats, buyBastionUnlock, buyFighterLevel,
+  BASTION_STAR_POWERS, BASTION_STAR_POWER_COST, BASTION_STAR_POWER_LEVEL,
+  bastionLevelStats, buyBastionStarPower, buyBastionUnlock, buyFighterLevel,
   claimSpecialistMastery, fighterLevelMultiplier, sanitizeFighterLevels,
-  sanitizeBastionGadget, sanitizeBastionGadgetsOwned, sanitizeSpecialistClaims, sanitizeSpecialistXp,
+  sanitizeBastionGadget, sanitizeBastionGadgetsOwned, sanitizeBastionStarPower,
+  sanitizeSpecialistClaims, sanitizeSpecialistXp,
   specialistBias, specialistMasteryAward,
   specialistModifiers, specialistRank,
 } = specialists;
@@ -110,4 +112,33 @@ test('terminal mastery is deterministic and claimed once without input mutation'
   assert.equal(claimSpecialistMastery(first, run, 'guard').result.awarded, 0);
   assert.equal(specialistMasteryAward({ status: 'failed', wins: 2 }), 30);
   assert.equal(specialistMasteryAward({ status: 'active', wins: 4 }), 0);
+});
+
+test('bastion star power: level 4, 2300 coins, exactly one forever', () => {
+  assert.deepEqual(Object.keys(BASTION_STAR_POWERS), ['push-super', 'fast-super']);
+  assert.equal(BASTION_STAR_POWER_COST, 2300);
+  assert.equal(BASTION_STAR_POWER_LEVEL, 4);
+  assert.equal(BASTION_STAR_POWERS['push-super'].bonusDamage, 20);
+  assert.equal(BASTION_STAR_POWERS['push-super'].pushDistance, 7);
+  assert.equal(BASTION_STAR_POWERS['fast-super'].speedSecs, 3);
+  assert.equal(BASTION_STAR_POWERS['fast-super'].chargeMultiplier, 1.05);
+
+  assert.equal(sanitizeBastionStarPower('push-super'), 'push-super');
+  assert.equal(sanitizeBastionStarPower('hyper'), null);
+  assert.equal(sanitizeBastionStarPower(undefined), null);
+
+  const rich = { fighterLevels: { bastion: 4 }, coins: 2300, bastionStarPower: null };
+  assert.equal(buyBastionStarPower({ ...rich, fighterLevels: { bastion: 3 } }, 'push-super').reason, 'level');
+  assert.equal(buyBastionStarPower({ ...rich, coins: 2299 }, 'push-super').reason, 'coins');
+  assert.equal(buyBastionStarPower(rich, 'nope').reason, 'unknown');
+
+  const bought = buyBastionStarPower(rich, 'push-super');
+  assert.deepEqual(bought, { ok: true, reason: null, coins: 0, bastionStarPower: 'push-super' });
+  assert.equal(rich.bastionStarPower, null); // вхід не мутується
+
+  // вибір назавжди: ні друга сила, ні повторна покупка тієї самої
+  const owner = { fighterLevels: { bastion: 5 }, coins: 999999, bastionStarPower: 'push-super' };
+  assert.equal(buyBastionStarPower(owner, 'fast-super').reason, 'chosen');
+  assert.equal(buyBastionStarPower(owner, 'push-super').reason, 'owned');
+  assert.equal(buyBastionStarPower(owner, 'fast-super').coins, 999999);
 });

@@ -21,8 +21,10 @@ import {
 } from './expedition.js';
 import {
   EXPEDITION_FIGHTER_IDS, FIGHTER_UPGRADE_COSTS, SPECIALISTS,
-  bastionLevelStats, buyBastionUnlock, buyFighterLevel, claimSpecialistMastery, fighterLevelMultiplier,
-  sanitizeBastionGadget, sanitizeBastionGadgetsOwned,
+  BASTION_STAR_POWERS, BASTION_STAR_POWER_COST, BASTION_STAR_POWER_LEVEL,
+  bastionLevelStats, buyBastionStarPower, buyBastionUnlock, buyFighterLevel,
+  claimSpecialistMastery, fighterLevelMultiplier,
+  sanitizeBastionGadget, sanitizeBastionGadgetsOwned, sanitizeBastionStarPower,
   sanitizeFighterId, sanitizeFighterLevels, sanitizeSpecialistClaims, sanitizeSpecialistId,
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
@@ -144,7 +146,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 700;
+const APP_VERSION = 701;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -786,6 +788,7 @@ class Game {
       bastionGadget: 'healing-punch',
       bastionGadgetsOwned: [],
       bastionHyperOwned: false,
+      bastionStarPower: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -942,6 +945,7 @@ class Game {
         out.bastionGadget = sanitizeBastionGadget(out.bastionGadget);
         out.bastionGadgetsOwned = sanitizeBastionGadgetsOwned(out.bastionGadgetsOwned);
         out.bastionHyperOwned = out.bastionHyperOwned === true;
+        out.bastionStarPower = sanitizeBastionStarPower(out.bastionStarPower);
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
@@ -3274,7 +3278,19 @@ class Game {
       : `<div class="fighter-ability" ${pending ? 'data-pending' : ''}><strong>${t(label)}</strong><span>${t(value)}</span></div>`).join('')
       + (isBastion
         ? `<button type="button" class="fighter-ability fighter-gadget" data-bastion-hyper aria-pressed="${this.save.bastionHyperOwned === true}" ${locked || level < 5 ? 'disabled' : ''}><strong>HYPERCHARGE</strong><span>${level < 5 ? t('🔒 Рівень 5') : this.save.bastionHyperOwned ? t('✅ Куплено · X') : '🪙 5000'}</span></button>`
-        : '');
+        : '')
+      // ⭐ дві Зоряні сили: обрати можна ЛИШЕ ОДНУ, друга після вибору закрита назавжди
+      + (isBastion ? Object.entries(BASTION_STAR_POWERS).map(([powerId, power]) => {
+        const chosen = sanitizeBastionStarPower(this.save.bastionStarPower);
+        const mine = chosen === powerId;
+        const other = !!chosen && !mine;
+        const tooLow = level < BASTION_STAR_POWER_LEVEL;
+        const state = tooLow ? t('🔒 Рівень {n}', { n: BASTION_STAR_POWER_LEVEL })
+          : mine ? t('✅ Обрано')
+            : other ? t('🔒 Обрано іншу')
+              : `🪙 ${BASTION_STAR_POWER_COST}`;
+        return `<button type="button" class="fighter-ability fighter-gadget" data-bastion-star="${powerId}" aria-pressed="${mine}" ${locked || tooLow || other || mine ? 'disabled' : ''}><strong>${power.icon} ${t('ЗОРЯНА СИЛА')}</strong><span>${t(power.name)} · ${state}</span><span>${t(power.desc)}</span></button>`;
+      }).join('') : '');
     abilitiesEl.querySelectorAll('[data-bastion-gadget]').forEach((button) => {
       button.addEventListener('click', () => {
         const id = sanitizeBastionGadget(button.dataset.bastionGadget);
@@ -3291,6 +3307,23 @@ class Game {
         }
         this.save.bastionGadget = id;
         this.saveGame();
+        this.renderExpeditionFighter();
+      });
+    });
+    abilitiesEl.querySelectorAll('[data-bastion-star]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const next = buyBastionStarPower(this.save, button.dataset.bastionStar);
+        if (!next.ok) {
+          this.audio.denied();
+          this.hud.toast(t(next.reason === 'coins' ? 'Не вистачає монет'
+            : next.reason === 'chosen' ? '⭐ Зоряну силу вже обрано — можна лише одну'
+              : '🔒 Потрібен рівень 4'));
+          return;
+        }
+        this.save.coins = next.coins;
+        this.save.bastionStarPower = next.bastionStarPower;
+        this.saveGame();
+        this.audio.purchase();
         this.renderExpeditionFighter();
       });
     });
@@ -4198,8 +4231,12 @@ class Game {
     level.bus.on('hitmarker', () => {
       const specialist = level.specialist;
       if (!specialist || !specialist.active || level.player.health <= 0) return;
+      // ⚡ Зоряна сила «Швидкий супер»: Super заряджається на 5% швидше
+      const chargeMult = specialist.id === 'bastion'
+        && sanitizeBastionStarPower(this.save.bastionStarPower) === 'fast-super'
+        ? BASTION_STAR_POWERS['fast-super'].chargeMultiplier : 1;
       specialist.charge = Math.min(specialist.maxCharge,
-        specialist.charge + SPECIALISTS[specialist.id].chargePerHit);
+        specialist.charge + SPECIALISTS[specialist.id].chargePerHit * chargeMult);
       if (specialist.id === 'bastion' && specialist.level >= 5 && this.save.bastionHyperOwned) {
         specialist.hyperCharge = Math.min(100,
           specialist.hyperCharge + SPECIALISTS.bastion.hyperChargePerHit);

@@ -5,6 +5,7 @@ import { makeHero, makeGunMesh, makeFPArms, attachHeroGear, updateRig, setAnim, 
 import { clamp, damp, dampAngle } from './utils.js';
 import { t } from './i18n.js';
 import { momentumStats } from './combatmomentum.js';
+import { BASTION_STAR_POWERS } from './specialists.js';
 
 export const WEAPONS = {
   fists: { name: 'Кулаки', icon: '👊', dmg: 50, rpm: 60, mag: 10, spread: 0, auto: false, reloadT: 1.5, recoil: 0.04, kick: 1, recover: 6, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3, rectWidth: 1, cleave: Infinity },
@@ -1163,15 +1164,19 @@ export class Player {
     return hits;
   }
 
-  bastionSuperPunch(hyper = false) {
+  bastionSuperPunch(hyper = false, push = false) {
     if (this.health <= 0) return 0;
+    const star = BASTION_STAR_POWERS['push-super'];
     const dir = this.forwardVec(new THREE.Vector3()).setY(0).normalize();
-    const damage = hyper ? 750 : 500;
+    const damage = (hyper ? 750 : 500) + (push ? star.bonusDamage : 0);
     const hits = this._bastionRectTargets(7, hyper ? 4 : 2);
     for (const hit of hits) {
       hit.zombie.lastHitBy = 1;
       hit.zombie.damage(damage, dir, false, {
-        weaponId: 'fists', hitZone: 'body', impactForce: 8, staggerTime: 0.4,
+        // ⭐ відкидання: імпульс живого зомбі згасає з коефіцієнтом 6/с (zombies.js),
+        // тож шлях ≈ сила/6 — щоб отримати метри, множимо на 6
+        weaponId: 'fists', hitZone: 'body', staggerTime: 0.4,
+        impactForce: push ? star.pushDistance * 6 : 8,
       });
       if (hyper) {
         hit.zombie.slowT = Math.max(hit.zombie.slowT || 0, 4);

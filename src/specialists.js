@@ -63,6 +63,24 @@ export const BASTION_UNLOCK_COSTS = Object.freeze({
   hyper: 5000,
 });
 
+// ⭐ Зоряні сили Бастіона: покращення Суперкулака НАЗАВЖДИ. Обрати можна лише ОДНУ —
+// куплена сила закриває другу, тож вибір справжній, а не «збери обидві».
+export const BASTION_STAR_POWER_COST = 2300;
+export const BASTION_STAR_POWER_LEVEL = 4;
+export const BASTION_STAR_POWERS = Object.freeze({
+  'push-super': Object.freeze({
+    icon: '💨', name: 'Відштовхуючий супер',
+    desc: 'Суперкулак відкидає зомбі на 7 м і б\'є на 20 сильніше',
+    bonusDamage: 20, pushDistance: 7,
+  }),
+  'fast-super': Object.freeze({
+    icon: '⚡', name: 'Швидкий супер',
+    desc: 'Після Суперкулака 3 с швидкості, а Super заряджається на 5% швидше',
+    speedSecs: 3, chargeMultiplier: 1.05,
+  }),
+});
+export const BASTION_STAR_POWER_IDS = Object.freeze(Object.keys(BASTION_STAR_POWERS));
+
 const clampInt = (value, min, max) => Math.max(min, Math.min(max,
   Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : min));
 
@@ -95,6 +113,24 @@ export function buyBastionUnlock(state, id) {
     bastionGadgetsOwned: id === 'hyper' ? bastionGadgetsOwned : [...bastionGadgetsOwned, id],
     bastionHyperOwned: id === 'hyper' || bastionHyperOwned,
   };
+}
+
+export function sanitizeBastionStarPower(value) {
+  return BASTION_STAR_POWER_IDS.includes(value) ? value : null;
+}
+
+export function buyBastionStarPower(state, id) {
+  const coins = clampInt(state && state.coins, 0, 999999999);
+  const level = sanitizeFighterLevels(state && state.fighterLevels).bastion;
+  const owned = sanitizeBastionStarPower(state && state.bastionStarPower);
+  const cleanId = sanitizeBastionStarPower(id);
+  const fail = (reason) => ({ ok: false, reason, coins, bastionStarPower: owned });
+  if (!cleanId) return fail('unknown');
+  if (level < BASTION_STAR_POWER_LEVEL) return fail('level');
+  // друга сила недоступна назавжди: 'owned' — та сама, 'chosen' — вибір уже зроблено
+  if (owned) return fail(owned === cleanId ? 'owned' : 'chosen');
+  if (coins < BASTION_STAR_POWER_COST) return fail('coins');
+  return { ok: true, reason: null, coins: coins - BASTION_STAR_POWER_COST, bastionStarPower: cleanId };
 }
 
 export function sanitizeSpecialistId(value, fallback = null) {

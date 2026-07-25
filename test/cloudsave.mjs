@@ -206,7 +206,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'weeklyCamp',
       // 🌍 v303 «Світ врятовано»
       'worldSaved',
-      'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'bastionGadgetsOwned', 'bastionHyperOwned', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
+      'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'bastionGadgetsOwned', 'bastionHyperOwned', 'bastionStarPower', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
     ]);
     out.progressManifestMissingKeys = Object.keys(fresh).filter((k) => !guardedTopLevelKeys.has(k));
     out.progressManifestCoversPermanentKeys = out.progressManifestMissingKeys.length === 0;
@@ -217,7 +217,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
       'towerSkins', 'diffStar', 'weapons', 'radiationCoins', 'cloneSkins', 'activeCloneSkin',
       'stars', 'starClaims', 'mercyDeaths', 'friends', 'friendThanks',
       'eggs', 'eggClaims', 'friendEggClaims', 'petFood', 'petLevels',
-      'weeklyCamp', 'worldSaved', 'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'bastionGadgetsOwned', 'bastionHyperOwned', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
+      'weeklyCamp', 'worldSaved', 'expedition', 'specialistXp', 'specialistClaims', 'fighterLevels', 'bastionGadget', 'bastionGadgetsOwned', 'bastionHyperOwned', 'bastionStarPower', 'front', 'frontCoopClaims', 'moonRescue', 'settlement', 'customMap', 'customMap2', 'customMapSlot',
     ].every((k) => knownProgressKeys.has(k));
     out.freshIsEmpty = saveHasProgress(fresh) === false; // свіжий сейв = «нема що втрачати»
     out.falseLiberatedIsEmpty = saveHasProgress({ ...fresh, liberated: { UKR: false } }) === false;
@@ -275,6 +275,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
     out.fighterLevel = saveHasProgress({ ...fresh, fighterLevels: { ...fresh.fighterLevels, guard: 2 } }) === true;
     out.bastionGadgetPurchase = saveHasProgress({ ...fresh, bastionGadgetsOwned: ['healing-punch'] }) === true;
     out.bastionHyperPurchase = saveHasProgress({ ...fresh, bastionHyperOwned: true }) === true;
+    out.bastionStarPurchase = saveHasProgress({ ...fresh, bastionStarPower: 'push-super' }) === true;
     return out;
   });
   check('drift guard: усі top-level ключі сейва мають явне рішення', res.progressManifestCoversPermanentKeys,
@@ -314,6 +315,7 @@ console.log('▸ F24: saveHasProgress бачить новий прогрес');
   check('рівень бійця → прогрес=true', res.fighterLevel);
   check('куплений гаджет Бастіона → прогрес=true', res.bastionGadgetPurchase);
   check('куплений Hypercharge Бастіона → прогрес=true', res.bastionHyperPurchase);
+  check('куплена Зоряна сила Бастіона → прогрес=true', res.bastionStarPurchase);
   check('монети понад стартові → прогрес=true', res.coins);
   check('кристали → прогрес=true', res.crystals);
   check('медалі → прогрес=true', res.medals);
