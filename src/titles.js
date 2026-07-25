@@ -13,6 +13,16 @@ const BESTIARY_ALL_COUNT = BESTIARY_TYPE_IDS.length;
 const bestiaryCollected = (s) => Object.keys((s && s.bestiary) || {}).filter((id) => BESTIARY_TYPE_IDS.includes(id) && s.bestiary[id] > 0).length;
 
 export const TITLES = {
+  season_hero: {
+    icon: '🗓️',
+    name: () => t('Герой сезону'),
+    desc: () => t('Пройди всі 12 сходинок сезону'),
+    detail: () => t('Відкривається за останню сходинку сезону'),
+    // видається напряму при клеймі фінальної сходинки — предикат лише зберігає його
+    unlocked: (s) => (s.titles || []).includes('season_hero'),
+    current: (s) => ((s.titles || []).includes('season_hero') ? 1 : 0),
+    target: 1,
+  },
   star_player: {
     icon: '🌟',
     name: () => t('Зоряний гравець'),

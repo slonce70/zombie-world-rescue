@@ -76,6 +76,7 @@ import { LivingHQ } from './hqbase.js';
 import { Chapter, CHAPTER2, CHAPTER3, CHAPTER2_UNLOCK_COUNTRIES } from './chapter.js';
 import { todaySlots } from './rotation.js';
 import { sanitizeSquad } from './squad.js';
+import { claimSeasonStep, ensureSeason, seasonState, SEASON_STEPS } from './season.js';
 import { TITLES, syncTitles } from './titles.js';
 import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
@@ -148,7 +149,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 720;
+const APP_VERSION = 730;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -792,6 +793,7 @@ class Game {
       bastionHyperOwned: false,
       bastionStarPower: null,
       squad: [],
+      season: null,
       // 🌟 «Пожертва рятівника»: donations — скільки разів купив (від нього росте ціна й титули),
       // donStars — престиж-зірки за донації (поки 1:1 з donations, але тримаємо окремо)
       donations: 0, donStars: 0,
@@ -950,6 +952,7 @@ class Game {
         out.bastionHyperOwned = out.bastionHyperOwned === true;
         out.bastionStarPower = sanitizeBastionStarPower(out.bastionStarPower);
         out.squad = sanitizeSquad(out);
+        if (out.season && (typeof out.season !== 'object' || Array.isArray(out.season))) out.season = null;
         out.expedition = sanitizeExpedition(out.expedition);
         out.front = sanitizeFront(out.front, { liberated: out.liberated, rescuedFriends: out.friends });
         out.frontCoopClaims = [...new Set((Array.isArray(out.frontCoopClaims) ? out.frontCoopClaims : [])
@@ -1441,6 +1444,15 @@ class Game {
         text: t('{i} {n}: ще {r} {u}', { i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: unit }),
       };
     }
+    // 🗓️ незабрана нагорода сезону — найдешевша дія, кличемо одразу
+    const season = seasonState(this.save, this._weekIndex());
+    if (season.claimable > 0) {
+      return {
+        icon: '🗓️',
+        title: t('Сходинка сезону'),
+        text: t('{i} {n} — забери нагороду!', { i: season.next.icon, n: season.next.title }),
+      };
+    }
     const lib = this.save.liberated || {};
     const next = CAMPAIGN_ORDER.find((id) => !lib[id]);
     if (next) {
@@ -1449,6 +1461,16 @@ class Game {
         icon: '🧭',
         title: t('Далі'),
         text: t('{f} {n}: звільни країну', { f: c.flag, n: c.name }),
+      };
+    }
+    // 🗓️ кампанію пройдено — веде сезон: він розганяє по режимах
+    if (season.next) {
+      return {
+        icon: '🗓️',
+        title: t('Сезон {n}', { n: season.index + 1 }),
+        text: t('{i} {t} · {a}/{b}', {
+          i: season.next.icon, t: season.next.title, a: season.next.progress, b: season.next.target,
+        }),
       };
     }
     if (!(this.save.infected && this.save.infected.done)) {
@@ -1769,7 +1791,54 @@ class Game {
         <div class="pass-state">${got ? '✅' : '🔒'}</div>
       </div>`;
     }
-    document.getElementById('pass-track').innerHTML = html;
+    document.getElementById('pass-track').innerHTML = this._seasonHtml() + html;
+    document.querySelectorAll('#pass-track [data-season-claim]').forEach((btn) => {
+      btn.addEventListener('click', () => this._claimSeasonStep(btn.dataset.seasonClaim));
+    });
+  }
+
+  // 🗓️ Сезон: 12 сходинок, що ведуть у різні режими. Живе зверху Зоряного шляху.
+  _seasonHtml() {
+    const st = seasonState(this.save, this._weekIndex());
+    const rows = st.steps.map((step) => {
+      const cls = step.claimed ? 'got' : step.done ? 'current' : 'locked';
+      const reward = [
+        `💎 ${step.reward.crystals}`,
+        step.reward.eggs ? '🥚' : '',
+        `⭐ ${step.reward.xp}`,
+        step.reward.title ? '🎖️' : '',
+      ].filter(Boolean).join(' · ');
+      const state = step.claimed ? '✅'
+        : step.done ? `<button type="button" class="btn btn-primary season-claim" data-season-claim="${step.id}">${t('Забрати')}</button>`
+          : `${step.progress}/${step.target}`;
+      return `<div class="pass-row ${cls}">
+        <div class="pass-lvl">${step.i + 1}</div>
+        <div class="pass-ico">${step.icon}</div>
+        <div class="pass-name">${step.title}<br><small>${reward}</small></div>
+        <div class="pass-state">${state}</div>
+      </div>`;
+    }).join('');
+    const doneN = st.steps.filter((s) => s.claimed).length;
+    return `<div class="season-head"><b>${t('🗓️ СЕЗОН {n}', { n: st.index + 1 })}</b>
+      <span>${t('Сходинок пройдено: {a}/{b}', { a: doneN, b: SEASON_STEPS })}</span></div>${rows}
+      <div class="season-head"><b>${t('🎖️ ЗОРЯНИЙ ШЛЯХ')}</b></div>`;
+  }
+
+  _claimSeasonStep(stepId) {
+    const reward = claimSeasonStep(this.save, this._weekIndex(), stepId);
+    if (!reward) { this.audio.denied(); return; }
+    this.save.crystals = (this.save.crystals || 0) + reward.crystals;
+    if (reward.eggs) this.save.eggs = (this.save.eggs || 0) + reward.eggs;
+    if (reward.title && !(this.save.titles || []).includes(reward.title)) {
+      if (!Array.isArray(this.save.titles)) this.save.titles = [];
+      this.save.titles.push(reward.title);
+    }
+    this.progress.addXp(reward.xp);
+    this.audio.levelUp();
+    this.hud.banner(t('🗓️ СХОДИНКА СЕЗОНУ!'),
+      t('💎 +{c} · ⭐ +{x} XP{e}', { c: reward.crystals, x: reward.xp, e: reward.eggs ? ' · 🥚' : '' }), 4.5);
+    this.saveGame();
+    this.renderPassPanel();
   }
 
   _soulReward(lvl) {

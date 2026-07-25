@@ -1477,6 +1477,9 @@ body.touch-mode #touch-coach.show { display: block; }
 .sm-name { font-weight: 900; font-size: 17px; letter-spacing: 1px; color: #fff; }
 .sm-desc { font-size: 13px; color: #9fb6c9; font-weight: 700; margin-top: 2px; }
 .sm-coop { font-size: 12px; color: #7bdcff; font-weight: 800; margin-top: 3px; }
+.season-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 12px 2px 6px; font-size: 14px; color: #ffd45a; }
+.season-head span { color: #9fb6c9; font-size: 12px; font-weight: 700; }
+.season-claim { padding: 6px 12px; font-size: 12px; min-height: 44px; }
 .sm-go { font-size: 20px; color: var(--accent); }
 /* 🎯 випробування дня і 🏆 рекорд на картці режиму */
 .solo-mode.daily { border-color: #ffd23f; box-shadow: 0 0 14px rgba(255, 210, 63, 0.35); }
