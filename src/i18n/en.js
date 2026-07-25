@@ -2908,4 +2908,5 @@ export const EN = {
 "⏱️ 5 ХВИЛИН": "⏱️ 5 MINUTES",
 "🌍 ДОВГА ОПЕРАЦІЯ": "🌍 LONG OPERATION",
 "Можна разом": "Playable together",
+"40% 50 монет · 40% 3 кристали · 10% Кактус · 4% Мандрівник · 3% Веселковий · 1% Садівник · 1% Зомбі": "40% 50 coins · 40% 3 crystals · 10% Cactus · 4% Traveler · 3% Rainbow · 1% Gardener · 1% Zombie",
 };

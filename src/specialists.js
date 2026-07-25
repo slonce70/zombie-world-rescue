@@ -230,10 +230,12 @@ export function specialistClaimId(run) {
 export function claimSpecialistMastery(state, run, id) {
   const specialistXp = sanitizeSpecialistXp(state && state.specialistXp);
   const specialistClaims = sanitizeSpecialistClaims(state && state.specialistClaims);
-  const cleanId = sanitizeSpecialistId(id, 'guard');
+  // БЕЗ fallback на 'guard': Бастіон має власну прокачку за монети (BASTION_LEVEL_STATS),
+  // рангові модифікатори до нього не застосовуються — тож його забіг не має качати Захисника.
+  const cleanId = sanitizeSpecialistId(id);
   const claimId = specialistClaimId(run);
-  const rankBefore = specialistRank(specialistXp[cleanId]);
-  const award = specialistMasteryAward(run);
+  const rankBefore = specialistRank(cleanId ? specialistXp[cleanId] : 0);
+  const award = cleanId ? specialistMasteryAward(run) : 0;
   if (!claimId || !award || specialistClaims.includes(claimId)) {
     return { specialistXp, specialistClaims, result: { awarded: 0, rankBefore, rankAfter: rankBefore } };
   }

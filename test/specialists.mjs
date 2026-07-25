@@ -142,3 +142,15 @@ test('bastion star power: level 4, 2300 coins, exactly one forever', () => {
   assert.equal(buyBastionStarPower(owner, 'push-super').reason, 'owned');
   assert.equal(buyBastionStarPower(owner, 'fast-super').coins, 999999);
 });
+
+test('bastion run does not feed another fighter mastery', () => {
+  const state = { specialistXp: { guard: 0, medic: 0, scout: 0 }, specialistClaims: [] };
+  const run = { seed: 710, coop: false, status: 'won', wins: 5 };
+  // у Бастіона власна прокачка за монети — його забіг не має качати Захисника
+  const bastion = claimSpecialistMastery(state, run, 'bastion');
+  assert.equal(bastion.result.awarded, 0);
+  assert.equal(bastion.specialistXp.guard, 0);
+  assert.deepEqual(bastion.specialistClaims, []);
+  // спеціалісти зі своєю ранговою системою нараховують як і раніше
+  assert.equal(claimSpecialistMastery(state, run, 'scout').specialistXp.scout, 100);
+});

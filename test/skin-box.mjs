@@ -11,7 +11,7 @@ console.log('▸ Скін-бокс у магазині');
 const res = await page.evaluate(async () => {
   Date.now = () => Date.UTC(2026, 5, 30);
   const { HERO_SKINS, makeHero } = await import('/src/characters.js');
-  const { SHOP_ITEMS, SKINBOX_AVAILABLE_UNTIL } = await import('/src/shop.js');
+  const { SHOP_ITEMS } = await import('/src/shop.js');
   const g = window.__game;
   g.shop.open();
   const boxTab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Бокси');
@@ -75,21 +75,21 @@ const res = await page.evaluate(async () => {
     }
   }
 
-  Date.now = () => Date.UTC(2026, 6, 25);
+  // 🎟️ через рік товар мусить лишатись у магазині: це єдине джерело п'яти скінів
+  Date.now = () => Date.UTC(2027, 6, 25);
   g.save.coins = 50;
   g.save.crystals = 15;
   g.shop.open();
-  const expiredTab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Бокси');
-  if (expiredTab) expiredTab.click();
-  const expiredCard = document.querySelector('.shop-item[data-id="skinbox"]');
+  const laterTab = [...document.querySelectorAll('.shop-tab')].find((t) => t.textContent === 'Бокси');
+  if (laterTab) laterTab.click();
+  const laterCard = document.querySelector('.shop-item[data-id="skinbox"]');
   g.shop.close();
-  const beforeExpired = { coins: g.save.coins, crystals: g.save.crystals, skins: [...g.save.skins] };
+  const beforeLater = { crystals: g.save.crystals, coins: g.save.coins, skins: g.save.skins.length };
   g.test.shopBuy('skinbox');
-  const afterExpired = { coins: g.save.coins, crystals: g.save.crystals, skins: [...g.save.skins] };
+  const afterLater = { crystals: g.save.crystals, coins: g.save.coins, skins: g.save.skins.length };
 
   return {
     item: SHOP_ITEMS.find((i) => i.id === 'skinbox'),
-    until: SKINBOX_AVAILABLE_UNTIL,
     card: card && { price: card.querySelector('.shop-price')?.textContent.trim(), desc: card.querySelector('.shop-desc')?.textContent.trim() },
     denied,
     coins,
@@ -101,17 +101,18 @@ const res = await page.evaluate(async () => {
     zombie,
     metas: Object.fromEntries(['cactus', 'traveler', 'rainbow', 'gardener', 'zombie'].map((id) => [id, HERO_SKINS[id] && HERO_SKINS[id].name])),
     built,
-    expiredHidden: !expiredCard,
-    expiredUnchanged: JSON.stringify(beforeExpired) === JSON.stringify(afterExpired),
+    laterVisible: !!laterCard,
+    laterBought: afterLater.crystals === beforeLater.crystals - 15,
+    laterDebug: { before: beforeLater, after: afterLater },
   };
 });
 
 check(res.item && res.item.crystalPrice === 15 && res.item.max === Infinity && res.item.cat === 'Бокси',
   'скін-бокс коштує 15 кристалів і купується повторно', JSON.stringify(res.item));
-check(res.until === Date.UTC(2026, 6, 24, 23, 59, 59),
-  'скін-бокс доступний 25 днів до 2026-07-24 включно', String(res.until));
-check(res.card && /15/.test(res.card.price) && res.card.desc.includes('25 днів'),
-  'картка показує ціну і 25-денний сезон', JSON.stringify(res.card));
+check(!res.item.availableUntil,
+  'скін-бокс не має вікна доступності й лишається в магазині назавжди', JSON.stringify(res.item.availableUntil));
+check(res.card && /15/.test(res.card.price) && res.card.desc.includes('Кактус'),
+  'картка показує ціну і шанси', JSON.stringify(res.card));
 check(res.denied.after.crystals === 14 && res.denied.after.coins === 50,
   '14 кристалів недостатньо для скін-бокса', JSON.stringify(res.denied));
 check(res.coins.after.coins === 100 && res.coins.after.crystals === 0,
@@ -130,8 +131,8 @@ check(res.zombie.after.skins.includes('zombie') && res.zombie.after.active === '
   '1% гілка дає скін Зомбі', JSON.stringify(res.zombie));
 check(Object.values(res.metas).every(Boolean) && Object.values(res.built).every(Boolean),
   'усі 5 нових скінів мають метадані і будуються без fallback', JSON.stringify({ metas: res.metas, built: res.built }));
-check(res.expiredHidden && res.expiredUnchanged,
-  'після 2026-07-24 скін-бокс зникає і не купується', JSON.stringify({ hidden: res.expiredHidden, unchanged: res.expiredUnchanged }));
+check(res.laterVisible && res.laterBought,
+  'через рік скін-бокс так само видно й можна купити', JSON.stringify({ visible: res.laterVisible, bought: res.laterBought, debug: res.laterDebug }));
 
 console.log('');
 if (errors.length) {

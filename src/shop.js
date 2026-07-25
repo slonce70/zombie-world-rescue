@@ -3,8 +3,6 @@ import { GADGETS, TOWER_SKINS } from './extras.js';
 import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 
-export const SKINBOX_AVAILABLE_UNTIL = Date.UTC(2026, 6, 24, 23, 59, 59);
-
 export const SHOP_ITEMS = [
   // --- припаси ---
   { id: 'grenade', icon: '💣', name: t('Граната'), desc: () => t('+1 граната ({k})', { k: keyHint('кнопка 💣', 'G — кинути') }), price: 35, max: Infinity, cat: t('Припаси') },
@@ -25,7 +23,9 @@ export const SHOP_ITEMS = [
   { id: 'smallbox', icon: '🎁', name: t('Маленький бокс'), desc: t('80%: 50 монет · 15%: 5 кристалів · 5%: скін Медик'), price: 0, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   { id: 'mediumbox', icon: '🧰', name: t('Середній бокс'), desc: t('60%: 100 монет · 39%: 10 кристалів · 1%: гіперзаряд'), price: 500, crystalPrice: 5, max: Infinity, cat: t('Бокси') },
   { id: 'megabox', icon: '🦙', name: t('Мегабокс'), desc: t('60%: 350 монет · 20%: 20 кристалів · 10%: гаджет · 5%: скін Привид · 3%: гіперзаряд · 2%: скін Самурай'), price: 0, crystalPrice: 25, max: Infinity, cat: t('Бокси') },
-  { id: 'skinbox', icon: '🎟️', name: t('Скін-бокс'), desc: t('25 днів: 40% 50 монет · 40% 3 кристали · 10% Кактус · 4% Мандрівник · 3% Веселковий · 1% Садівник · 1% Зомбі'), price: 0, crystalPrice: 15, max: Infinity, cat: t('Бокси'), availableUntil: SKINBOX_AVAILABLE_UNTIL },
+  // 🎟️ постійний товар: це ЄДИНЕ джерело скінів Кактус/Мандрівник/Веселковий/Садівник/Зомбі,
+  // тож вікно доступності прибрано — інакше контент зникає з гри назавжди
+  { id: 'skinbox', icon: '🎟️', name: t('Скін-бокс'), desc: t('40% 50 монет · 40% 3 кристали · 10% Кактус · 4% Мандрівник · 3% Веселковий · 1% Садівник · 1% Зомбі'), price: 0, crystalPrice: 15, max: Infinity, cat: t('Бокси') },
   // --- гаджети: купуєш НАЗАВЖДИ, обираєш один у Гардеробі, клавіша F ---
   // desc — функції: GADGETS.*.desc можуть бути сенсор-залежними (читаємо у момент показу)
   { id: 'shield', icon: GADGETS.shield.icon, name: GADGETS.shield.name, desc: () => GADGETS.shield.desc + t(' · перезарядка {n}с', { n: GADGETS.shield.cd }), price: GADGETS.shield.price, max: 1, cat: t('Гаджети й друзі'), gadget: true },
