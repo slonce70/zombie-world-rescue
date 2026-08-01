@@ -2829,7 +2829,7 @@ export const EN = {
 "🏗️ Поселення вже на максимумі — матеріали продано: 🪙 +{n}": "🏗️ Settlement is already maxed — materials sold: 🪙 +{n}",
 "🌍 СВІТ ОСВОЄНО!": "🌍 WORLD SETTLED!",
 "Усі 4 регіони — 💎 +25 і 🥚 яйце петса": "All 4 regions — 💎 +25 and 🥚 a pet egg",
-"⭐ ЗІРКИ ПЕРЕПРОХОДЖЕННЯ ·": "⭐ REPLAY STARS ·",
+"⭐ ЗІРКА СКЛАДНОСТІ ·": "⭐ DIFFICULTY STAR ·",
 "Вище зірка — міцніші вороги й більше монет. Діє на першому проходженні країни, на «Живому фронті» й у коопі (там — зірка хоста).": "Higher star — tougher enemies and more coins. It applies to a country's first run, to Living Front operations and in co-op (the host's star there).",
 "Порив кориди": "Bullfight Charge",
 "+4% до швидкості бігу": "+4% run speed",
