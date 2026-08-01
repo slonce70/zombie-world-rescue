@@ -1677,13 +1677,20 @@ class Game {
     };
     todaySlots(this._dayIndex()).forEach(addRecommendation);
     [daily, weekly, ...catalogOrder].forEach(addRecommendation);
+    // 🚫 без дублів: картку, що вже стоїть у «СЬОГОДНІ», категорія нижче не повторює.
+    // Режим НЕ зникає з каталогу — він просто живе вгорі того самого екрана,
+    // а лічильник у заголовку категорії рахує рівно те, що в ній намальовано.
+    const featured = new Set(recommendedIds);
+    const catGroups = groups
+      .map((g) => ({ ...g, ids: g.ids.filter((id) => !featured.has(id)) }))
+      .filter((g) => g.ids.length);
     root.innerHTML = `
       ${this._playerCompassHtml()}
       <section class="solo-recommended" aria-labelledby="solo-recommended-title">
         <h3 id="solo-recommended-title">${t('СЬОГОДНІ')}</h3>
         ${recommendedIds.map((id) => modeHtml(byId.get(id))).join('')}
       </section>
-      ${groups.map((g) => `
+      ${catGroups.map((g) => `
       <details class="solo-category" data-category="${g.id}">
         <summary>${g.title}<span>${g.ids.length}</span></summary>
         <section class="solo-section" data-category="${g.id}" aria-label="${g.title}">

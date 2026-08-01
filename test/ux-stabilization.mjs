@@ -31,17 +31,26 @@ const catalog = await page.evaluate(() => ({
   ])),
   expeditionLocked: document.querySelector('.solo-category [data-mode="expedition"]').classList.contains('locked'),
 }));
+// категорії показують свій склад МІНУС підбірка дня — картка не дублюється на екрані.
+// Підбірка залежить від дати, тож очікування рахуємо, а не прибиваємо цвяхами.
+const featured = catalog.recommended.map((mode) => mode.id);
 const expectedGroups = {
   quick: ['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans'],
   long: ['campaign', 'expedition', 'community', 'storm', 'arena', 'worldboss', 'infected', 'chapter3'],
 };
+const allModes = [...expectedGroups.quick, ...expectedGroups.long];
+const withoutFeatured = Object.fromEntries(Object.entries(expectedGroups)
+  .map(([id, ids]) => [id, ids.filter((mode) => !featured.includes(mode))]));
 check(catalog.role === 'dialog' && catalog.title === '🎮 РЕЖИМИ', 'каталог є діалогом РЕЖИМИ', JSON.stringify(catalog));
 check(catalog.recommended.length === 4
   && new Set(catalog.recommended.map((mode) => mode.id)).size === catalog.recommended.length
   && catalog.recommended.every((mode) => !mode.locked),
 'слоти «СЬОГОДНІ» — 4 унікальні доступні режими', JSON.stringify(catalog.recommended));
-check(catalog.open === 0 && JSON.stringify(catalog.groups) === JSON.stringify(expectedGroups) && !catalog.expeditionLocked,
-'дві категорії згорнуті, містять усі 19 режимів, Expedition доступна', JSON.stringify(catalog.groups));
+check(catalog.open === 0 && JSON.stringify(catalog.groups) === JSON.stringify(withoutFeatured) && !catalog.expeditionLocked,
+'дві категорії згорнуті, не дублюють підбірку дня, Expedition доступна', JSON.stringify(catalog.groups));
+check(new Set([...featured, ...Object.values(catalog.groups).flat()]).size === allModes.length
+  && allModes.every((mode) => featured.includes(mode) || Object.values(catalog.groups).flat().includes(mode)),
+'усі 19 режимів досяжні рівно одним входом', JSON.stringify({ featured, groups: catalog.groups }));
 
 await page.locator('.solo-category[data-category="quick"] > summary').click();
 await page.locator('.solo-category[data-category="long"] > summary').click();

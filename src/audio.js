@@ -9,6 +9,94 @@ const VOICE_IDS = ['wave', 'victory', 'defeat', 'levelup', 'boss', 'heal', 'comb
 // assets/voice/<мова>/boss-<id>.m4a; НЕ в VOICE_IDS — вантажаться ліниво при появі боса
 const BOSS_VOICE_IDS = new Set(['ukr', 'pol', 'deu', 'fra', 'esp', 'prt', 'ita', 'tur', 'swe', 'egy', 'jpn', 'chn', 'lost', 'lab']);
 
+// ---------- 🎼 варіації музики ----------
+// Музика лишається повністю синтезованою (жодного аудіофайлу), але раніше це була
+// ОДНА фраза на 64 шістнадцятих ≈ 10 секунд, яка крутилась усю сесію. Тепер кожен
+// режим має банк із 4 варіацій фрази і власний порядок їх чергування на 12 фраз,
+// тож повний цикл — понад дві хвилини для спокійної теми замість десяти секунд.
+//
+// Варіацію обирає НОМЕР ФРАЗИ (64 кроки), а не номер кроку, тож зміна завжди
+// припадає на межу фрази: жодна нота не рветься посеред звучання і клацання не чути.
+//
+// Крокова нотація: індекс символу = 16-та доля такту, '.' — пауза.
+//   бас: 'x' — корінь такту, '3' — мала терція, '5' — квінта, '8' — октава;
+//   барабани: будь-який символ, крім '.', — удар.
+// Патерн може бути коротшим за такт — тоді він просто зациклюється всередині такту.
+const BASS_INT = { x: 0, 3: 3, 5: 7, 8: 12 };
+const patHit = (pat, st) => pat.charAt(st % pat.length) !== '.';
+// скільки 16-х лишилось до наступного удару патерна — звідси довжина ноти баса,
+// щоб сусідні ноти не накладались одна на одну незалежно від темпу
+const patGap = (pat, st) => {
+  for (let i = 1; i <= pat.length; i++) if (pat.charAt((st + i) % pat.length) !== '.') return i;
+  return pat.length;
+};
+
+// Спокійна пригодницька тема (A-мінорна пентатоніка) — «глобус» і «затишшя».
+// phr — у яких тактах звучить мелодія; lift — зсув мелодії по тактах;
+// skip — прорідження мелодії ((st + bar) % skip !== 1), 0 = без прорідження.
+const CALM_VARS = [
+  { // 0 — «Мандрівка»: вихідна тема гри
+    roots: [45, 45, 41, 43], bass: 'x.......5.......',
+    mel: [69, 0, 72, 0, 74, 0, 76, 0, 79, 0, 76, 0, 74, 0, 72, 0],
+    phr: [1, 0, 1, 1], lift: [0, 0, -2, 0], skip: 3, melDur: 0.35, melType: 'sine',
+    hat: '....x.......x...',
+  },
+  { // 1 — «Дорога»: бас крокує, останній такт злітає на октаву вгору
+    roots: [41, 43, 45, 45], bass: 'x...5...x...8...',
+    mel: [0, 0, 76, 0, 74, 0, 72, 0, 0, 0, 69, 0, 72, 0, 76, 0],
+    phr: [1, 1, 0, 1], lift: [0, 0, 0, 12], skip: 0, melDur: 0.3, melType: 'sine',
+    hat: '..x...x...x...x.',
+  },
+  { // 2 — «Спокій»: довгі ноти у верхньому регістрі, майже без перкусії
+    roots: [45, 43, 41, 45], bass: 'x...............',
+    mel: [81, 0, 0, 0, 79, 0, 0, 0, 76, 0, 0, 0, 74, 0, 72, 0],
+    phr: [1, 1, 1, 0], lift: [0, 0, 0, 0], skip: 0, melDur: 0.7, melType: 'triangle',
+    hat: '........x.......',
+  },
+  { // 3 — «Низька хода»: мелодія на октаву нижче, бас частіший
+    roots: [45, 41, 43, 41], bass: 'x...x...5...5...',
+    mel: [72, 0, 74, 0, 0, 0, 76, 0, 74, 0, 0, 0, 69, 0, 67, 0],
+    phr: [1, 1, 1, 1], lift: [-12, 0, -12, 0], skip: 4, melDur: 0.4, melType: 'sine',
+    hat: '....x...x...x...',
+  },
+];
+
+// Бойова тема — швидкий пульс. Бос грає той самий банк, але нижче (root 43)
+// і з рифом на два півтони нижче, як було й до варіацій.
+const BATTLE_VARS = [
+  { // 0 — вихідний пульс
+    kick: 'x...x...x...x...', hat: '..x...x...x...x.', bass: 'x.x.x.3.x.x.x.3.',
+    riff: [57, 0, 60, 57, 0, 62, 0, 60, 57, 0, 63, 62, 0, 60, 57, 0],
+    riffBars: [0, 1, 0, 1], riffType: 'square',
+  },
+  { // 1 — синкопа: бочка збивається з долі, риф переїжджає на парні такти
+    kick: 'x...x..x.x..x...', hat: '..x...x...x.x.x.', bass: 'x..x..x.x..x..3.',
+    riff: [0, 0, 57, 0, 60, 0, 62, 0, 0, 0, 63, 0, 62, 0, 60, 0],
+    riffBars: [1, 0, 1, 0], riffType: 'square',
+  },
+  { // 2 — напів-темп: важкі рідкі удари, довгий бас
+    kick: 'x.......x..x....', hat: '....x.......x...', bass: 'x...x...5...x...',
+    riff: [57, 0, 0, 60, 0, 0, 62, 0, 63, 0, 0, 62, 0, 0, 60, 0],
+    riffBars: [0, 1, 1, 0], riffType: 'sawtooth', bassDur: 0.3, riffDur: 0.28,
+  },
+  { // 3 — гонка: рівні шістнадцяті в хеті, риф суцільний у другій половині
+    kick: 'x...x...x...x.x.', hat: 'x.x.x.x.x.x.x.x.', bass: 'x.x.3.x.x.x.3.x.',
+    riff: [57, 0, 59, 0, 60, 0, 62, 63, 0, 62, 0, 60, 0, 59, 57, 0],
+    riffBars: [0, 0, 1, 1], riffType: 'square',
+  },
+];
+
+// order — порядок варіацій по фразах. Довжина 12 при 4 варіаціях: повний цикл
+// утричі довший за банк, а сусідні фрази ніколи не повторюють одна одну підряд.
+const MUSIC = {
+  globe: { theme: 'calm', vars: CALM_VARS, order: [0, 1, 0, 2, 3, 2, 1, 3, 0, 2, 1, 3] },
+  calm: { theme: 'calm', vars: CALM_VARS, hat: true, order: [0, 1, 2, 0, 3, 1, 2, 3, 1, 0, 3, 2] },
+  battle: { theme: 'battle', vars: BATTLE_VARS, root: 45, shift: 0, order: [0, 1, 2, 3, 0, 2, 1, 3, 2, 0, 3, 1] },
+  boss: { theme: 'battle', vars: BATTLE_VARS, root: 43, shift: -2, order: [0, 2, 1, 3, 2, 0, 3, 1, 0, 3, 2, 1] },
+};
+
+const PHRASE_STEPS = 64; // фраза = 4 такти по 16 шістнадцятих
+
 export class AudioMan {
   constructor() {
     this.ctx = null;
@@ -604,36 +692,49 @@ export class AudioMan {
     const step16 = (60 / this.bpm) / 4;
     if (this.nextT < this.ctx.currentTime) this.nextT = this.ctx.currentTime + 0.05;
     while (this.nextT < this.ctx.currentTime + 0.3) {
-      this._playStep(this.musStep % 64, this.nextT);
+      // musStep — наскрізний лічильник, тож номер фрази росте й через зміну режиму:
+      // повернувшись у 'calm' після бою, гравець чує НАСТУПНУ варіацію, а не ту саму
+      this._playStep(this.musStep % PHRASE_STEPS, this.nextT,
+        Math.floor(this.musStep / PHRASE_STEPS));
       this.musStep++;
       this.nextT += step16;
     }
   }
 
-  _playStep(s, t) {
-    const mode = this.mode;
+  // варіація фрази для режиму; змінюється лише на межі фрази, тож нота не рветься
+  _variant(bank, phrase) {
+    const n = bank.order.length;
+    return bank.vars[bank.order[(((phrase % n) + n) % n)] % bank.vars.length];
+  }
+
+  _playStep(s, t, phrase = 0) {
+    const bank = MUSIC[this.mode];
+    if (!bank) return;
+    const v = this._variant(bank, phrase);
     const bar = Math.floor(s / 16); // 0..3
     const st = s % 16;
-    if (mode === 'globe' || mode === 'calm') {
+    if (bank.theme === 'calm') {
       // спокійна пригодницька тема — A-мінорна пентатоніка
-      const bassLine = [45, 45, 41, 43]; // A2 A2 F2 G2
-      if (st === 0) this._note(bassLine[bar], t, 1.6, 0.22, 'triangle');
-      if (st === 8) this._note(bassLine[bar] + 7, t, 0.8, 0.12, 'triangle');
-      const mel = [69, 0, 72, 0, 74, 0, 76, 0, 79, 0, 76, 0, 74, 0, 72, 0];
-      const phr = [1, 0, 1, 1]; // у яких тактах грає мелодія
-      if (phr[bar] && mel[st] && ((st + bar) % 3 !== 1)) {
-        this._note(mel[st] - (bar === 2 ? 2 : 0), t, 0.35, 0.1, 'sine');
+      if (patHit(v.bass, st)) {
+        const iv = BASS_INT[v.bass.charAt(st % v.bass.length)] || 0;
+        // трохи довше за паузу до наступної ноти — легато, підкладка без дірок
+        const dur = patGap(v.bass, st) * ((60 / this.bpm) / 4) * 1.2;
+        this._note(v.roots[bar] + iv, t, dur, iv ? 0.12 : 0.22, 'triangle');
       }
-      if (mode === 'calm' && st % 8 === 4) this._drum('hat', t);
+      if (v.phr[bar] && v.mel[st] && (!v.skip || (st + bar) % v.skip !== 1)) {
+        this._note(v.mel[st] + v.lift[bar], t, v.melDur, 0.1, v.melType);
+      }
+      if (bank.hat && patHit(v.hat, st)) this._drum('hat', t);
     } else {
       // бойова тема — швидкий пульс
-      const root = mode === 'boss' ? 43 : 45; // G2 для боса, A2 для бою
-      if (st % 4 === 0) this._drum('kick', t);
-      if (st % 4 === 2) this._drum('hat', t);
-      if (st % 2 === 0) this._note(root + (st % 8 === 6 ? 3 : 0), t, 0.16, 0.2, 'sawtooth');
-      const riff = [57, 0, 60, 57, 0, 62, 0, 60, 57, 0, 63, 62, 0, 60, 57, 0];
-      if (riff[st] && bar % 2 === 1) {
-        this._note(riff[st] + (mode === 'boss' ? -2 : 0), t, 0.2, 0.12, 'square');
+      if (patHit(v.kick, st)) this._drum('kick', t);
+      if (patHit(v.hat, st)) this._drum('hat', t);
+      if (patHit(v.bass, st)) {
+        const iv = BASS_INT[v.bass.charAt(st % v.bass.length)] || 0;
+        this._note(bank.root + iv, t, v.bassDur || 0.16, 0.2, 'sawtooth');
+      }
+      if (v.riff[st] && v.riffBars[bar]) {
+        this._note(v.riff[st] + bank.shift, t, v.riffDur || 0.2, 0.12, v.riffType);
       }
     }
   }

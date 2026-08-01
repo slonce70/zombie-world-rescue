@@ -45,7 +45,7 @@ try {
       })
       .map((m) => m.dataset.mode);
     return {
-      modes: document.querySelectorAll('.solo-category .solo-mode').length,
+      modes: document.querySelectorAll('#solo-modes .solo-mode').length,
       stormLocked: document.querySelector('.solo-mode[data-mode="storm"]').classList.contains('locked'),
       arenaLocked: document.querySelector('.solo-mode[data-mode="arena"]').classList.contains('locked'),
       worldbossLocked: document.querySelector('.solo-mode[data-mode="worldboss"]').classList.contains('locked'),
@@ -75,6 +75,15 @@ try {
       && !fresh.bankLocked && !fresh.portalLocked && !fresh.mazeLocked && !fresh.humansLocked && !fresh.pvpLocked && !fresh.campLocked
       && fresh.skulls === 0,
     JSON.stringify(fresh));
+  // категорія показує свій склад МІНУС підбірка дня: жодної картки двічі на екрані.
+  // Підбірка рахується від дати, тож очікування будуємо, а не прибиваємо цвяхами.
+  const featuredIds = fresh.recommended.map((x) => x.id);
+  const groupIds = {
+    '⏱️ 5 ХВИЛИН': ['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans'],
+    '🌍 ДОВГА ОПЕРАЦІЯ': ['campaign', 'expedition', 'community', 'storm', 'arena', 'worldboss', 'infected', 'chapter3'],
+  };
+  const expectedSections = Object.entries(groupIds)
+    .map(([title, modes]) => ({ title, modes: modes.filter((id) => !featuredIds.includes(id)) }));
   check('режими згруповані у дві згорнуті категорії за довжиною сесії',
     fresh.categories.length === 2
       && ['5 ХВИЛИН', 'ДОВГА ОПЕРАЦІЯ'].every((name) => fresh.categories.some((x) => x.includes(name)))
@@ -82,16 +91,17 @@ try {
       && fresh.recommended.length === 4
       && new Set(fresh.recommended.map((x) => x.id)).size === fresh.recommended.length
       && fresh.recommended.every((x) => !x.locked)
-      && JSON.stringify(fresh.sections) === JSON.stringify([
-        { title: '⏱️ 5 ХВИЛИН', modes: ['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans'] },
-        { title: '🌍 ДОВГА ОПЕРАЦІЯ', modes: ['campaign', 'expedition', 'community', 'storm', 'arena', 'worldboss', 'infected', 'chapter3'] },
-      ]),
+      && JSON.stringify(fresh.sections) === JSON.stringify(expectedSections),
     JSON.stringify({ categories: fresh.categories, open: fresh.openCategories, recommended: fresh.recommended, sections: fresh.sections }));
+  check('«СЬОГОДНІ» не дублює картки категорій',
+    !featuredIds.some((id) => fresh.sections.some((s) => s.modes.includes(id)))
+      && new Set([...featuredIds, ...fresh.sections.flatMap((s) => s.modes)]).size === 19,
+    JSON.stringify({ featured: featuredIds, sections: fresh.sections }));
   await page.locator('.solo-category[data-category="quick"] > summary').click();
   const trialModes = await page.evaluate(() =>
     [...document.querySelectorAll('.solo-category[data-category="quick"] .solo-mode')].map((m) => m.dataset.mode));
   check('клік по категорії показує тільки її режими',
-    JSON.stringify(trialModes) === JSON.stringify(['knockout', 'radiation', 'pvp', 'bank', 'maze', 'zone-defense', 'soul-collector', 'defense', 'portal', 'turretwar', 'humans']),
+    JSON.stringify(trialModes) === JSON.stringify(expectedSections[0].modes),
     trialModes.join(','));
   await page.locator('.solo-category[data-category="long"] > summary').click();
   check('одночасно розгорнута лише одна категорія',
