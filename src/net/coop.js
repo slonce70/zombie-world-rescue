@@ -385,7 +385,7 @@ export class CoopSession {
     // розсилкою spec), щоб `so` доїхав обом сторонам однаково — лише у чистій кооп-кампанії
     // (не шторм/арена/нокаут/оборона/радіація/турель/світовий бос). Той самий сід-патерн, що соло.
     const isPlainCampaign = !storm && !arena && !knockout && !defense && !radiation && !turretwar && !wb;
-    const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3) : null;
+    const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3, this.difficultyStar()) : null;
     // ⭐ зірка складності їде тим самим шляхом, що ms/mt: значення ХОСТА, гість не рахує своє
     const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, rid: makeRunId(), ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle), ds: this.difficultyStar() };
     this.transport.broadcast({ t: 'start', ...spec }, true);

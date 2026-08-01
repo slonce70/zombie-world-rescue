@@ -157,16 +157,17 @@ export function buildTestApi(game) {
     forceSecondary: (id) => { g._forceSecondary = id; }, // форс типу вторинної цілі на наступний старт
     secondaryState: () => {
       const so = g.level && g.level.secondaryObjective;
-      return so ? { id: so.id, ev: so.ev, target: so.target, progress: so.progress, done: so.done, label: so.label() } : null;
+      return so ? { id: so.id, ev: so.ev, target: so.target, need: so.need, progress: so.progress, done: so.done, label: so.label() } : null;
     },
     // ⭐ v298 «Зірки разом»: форс виконання КОМАНДНОЇ цілі на ХОСТІ (як соло-тести форсять
     // secondaryObjective.done). Хост доганяє прогрес до target через _bumpSecondary → шле `soc`.
     // На гості (mirror) — no-op: прогрес авторитетний у хоста.
+    // v750: force=true — в обхід gate/measure цілі (тест не мусить відтворювати умову).
     forceSecondaryDone: () => {
       const level = g.level;
       const so = level && level.secondaryObjective;
       if (!so || (level.net && !level.net.authority)) return false;
-      g._bumpSecondary(level, so.ev, so.target);
+      g._bumpSecondary(level, so.ev, so.target, true);
       return so.done;
     },
     starState: () => ({

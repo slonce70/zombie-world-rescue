@@ -351,9 +351,11 @@ export function claimStarThresholds(game) {
   for (const th of STAR_THRESHOLDS) {
     if (tot < th.at || game.save.starClaims.includes(th.at)) continue;
     game.save.starClaims.push(th.at);
-    if (th.type === 'coins') game.save.coins += th.n;
-    else if (th.type === 'crystals') game.save.crystals = (game.save.crystals || 0) + th.n;
-    else if (th.type === 'title' && th.id && !game.save.titles.includes(th.id)) game.save.titles.push(th.id);
+    // v750: поріг може дати кілька видів нагороди одразу (36⭐ — титул + кристали),
+    // тож читаємо поля, а не один `type`. Ключ клейма лишається `at` — сумісно зі старим сейвом.
+    if (th.coins) game.save.coins += th.coins;
+    if (th.crystals) game.save.crystals = (game.save.crystals || 0) + th.crystals;
+    if (th.title && !game.save.titles.includes(th.title)) game.save.titles.push(th.title);
     claimed.push(th);
   }
   return claimed;

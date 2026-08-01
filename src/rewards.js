@@ -10,7 +10,7 @@ import { friendFor } from './friends.js';
 import { bumpWeeklyCamp, weeklyCampReminder } from './weeklycamp.js';
 import { PETS, HERO_SKINS, DANCES } from './characters.js';
 import { COUNTRIES, CAMPAIGN_ORDER } from './countries.js';
-import { pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
+import { pickSecondaryObjective, secondaryPool } from './stars.js';
 import { SuperPickup } from './extras.js';
 
 // 🎁 v302: єдина таблиця нагород скринь — числа продубльовані у 4 місцях (соло-хендлери
@@ -139,12 +139,13 @@ export function feedPetFromAlbum(game, id) {
 
 // ⭐ R3 «Зірки разом» (v298): детермінований рол КОМАНДНОЇ вторинної цілі кооп-кампанії.
 // Викликає coop.startLevel ПЕРЕД розсилкою spec, щоб `so` доїхав обом сторонам однаково.
-// Пул звужено (COOP_SECONDARY_IDS) до цілей, які ХОСТ бачить авторитетно для всієї команди
-// (див. коментар у stars.js). Тест форсить тип через _forceSecondary. Повертає {id,target} або null.
-export function rollCoopSecondary(game, countryId, seed) {
+// Пул звужено до цілей, які ХОСТ бачить авторитетно для всієї команди (див. коментар у
+// stars.js), і додатково відфільтрований зіркою складності КІМНАТИ (v750 — вона ж хостова).
+// Тест форсить тип через _forceSecondary. Повертає {id,target} або null.
+export function rollCoopSecondary(game, countryId, seed, diffStar = 1) {
   const country = COUNTRIES[countryId];
   if (!country || !CAMPAIGN_ORDER.includes(countryId)) return null;
-  const pool = COOP_SECONDARY_IDS;
+  const pool = secondaryPool(diffStar, true).map((o) => o.id);
   const forced = game._forceSecondary && pool.includes(game._forceSecondary) ? game._forceSecondary : null;
   const id = forced || pool[(((seed | 0) % pool.length) + pool.length) % pool.length];
   const so = pickSecondaryObjective(country, 0, id);
@@ -156,11 +157,16 @@ export function rollCoopSecondary(game, countryId, seed) {
 // Кооп: прогрес КОМАНДНИЙ і авторитетний у ХОСТА. Гість-дзеркало НЕ тікає локально —
 // він отримує progress у снапшоті (snap.so) і виконання подією `soc`. На виконанні хост
 // шле `soc` → тік+дзвіночок+тост у всіх (як соло).
-export function bumpSecondary(game, level, ev, n = 1) {
+// v750: ціль може мати `gate` (подія зараховується лише за умовою — так живуть цілі-
+// заперечення «не купуй/без гаджета») і `measure` (прогрес = виміряному, а не сумі —
+// комбо). force=true — тестовий шлях (testapi.forceSecondaryDone) в обхід обох.
+export function bumpSecondary(game, level, ev, n = 1, force = false) {
   const so = level && level.secondaryObjective;
   if (!so || so.done || so.ev !== ev) return;
   if (level.net && !level.net.authority) return; // гість не рахує сам — прогрес йде від хоста
-  so.progress = Math.min(so.target, so.progress + n);
+  if (!force && so.gate && !so.gate(level)) return;
+  const next = (!force && so.measure) ? so.measure(level) : so.progress + n;
+  so.progress = Math.min(so.target, Math.max(so.progress, next));
   if (so.progress >= so.target) {
     so.done = true;
     game._secondaryDoneToast(level);

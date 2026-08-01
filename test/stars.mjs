@@ -226,6 +226,163 @@ check(infRes.starUKR === undefined, 'UKR НЕ отримала зірок за �
 check(infRes.claims.length === 0, 'жоден поріг 12/24/36 не нараховано (claims порожній)', JSON.stringify(infRes.claims));
 check(infRes.mercy && infRes.mercy.cid === 'UKR' && infRes.mercy.n === 2, 'mercyDeaths недоторканий (зараження не скидає)', JSON.stringify(infRes.mercy));
 
+// ---------- v750: пул виріс до 14, важкі цілі гейтяться зіркою складності ----------
+console.log('▸ v750: пул цілей у живій сторінці — 14, ★1 лишився дитячим');
+const pools = await page.evaluate(async () => {
+  const m = await import('/src/stars.js');
+  return {
+    all: m.secondaryPool(5).map((o) => o.id),
+    easy: m.secondaryPool(1).map((o) => o.id),
+    coop: [...m.COOP_SECONDARY_IDS],
+  };
+});
+check(pools.all.length === 14, 'пул на ★5 — 14 цілей', String(pools.all.length));
+check(pools.easy.length === 7 && !pools.easy.includes('flawless') && !pools.easy.includes('nogadget'),
+  '★1 — 7 дитячих цілей, важких нема', JSON.stringify(pools.easy));
+check(pools.easy.every((id) => pools.all.includes(id)), 'пул кумулятивний (★1 ⊂ ★5)');
+check(pools.coop.every((id) => pools.all.includes(id)) && !pools.coop.includes('coins') && !pools.coop.includes('headshots'),
+  'кооп-пул — лише хост-авторитетні цілі', JSON.stringify(pools.coop));
+
+console.log('▸ v750: на ★1 забіг отримує ціль саме з дитячого пулу');
+await page.evaluate(() => { window.__game.save.diffStar = 1; });
+await startRun('UKR', null);
+const easyPick = await page.evaluate(() => ({
+  id: window.__game.test.secondaryState().id,
+  star: window.__game.level.diffStar,
+}));
+check(easyPick.star === 1 && pools.easy.includes(easyPick.id),
+  'ціль ★1-забігу з дитячого пулу', JSON.stringify(easyPick));
+
+console.log('▸ v750: «Прокатись на самокаті» зараховується подією поїздки');
+await startRun('UKR', 'scooter');
+const scooter = await page.evaluate(() => {
+  const g = window.__game;
+  const before = g.test.secondaryState();
+  g.level.bus.emit('scooterRide');
+  return { before, after: g.test.secondaryState() };
+});
+check(scooter.before.id === 'scooter' && !scooter.before.done && scooter.after.done,
+  'ціль «самокат» 0/1 → done після поїздки', JSON.stringify(scooter));
+
+console.log('▸ v750: «Підбери N припасів» тікає з пікапів (не з монет)');
+await startRun('UKR', 'pickups');
+const pickups = await page.evaluate(() => {
+  const g = window.__game;
+  g.level.effects.onPickup('coin', 10);          // монети — окрема ціль, не рахуються
+  const afterCoin = g.test.secondaryState().progress;
+  for (let i = 0; i < g.test.secondaryState().target; i++) g.level.effects.onPickup('ammo', 0);
+  return { afterCoin, final: g.test.secondaryState() };
+});
+check(pickups.afterCoin === 0 && pickups.final.done, 'монета не рахується, припаси — так', JSON.stringify(pickups));
+
+console.log('▸ v750: «Переможи N зомбі» тікає з убивств, але салют після боса не дарує ціль');
+await startRun('UKR', 'kills');
+const kills = await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 3; i++) g.level.bus.emit('zombieKilled', { type: 'walker' });
+  const at3 = g.test.secondaryState();
+  g.level.bossDefeated = true;                    // переможна зачистка карти
+  for (let i = 0; i < 20; i++) g.level.bus.emit('zombieKilled', { type: 'walker' });
+  return { at3, afterSweep: g.test.secondaryState() };
+});
+check(kills.at3.progress === 3, 'три вбивства — 3/N', JSON.stringify(kills.at3));
+check(kills.afterSweep.progress === 3 && !kills.afterSweep.done,
+  'зачистка після боса НЕ тікає ціль', JSON.stringify(kills.afterSweep));
+// ⭐ нова ціль так само видима на HUD, як і стара (критерій тікета 09)
+const killsChip = await page.evaluate(() => {
+  const g = window.__game;
+  g.hud.update(0.016);
+  const el = document.getElementById('mission-list');
+  const chip = el ? el.querySelector('.mission.secondary') : null;
+  return chip ? chip.textContent.replace(/\s+/g, ' ').trim() : null;
+});
+check(!!killsChip && /3\/25/.test(killsChip) && /зомб/i.test(killsChip),
+  'чип нової цілі з написом і прогресом на HUD', String(killsChip));
+
+console.log('▸ v750: «Набери комбо ×N» вимірює найкраще комбо');
+await startRun('UKR', 'combo');
+const combo = await page.evaluate(() => {
+  const g = window.__game;
+  const target = g.test.secondaryState().target;
+  for (let i = 0; i < target - 2; i++) g.level.bus.emit('zombieKilled', { type: 'walker' });
+  const mid = g.test.secondaryState();
+  g.level.combo.n = 0;                            // серія обірвалась
+  const afterBreak = g.test.secondaryState();
+  for (let i = 0; i < target; i++) g.level.bus.emit('zombieKilled', { type: 'walker' });
+  return { target, mid, afterBreak, final: g.test.secondaryState() };
+});
+check(combo.mid.progress === combo.target - 2 && combo.afterBreak.progress === combo.mid.progress,
+  'обрив серії не відкочує чип назад', JSON.stringify(combo));
+check(combo.final.done, 'комбо дотягнуто до цілі', JSON.stringify(combo.final));
+
+console.log('▸ v750: ціль-заперечення «Не купуй нічого в магазині» рахується на смерті боса');
+await startRun('UKR', 'noshop');
+const noshop = await page.evaluate(() => {
+  const g = window.__game;
+  g.victoryShown = true;                          // глушимо каскад перемоги — перевіряємо саму ціль
+  g.level.coinsSpent = 250;                       // щось куплено за забіг
+  g.level.bus.emit('bossDied', null);
+  const spent = g.test.secondaryState();
+  g.level.coinsSpent = 0;                         // «чистий» забіг
+  g.level.bus.emit('bossDied', null);
+  return { spent, clean: g.test.secondaryState() };
+});
+check(!noshop.spent.done, 'покупка за забіг ламає ціль', JSON.stringify(noshop.spent));
+check(noshop.clean.done, 'без покупок ціль зараховується на смерті боса', JSON.stringify(noshop.clean));
+// _onBossDied планує _showVictory через 2.4с — даємо таймеру згоріти під victoryShown=true,
+// щоб він не сплив уже в наступному забігу
+await page.waitForTimeout(2600);
+
+console.log('▸ v750: «Не дай босу зачепити тебе» відкривається на старті боса й ламається ударом');
+await startRun('UKR', 'flawless');
+const flawless = await page.evaluate(() => {
+  const g = window.__game;
+  g.victoryShown = true;
+  const beforeBoss = g.level.bossHitFree;
+  g.level.bus.emit('bossStart');
+  const opened = g.level.bossHitFree;
+  g.level.bus.emit('playerHurt', { angle: 0 });
+  g.level.bus.emit('bossDied', null);
+  const hurt = g.test.secondaryState();
+  g.level.bus.emit('bossStart');                  // нове вікно — герой цілий
+  g.level.bus.emit('bossDied', null);
+  return { beforeBoss, opened, hurt, clean: g.test.secondaryState() };
+});
+check(flawless.beforeBoss === undefined && flawless.opened === true,
+  'вікно «без удару» відкривається саме на bossStart', JSON.stringify(flawless));
+check(!flawless.hurt.done, 'удар по герою ламає ціль', JSON.stringify(flawless.hurt));
+check(flawless.clean.done, 'цілий герой — ціль зарахована', JSON.stringify(flawless.clean));
+await page.waitForTimeout(2600); // той самий гард на відкладений _showVictory
+
+console.log('▸ v750: пороги 12/24/36 дають нову вагу нагороди');
+const thresholds = await page.evaluate(async () => {
+  const m = await import('/src/stars.js');
+  return m.STAR_THRESHOLDS.map((th) => ({ at: th.at, coins: th.coins || 0, crystals: th.crystals || 0, title: th.title || null }));
+});
+check(JSON.stringify(thresholds) === JSON.stringify([
+  { at: 12, coins: 2500, crystals: 0, title: null },
+  { at: 24, coins: 0, crystals: 40, title: null },
+  { at: 36, coins: 0, crystals: 100, title: 'star_savior' },
+]), 'нагороди порогів: 2500 монет / 40💎 / титул + 100💎', JSON.stringify(thresholds));
+
+const claimNew = await page.evaluate(() => {
+  const g = window.__game;
+  g.save.stars = { UKR: 3, POL: 3, DEU: 3, FRA: 3, ESP: 3, PRT: 3, ITA: 3, TUR: 3, SWE: 3, EGY: 3, JPN: 3, CHN: 3 };
+  g.save.starClaims = [];
+  g.save.titles = [];
+  const coins = g.save.coins, crystals = g.save.crystals || 0;
+  const claimed = g._claimStarThresholds();
+  return {
+    claimed: claimed.map((th) => th.at),
+    coins: g.save.coins - coins,
+    crystals: (g.save.crystals || 0) - crystals,
+    titles: [...g.save.titles],
+  };
+});
+check(JSON.stringify(claimNew.claimed) === JSON.stringify([12, 24, 36]), 'усі три пороги видано', JSON.stringify(claimNew.claimed));
+check(claimNew.coins === 2500 && claimNew.crystals === 140, '36⭐ повна кампанія: +2500 монет і +140💎', JSON.stringify(claimNew));
+check(claimNew.titles.includes('star_savior'), 'титул «Зоряний рятівник» нараховано', JSON.stringify(claimNew.titles));
+
 check(errors.length === 0, 'без JS-помилок', errors.slice(0, 3).join(' | '));
 console.log(fail === 0 ? '\n🎉 ЗІРКИ OK' : `\n❌ ПРОВАЛЕНО: ${fail}`);
 await browser.close();

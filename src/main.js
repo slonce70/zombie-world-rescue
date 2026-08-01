@@ -80,7 +80,7 @@ import { todaySlots } from './rotation.js';
 import { sanitizeSquad } from './squad.js';
 import { claimSeasonStep, ensureSeason, seasonState, SEASON_STEPS } from './season.js';
 import { TITLES, syncTitles } from './titles.js';
-import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective, COOP_SECONDARY_IDS } from './stars.js';
+import { starTotal, countryStars, STARS_PER_COUNTRY, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, pickSecondaryObjective } from './stars.js';
 import { HiddenRescue, FRIENDS, FRIEND_TOTAL, friendFor, isFriendRescued, rescuedFriendCount } from './friends.js';
 import {
   claimStarEggs, claimFriendEggs, claimBacklogEggs, openEgg, eggOddsText,
@@ -4066,9 +4066,11 @@ class Game {
       if ((!coop || coop.role === 'host') && !isPlayground) level.superEligible = true;
       // ⭐ R3 «Зірки та милосердя»: лише СОЛО-забіг країни кампанії (не інфекція/кооп/полігон).
       if (!coop && !isPlayground && !isInfected && !level.expedition && !operation && CAMPAIGN_ORDER.includes(countryId)) {
-        // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип)
+        // ⭐2 — 1 випадкова вторинна ціль на забіг (варіює за країною й повтором; тест форсить тип).
+        // v750: пул фільтрується зіркою складності забігу — на ★1 набір лишається дитячим,
+        // вимогливі цілі підмішуються лише з ★2 (див. таблицю в stars.js).
         const runIdx = (this.save.missionRuns[countryId] || 0);
-        level.secondaryObjective = pickSecondaryObjective(country, country.seed + runIdx * 3, this._forceSecondary || null);
+        level.secondaryObjective = pickSecondaryObjective(country, country.seed + runIdx * 3, this._forceSecondary || null, level.diffStar);
         // 🕊️ невидиме милосердя: після 2+ смертей поспіль у ЦІЙ країні — тихі послаблення (БЕЗ UI).
         const md = this.save.mercyDeaths;
         level.mercy = (md && md.cid === countryId && md.n >= 2) ? { hpMult: 0.9, medkitMult: 1.5, eliteMinus: 1 } : null;
@@ -4183,7 +4185,10 @@ class Game {
         this.hud.toast(t('У цьому режимі пікапи вимкнені'));
         return;
       }
-      if (!level.playground && !level.noProgress && type !== 'coin') this.quests.onEvent('pickup');
+      if (!level.playground && !level.noProgress && type !== 'coin') {
+        this.quests.onEvent('pickup');
+        this._bumpSecondary(level, 'pickup'); // ⭐2 «Підбери N припасів» (монети — окрема ціль)
+      }
       if (type === 'spacesuit') {
         level.player.equipSpacesuit();
         this.audio.powerup();
@@ -4332,7 +4337,19 @@ class Game {
     });
     level.bus.on('playerDied', () => this._onPlayerDied());
     level.bus.on('playerRevived', () => this._onPlayerRevivedFx());
+    // ⭐2 (v750): цілі-підсумки забігу («не купуй», «без гаджета», «за N хвилин»,
+    // «влучність», «без єдиного удару від боса») тікають РІВНО раз — на смерті боса.
+    // Реєструємо ДО _onBossDied: той ставить bossDefeated і зачищає карту «салютом»,
+    // а умови цілей мають читати стан ДО цього.
+    level.bus.on('bossDied', () => { if (!level.playground && !level.noProgress) this._bumpSecondary(level, 'bossDied'); });
     level.bus.on('bossDied', (boss) => this._onBossDied(boss));
+    // 🛡️ ⭐2 «Не дай босу зачепити тебе»: вікно відкривається на старті бою з босом
+    // і закривається першим же влучанням по герою (обидві події вже є в шині).
+    level.bus.on('bossStart', () => { level.bossHitFree = true; });
+    level.bus.on('playerHurt', () => { level.bossHitFree = false; });
+    // 🛴 ⭐2 «Прокатись на самокаті» (на Місяці — місяцехід тим самим гачком)
+    level.bus.on('scooterRide', () => this._bumpSecondary(level, 'scooter'));
+    level.bus.on('moonRoverRide', () => this._bumpSecondary(level, 'scooter'));
     level.bus.on('hordeEnd', () => {
       if (level.playground || level.noProgress) return;
       level.addCoins(60);
@@ -4414,6 +4431,10 @@ class Game {
       // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
       // лічильник елітів рахує окремий уникредитований гачок нижче (еліт, убитий будь-ким).
       if (z.elite && !level.net) this._bumpSecondary(level, 'elite');
+      // ⭐2 «Переможи N зомбі» / «Переможи N зомбі з пістолета» (v750) — СОЛО тікає тут
+      // (свій кіл-кредит; зброя = level.player.cur читається у gate цілі). Командний
+      // лічильник кооп-кампанії рахує уникредитований гачок нижче, як і з елітами.
+      if (!level.net) this._bumpSecondary(level, 'kill');
       // 🏕️ тижневий квест табору «Здолай N елітних» — тікає з ЛОКАЛЬНИХ елітних кілів
       // гравця (цей гачок уже кіл-кредитований: у коопі-хості чужі кіли відсіяно вище)
       if (z.elite) this._bumpCamp('elite');
@@ -4445,6 +4466,7 @@ class Game {
     level.bus.on('zombieKilled', (z) => {
       if (level.noProgress || !level.net || !level.net.authority) return; // соло/гість тут не рахують
       if (z.elite) this._bumpSecondary(level, 'elite');
+      this._bumpSecondary(level, 'kill'); // ⭐2 «Переможи N зомбі» — командний лічильник (v750)
     });
     level.bus.on('zombieDamaged', (n, z) => {
       if (level.playground || level.noProgress) return;
@@ -4480,6 +4502,7 @@ class Game {
       this.hud.toast(t('Суперсила скінчилась'));
     });
     level.bus.on('gadgetUsed', (id) => {
+      level.gadgetUsed = true; // ⭐2 «Перемож боса без гаджета» — прапорець забігу (v750)
       if (!level.playground && !level.noProgress) {
         this.save.stats.gadgetUses++;
         if (id === 'clone') this.save.stats.cloneUses++;
@@ -4509,6 +4532,9 @@ class Game {
       if (level.bossDefeated) return; // «здача» після перемоги не рахується
       const c = level.combo;
       const momentum = advanceMomentum(c);
+      // ⭐2 «Набери комбо ×N» (v750): ціль вимірює НАЙКРАЩЕ досягнуте комбо (measure),
+      // тож обрив серії не відкочує чип назад
+      if (!level.noProgress) this._bumpSecondary(level, 'combo');
       if (!level.noProgress && c.best > this.save.stats.bestCombo) this.save.stats.bestCombo = c.best;
       if (c.n >= 3) this.hud.comboPop(c.n);
       if (momentum.tierUp) {
@@ -4734,9 +4760,9 @@ class Game {
 
   _feedPetFromAlbum(id) { return feedPetFromAlbum(this, id); }
 
-  _rollCoopSecondary(countryId, seed) { return rollCoopSecondary(this, countryId, seed); }
+  _rollCoopSecondary(countryId, seed, diffStar = 1) { return rollCoopSecondary(this, countryId, seed, diffStar); }
 
-  _bumpSecondary(level, ev, n = 1) { return bumpSecondary(this, level, ev, n); }
+  _bumpSecondary(level, ev, n = 1, force = false) { return bumpSecondary(this, level, ev, n, force); }
 
   _secondaryDoneToast(level) { return secondaryDoneToast(this, level); }
 

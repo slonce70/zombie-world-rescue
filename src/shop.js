@@ -384,6 +384,9 @@ export class Shop {
       save.coins -= price;
       if (!save.stats || typeof save.stats !== 'object') save.stats = {};
       save.stats.coinsSpent = (save.stats.coinsSpent || 0) + price;
+      // ⭐2 «Не купуй нічого в магазині» (v750): витрати ЦЬОГО забігу — на рівні,
+      // щоб ціль читала лише свій забіг, а не сумарний лічильник сейва
+      if (game.level) game.level.coinsSpent = (game.level.coinsSpent || 0) + price;
     }
     if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin && !item.cloneSkin && !item.contract) save.upgrades[id] = count + 1;
     if (item.skin) {
