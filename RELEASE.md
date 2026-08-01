@@ -60,7 +60,8 @@ Push у `main` (і будь-який PR) запускає рівно дві бл
 - **`quick`** (ліміт 12 хв, без Chromium) — `version-sync`, `sw-cache`, `i18n-parity`,
   `community-schema`, `community-api` і швидкі доменні юніти одним `node --test`:
   `worldfront-unit`, `worldevents`, `expedition-unit`, `season-unit`, `squad-unit`,
-  `combat-momentum-unit`. Увесь набір локально — менше секунди.
+  `combat-momentum-unit`, `runbuild-unit`, `countrypowers-unit`, `tier2-unit`, `stars-unit`.
+  Увесь набір локально — менше секунди.
 - **`smoke`** (ліміт 20 хв, з Chromium) — `npm test` (`test/smoke.mjs`: глобус, вхід у рівень,
   рух, постріл, чиста консоль), `combat-reborn` і `save-migration`. Статичний сервер тести
   піднімають самі, окремий крок не потрібен. Локально всі три — близько хвилини.
