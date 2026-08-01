@@ -24,6 +24,7 @@ const cfg = await page.evaluate(async () => {
   out.extra = C && C.extraZombie;
   out.bossStyle = C && C.boss.style;
   out.bossHp = C && C.boss.hp;
+  out.jpnBossHp = COUNTRIES.JPN.boss.hp;
   out.biome = C && C.biome;
   out.hasBiome = !!(C && BIOMES[C.biome]);
   out.coin = C && C.coinReward;
@@ -51,7 +52,9 @@ check(cfg.extra === 'terracotta', 'унікальний моб Китаю — te
 check((cfg.types.terracotta || 0) > 0, 'теракотові воїни присутні у спавні Китаю', JSON.stringify(cfg.types));
 check(cfg.terraBuilt, 'spawn(terracotta) будує броньованого воїна-чарджера з HP країни', JSON.stringify({ hp: cfg.terraHp, expected: cfg.terraExpectedHp, errors: cfg.errors }));
 check(cfg.bossStyle === 'emperor', 'бос — стиль emperor', cfg.bossStyle);
-check(cfg.bossHp === 7600 && cfg.bossHp > 7200, 'бос HP 7600 (вище за JPN 7200)', String(cfg.bossHp));
+// v750: звіряємо з JPN, а не з константою — крива складності перебалансовується (тікет 06),
+// а важлива тут саме монотонність «фінал кампанії важчий за передостанню країну».
+check(cfg.bossHp > cfg.jpnBossHp, `бос HP ${cfg.bossHp} (вище за JPN ${cfg.jpnBossHp})`, String(cfg.bossHp));
 check(cfg.emperorBuilt, 'makeBoss(emperor) будує риг без помилок', cfg.errors.join('|'));
 check(cfg.coin === 900, 'нагорода — 900 монет (як фінал кампанії)', String(cfg.coin));
 check(Array.isArray(cfg.landmarks) && cfg.landmarks.includes('greatwall'), 'ландмарк Велика стіна на карті', JSON.stringify(cfg.landmarks));

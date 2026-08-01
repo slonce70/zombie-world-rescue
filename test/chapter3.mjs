@@ -54,16 +54,19 @@ check(lab.missions > 0 && lab.zombies > 0 && lab.modeId === 'campaign', 'LAB —
 // Глобальний перф-борг «менше акторів/instancing» — окрема задача з аудиту v232.
 check(lab.calls <= 700, 'draw calls не гірше Острова Динозаврів (≤700)', lab.calls);
 
-// бос: стиль slime, 9000 HP, щит-фази і призов крапель
-const boss = await page.evaluate(() => {
+// бос: стиль slime, HP з конфігу країни, щит-фази і призов крапель.
+// v750: HP звіряємо з COUNTRIES.LAB.boss.hp, а не з константою — крива складності
+// перебалансовується (тікет 06), і тест має ловити регресію, а не число з минулого релізу.
+const boss = await page.evaluate(async () => {
   const g = window.__game;
+  const { COUNTRIES } = await import('/src/countries.js');
   const b = g.level.zombies.spawnBoss();
   g.test.god();
   // цілі присипляємо, щоб update не відволікався
   for (const z of g.level.zombies.list) if (z !== b) z.sleeping = true;
-  return { style: b.bossStyle, hp: b.maxHp };
+  return { style: b.bossStyle, hp: b.maxHp, want: COUNTRIES.LAB.boss.hp };
 });
-check(boss.style === 'slime' && boss.hp === 9000, 'МЕГА-СЛИЗНЯК: стиль slime, 9000 HP', JSON.stringify(boss));
+check(boss.style === 'slime' && boss.hp === boss.want, `МЕГА-СЛИЗНЯК: стиль slime, ${boss.want} HP`, JSON.stringify(boss));
 
 const phases = await page.evaluate(() => {
   const g = window.__game;

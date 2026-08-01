@@ -23,6 +23,9 @@ const cfg = await page.evaluate(async () => {
   out.extra = L && L.extraZombie;
   out.bossStyle = L && L.boss.style;
   out.bossHp = L && L.boss.hp;
+  out.chnBossHp = COUNTRIES.CHN.boss.hp;
+  out.chnHp = COUNTRIES.CHN.difficulty.hp;
+  out.lostHp = L && L.difficulty.hp;
   out.biome = L && L.biome;
   out.hasBiome = !!(L && BIOMES[L.biome]);
   out.reward = L && L.weaponReward;
@@ -45,7 +48,10 @@ check(!cfg.inOrder && cfg.count >= 10, 'LOST — бонус ПОЗА CAMPAIGN_OR
 check(cfg.hasBiome && cfg.biome === 'prehistoric', 'біом prehistoric існує', cfg.biome);
 check(cfg.bossStyle === 'rex', 'бос — стиль rex (тиранозавр)', cfg.bossStyle);
 check(cfg.rexBuilt, 'makeBoss(rex) будує риг без помилок', cfg.errors.join('|'));
-check(cfg.bossHp > 7200, 'бос — найміцніший (фінал, > JPN)', String(cfg.bossHp));
+// v750: звіряємо з ФІНАЛОМ КАМПАНІЇ, а не з константою — острів відкривається лише після
+// всіх 12 країн, тож він мусить лишатись важчим за Китай і за складністю, і за босом.
+check(cfg.bossHp > cfg.chnBossHp && cfg.lostHp > cfg.chnHp,
+  `бос — найміцніший (фінал, > CHN ${cfg.chnBossHp}; складність ${cfg.lostHp} > ${cfg.chnHp})`, String(cfg.bossHp));
 check(cfg.reward === 'laser', 'нагорода — ЛАЗЕР', cfg.reward);
 check(cfg.extra === 'toro', 'унікальний моб — toro (стадо)', cfg.extra);
 check(Array.isArray(cfg.landmarks) && cfg.landmarks.includes('volcano'), 'вулкан-ландмарк на карті', JSON.stringify(cfg.landmarks));
