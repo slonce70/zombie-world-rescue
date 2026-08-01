@@ -48,3 +48,19 @@ git worktree add /tmp/baseline HEAD && cd /tmp/baseline && node test/<тест>.
 
 Українська — мова оригіналу коду й UI. `en.js`/`ru.js` — переклади.
 Коментарі в коді українською, як у решті проєкту.
+
+## Agent skills
+
+### Issue tracker
+
+Локальний markdown: спеки й тікети живуть у `.scratch/<feature-slug>/`.
+Див. `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Стандартний словник із пʼяти ролей. Див. `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` і `docs/adr/` у корені репозиторію.
+Див. `docs/agents/domain.md`.
