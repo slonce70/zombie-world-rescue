@@ -140,7 +140,11 @@ test('умови важких цілей читають стан рівня, а 
 
   const noshop = pickSecondaryObjective(COUNTRY, 0, 'noshop');
   assert.equal(noshop.gate(lvl()), true, 'нічого не куплено — ціль зараховується');
-  assert.equal(noshop.gate(lvl({ coinsSpent: 300 })), false, 'покупка за забіг ламає ціль');
+  assert.equal(noshop.gate(lvl({ shopUsed: false })), true, 'магазином не користувались — ціль жива');
+  // v751: прапорець ставить shop.buy() після БУДЬ-ЯКОЇ покупки — байдуже, якою валютою
+  assert.equal(noshop.gate(lvl({ shopUsed: true })), false, 'покупка за забіг ламає ціль');
+  // джерело правди одне: монетний лічильник забігу ціль більше не гейтить
+  assert.equal(noshop.gate(lvl({ coinsSpent: 300 })), true, 'старий монетний лічильник ціль не тримає');
 
   const nogadget = pickSecondaryObjective(COUNTRY, 0, 'nogadget');
   assert.equal(nogadget.gate(lvl()), true);

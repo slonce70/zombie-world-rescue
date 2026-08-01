@@ -3782,6 +3782,10 @@ class Game {
       stats: { kills: 0, shotsFired: 0, shotsHit: 0, coinsEarned: 0, deaths: 0, time: 0 },
       combo: { n: 0, t: 0, best: 0 },
       bossDefeated: false,
+      // 🛒 ⭐2 «Не купуй нічого в магазині»: прапорець ЦЬОГО забігу — shop.buy() ставить
+      // його після будь-якої успішної покупки (монети/кристали/радіація). Живе рівно
+      // один забіг: новий level — новий false, сумарна статистика сейва тут ні до чого.
+      shopUsed: false,
       // кооп: net ставиться нижче; netEv — безпечна заглушка для соло
       net: null,
       mirror: isGuest,

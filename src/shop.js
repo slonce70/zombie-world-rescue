@@ -384,10 +384,17 @@ export class Shop {
       save.coins -= price;
       if (!save.stats || typeof save.stats !== 'object') save.stats = {};
       save.stats.coinsSpent = (save.stats.coinsSpent || 0) + price;
-      // ⭐2 «Не купуй нічого в магазині» (v750): витрати ЦЬОГО забігу — на рівні,
-      // щоб ціль читала лише свій забіг, а не сумарний лічильник сейва
-      if (game.level) game.level.coinsSpent = (game.level.coinsSpent || 0) + price;
     }
+    // 🛒 ⭐2 «Не купуй нічого в магазині» (v751): прапорець ЗАБІГУ, а не лічильник монет.
+    // До v751 тут ріс level.coinsSpent — і тільки всередині гілки «ціна в монетах», тож
+    // уся кристалово-радіаційна вітрина (бокси, скіни, гаджети, обмін валют, контракт)
+    // ціль не ламала взагалі. Питання цілі — «чи користувався магазином», тож ставимо
+    // після БУДЬ-ЯКОЇ успішної покупки, якою б валютою за неї не платили (у т.ч. якщо
+    // колись з'явиться товар за нуль: скористався магазином — ціль не твоя).
+    // Сюди доходить лише реальна покупка: усі відмови (немає валюти, МАКС, needsGadget/
+    // needsUpgrade/needsSkin, замок ярусу 2, повна броня) і ПЕРШИЙ тап підтвердження
+    // ярусу 2 вийшли з buy() вище. game.level гарантовано є — без нього не було б player.
+    game.level.shopUsed = true;
     if (item.max !== Infinity && !item.weapon && !item.gadget && !item.pet && !item.towerSkin && !item.hyper && !item.skin && !item.cloneSkin && !item.contract) save.upgrades[id] = count + 1;
     if (item.skin) {
       if (!save.skins.includes(item.skin)) save.skins.push(item.skin);

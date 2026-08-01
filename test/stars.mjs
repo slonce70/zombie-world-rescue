@@ -320,10 +320,10 @@ await startRun('UKR', 'noshop');
 const noshop = await page.evaluate(() => {
   const g = window.__game;
   g.victoryShown = true;                          // глушимо каскад перемоги — перевіряємо саму ціль
-  g.level.coinsSpent = 250;                       // щось куплено за забіг
+  g.level.shopUsed = true;                        // щось куплено за забіг (будь-яка валюта)
   g.level.bus.emit('bossDied', null);
   const spent = g.test.secondaryState();
-  g.level.coinsSpent = 0;                         // «чистий» забіг
+  g.level.shopUsed = false;                       // «чистий» забіг
   g.level.bus.emit('bossDied', null);
   return { spent, clean: g.test.secondaryState() };
 });
