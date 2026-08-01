@@ -196,6 +196,30 @@ try {
     JSON.stringify({ honest: honest.made, burst: burst.made }));
   check(burst.fires <= 12, 'одночасно живих плям не більше за стелю', JSON.stringify(burst));
 
+  // ── 6b. Підроблений hyper: турель гостя не стає гіперзарядженою ────────────
+  // (батут колайдера не лишає, тож його місце вільне для турелі)
+  await B.evaluate((s) => window.__send('turret', s.x, s.z, true), sTramp);
+  await until((v) => v.turrets >= 1, 'турель гостя');
+  const turret = await A.evaluate((p) => {
+    const g = window.__game;
+    const gd = g.level.gadgets;
+    const guest = gd.turrets.find((tu) => tu.ownerPid === p);
+    // еталон: така сама турель, поставлена ХОСТОМ і свідомо без гіперзаряду
+    const q = g.level.player.pos;
+    const s = g.level.world.collide(q.x + 2.4, q.z, 0.7);
+    gd.placeTurretAt(s.x, s.z, 1, false);
+    const own = gd.turrets.find((tu) => tu.ownerPid === 1);
+    return {
+      guest: guest ? { hp: guest.hp, dmg: guest.dmg } : null,
+      plain: own ? { hp: own.hp, dmg: own.dmg } : null,
+    };
+  }, pid);
+  check(!!turret.guest, 'чесна турель гостя стала у хоста', JSON.stringify(turret));
+  // порівнюємо саме шкоду: у гіпер-турелі вона 25 замість 14, а от hp у неї МЕНШЕ
+  // (100 проти 120) і воно ще й тане від зомбі — за hp гіпер не впізнати
+  check(!!turret.guest && !!turret.plain && turret.guest.dmg === turret.plain.dmg,
+    'підроблений hyper турель не посилив — шкода звичайна', JSON.stringify(turret));
+
   // ── 7. Хост сам собі авторитет: його гаджети лімітом не зачеплені ──────────
   const hostPlaced = await A.evaluate(() => {
     const g = window.__game;

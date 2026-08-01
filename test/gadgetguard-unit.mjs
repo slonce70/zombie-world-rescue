@@ -147,12 +147,61 @@ test('право на картку: сила зі спільної збірки 
   const twice = createGadgetGuard();
   const r = checkGadget(twice, 'firetrail', 1000, { build: ['firetrail', 'dmg25', 'firetrail'], strong: true });
   assert.ok(r.ok && r.strong, 'двічі у збірці — сильний слід законний');
+});
 
-  // роздача і збірка складаються: разом це теж «дали двічі»
-  const mixed = createGadgetGuard();
-  grantDraftCards(mixed, ['firetrail']);
-  const sum = checkGadget(mixed, 'firetrail', 1000, { build: ['firetrail'], strong: true });
-  assert.ok(sum.ok && sum.strong, 'роздача + збірка = картка була двічі');
+test('набір драфту дає право рівно на ОДНУ картку', () => {
+  const g = createGadgetGuard();
+  grantDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
+  assert.equal(g.offers, 1, 'набір із трьох карток — це один вибір, а не три');
+  assert.ok(ok(g, 'firetrail', 1000), 'свій єдиний вибір гість може витратити на слід');
+  assert.equal(g.claimedN, 1, 'вибір списано рівно один раз');
+  assert.ok(ok(g, 'firetrail', 1000 + GADGET_LIMITS.firetrail.minGapMs),
+    'узяту картку далі ставимо вільно — вибір уже списаний');
+  assert.equal(g.claimedN, 1, 'повторний ужиток тієї ж картки бюджет не витрачає');
+
+  // той самий набір, але гість витратив свій вибір на іншу картку
+  const spent = createGadgetGuard();
+  grantDraftCards(spent, ['firetrail', 'dmg25', 'spd12']);
+  spent.claimed.dmg25 = true;
+  spent.claimedN = 1;
+  assert.equal(why(spent, 'firetrail', 1000), 'nocard', 'другої картки з одного набору не буває');
+  grantDraftCards(spent, ['firetrail', 'nades4', 'maxhp40']);
+  assert.ok(ok(spent, 'firetrail', 1000), 'новий набір — новий вибір');
+});
+
+test('дві роздачі однієї картки самі по собі не дають посилення', () => {
+  const g = createGadgetGuard();
+  grantDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
+  grantDraftCards(g, ['firetrail', 'nades4', 'maxhp40']);
+  const r = checkGadget(g, 'firetrail', 1000, { strong: true });
+  assert.ok(r.ok, 'слід пускаємо');
+  assert.equal(r.strong, false, '«показали двічі» не означає «взяв двічі»');
+
+  // і скільки б наборів не роздали — право не накопичується понад їхню кількість
+  const many = createGadgetGuard();
+  for (let i = 0; i < 5; i++) grantDraftCards(many, ['firetrail', 'dmg25', 'spd12']);
+  assert.equal(many.offers, 5, 'пʼять наборів — пʼять виборів');
+  assert.equal(checkGadget(many, 'firetrail', 1000, { strong: true }).strong, false,
+    'посилення шляхом роздач не дається ніколи');
+  assert.equal(many.claimedN, 1, 'узята картка витратила рівно один вибір');
+  assert.ok(many.claimedN <= many.offers, 'взято не більше, ніж роздано');
+});
+
+test('підроблений прапорець посилення не діє там, де в хоста немає даних', () => {
+  const g = createGadgetGuard();
+  // 🤖 турель і ☄️ метеорит: посилення дає КУПЛЕНИЙ гіперзаряд, хост про покупки
+  // гостя не знає — прапорець із повідомлення тут не значить нічого
+  const turret = checkGadget(g, 'turret', 1000, { strong: true, active: 0 });
+  assert.ok(turret.ok, 'звичайна турель гостя як ставилась, так і ставиться');
+  assert.equal(turret.strong, false, 'але гіперзарядженою вона від прапорця не стає');
+
+  const meteor = checkGadget(g, 'meteor', 1000, { strong: true });
+  assert.ok(meteor.ok, 'звичайний метеорит працює як раніше');
+  assert.equal(meteor.strong, false, 'гіпер-версія від прапорця не будується');
+
+  // те саме для решти типів каналу
+  assert.equal(checkGadget(g, 'wall', 1000, { strong: true, active: 0 }).strong, false, 'барикада');
+  assert.equal(checkGadget(g, 'tramp', 1000, { strong: true, active: 0 }).strong, false, 'батут');
 });
 
 test('право на картку: пускаємо лише те, що хост роздав саме цьому гостю', () => {
@@ -168,20 +217,13 @@ test('право на картку: пускаємо лише те, що хос�
   assert.equal(why(other, 'firetrail', 3000), 'nocard', 'сміття в наборі права не дає');
 });
 
-test('подвійна картка: сильний слід лише тому, кому її роздавали двічі', () => {
-  const once = createGadgetGuard();
-  grantDraftCards(once, ['firetrail']);
-  const r1 = checkGadget(once, 'firetrail', 4000, { strong: true });
-  assert.ok(r1.ok, 'слід пускаємо');
-  assert.equal(r1.strong, false, 'але слабким — узяти картку двічі гість не міг');
-
-  const twice = createGadgetGuard();
-  grantDraftCards(twice, ['firetrail']);
-  grantDraftCards(twice, ['firetrail']);
-  const r2 = checkGadget(twice, 'firetrail', 4000, { strong: true });
-  assert.ok(r2.ok && r2.strong, 'роздавали двічі — сильний слід законний');
-  const r3 = checkGadget(twice, 'firetrail', 4000 + GADGET_LIMITS.firetrail.minGapMs);
-  assert.equal(r3.strong, false, 'без прапорця слід лишається слабким');
+test('посилення: без прапорця його не буває навіть за авторитетних даних', () => {
+  const g = createGadgetGuard();
+  const build = ['firetrail', 'firetrail'];
+  const asked = checkGadget(g, 'firetrail', 4000, { build, strong: true });
+  assert.ok(asked.ok && asked.strong, 'просив і мав право — отримав');
+  const quiet = checkGadget(g, 'firetrail', 4000 + GADGET_LIMITS.firetrail.minGapMs, { build });
+  assert.ok(quiet.ok && quiet.strong === false, 'не просив — слід лишається слабким');
 });
 
 test('чесний темп: жодної відмови', () => {
