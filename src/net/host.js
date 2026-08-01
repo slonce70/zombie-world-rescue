@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 import { PING_PHRASES } from './coop.js';
+import { checkGadget, createGadgetGuard, grantDraftCards } from './gadgetguard.js';
 import { t } from '../i18n.js';
 import { WEAPONS } from '../player.js';
 
@@ -27,6 +28,22 @@ const clampHitMeta = (h) => ({
 });
 const isVec3 = (a) => Array.isArray(a) && a.length >= 3
   && isFinite(a[0]) && isFinite(a[1]) && isFinite(a[2]);
+
+// 🧰 Хто що ставить за повідомленням гостя. Ключі мусять збігатися з
+// `GADGET_LIMITS` (gadgetguard.js): тип без рядка в таблиці лімітів не проходить
+// `checkGadget`, тож новий гаджет неможливо додати повз перевірку — а звірку
+// обох таблиць тримає `test/gadgetguard-unit.mjs`.
+const GADGET_PLACERS = {
+  wall: (g, d, pid) => g.placeWallAt(d.x, d.z, d.yaw, pid),
+  tramp: (g, d, pid) => g.placeTrampAt(d.x, d.z, pid),
+  turret: (g, d, pid, strong) => g.placeTurretAt(d.x, d.z, pid, strong),
+  // ☄️ метеорит на найближчого до гостя
+  meteor: (g, d, pid, strong) => g.hostMeteor(d.x, d.z, strong),
+  // 🌋 картка драфту «Вогняний слід» гостя: шкоду вогню ставить ХОСТ (гість малює
+  // лише картинку). `strong` тут означає «гість узяв картку двічі» — окремого поля
+  // під DPS у каналі гаджетів немає, а числа картки й так фіксовані.
+  firetrail: (g, d, pid, strong) => g.hostFireTrail(d.x, d.z, strong),
+};
 
 export class HostNet {
   constructor(session, level) {
@@ -97,7 +114,20 @@ export class HostNet {
     this.level.players = [this.hostProxy, ...this.remotes.values()];
   }
 
-  ev(...args) { this.evQueue.push(args); }
+  ev(...args) {
+    // 🎲 роздача набору драфту гостю — ЄДИНЕ джерело його права на карткові ефекти.
+    // Ловимо саме тут, у момент відправки: формат повідомлень не змінюється,
+    // гість нічого зайвого не шле, а хост веде власний облік того, що роздав.
+    if (args[0] === 'dro') grantDraftCards(this._guard(args[1]), args[2]);
+    this.evQueue.push(args);
+  }
+
+  // стан лімітів каналу гаджетів живе на самому гості: відвалився — стан пішов з ним
+  _guard(pid) {
+    const rp = this.remotes.get(pid);
+    if (!rp) return null;
+    return rp.gadgetGuard || (rp.gadgetGuard = createGadgetGuard());
+  }
 
   // 📣 пінг хоста: розсилаємо подію всім гостям (від pid 1)
   hostPing(i) { this.ev('pg', 1, i | 0); }
@@ -397,20 +427,37 @@ export class HostNet {
     const level = this.level;
     const rp = this.remotes.get(from);
     if (!rp) return;
+    // невідомий тип — мовчки в нікуди (і повз таблицю лімітів пройти теж нікуди)
+    const place = GADGET_PLACERS[d.kind];
+    if (!place) return;
     // NaN/Infinity-координати обходять перевірки відстані нижче (NaN > 6 === false), тож гаджет
     // міг би лягти в NaN-точку й піти у снапшот усім. Відкидаємо нескінченні координати/кут.
     if (!Number.isFinite(d.x) || !Number.isFinite(d.z) || (d.yaw != null && !Number.isFinite(d.yaw))) return;
     if (Math.hypot(rp.pos.x - d.x, rp.pos.z - d.z) > 6) return;
     const solved = level.world.collide(d.x, d.z, 0.7);
     if (Math.hypot(solved.x - d.x, solved.z - d.z) > 0.4) return;
-    if (d.kind === 'wall') level.gadgets.placeWallAt(d.x, d.z, d.yaw, from);
-    else if (d.kind === 'tramp') level.gadgets.placeTrampAt(d.x, d.z, from);
-    else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from, !!d.hyper);
-    else if (d.kind === 'meteor') level.gadgets.hostMeteor(d.x, d.z, !!d.hyper); // ☄️ метеорит на найближчого до гостя
-    // 🌋 картка драфту «Вогняний слід» гостя: шкоду вогню ставить ХОСТ (гість малює
-    // лише картинку). `hyper` тут означає «гість узяв картку двічі» — окремого поля
-    // під DPS у каналі гаджетів немає, а числа картки й так фіксовані.
-    else if (d.kind === 'firetrail') level.gadgets.hostFireTrail(d.x, d.z, !!d.hyper);
+    // 🛡️ ліміти каналу: право на картку + частота + стеля живих обʼєктів.
+    // Рішення приймає gadgetguard.js, і саме ОСТАННІМ кроком: невдале місце не
+    // має зʼїдати бюджет чесного гостя. Понадлімітне повідомлення просто зникає.
+    const verdict = checkGadget(this._guard(from), d.kind, performance.now(), {
+      strong: !!d.hyper,
+      storm: !!level.storm,
+      active: this._liveGadgets(d.kind, from),
+    });
+    if (!verdict.ok) return;
+    place(level.gadgets, d, from, verdict.strong);
+  }
+
+  // скільки обʼєктів цього типу гість тримає живими у світі просто зараз.
+  // Стіни, батути й турелі памʼятають власника — рахуємо по ньому; метеорит і
+  // вогняний слід власника не мають, їх guard рахує сам за часом життя.
+  _liveGadgets(kind, pid) {
+    const g = this.level.gadgets;
+    if (!g) return 0;
+    if (kind === 'wall') return g.walls.filter((w) => w.ownerPid === pid).length;
+    if (kind === 'tramp') return g.tramps.filter((tr) => tr.ownerPid === pid).length;
+    if (kind === 'turret') return g.turrets.filter((tu) => tu.ownerPid === pid).length;
+    return 0;
   }
 
   // ---------- зомбі / гравці: гачки для ігрових систем ----------

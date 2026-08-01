@@ -2037,18 +2037,20 @@ export class Gadgets {
     const level = this.level;
     const y = level.world.groundH(x, z);
     const nid = level.net && level.net.authority ? level.net.allocId() : ++this._gidSeq;
-    this._buildTramp(nid, x, y, z);
+    this._buildTramp(nid, x, y, z, ownerPid);
     if (level.net && level.net.authority) level.netEv('tramp', nid, ownerPid, Math.round(x * 10) / 10, Math.round(z * 10) / 10);
     return true;
   }
 
-  _buildTramp(nid, x, y, z) {
+  // ownerPid памʼятає і батут — як стіна й турель. Хосту він потрібен, щоб рахувати
+  // стелю живих обʼєктів гостя (`net/host.js` → `_liveGadgets`).
+  _buildTramp(nid, x, y, z, ownerPid = 1) {
     const mesh = makeTrampolineMesh();
     mesh.position.set(x, y, z);
     this.level.scene.add(mesh);
     const pad = { x, z, y, power: 15, cd: 0 };
     this.level.world.jumpPads.push(pad);
-    this.tramps.push({ mesh, pad, nid });
+    this.tramps.push({ mesh, pad, nid, ownerPid });
     if (this.tramps.length > 3) {
       const old = this.tramps.shift();
       this._disposeTramp(old);
@@ -2068,7 +2070,7 @@ export class Gadgets {
   // гість: батут із мережі
   netTramp(nid, ownerPid, x, z) {
     if (this.tramps.some((t) => t.nid === nid)) return;
-    this._buildTramp(nid, x, this.level.world.groundH(x, z), z);
+    this._buildTramp(nid, x, this.level.world.groundH(x, z), z, ownerPid);
   }
 
   netTrampGone(nid) {

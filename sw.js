@@ -94,6 +94,7 @@ const SHELL = [
   './src/net/transport.js',
   './src/net/coop.js',
   './src/net/host.js',
+  './src/net/gadgetguard.js',
   './src/net/client.js',
   './src/net/remoteplayer.js',
   './src/net/league.js',
