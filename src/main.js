@@ -4151,8 +4151,11 @@ class Game {
 
     level.effects.getPlayerPos = () => level.player.pos;
     level.effects.getMagnetActive = () => level.player.buffs.magnet > 0;
-    // 🌟 «Магніт-буря»: тягне монети з усієї мапи (радіус ∞) поки сила активна
-    level.effects.getSuperMagnet = () => !!(level.player.superPower && level.player.superPower.type === 'magnet');
+    // 🌟 «Магніт-буря»: тягне монети з усієї мапи (радіус ∞) поки сила активна.
+    // 🧲 картка драфту «Магніт монет» тягне ті самі монети тим самим механізмом,
+    // тільки до кінця забігу — власного магніту не заводимо.
+    level.effects.getSuperMagnet = () => !!(level.player.superPower && level.player.superPower.type === 'magnet')
+      || (level.player.coinMagnet || 0) > 0;
     // 🐾 R5: рівень активного петса трохи розширює радіус магніту монет (×1.05/×1.10). Супер виграє.
     level.effects.getPetMagnet = () => activePetMagnet(this.save);
     level.effects.zombieHitTest = (origin, dir, maxD) => level.zombies.hitTest(origin, dir, maxD);
@@ -4392,6 +4395,8 @@ class Game {
       // 🎇 картка драфта «Вибухове добивання»: убитий зомбі вибухає (той самий гачок,
       // що й вампіризм вище — гачок уже кіл-кредитований, чужі перемоги сюди не доходять)
       if (lp.killBlast > 0) this._killBlast(level, z);
+      // ⏱️ картка драфта «Гарячі руки»: вбивство відкриває вікно миттєвої перезарядки
+      if (lp.killReload > 0 && lp.health > 0) lp.killReloadT = lp.killReload;
       if (level.noProgress) return;
       this.save.stats.killed++;
       // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
@@ -4559,9 +4564,13 @@ class Game {
               magnet: pl.pid === 1 ? level.player.buffs.magnet > 0 : !!pl.magnet,
               // 🌟 «Магніт-буря» в коопі: монети тягне ∞-радіусом ЛИШЕ гравцю з активною
               // силою «магніт». pid 1 (хост) — свій player.superPower; гості — мапа superActive.
+              // 🧲 картка драфту «Магніт монет» дає той самий ∞-радіус: у хоста читаємо
+              // поле гравця, у гостя — прапорець із його p-пакета (біт 2048).
               superMagnet: pl.pid === 1
-                ? !!(level.player.superPower && level.player.superPower.type === 'magnet')
-                : ((level.superActive && level.superActive.get(pl.pid) || {}).power === 'magnet'),
+                ? (!!(level.player.superPower && level.player.superPower.type === 'magnet')
+                  || (level.player.coinMagnet || 0) > 0)
+                : (((level.superActive && level.superActive.get(pl.pid) || {}).power === 'magnet')
+                  || !!pl.coinMagnet),
               pid: pl.pid,
               // pid 1 — снапшот у player.pickupMult (заморожено на старті); гості — роль з ростера
               pickMult: pl.pid === 1 ? (level.player.pickupMult || 1)

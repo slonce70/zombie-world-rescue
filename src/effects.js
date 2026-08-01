@@ -1688,9 +1688,12 @@ export class Effects {
         const dz = pp.z - c.mesh.position.z;
         const d = Math.hypot(dx, dz);
         const magnetOn = this.getMagnetActive && this.getMagnetActive();
+        // 🧲 «Магніт-буря» і картка драфту «Магніт монет» — той самий ∞-радіус, що й у хоста
+        // (сам підбір усе одно вирішує хост, тут лише картинка).
+        const superOn = this.getSuperMagnet && this.getSuperMagnet();
         // 🎭 гість-scout бачить ширший магніт-радіус (підбір усе одно вирішує хост)
         const pm = (L.player && L.player.pickupMult) || 1;
-        const magnetR = (c.type === 'coin' ? (magnetOn ? 22 : 5) : 2.2) * pm;
+        const magnetR = (c.type === 'coin' ? (superOn ? 9999 : magnetOn ? 22 : 5) : 2.2) * pm;
         if (d < magnetR && d > 0.01) {
           const pull = (c.type === 'coin' ? 14 : 8) * dt / Math.max(d, 0.5);
           c.mesh.position.x += dx * pull;

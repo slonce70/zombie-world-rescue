@@ -132,6 +132,9 @@ export class GuestNet {
     if (p.gadgetShield > 0) f |= PF.SHIELD;
     if (this.holdE && this.game.input.down('KeyE')) f |= PF.HOLDE;
     if (p.buffs.magnet > 0) f |= 1024;
+    // 🧲 картка драфту «Магніт монет» (PROTO 25): біт додано В КІНЕЦЬ до наявних —
+    // старший хост його просто не читає, а новий тягне монети гостю з усієї карти.
+    if (p.coinMagnet > 0) f |= 2048;
     const d = {
       t: 'p',
       x: Math.round(p.pos.x * 100) / 100, y: Math.round(p.pos.y * 100) / 100, z: Math.round(p.pos.z * 100) / 100,
@@ -289,6 +292,8 @@ export class GuestNet {
       case 'rk': level.effects.spawnNetRocket(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
       case 'bm': level.effects.netExplosion(a[0], a[1], a[2], a[3], a[4], a[5] || []); break;
       case 'met': level.effects.callMeteor(a[0], a[1], a[2] ? () => level.gadgets && level.gadgets._addMeteorFire(a[0], a[1], false) : null); break; // ☄️ візуал метеорита (шкода — у хоста)
+      // 🌋 вогняний слід хоста (картка драфту): у гостя — лише картинка, шкода в хоста
+      case 'ft': if (level.gadgets) level.gadgets.showFireTrail(a[0], a[1]); break;
       case 'ad': level.effects.netAirdrop(a[0], a[1]); break;
       case 'sh': {
         if (a[0] === me) break;

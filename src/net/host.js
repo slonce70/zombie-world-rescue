@@ -145,6 +145,7 @@ export class HostNet {
           rp = new RemotePlayer(level, from, info);
           rp.holdE = false;
           rp.magnet = false;
+          rp.coinMagnet = false;
           this.remotes.set(from, rp);
           this._rebuildPlayers();
         }
@@ -153,6 +154,9 @@ export class HostNet {
         rp.apply(d.x, d.y, d.z, d.yaw, d.pi, hp, mhp, d.w, d.f, d.ri ?? -1, d.em || null);
         rp.holdE = (d.f & PF.HOLDE) !== 0;
         rp.magnet = (d.f & 1024) !== 0;
+        // 🧲 картка драфту «Магніт монет» гостя: підбір монет вирішує хост, тож прапорець
+        // мусить доїхати сюди — інакше гість бачив би, як монети летять, і не отримував їх.
+        rp.coinMagnet = (d.f & 2048) !== 0;
         rp._lastP = performance.now();
         if (rp.health <= 0) this._downedAt.set(from, rp._lastP); // зафіксували факт смерті — для 'respawned'
         return true;
@@ -403,6 +407,10 @@ export class HostNet {
     else if (d.kind === 'tramp') level.gadgets.placeTrampAt(d.x, d.z, from);
     else if (d.kind === 'turret') level.gadgets.placeTurretAt(d.x, d.z, from, !!d.hyper);
     else if (d.kind === 'meteor') level.gadgets.hostMeteor(d.x, d.z, !!d.hyper); // ☄️ метеорит на найближчого до гостя
+    // 🌋 картка драфту «Вогняний слід» гостя: шкоду вогню ставить ХОСТ (гість малює
+    // лише картинку). `hyper` тут означає «гість узяв картку двічі» — окремого поля
+    // під DPS у каналі гаджетів немає, а числа картки й так фіксовані.
+    else if (d.kind === 'firetrail') level.gadgets.hostFireTrail(d.x, d.z, !!d.hyper);
   }
 
   // ---------- зомбі / гравці: гачки для ігрових систем ----------

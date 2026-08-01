@@ -44,6 +44,11 @@ const HIT_ZONE_MULT = { head: 2, arms: 0.85, legs: 0.75, body: 1 };
 const RICOCHET_RANGE = 6;      // 🪃 наскільки далеко від точки влучання шукаємо сусіда
 const CHILL_SLOW_MUL = 0.6;    // 🧊 множник швидкості замороженого зомбі (slowMul)
 const DRAFT_ROCKET_DMG = 110;  // 🚀 ракета картки — половина базуки (220)
+const AIR_JUMP_MUL = 0.8;      // 🪶 стрибок у повітрі слабший за наземний
+const FIRE_TRAIL_STEP = 0.5;   // 🌋 як часто падає вогняна пляма (у спринті — частіше)
+const FIRE_TRAIL_SPRINT = 0.3;
+const SECOND_WIND_HP = 0.15;   // 💚 «крихта здоровʼя», з якою підводить друге дихання
+const SECOND_WIND_GUARD = 3;   // секунд невразливості після порятунку (як гіпер-ривок)
 
 export class Player {
   constructor(level) {
@@ -103,6 +108,15 @@ export class Player {
     this.rocketEvery = 0; // 🚀 кожен N-й постріл летить ракетою — `_shoot`
     this._critHitN = 0;   // лічильники карток (влучання / постріли за забіг)
     this._rocketShotN = 0;
+    // 🏃 поля карток про рух і виживання (v750)
+    this.airJumps = 0;    // 🪶 скільки стрибків дозволено в повітрі — `_updateGravityCollide`
+    this.fireTrail = 0;   // 🌋 шкода/с вогняної плями за спиною — `_updateLocomotion`
+    this.killReload = 0;  // ⏱️ секунди миттєвої перезарядки після вбивства — main.js `zombieKilled`
+    this.killReloadT = 0; // скільки тих секунд лишилось (тікає в _updateBuffTimers)
+    this.secondWind = 0;  // 💚 одноразовий порятунок від смерті — `takeDamage`
+    this.coinMagnet = 0;  // 🧲 монети з усієї карти — effects.getSuperMagnet (main.js)
+    this._airJumpsLeft = 0;
+    this._fireTrailT = 0;
     this.invisibleT = 0;
     this.invisibleRegenRate = 0;
     this.appleT = 0; this.appleBonus = 20; // 🍎 золоте яблуко: тимчасовий maxHealth бонус згасає сам
@@ -481,6 +495,8 @@ export class Player {
       }
     }
     if (this.stunAmmoT > 0) this.stunAmmoT = Math.max(0, this.stunAmmoT - dt);
+    // ⏱️ вікно миттєвої перезарядки після вбивства (картка «Гарячі руки»)
+    if (this.killReloadT > 0) this.killReloadT = Math.max(0, this.killReloadT - dt);
     if (this.invisibleT > 0) {
       const activeDt = Math.min(dt, this.invisibleT);
       if ((this.invisibleRegenRate || 0) > 0 && this.health > 0) {
@@ -538,16 +554,46 @@ export class Player {
       const accel = this.onGround ? (onIce ? 2.3 : 14) : 4;
       this.vel.x = damp(this.vel.x, tx, accel, dt);
       this.vel.z = damp(this.vel.z, tz, accel, dt);
+      if (this.fireTrail > 0) this._dropFireTrail(dt, moving, sprint);
     }
+  }
+
+  // 🌋 картка «Вогняний слід»: під час бігу за спиною лишається вогонь.
+  // Перевикористовуємо готові «вогнища метеорита» (extras.js `_addMeteorFire`) — вони
+  // палять ЛИШЕ `level.zombies.list`, тож ані сам гравець, ані пет, клон, врятований
+  // загін чи напарник по коопу від сліду не горять. Своєї системи калюж не заводимо.
+  _dropFireTrail(dt, moving, sprint) {
+    if (!moving || !this.onGround || this.health <= 0 || this.level.playground) {
+      this._fireTrailT = 0;
+      return;
+    }
+    this._fireTrailT -= dt;
+    if (this._fireTrailT > 0) return;
+    this._fireTrailT = sprint ? FIRE_TRAIL_SPRINT : FIRE_TRAIL_STEP;
+    if (this.level.gadgets) this.level.gadgets.dropFireTrail(this.pos.x, this.pos.z, this.fireTrail);
   }
 
   // стрибок, гравітація, 🏔️ чесні схили (пішки у відвісну кручу не зайти), приземлення і колізії світу.
   _updateGravityCollide(dt, input, allowControl) {
     const world = this.world;
     // стрибок і гравітація
-    if (allowControl && input.pressed('Space') && this.onGround) {
-      this.vel.y = this.jumpPower;
-      this.onGround = false;
+    if (allowControl && input.pressed('Space')) {
+      if (this.onGround) {
+        this.vel.y = this.jumpPower;
+        this.onGround = false;
+        this._airJumpsLeft = this.airJumps; // 🪶 картка «Подвійний стрибок»
+      } else if (this._airJumpsLeft > 0 && !this.riding && !this.emoting && this.health > 0) {
+        // 🪶 картка «Подвійний стрибок»: швидкість ВСТАНОВЛЮЄТЬСЯ, а не додається —
+        // після батута, стрибкової платформи чи місячної гравітації другий стрибок
+        // не підкидає вище, ніж підкинула сама платформа (на дах не закинути).
+        this._airJumpsLeft--;
+        this.vel.y = this.jumpPower * AIR_JUMP_MUL;
+        this.level.audio.boing();
+        this.level.effects.burst(
+          new THREE.Vector3(this.pos.x, this.pos.y + 0.2, this.pos.z), 0xbfe9ff, 7,
+          { speed: 2.6, up: 1.4, life: 0.4, size: 0.7 }
+        );
+      }
     }
     this.vel.y -= this.gravity * dt;
     const preSlopeX = this.pos.x, preSlopeZ = this.pos.z;
@@ -604,6 +650,7 @@ export class Player {
       this.pos.y = gh;
       this.vel.y = 0;
       this.onGround = true;
+      this._airJumpsLeft = this.airJumps; // 🪶 приземлення повертає повітряні стрибки
     } else if (this.pos.y > gh + 0.05) {
       this.onGround = false;
     }
@@ -672,7 +719,10 @@ export class Player {
   _updateWeaponFiring(dt, input, allowControl) {
     // --- перезарядка ---
     if (this.reloading > 0) {
-      this.reloading -= dt * momentumStats(this.level.combo).reload;
+      // ⏱️ картка «Гарячі руки»: кілька секунд після вбивства магазин набивається миттєво
+      // (той самий шлях, що й звичайна перезарядка — просто лишок часу списується весь одразу)
+      if (this.killReloadT > 0) { this.reloading = 0; this.rig.anim.reloadT = 0; }
+      else this.reloading -= dt * momentumStats(this.level.combo).reload;
       if (this.reloading <= 0) {
         const w = this.weapon;
         if (w.continuous) {
@@ -1511,6 +1561,20 @@ export class Player {
         this.level.audio.powerup();
         this.level.bus.emit('toast', t('🪬 Тотем урятував тебе!'));
         this.level.bus.emit('playerRevived', { kind: 'totem' });
+        return;
+      }
+      // 💚 картка драфту «Друге дихання»: РІВНО ОДИН порятунок за етап забігу.
+      // Поле обнуляється тут і більше нічим у бою не відновлюється — новий заряд
+      // коштує нового піка в драфті. Невразливість — той самий respawnProtect,
+      // яким уже прикриває гіпер-ривок і воскресіння (паралельного прапорця нема).
+      if (this.secondWind > 0) {
+        this.secondWind = 0;
+        this.health = Math.max(1, Math.ceil(this.maxHealth * SECOND_WIND_HP));
+        this.respawnProtect = SECOND_WIND_GUARD;
+        if (this.level.effects) this.level.effects.totemBurst(this.pos.clone().setY(this.pos.y + 1.0));
+        this.level.audio.powerup();
+        this.level.bus.emit('toast', t('💚 ДРУГЕ ДИХАННЯ! Картка врятувала — {n}с невразливості', { n: SECOND_WIND_GUARD }));
+        this.level.bus.emit('playerRevived', { kind: 'secondwind' });
         return;
       }
       this.health = 0;

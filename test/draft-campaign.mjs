@@ -117,6 +117,144 @@ check(ricochet.field === 0.5, 'картка «Рикошет» поставил�
 check(ricochet.targetHurt, 'постріл влучив у ціль');
 check(ricochet.sideHurt, 'куля відскочила в сусіда збоку');
 
+// 🪶 «Подвійний стрибок»: у повітрі Space дає ще один поштовх — і рівно стільки разів,
+// скільки дала картка (сила наземного стрибка й гаджети стрибка не змінюються).
+const dblJump = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  const jumpPowerBefore = p.jumpPower;
+  g.level.runBuild.apply(g.test.draftCard('doublejump'), p);
+  // у повітрі: падаємо вниз, заряд повітряного стрибка є
+  p.onGround = false;
+  p.pos.y += 3;
+  p.vel.set(0, -2, 0);
+  p._airJumpsLeft = p.airJumps;
+  g.input.justPressed.add('Space');
+  p._updateGravityCollide(1 / 60, g.input, true);
+  const afterFirst = p.vel.y;
+  const leftAfterFirst = p._airJumpsLeft;
+  // другий раз у тому самому стрибку — заряду вже немає
+  p.vel.y = -2;
+  g.input.justPressed.add('Space');
+  p._updateGravityCollide(1 / 60, g.input, true);
+  const afterSecond = p.vel.y;
+  g.input.justPressed.delete('Space');
+  return {
+    field: p.airJumps,
+    jumpPowerKept: p.jumpPower === jumpPowerBefore,
+    afterFirst, leftAfterFirst, afterSecond, jumpPower: p.jumpPower,
+  };
+});
+check(dblJump.field === 1, 'картка «Подвійний стрибок» поставила поле airJumps', dblJump.field);
+check(dblJump.jumpPowerKept, 'сила наземного стрибка (кросівки/батут) не змінилась', dblJump.jumpPower);
+check(dblJump.afterFirst > 0, 'у повітрі Space підкидає гравця вгору', dblJump.afterFirst);
+check(dblJump.afterFirst < dblJump.jumpPower, 'повітряний стрибок слабший за наземний — на дах не закинути', dblJump.afterFirst);
+check(dblJump.leftAfterFirst === 0, 'заряд повітряного стрибка витрачено');
+check(dblJump.afterSecond < 0, 'третього стрибка без приземлення немає', dblJump.afterSecond);
+
+// 🌋 «Вогняний слід»: пляма пече зомбі й НЕ пече гравця (ані пета/клона/загін — вони
+// взагалі не в zombies.list, куди дивиться вогонь)
+const trail = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.runBuild.apply(g.test.draftCard('firetrail'), p);
+  p.onGround = true;
+  p.health = p.maxHealth;
+  const firesBefore = g.level.gadgets._meteorFires.length;
+  p._dropFireTrail(0.1, true, false); // біжимо → падає пляма під ногами
+  const z = g.test.spawnZombie('tank', p.pos.x, p.pos.z);
+  z.x = p.pos.x; z.z = p.pos.z;
+  const hpBefore = z.hp;
+  const healthBefore = p.health;
+  g.level.gadgets._updateMeteorFires(1);
+  return {
+    field: p.fireTrail,
+    dropped: g.level.gadgets._meteorFires.length > firesBefore,
+    zombieBurned: z.hp < hpBefore,
+    playerSafe: p.health === healthBefore,
+    damaging: g.level.gadgets._meteorFires.every((f) => !f.damage || f.dps > 0),
+  };
+});
+check(trail.field === 9, 'картка «Вогняний слід» поставила поле fireTrail', trail.field);
+check(trail.dropped, 'під час бігу під ногами лишається вогняна пляма');
+check(trail.zombieBurned, 'зомбі у сліді горить');
+check(trail.playerSafe, 'слід НЕ шкодить самому гравцю');
+
+// ⏱️ «Гарячі руки»: вбивство відкриває вікно, у якому магазин набивається миттєво
+const hotHands = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.runBuild.apply(g.test.draftCard('fastreload'), p);
+  const z = g.test.spawnZombie('walker', p.pos.x + 3, p.pos.z);
+  z.hp = 1;
+  z.lastHitBy = 1;
+  z.damage(999, null, false);
+  const windowAfterKill = p.killReloadT;
+  p.cur = 'pistol';
+  p.curAmmo.mag = 0;
+  p.reloading = 0;
+  p.startReload();
+  const started = p.reloading;
+  p._updateWeaponFiring(1 / 60, g.input, false);
+  return { field: p.killReload, windowAfterKill, started, mag: p.curAmmo.mag, reloading: p.reloading };
+});
+check(hotHands.field === 2.5, 'картка «Гарячі руки» поставила поле killReload', hotHands.field);
+check(hotHands.windowAfterKill === 2.5, 'вбивство відкрило вікно миттєвої перезарядки', hotHands.windowAfterKill);
+check(hotHands.started > 0, 'перезарядка почалась', hotHands.started);
+check(hotHands.reloading === 0 && hotHands.mag === 12, 'магазин набився миттєво', JSON.stringify(hotHands));
+
+// 🧲 «Магніт монет»: монети тягне тим самим ∞-магнітом, що й супер-сила
+const magnet = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  const before = g.level.effects.getSuperMagnet();
+  g.level.runBuild.apply(g.test.draftCard('coinmagnet'), p);
+  const coin = g.level.effects.spawnCoin(p.pos.x + 60, p.pos.z + 60, 5, 45);
+  const far = g.level.effects.coins[g.level.effects.coins.length - 1];
+  const dBefore = Math.hypot(far.mesh.position.x - p.pos.x, far.mesh.position.z - p.pos.z);
+  for (let i = 0; i < 30; i++) g.level.effects.update(1 / 60);
+  const dAfter = Math.hypot(far.mesh.position.x - p.pos.x, far.mesh.position.z - p.pos.z);
+  return { before, field: p.coinMagnet, pickupMult: p.pickupMult, after: g.level.effects.getSuperMagnet(), dBefore, dAfter, coin: !!coin };
+});
+check(magnet.field === 1, 'картка «Магніт монет» поставила поле coinMagnet', magnet.field);
+check(magnet.pickupMult > 1, 'радіус підбору теж підріс', magnet.pickupMult);
+check(magnet.before === false && magnet.after === true, '∞-магніт увімкнувся наявним механізмом', JSON.stringify(magnet));
+check(magnet.dAfter < magnet.dBefore, 'монета з іншого кінця карти полетіла до гравця', `${magnet.dBefore} → ${magnet.dAfter}`);
+
+// 💚 «Друге дихання»: РІВНО один порятунок за етап, з тостом і невразливістю
+const wind = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.runBuild.apply(g.test.draftCard('secondwind'), p);
+  p.reviveCharges = 0;
+  p.armor = 0;
+  p.buffs.bubble = 0;
+  p.gadgetShield = 0;
+  p.respawnProtect = 0;
+  p.health = p.maxHealth;
+  let toast = null;
+  g.level.bus.on('toast', (text) => { toast = text; });
+  p.takeDamage(99999, p.pos.x + 2, p.pos.z);
+  const saved = { health: p.health, guard: p.respawnProtect, charge: p.secondWind, toast };
+  // другий смертельний удар у тому самому забігу — заряду вже немає
+  p.respawnProtect = 0;
+  p.takeDamage(99999, p.pos.x + 2, p.pos.z);
+  const died = p.health;
+  // прибираємо за собою: смерть відкрила оверлей і завела таймер респавну
+  g.deathT = -1;
+  g._hideOverlay('overlay-death');
+  p.health = p.maxHealth;
+  p.respawnProtect = 0;
+  p.fireTrail = 0;
+  return { ...saved, died, max: p.maxHealth };
+});
+check(wind.charge === 0, 'заряд «Другого дихання» витрачено');
+check(wind.health > 0 && wind.health <= Math.ceil(wind.max * 0.2),
+  'смерть замінилась на крихту здоровʼя', `${wind.health}/${wind.max}`);
+check(wind.guard >= 3, 'після порятунку є коротка невразливість', wind.guard);
+check(typeof wind.toast === 'string' && wind.toast.length > 0, 'гравцю сказали, що його врятувало', wind.toast);
+check(wind.died === 0, 'другий раз за забіг картка вже не рятує', wind.died);
+
 // екран перемоги показує рядок «Твоя збірка»
 const victory = await page.evaluate(() => {
   const g = window.__game;

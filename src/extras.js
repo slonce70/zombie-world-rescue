@@ -600,6 +600,13 @@ export const GADGETS = {
 // ☄️ напрямок удару метеорита — згори вниз: обходить фронтальний щит (кут) і нагрудник (headshot)
 const METEOR_DOWN = new THREE.Vector3(0, -1, 0);
 
+// 🌋 картка драфту «Вогняний слід»: пляма живе коротко й вузька, щоб слід читався
+// доріжкою, а не суцільним килимом. DPS приходить від картки (9, з другим піком 18).
+const FIRE_TRAIL_RADIUS = 1.6;
+const FIRE_TRAIL_LIFE = 2.4;
+const FIRE_TRAIL_DPS = 9;
+const FIRE_TRAIL_MAX_DPS = 18;
+
 // баланс турелі: підтримка, а не заміна гравця (DPS героя ~180-220)
 export const TURRET = { range: 14, dmg: 14, fireCd: 0.5, life: 30, hp: 120 };
 const TURRET_HYPER = { hp: 100, dmg: 25 };
@@ -1306,7 +1313,7 @@ export class Gadgets {
     if (hyper) this._addMeteorFire(x, z, true);
   }
 
-  _addMeteorFire(x, z, damage = true, dps = 10, radius = 3.5) {
+  _addMeteorFire(x, z, damage = true, dps = 10, radius = 3.5, life = 10) {
     const y = this.level.world.groundH(x, z) + 0.04;
     const mesh = new THREE.Mesh(
       new THREE.CylinderGeometry(radius, radius, 0.05, 24),
@@ -1314,7 +1321,36 @@ export class Gadgets {
     );
     mesh.position.set(x, y, z);
     this.level.scene.add(mesh);
-    this._meteorFires.push({ x, z, mesh, life: 10, damage, dps, radius });
+    this._meteorFires.push({ x, z, mesh, life, damage, dps, radius });
+  }
+
+  // 🌋 картка драфту «Вогняний слід» (runbuild.js → player.fireTrail): пляма вогню під
+  // ногами гравця. Це ті самі вогнища метеорита, тож палять ЛИШЕ зомбі
+  // (`_updateMeteorFires` ходить по `level.zombies.list`) — гравець, пет, клон, загін
+  // врятованих і напарник по коопу в них не горять.
+  // 🤝 Кооп: шкоду ставить ХОСТ. Гість шле пляму наявним каналом гаджетів (той самий,
+  // яким їде метеорит) і малює свій вогонь лише як картинку; хост шле гостям подію `ft`,
+  // щоб слід хоста теж було видно. Через shotReport слід не пускаємо: він тікає щопівсекунди,
+  // і кімната чула б фантомні постріли.
+  dropFireTrail(x, z, dps) {
+    const level = this.level;
+    if (level.mirror) {
+      level.net.sendGadget('firetrail', x, z, 0, dps >= FIRE_TRAIL_MAX_DPS);
+      this.showFireTrail(x, z);
+      return;
+    }
+    this._addMeteorFire(x, z, true, dps, FIRE_TRAIL_RADIUS, FIRE_TRAIL_LIFE);
+    if (level.net && level.net.authority) level.netEv('ft', Math.round(x * 10) / 10, Math.round(z * 10) / 10);
+  }
+
+  // слід гостя: шкоду накладає хост своїм вогнищем (гість уже намалював собі картинку)
+  hostFireTrail(x, z, strong = false) {
+    this._addMeteorFire(x, z, true, strong ? FIRE_TRAIL_MAX_DPS : FIRE_TRAIL_DPS, FIRE_TRAIL_RADIUS, FIRE_TRAIL_LIFE);
+  }
+
+  // чужий слід: лише вогонь без шкоди (шкоду вже порахував той, у кого авторитет)
+  showFireTrail(x, z) {
+    this._addMeteorFire(x, z, false, 0, FIRE_TRAIL_RADIUS, FIRE_TRAIL_LIFE);
   }
 
   _updateMeteorFires(dt) {

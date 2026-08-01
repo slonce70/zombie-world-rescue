@@ -82,6 +82,21 @@ export const CARD_POOL = [
     apply: (p) => { p.killBlast = Math.min(165, (p.killBlast || 0) + 55); } },
   { id: 'rocketvolley', icon: '🚀', tag: 'speed', rarity: 'epic', name: 'Ракетний залп: кожен 6-й постріл — ракета',
     apply: (p) => { p.rocketEvery = p.rocketEvery ? Math.max(3, p.rocketEvery - 2) : 6; } },
+  // 🏃 v750: картки про РУХ і ВИЖИВАННЯ — той самий патерн, що й бойові вище.
+  // apply() ставить поле на гравці, читає його наявна гілка: стрибок і рух у
+  // `player.js` (`_updateGravityCollide` / `_updateLocomotion`), перезарядка в
+  // `_updateWeaponFiring`, порятунок від смерті в `takeDamage`, магніт монет —
+  // готовий `effects.getSuperMagnet` (main.js). Нової підсистеми немає.
+  { id: 'doublejump', icon: '🪶', tag: 'speed', rarity: 'rare', name: 'Подвійний стрибок: ще один стрибок у повітрі',
+    apply: (p) => { p.airJumps = Math.min(2, (p.airJumps || 0) + 1); } },
+  { id: 'firetrail', icon: '🌋', tag: 'power', rarity: 'epic', name: 'Вогняний слід: за спиною горить земля',
+    apply: (p) => { p.fireTrail = Math.min(18, (p.fireTrail || 0) + 9); } },
+  { id: 'fastreload', icon: '⏱️', tag: 'speed', rarity: 'rare', name: 'Гарячі руки: після вбивства перезарядка миттєва',
+    apply: (p) => { p.killReload = Math.min(5, (p.killReload || 0) + 2.5); } },
+  { id: 'secondwind', icon: '💚', tag: 'tank', rarity: 'epic', name: 'Друге дихання: один раз рятує від смерті',
+    apply: (p) => { p.secondWind = Math.min(1, (p.secondWind || 0) + 1); } },
+  { id: 'coinmagnet', icon: '🧲', tag: 'tank', rarity: 'common', name: 'Магніт монет: монети летять з усієї карти',
+    apply: (p) => { p.coinMagnet = 1; p.pickupMult = Math.min(1.6, (p.pickupMult || 1) * 1.25); } },
 ];
 
 // 3 однотегові картки → комбо: гучний банер + реальний бонус. Кап тримає run-only силу в межах.
