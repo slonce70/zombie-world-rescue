@@ -38,10 +38,23 @@ export const FRONT_TEMPLATES = Object.freeze({
   }),
 });
 
-const EVACUATION_STAGES = Object.freeze({
-  UKR: Object.freeze(['rebuild-center', 'night-evacuation', 'commander-pursuer']),
-  POL: Object.freeze(['rescue-train', 'night-evacuation', 'commander-pursuer']),
-  TUR: Object.freeze(['rescue-ship', 'night-evacuation', 'commander-pursuer']),
+// Країнові ланцюжки етапів. Ключ верхнього рівня — ШАБЛОН операції, і аж потім
+// країна: шаблон завжди лишається головним, країна лише підмінює свій варіант
+// того самого виду операції. Так на дошці всі чотири картки країни грають різне.
+const COUNTRY_TEMPLATE_STAGES = Object.freeze({
+  // «Відродження»: своє серце міста і своя ніч евакуації
+  evacuation: Object.freeze({
+    UKR: Object.freeze(['rebuild-center', 'night-evacuation', 'commander-pursuer']),
+    POL: Object.freeze(['rescue-train', 'night-evacuation', 'commander-pursuer']),
+    TUR: Object.freeze(['rescue-ship', 'night-evacuation', 'commander-pursuer']),
+  }),
+  // «Полювання»: сюжетний ланцюжок країни з її іменним командиром у фіналі.
+  // worldevents.js веде на арену того самого боса (POL — Переслідувач, DEU — Барон),
+  // тож фінальний етап і командир зустрічі збігаються.
+  hunt: Object.freeze({
+    POL: Object.freeze(['pol-light-bonfires', 'pol-rescue-train', 'pol-defeat-pursuer']),
+    DEU: Object.freeze(['deu-rescue-mechanics', 'deu-start-convoy', 'deu-defeat-baron']),
+  }),
 });
 
 const SPAIN_REBUILD_STAGES = Object.freeze([
@@ -50,20 +63,13 @@ const SPAIN_REBUILD_STAGES = Object.freeze([
   'spain-defend-fireworks',
 ]);
 
-const COUNTRY_OPERATION_STAGES = Object.freeze({
-  POL: Object.freeze(['pol-light-bonfires', 'pol-rescue-train', 'pol-defeat-pursuer']),
-  DEU: Object.freeze(['deu-rescue-mechanics', 'deu-start-convoy', 'deu-defeat-baron']),
-});
-
 function operationStages(front, operation) {
   if (operation.country === 'ESP' && front.world.countries.ESP?.damage >= 3) {
     return SPAIN_REBUILD_STAGES;
   }
-  if (COUNTRY_OPERATION_STAGES[operation.country]) return COUNTRY_OPERATION_STAGES[operation.country];
-  if (operation.template === 'evacuation' && EVACUATION_STAGES[operation.country]) {
-    return EVACUATION_STAGES[operation.country];
-  }
-  return FRONT_TEMPLATES[operation.template].stages;
+  const byCountry = COUNTRY_TEMPLATE_STAGES[operation.template];
+  const stages = byCountry && byCountry[operation.country];
+  return stages || FRONT_TEMPLATES[operation.template].stages;
 }
 
 const TEMPLATE_IDS = Object.freeze(Object.keys(FRONT_TEMPLATES));

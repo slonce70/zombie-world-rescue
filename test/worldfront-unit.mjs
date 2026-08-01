@@ -144,6 +144,59 @@ test('evacuation becomes a country-specific rebirth operation', () => {
   }
 });
 
+const CAMPAIGN_COUNTRIES = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'];
+
+// Дошка операцій обіцяє чотири різні операції — стільки ж різних ланцюжків має і грати.
+function stagesFor(country, template) {
+  const front = createFront({ seed: 920, liberated: [country] });
+  front.board[0].template = template;
+  return frontViewModel(front).board[0].stages;
+}
+
+test('every country plays four different stage chains for the four templates', () => {
+  const templates = Object.keys(FRONT_TEMPLATES);
+  assert.equal(templates.length, 4);
+  for (const country of CAMPAIGN_COUNTRIES) {
+    const chains = templates.map((template) => stagesFor(country, template));
+    assert.ok(chains.every((stages) => stages.length === 3), `${country}: three stages per operation`);
+    const unique = new Set(chains.map((stages) => stages.join('>')));
+    assert.equal(unique.size, 4, `${country}: four templates give four different chains`);
+  }
+});
+
+test('country story chains ride the hunt template and stay reachable on the board', () => {
+  assert.deepEqual(stagesFor('POL', 'hunt'), ['pol-light-bonfires', 'pol-rescue-train', 'pol-defeat-pursuer']);
+  assert.deepEqual(stagesFor('DEU', 'hunt'), ['deu-rescue-mechanics', 'deu-start-convoy', 'deu-defeat-baron']);
+  // сюжет не з'їдає інші шаблони: облога Польщі лишається типовою облогою
+  assert.deepEqual(stagesFor('POL', 'siege'), FRONT_TEMPLATES.siege.stages);
+  assert.deepEqual(stagesFor('DEU', 'outbreak'), FRONT_TEMPLATES.outbreak.stages);
+
+  // ланцюжок країни справді випадає на згенерованій дошці, а не лише в тесті
+  const reachable = new Set();
+  for (let seed = 0; seed < 200; seed++) {
+    for (const operation of createFront({ seed, liberated: CAMPAIGN_COUNTRIES }).board) {
+      if (operation.template === 'hunt' && ['POL', 'DEU'].includes(operation.country)) reachable.add(operation.country);
+    }
+  }
+  assert.deepEqual([...reachable].sort(), ['DEU', 'POL']);
+});
+
+test('a Polish hunt plays its story stages from the first to the last', () => {
+  let front = createFront({ seed: 921, liberated: ['POL'] });
+  front.board[0].template = 'hunt';
+  front = sanitizeFront(front);
+  front = reduce(front, { type: 'START_OPERATION', operationId: front.board[0].id }).front;
+  const presets = [];
+  for (let stage = 0; stage < 3; stage++) {
+    presets.push(frontStageConfig(front).missionPreset);
+    if (stage < 2) {
+      front = reduce(front, { type: 'START_STAGE' }).front;
+      front = reduce(front, { type: 'COMPLETE_STAGE', build: [] }).front;
+    }
+  }
+  assert.deepEqual(presets, ['pol-light-bonfires', 'pol-rescue-train', 'pol-defeat-pursuer']);
+});
+
 test('destroyed Spain gets its dedicated recovery stages without changing normal Spain', () => {
   let front = createFront({ seed: 901, liberated: ['ESP'] });
   const normalStages = frontViewModel(front).board[0].stages;
