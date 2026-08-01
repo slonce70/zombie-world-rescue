@@ -82,12 +82,25 @@ const clean = await bossDied();
 check(!clean.shopUsed && clean.done, 'нічого не купували — ціль зарахована', JSON.stringify(clean));
 
 // ---------- покупка САМЕ за кристали (регресія тікета) ----------
-console.log('▸ Покупка тільки за кристали (Великий бокс — 10 💎) ламає ціль');
+// 🎲 Свідомо НЕ бокс: bigbox/smallbox/mediumbox/megabox/skinbox — лутбокси, і частина
+// роллів повертає кристали (у bigbox 27% дають +15 💎, тобто після покупки за 10 💎
+// баланс іде ВГОРУ). Такий кейс флакав би 1 прогін із чотирьох. Берем скін Жабка —
+// фіксовані 15 💎, нуль монет, нуль радіації і жодного випадкового повернення валюти.
+console.log('▸ Покупка тільки за кристали (скін Жабка — 15 💎) ламає ціль');
+await startRun();
+const skin = await buy('frogskin', { coins: 0, crystals: 15, radiation: 0, upgrades: {} });
+check(skin.crystals === 0, `кристали списані рівно за прайсом: 15 → ${skin.crystals}`);
+check(skin.coins === 0 && skin.radiation === 0, 'інші валюти не зачеплені', JSON.stringify(skin));
+check(skin.shopUsed, 'прапорець забігу піднявся після покупки за кристали', JSON.stringify(skin));
+check(skin.spent === skin.spentBefore, 'сумарний coinsSpent сейва не зачеплено — він про монети', JSON.stringify(skin));
+const afterSkin = await bossDied();
+check(!afterSkin.done, 'ціль НЕ зараховується після покупки за кристали', JSON.stringify(afterSkin));
+
+// ---------- і окремо сам лутбокс: тут перевіряємо лише те, що НЕ залежить від ролла ----------
+console.log('▸ Лутбокс за кристали (Великий бокс — 10 💎) ламає ціль за будь-якого ролла');
 await startRun();
 const box = await buy('bigbox', { coins: 0, crystals: 10, radiation: 0, upgrades: {} });
-check(box.crystals === 0, `кристали списані: 10 → ${box.crystals}`);
-check(box.shopUsed, 'прапорець забігу піднявся після покупки за кристали', JSON.stringify(box));
-check(box.spent === box.spentBefore, 'сумарний coinsSpent сейва не зачеплено — він про монети', JSON.stringify(box));
+check(box.shopUsed, 'прапорець піднявся незалежно від того, що випало з бокса', JSON.stringify(box));
 const afterBox = await bossDied();
 check(!afterBox.done, 'ціль НЕ зараховується після коробки за кристали', JSON.stringify(afterBox));
 
@@ -132,6 +145,8 @@ const denied = await page.evaluate((base) => {
   g.save.coins = 0; g.save.crystals = 4; g.save.radiationCoins = 0;
   g.test.shopBuy('smallbox'); push('кристалів 4 із 5');
 
+  // тижневий слот контракту звільняємо — інакше першим спрацював би МАКС, а не гаманець
+  g.save.weekly = {};
   g.save.radiationCoins = 149;
   g.test.shopBuy('radiationcontract'); push('радіації 149 зі 150');
 
