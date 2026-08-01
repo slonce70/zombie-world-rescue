@@ -18,12 +18,28 @@ node test/sw-cache.mjs               # секунди
 Якщо зміна велика — швидше **перевірити в реальному браузері**, ніж ганяти
 батарею: `npm run serve` (порт 8741) + `npm run relay` і подивитись руками.
 
-Job `quick` у CI має ліміт 12 хвилин — туди додавати лише секундні гейти
-(схема, API, версії, i18n). Браузерні й кооп-тести живуть у `release`/`coop-gate`.
+Деплой блокують дві джоби CI — `quick` і `smoke` (`deploy-pages` має
+`needs: [quick, smoke]`):
+
+- `quick` (ліміт 12 хвилин, Chromium не ставиться) — тільки секундні гейти без
+  браузера: `version-sync`, `sw-cache`, `i18n-parity`, `community-schema`,
+  `community-api` і швидкі доменні юніти одним `node --test` (`worldfront-unit`,
+  `worldevents`, `expedition-unit`, `season-unit`, `squad-unit`,
+  `combat-momentum-unit`). Новий чистий доменний юніт — сюди.
+- `smoke` (ліміт 20 хвилин, з Chromium) — `npm test` (`test/smoke.mjs`),
+  `combat-reborn`, `save-migration`. Новий браузерний тест сюди додавати лише
+  якщо він укладається в хвилину.
+
+Довгі браузерні й кооп-батареї лишаються ручними (`workflow_dispatch`):
+`expedition`, `front`, `e2e`, `release-gate`, `coop-gate`.
 
 ## Що вже червоне не з нашої вини
 
-У гілці v610 частина тестів червона (меч, боси Іспанії/Франції, зірки, Фронт).
+Борг попередніх релізів: `test/soul-collector.mjs` і `test/radiation-mode.mjs`
+падають тими самими перевірками, що й на baseline (зафіксовано в коміті
+`603e052`). «Фронт» (`test/worldfront-unit.mjs`) до цього переліку більше не
+належить — його полагоджено у v750.
+
 Перед тим як «лагодити» червоний тест, перевір baseline:
 
 ```bash
@@ -41,7 +57,7 @@ git worktree add /tmp/baseline HEAD && cd /tmp/baseline && node test/<тест>.
 - Нові ESM-модулі додавати в `SHELL` у `sw.js` — інакше офлайн зламається
   (`node test/sw-cache.mjs`).
 - Нові рядки `t('…')` мусять зʼявитись у `src/i18n/en.js` і `src/i18n/ru.js`.
-- GitHub Pages деплоїться автоматично при push у `main` після job `quick`.
+- GitHub Pages деплоїться автоматично при push у `main` після джоб `quick` і `smoke`.
   Cloudflare Worker (`worker/`) деплоїться **окремо** через `wrangler deploy`.
 
 ## Мова

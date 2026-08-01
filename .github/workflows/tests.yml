@@ -54,6 +54,8 @@ jobs:
       - name: Full coop shard
         run: SLOW=4 RETRY=1 SHARD_INDEX=${{ matrix.shard }} SHARD_TOTAL=4 node test/coop-release.mjs
 
+  # Секундні гейти без браузера: жоден крок тут не піднімає Chromium,
+  # тому playwright install не потрібен — локально весь набір < 1 с.
   quick:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -64,13 +66,38 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Version sync
         run: node test/version-sync.mjs
+      - name: Service worker shell and i18n parity
+        run: node test/sw-cache.mjs && node test/i18n-parity.mjs
       - name: Community schema and API
         run: node test/community-schema.mjs && node test/community-api.mjs
+      - name: Fast domain units
+        run: node --test test/worldfront-unit.mjs test/worldevents.mjs test/expedition-unit.mjs test/season-unit.mjs test/squad-unit.mjs test/combat-momentum-unit.mjs
+
+  # Блокує деплой разом із quick: тут гра справді стартує в Chromium.
+  # Статичний сервер піднімає сам тест (ensureWebServer у test/_server.mjs),
+  # окремий крок із python3 -m http.server не потрібен.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Game smoke
+        timeout-minutes: 8
+        run: npm test
       - name: Combat Reborn
+        timeout-minutes: 6
         run: node test/combat-reborn.mjs
+      - name: Save migration
+        timeout-minutes: 8
+        run: node test/save-migration.mjs
 
   e2e:
     if: github.event_name == 'workflow_dispatch'
@@ -124,7 +151,7 @@ jobs:
 
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: quick
+    needs: [quick, smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

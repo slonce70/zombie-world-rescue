@@ -23,7 +23,9 @@ node test/i18n-parity.mjs
 SLOW=2 node test/coop-elite.mjs
 ```
 
-Повна soak-батарея та реальний UKR playthrough запускаються щоночі й вручну через `workflow_dispatch`; вони не блокують швидкий production deploy через довгі мережеві та real-combat сценарії:
+Повна soak-батарея та реальний UKR playthrough запускаються лише вручну через `workflow_dispatch`
+(розкладу в workflow немає); вони не блокують production deploy через довгі мережеві та
+real-combat сценарії:
 
 ```bash
 for i in 0 1 2 3; do SHARD_INDEX=$i SHARD_TOTAL=4 SLOW=4 node test/release.mjs || exit 1; done
@@ -52,7 +54,20 @@ gh api repos/slonce70/zombie-world-rescue/pages -X PUT -f build_type=workflow
 gh api repos/slonce70/zombie-world-rescue/pages --jq .build_type
 ```
 
-Після merge push у `main` запускає blocking `smoke`, `expedition` і `front`; `deploy-pages` стартує лише після їхнього успіху. Повні `release-gate`, `coop-gate` та `e2e` лишаються nightly/manual і мають бути зеленими перед ручним release/tag.
+Push у `main` (і будь-який PR) запускає рівно дві блокуючі джоби — `quick` і `smoke`.
+`deploy-pages` має `needs: [quick, smoke]`, тобто стартує лише після успіху обох.
+
+- **`quick`** (ліміт 12 хв, без Chromium) — `version-sync`, `sw-cache`, `i18n-parity`,
+  `community-schema`, `community-api` і швидкі доменні юніти одним `node --test`:
+  `worldfront-unit`, `worldevents`, `expedition-unit`, `season-unit`, `squad-unit`,
+  `combat-momentum-unit`. Увесь набір локально — менше секунди.
+- **`smoke`** (ліміт 20 хв, з Chromium) — `npm test` (`test/smoke.mjs`: глобус, вхід у рівень,
+  рух, постріл, чиста консоль), `combat-reborn` і `save-migration`. Статичний сервер тести
+  піднімають самі, окремий крок не потрібен. Локально всі три — близько хвилини.
+
+Джоби `expedition`, `front`, `e2e`, `release-gate` і `coop-gate` **не блокують деплой**: усі вони
+під `if: github.event_name == 'workflow_dispatch'` і запускаються лише вручну. Перед ручним
+release/tag вони мають бути зеленими — це відповідальність релізера, а не CI.
 
 ## 5. Production acceptance
 
