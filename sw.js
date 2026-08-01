@@ -38,6 +38,7 @@ const SHELL = [
   './src/utils.js',
   './src/countries.js',
   './src/countrypowers.js',
+  './src/tier2.js',
   './src/mapsize.js',
   './src/chapter.js',
   './src/titles.js',

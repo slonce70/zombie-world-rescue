@@ -6,6 +6,7 @@ import { clamp, damp, dampAngle } from './utils.js';
 import { t } from './i18n.js';
 import { momentumStats } from './combatmomentum.js';
 import { BASTION_STAR_POWERS } from './specialists.js';
+import { tier2Mods, neutralTier2Mods, rangeDamageMult } from './tier2.js';
 
 export const WEAPONS = {
   fists: { name: 'Кулаки', icon: '👊', dmg: 50, rpm: 60, mag: 10, spread: 0, auto: false, reloadT: 1.5, recoil: 0.04, kick: 1, recover: 6, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3, rectWidth: 1, cleave: Infinity },
@@ -87,6 +88,13 @@ export class Player {
     this.helmetMult = 1; // шолом: множник вхідної шкоди
     this.jumpPower = this.moon ? 9.4 : 7.6;
     this.gearAttached = {};
+    // 🏅 другий ярус прокачки (src/tier2.js): набір рахує applyGear із save.upgrades.
+    // Поля живуть тут, бо їх читають бій (шкода за дистанцією), перезарядка і патрони.
+    this.tier2 = neutralTier2Mods();
+    this.armorRegen = 0;      // 🩹 «Нанопластини»: броні за секунду
+    this.reloadMult = 1;      // ⚙️ «Швидкі руки»: множник тривалості перезарядки
+    this._noHitT = 0;         // секунд без отриманої шкоди (для «Нанопластин»)
+    this._ammoMultApplied = 1; // 🎒 «Патронташ»: який множник запасу вже застосовано
     // тимчасові бафи (секунди, що лишились)
     this.buffs = { speed: 0, rage: 0, bubble: 0, magnet: 0 };
     this.gadgetShield = 0; // 🛡️ гаджет-щит: поглинає шкоду повністю, поки не розіб'ється
@@ -272,9 +280,11 @@ export class Player {
     // патрони для всієї вогнепальної зброї пропорційно (ракети — окремо).
     // магнум/снайперка поповнюються щедріше (1/3, 1/4 замість 1/6, 1/10) —
     // потужні, але тепер ними реально можна гратись, а не «стріляти крихтами».
+    // 🎒 «Патронташ» (ярус 2) піднімає і стелю запасу, і щедрість самого пікапа
+    const belt = this._ammoMultApplied;
     const ratio = { rifle: 1, smg: 1.4, shotgun: 1 / 7.5, magnum: 1 / 3, sniper: 1 / 4 };
     for (const [w, k] of Object.entries(ratio)) {
-      this.ammo[w].reserve = Math.min(WEAPONS[w].cap, this.ammo[w].reserve + Math.ceil(n * k));
+      this.ammo[w].reserve = Math.min(this.ammoCap(w), this.ammo[w].reserve + Math.ceil(n * k * belt));
     }
     // 🔋 паливні зброї поповнюються фіксовано: ~2с балона за пікап набоїв (90 → +2с),
     // масштабовано від n, щоб дрібний пікап давав менше. Балон ≤5с.
@@ -282,7 +292,13 @@ export class Player {
   }
 
   addRockets(n) {
-    this.ammo.bazooka.reserve = Math.min(WEAPONS.bazooka.cap, this.ammo.bazooka.reserve + n);
+    this.ammo.bazooka.reserve = Math.min(this.ammoCap('bazooka'), this.ammo.bazooka.reserve + n);
+  }
+
+  // 🎒 стеля запасу зброї з урахуванням «Патронташа» (нескінченні зброї — Infinity)
+  ammoCap(id) {
+    const cap = WEAPONS[id] && WEAPONS[id].cap;
+    return Number.isFinite(cap) ? Math.round(cap * this._ammoMultApplied) : Infinity;
   }
 
   // куплене спорядження: ефекти + видимі речі на герої (3-тя особа).
@@ -292,14 +308,39 @@ export class Player {
   // посеред забігу стирала б її.
   applyGear(upgrades, powers = null) {
     const vest = upgrades.vest || 0;
-    this.maxArmor = 50 + vest * 50 + ((powers && powers.maxArmor) || 0);
+    // 🏅 ярус 2 живе рівно там, де й пасивки країн: `powers === null` — це режим
+    // із фіксованим лоадаутом (нокаут, оборона, PVP, банк, портал, люди, збирач душ,
+    // оборона турелі, радіація), який свідомо переписує героя під свій баланс.
+    // Туди куплений ярус не заходить — інакше 50 HP радіації перестали б бути 50.
+    const t2 = powers ? tier2Mods(upgrades) : neutralTier2Mods();
+    this.tier2 = t2;
+    // броня рахується з нуля щоразу: жилет + пасивка Італії + 🧱 Панцир
+    this.maxArmor = 50 + vest * 50 + ((powers && powers.maxArmor) || 0) + t2.maxArmor;
     this.helmetMult = (upgrades.helmet ? 0.85 : 1) * ((powers && powers.damageTakenMult) || 1);
     this.jumpPower = (upgrades.sneakers ? 8.6 : 7.6) + (this.moon ? 1.8 : 0);
+    this.armorRegen = t2.armorRegen;
+    this.reloadMult = t2.reloadMult;
+    this._applyAmmoBelt(t2.ammoMult);
     for (const kind of ['vest', 'helmet', 'sneakers']) {
       if ((upgrades[kind] || 0) > 0 && !this.gearAttached[kind]) {
         attachHeroGear(this.rig, kind);
         this.gearAttached[kind] = true;
       }
+    }
+  }
+
+  // 🎒 «Патронташ»: множник стелі запасу. Наявний запас підтягуємо РІВНО ОДИН раз —
+  // у момент, коли множник змінився (старт рівня або сама покупка в магазині).
+  // Без цієї засувки кожна наступна покупка спорядження знову «доливала» б патрони,
+  // бо applyGear рахує спорядження з нуля і викликається після кожної покупки.
+  _applyAmmoBelt(mult) {
+    if (mult === this._ammoMultApplied) return;
+    const k = mult / this._ammoMultApplied;
+    this._ammoMultApplied = mult;
+    for (const id of ALL_WEAPON_IDS) {
+      const a = this.ammo[id];
+      if (!a || !Number.isFinite(a.reserve)) continue;
+      a.reserve = Math.min(this.ammoCap(id), Math.round(a.reserve * k));
     }
   }
 
@@ -340,22 +381,25 @@ export class Player {
 
   startReload() {
     const w = this.weapon;
+    // ⚙️ «Швидкі руки» (ярус 2) вкорочують саму тривалість — і смужка в HUD,
+    // і анімація рук їдуть від того самого числа, тож розсинхрону картинки нема
+    const reloadT = w.reloadT * this.reloadMult;
     if (w.continuous) {
       // континуальна зброя (лазер/вогнемет): перезаряджаємо балон, якщо він не повний
       if (this.reloading > 0 || (this.fuel[this.cur] || 0) >= w.fuelMax) return;
-      this.reloading = w.reloadT;
-      this.reloadDur = w.reloadT;
-      this.rig.anim.reloadT = w.reloadT;
-      this.rig.anim.reloadDuration = w.reloadT;
+      this.reloading = reloadT;
+      this.reloadDur = reloadT;
+      this.rig.anim.reloadT = reloadT;
+      this.rig.anim.reloadDuration = reloadT;
       this.level.audio.reload(this.cur);
       return;
     }
     const a = this.curAmmo;
     if (this.reloading > 0 || a.mag >= w.mag || (!w.infinite && a.reserve <= 0)) return;
-    this.reloading = w.reloadT;
-    this.reloadDur = w.reloadT;
-    this.rig.anim.reloadT = w.reloadT;
-    this.rig.anim.reloadDuration = w.reloadT;
+    this.reloading = reloadT;
+    this.reloadDur = reloadT;
+    this.rig.anim.reloadT = reloadT;
+    this.rig.anim.reloadDuration = reloadT;
     this.level.audio.reload(this.cur);
   }
 
@@ -513,6 +557,14 @@ export class Player {
     if (this.appleT > 0) {
       this.appleT = Math.max(0, this.appleT - dt);
       if (this.appleT === 0) { this.maxHealth -= this.appleBonus || 20; this.appleBonus = 20; if (this.health > this.maxHealth) this.health = this.maxHealth; }
+    }
+    // 🩹 «Нанопластини» (ярус 2): броня сама наростає, якщо тебе кілька секунд не били.
+    // Лічильник обнуляє takeDamage — тобто в гущі бою пластини мовчать, а перебіжка
+    // між хвилями відновлює запас. Це і є вибір проти 🧱 Панцира (більший запас разово).
+    this._noHitT += dt;
+    if (this.armorRegen > 0 && this.health > 0 && this.armor < this.maxArmor
+      && this._noHitT >= this.tier2.armorRegenDelay) {
+      this.armor = Math.min(this.maxArmor, this.armor + this.armorRegen * dt);
     }
   }
 
@@ -1066,7 +1118,9 @@ export class Player {
         // прапорець headshot — інакше картка накрутила б статистику хедшотів і ⭐2-ціль.
         // Шкоду рахує стрілець, тож у коопі гість просто шле більше число в netHits.
         const critHit = this.critEvery > 0 && (++this._critHitN % this.critEvery === 0);
-        let dmg = w.dmg * dmgMult * (HIT_ZONE_MULT[zone] || 1) * (critHit ? (this.critMult || 2) : 1);
+        // 🏅 пара «Постріл» ярусу 2: 🥊 Впритул або 🔭 Далекобій — множник від дистанції
+        const rangeMul = rangeDamageMult(this.tier2, hit.t);
+        let dmg = w.dmg * dmgMult * (HIT_ZONE_MULT[zone] || 1) * (critHit ? (this.critMult || 2) : 1) * rangeMul;
         const impactForce = w.impact || 1;
         const staggerTime = this.cur === 'shotgun' && hit.t > 12 ? 0.12 : (w.stagger || 0);
         const damageOpts = { weaponId: this.cur, hitZone: zone, impactSide: hit.impactSide, impactForce, staggerTime };
@@ -1109,7 +1163,7 @@ export class Player {
             if (wallT < next.t) break;
             pierceBase *= 0.7;
             const nextZone = next.hitZone || (next.headshot ? 'head' : 'body');
-            dmg = pierceBase * (HIT_ZONE_MULT[nextZone] || 1);
+            dmg = pierceBase * (HIT_ZONE_MULT[nextZone] || 1) * rangeDamageMult(this.tier2, travelled + next.t);
             const nextOpts = { weaponId: this.cur, hitZone: nextZone, impactSide: next.impactSide, impactForce, staggerTime };
             if (level.mirror) netHits.push([next.zombie.nid, Math.round(dmg), next.headshot ? 1 : 0, 0, 0, nextZone, impactForce, staggerTime]);
             else { next.zombie.lastHitBy = 1; next.zombie.damage(dmg, dir, next.headshot, nextOpts); }
@@ -1130,7 +1184,7 @@ export class Player {
         // Рівно ОДИН відскок — рикошет не породжує рикошету, тож у натовпі
         // це +1 ціль на кулю, а не ланцюгова реакція на всю карту.
         if (this.ricochet > 0) {
-          this._ricochetShot(hit, w.dmg * dmgMult * this.ricochet, netHits, dmgByZombie, level);
+          this._ricochetShot(hit, w.dmg * dmgMult * rangeMul * this.ricochet, netHits, dmgByZombie, level);
         }
       } else {
         endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
@@ -1259,7 +1313,8 @@ export class Player {
       : level.soulCollector && weaponId === 'sword' ? 30 : w.dmg;
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
-      const damage = baseDmg * dmgMult * (fists ? 1 : falloff[i]);
+      // 🥊 «Впритул» працює і в ближньому бою — там дистанція завжди менша за поріг
+      const damage = baseDmg * dmgMult * (fists ? 1 : falloff[i]) * rangeDamageMult(this.tier2, hit.distance);
       const opts = { weaponId, hitZone: 'body', impactForce: w.impact || 4, staggerTime: w.stagger || 0.25 };
       if (level.mirror) netHits.push([hit.zombie.nid, Math.round(damage), 0, 0, 0, 'body', opts.impactForce, opts.staggerTime]);
       else { hit.zombie.lastHitBy = 1; hit.zombie.damage(damage, dir, false, opts); }
@@ -1428,7 +1483,7 @@ export class Player {
         }
         // соло/хост б'є локально; гість (mirror) репортить влучання, шкоду рахує хост
         const zone = hit.hitZone || (hit.headshot ? 'head' : 'body');
-        const dealt = dmg * (HIT_ZONE_MULT[zone] || 1);
+        const dealt = dmg * (HIT_ZONE_MULT[zone] || 1) * rangeDamageMult(this.tier2, travelled + hit.t);
         if (level.mirror) netReport?.hits.push([hit.zombie.nid, Math.round(dealt), hit.headshot ? 1 : 0, 0, 0, zone, 1, 0]);
         else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dealt, dir, hit.headshot, { weaponId: this.cur, hitZone: zone, impactSide: hit.impactSide, impactForce: 1, staggerTime: 0 }); }
         anyHit = true;
@@ -1482,8 +1537,8 @@ export class Player {
         this._flameDir = this._flameDir || new THREE.Vector3();
         this._flameDir.set(dx / d, dy / d, dz / d);
         if (this.world.shotBlockDist(origin, this._flameDir, d) < d) continue;
-        // лінійний спад шкоди з дистанцією (повна у впор → ~0 на краю)
-        const falloff = 1 - (d / w.range) * 0.85;
+        // лінійний спад шкоди з дистанцією (повна у впор → ~0 на краю) × пара «Постріл»
+        const falloff = (1 - (d / w.range) * 0.85) * rangeDamageMult(this.tier2, d);
         // 🔥 ТИП ШКОДИ «вогонь» (v47-гак): передаємо опції з прапорцем fire.
         // соло/хост б'є локально; гість (mirror) репортить влучання, шкоду рахує хост
         if (level.mirror) netReport?.hits.push([z.nid, Math.round(dmg * falloff), 0]);
@@ -1524,6 +1579,7 @@ export class Player {
   takeDamage(amt, fromX, fromZ) {
     if (this.respawnProtect > 0 || this.health <= 0) return;
     if (this.level.playground) return;
+    this._noHitT = 0; // 🩹 будь-яке влучання по герою відкладає відновлення «Нанопластин»
     // 🛡 бульбашка: повна невразливість, поки діє баф
     if (this.buffs.bubble > 0) {
       this.level.bus.emit('bubbleBlock');

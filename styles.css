@@ -1918,6 +1918,9 @@ body.touch-mode #touch-coach.show { display: block; }
 }
 .shop-goal-btn.on { opacity: 1; background: #f5c542; }
 .shop-item.goal { outline: 2px solid #f5c542; }
+/* ⚠️ ярус 2: картка чекає на друге натискання — вибір у парі незворотний */
+.shop-item.confirm { outline: 2px solid #ff6b4a; background: rgba(255,107,74,0.16); animation: shop-confirm-pulse 0.9s ease-in-out infinite; }
+@keyframes shop-confirm-pulse { 0%, 100% { outline-color: #ff6b4a; } 50% { outline-color: #ffd23f; } }
 
 /* 🏠 База */
 .hqbase-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 8px 0 14px; }

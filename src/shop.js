@@ -3,6 +3,7 @@ import { GADGETS, TOWER_SKINS } from './extras.js';
 import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 import { countryPowerMods } from './countrypowers.js';
+import { TIER2, TIER2_ITEMS, tier2Item, tier2Lock } from './tier2.js';
 
 export const SHOP_ITEMS = [
   // --- припаси ---
@@ -104,11 +105,25 @@ export const SHOP_ITEMS = [
   { id: 'maxhp', icon: '❤️', name: t('Міцність'), desc: t('+25 макс. здоров’я'), price: 120, max: 4, cat: t('Прокачування') },
   { id: 'speed', icon: '⚡', name: t('Швидкість'), desc: t('+10% до швидкості'), price: 100, max: 3, cat: t('Прокачування') },
   { id: 'damage', icon: '💥', name: t('Шкода'), desc: t('+15% до шкоди'), price: 150, max: 3, cat: t('Прокачування') },
+  // --- 🏅 другий ярус: ВИБІР, а не сума (таблиця й гейт — у src/tier2.js) ---
+  // Вкладка стоїть ОСТАННЬОЮ і видна завжди — замкнені картки показують, до чого
+  // прагнути, з чесною підказкою «лишилось N». Ховати ярус до викупу базової гілки
+  // не стали: дитині «бачу мету» працює краще, ніж «раптом з'явилось».
+  ...TIER2_ITEMS.map((it) => ({
+    id: it.id, icon: it.icon, name: it.name(), desc: it.desc,
+    price: it.price, max: 1, cat: t('Вибір героя'), tier2: true,
+  })),
 ];
 
 function itemAvailable(item) {
   return !item.availableUntil || Date.now() <= item.availableUntil;
 }
+
+// ⚠️ Ярус 2 — вибір НАЗАВЖДИ, тож купівля у два кроки: перший тап переводить картку
+// в стан «Точно? Тисни ще раз», другий (протягом цього вікна) уже списує монети.
+// Окремого діалога не заводимо — попередження стоїть на самій картці, там, куди
+// дитина й дивиться перед покупкою, і воно видно ЩЕ ДО першого тапу.
+const TIER2_CONFIRM_MS = 12000;
 
 function offerChain(item) {
   if (item.angelStep) return { skin: 'angel', step: item.angelStep, icon: '🪽', name: t('Ангел'), fx: t('Білі іскри після вбивства і відродження') };
@@ -150,12 +165,14 @@ export class Shop {
     this.isOpen = true;
     this.el.classList.add('show');
     this.game.input.exitLock();
+    this._confirmId = null; // ⚠️ підтвердження ярусу 2 не переживає закриття магазину
     this.render();
     this.game.audio.click();
   }
 
   close() {
     this.isOpen = false;
+    this._confirmId = null;
     this.el.classList.remove('show');
     this.game.audio.click();
     if (this.game.level && !this.game.paused) this.game.input.request();
@@ -225,6 +242,7 @@ export class Shop {
     tabsEl.querySelectorAll('.shop-tab').forEach((el) => {
       el.addEventListener('click', () => {
         this.activeTab = el.dataset.cat;
+        this._confirmId = null;
         this.game.audio.click();
         this.render();
       });
@@ -240,12 +258,18 @@ export class Shop {
       const lockedUpgrade = item.needsUpgrade && !(save.upgrades[item.needsUpgrade] > 0);
       const chain = offerChain(item);
       const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
+      // 🏅 ярус 2: замок (базова гілка не викуплена / у парі вже обрано інше) і стан «Точно?»
+      const t2lock = item.tier2 ? tier2Lock(save.upgrades, item.id) : null;
+      const lockedTier2 = !!(t2lock && t2lock.kind !== 'owned');
+      const rival = item.tier2 ? tier2Item(tier2Item(item.id).rival) : null;
+      const confirming = item.tier2 && this._confirmId === item.id;
       const price = this.priceOf(item);
       const afford = save.coins >= price && (!item.crystalPrice || (save.crystals || 0) >= item.crystalPrice)
         && (!item.radiationPrice || (save.radiationCoins || 0) >= item.radiationPrice);
       const lvl = item.max !== Infinity && item.max > 1 ? ` <span class="shop-lvl">${count}/${item.max}</span>` : '';
       const surge = price > this.basePriceOf(item) ? ' <span class="shop-surge">📈</span>' : '';
-      const priceLabel = (locked || lockedGadget || lockedSkin || lockedUpgrade || lockedChain) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
+      const priceLabel = (locked || lockedGadget || lockedSkin || lockedUpgrade || lockedChain || lockedTier2) ? '🔒' : maxed ? (item.weapon || item.gadget || item.skin || item.cloneSkin ? t('Є!') : t('МАКС'))
+        : confirming ? t('Точно? Тисни ще раз')
         : item.crystalPrice && price ? `${price} <span class="coin-icon">₴</span> + ${item.crystalPrice} 💎`
         : item.crystalPrice && item.radiationPrice ? `${item.crystalPrice} 💎 + ${item.radiationPrice} ☢️`
         : item.radiationPrice ? `${item.radiationPrice} ☢️`
@@ -255,13 +279,18 @@ export class Shop {
         : lockedSkin ? t('Спершу купи скін Радіаційний')
         : lockedUpgrade ? t('Спершу звільни першу країну')
         : lockedChain ? t('Спершу купи попередню акцію')
+        : lockedTier2 ? (t2lock.kind === 'base'
+          ? t('Спершу викупи все «Прокачування» і «Спорядження» — лишилось {n}', { n: t2lock.left })
+          : t('Ти вже обрав {n} — цей шлях закрито назавжди', { n: t2lock.rival.name() }))
+        : confirming ? t('⚠️ НАЗАВЖДИ! {n} закриється. Тисни ще раз — купую', { n: rival.name() })
+        : item.tier2 && !maxed ? `${item.desc()} · ${t('⚠️ Або це, або {n} — друге закриється назавжди', { n: rival.name() })}`
         : (typeof item.desc === 'function' ? item.desc() : item.desc);
       // ціль можна ставити лише на те, на що варто збирати: не консумабли, не куплене, не locked
-      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedSkin && !lockedUpgrade && !lockedChain;
+      const goalOk = item.cat !== t('Припаси') && !(item.crystalPrice && price) && !maxed && !locked && !lockedGadget && !lockedSkin && !lockedUpgrade && !lockedChain && !lockedTier2;
       const isGoal = save.goal === item.id;
       const goalBtn = goalOk ? `<button class="shop-goal-btn ${isGoal ? 'on' : ''}" data-goal="${item.id}" title="${t('Зробити ціллю')}">🎯</button>` : '';
       html += `
-        <div class="shop-item ${maxed || locked || lockedGadget || lockedUpgrade || lockedChain ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''}" data-id="${item.id}">
+        <div class="shop-item ${maxed || locked || lockedGadget || lockedUpgrade || lockedChain || lockedTier2 ? 'maxed' : afford ? '' : 'poor'} ${isGoal ? 'goal' : ''} ${confirming ? 'confirm' : ''}" data-id="${item.id}">
           ${goalBtn}
           <div class="shop-icon">${item.icon}</div>
           <div class="shop-name">${item.name}${lvl}</div>
@@ -308,6 +337,17 @@ export class Shop {
     const chain = offerChain(item);
     const lockedChain = chain && chain.step > 1 && !(save.upgrades[`${chain.skin}-action-${chain.step - 1}`] > 0);
     const lockedSkin = item.needsSkin && !save.skins.includes(item.needsSkin);
+    // 🏅 ярус 2: гейт базової гілки і взаємне виключення в парі — з поясненням, а не мовчки
+    const t2lock = item.tier2 ? tier2Lock(save.upgrades, id) : null;
+    if (t2lock && t2lock.kind !== 'owned') {
+      this._confirmId = null;
+      game.audio.denied();
+      game.hud.toast(t2lock.kind === 'base'
+        ? t('🔒 Спершу викупи все «Прокачування» і «Спорядження» — лишилось {n}', { n: t2lock.left })
+        : t('🔒 У цій парі ти вже обрав {n} — вибір був назавжди', { n: t2lock.rival.name() }));
+      this.render();
+      return;
+    }
     if (count >= item.max || save.coins < price || (item.crystalPrice && (save.crystals || 0) < item.crystalPrice)
       || (item.radiationPrice && (save.radiationCoins || 0) < item.radiationPrice)
       || (item.needsBazooka && !save.weapons.includes('bazooka'))
@@ -324,6 +364,20 @@ export class Shop {
       game.hud.toast(t('Броня вже повна! 🛡️'));
       return;
     }
+    // ⚠️ ярус 2: перший тап лише попереджає («Точно? Тисни ще раз»), купує другий.
+    // Стоїть ПІСЛЯ перевірки монет — щоб не питати підтвердження там, де покупки й так не буде.
+    if (item.tier2) {
+      const rival = tier2Item(tier2Item(id).rival);
+      if (this._confirmId !== id || Date.now() - (this._confirmT || 0) > TIER2_CONFIRM_MS) {
+        this._confirmId = id;
+        this._confirmT = Date.now();
+        game.audio.click();
+        game.hud.toast(t('⚠️ Вибір назавжди: візьмеш {a} — {b} закриється. Тисни ще раз, щоб підтвердити', { a: item.name, b: rival.name() }));
+        this.render();
+        return;
+      }
+    }
+    this._confirmId = null;
     if (item.crystalPrice) save.crystals -= item.crystalPrice;
     if (item.radiationPrice) save.radiationCoins = Math.max(0, (save.radiationCoins || 0) - item.radiationPrice);
     if (price) {
@@ -561,6 +615,21 @@ export class Shop {
         player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08 * powers.speedMult;
         game.hud.toast(t('👟 Кросівки-ракети! Стрибай вище — {k}', { k: keyHint('кнопка ⬆️', 'Space') }));
         break;
+      // 🏅 усі шість покупок ярусу 2 рахує applyGear із save.upgrades — там само, де вже
+      // рахуються жилет, шолом і пасивки країн, тож нічого нікого не затирає
+      case 't2-carapace':
+      case 't2-nanoplates':
+      case 't2-pointblank':
+      case 't2-marksman':
+      case 't2-ammobelt':
+      case 't2-quickhands': {
+        player.applyGear(save.upgrades, powers);
+        if (id === 't2-carapace') player.addArmor(TIER2.carapaceArmor); // нову броню дає одразу
+        const rival = tier2Item(tier2Item(id).rival);
+        game.hud.toast(t('{i} {n} — назавжди твій! Шлях «{r}» закрито.', { i: item.icon, n: item.name, r: rival.name() }));
+        game.audio.levelUp();
+        break;
+      }
       case 'shield':
       case 'heal':
       case 'chainlightning':
