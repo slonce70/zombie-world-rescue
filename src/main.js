@@ -37,6 +37,7 @@ import { getMoonRegion, getSpaceWorld } from './moonregions.js';
 import { MoonHazards } from './moonhazards.js';
 import { Bus, RNG, disposeObject } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
+import { countryPowerMods } from './countrypowers.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
 import { Megabox, Pet, Vehicles, Gadgets, GADGETS, TOWER_SKINS, SuperPickup } from './extras.js';
@@ -3854,17 +3855,28 @@ class Game {
       this.saveGame();
     };
     level.player = new Player(level);
+    // 🎖️ пасивки звільнених країн (v750): лягають у ТІ САМІ поля, що й куплені апгрейди,
+    // тому окремої системи не з'являється. Вимкнені там, де режим свідомо переписує героя
+    // під свій баланс — фіксований лоадаут (нокаут, оборона, PVP, банк, портал, люди,
+    // збирач душ, оборона турелі, радіація): там нижче руками ставляться HP/броня/шкода,
+    // і пасивка або зникла б безслідно, або зламала б задуману складність кімнати.
+    // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Лабіринт, Експедиція,
+    // «Живий фронт», кастомні карти) герой іде зі своїм спорядженням — там пасивки діють.
+    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation;
+    const powers = fixedLoadout ? null : countryPowerMods(this.save.liberated);
+    level.countryPowers = powers;
     // застосовуємо куплені прокачування
     const u = this.save.upgrades;
-    level.player.maxHealth = 100 + (u.maxhp || 0) * 25;
+    level.player.maxHealth = 100 + (u.maxhp || 0) * 25 + (powers ? powers.maxHealth : 0);
     level.player.health = level.player.maxHealth;
-    level.player.speedMult = (1 + (u.speed || 0) * 0.1) * (u.sneakers ? 1.08 : 1);
-    level.player.damageMult = 1 + (u.damage || 0) * 0.15;
+    level.player.speedMult = (1 + (u.speed || 0) * 0.1) * (u.sneakers ? 1.08 : 1) * (powers ? powers.speedMult : 1);
+    level.player.damageMult = (1 + (u.damage || 0) * 0.15) * (powers ? powers.damageMult : 1);
+    level.player.healMult = powers ? powers.healMult : 1;
     // спорядження: бронежилет, шолом, кросівки (видно на герої)
-    level.player.applyGear(u);
+    level.player.applyGear(u, powers);
     if ((u.vest || 0) > 0) level.player.armor = level.player.maxArmor;
     // зброя, здобута в попередніх країнах. У спецрежимах даємо фіксований набір.
-    if (isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation) {
+    if (fixedLoadout) {
       level.player.weapons = isRadiation ? ['shotgun'] : isTurretWar ? ['hammer'] : isSoulCollector ? ['staff', 'sword'] : isHumans ? ['pistol', 'staff', 'sword'] : isPortal ? ['pistol', 'bazooka'] : isBank ? ['staff', 'pistol'] : isPvp ? (pvpVariant === 'overloaded' ? ['cannon', 'sword'] : ['staff']) : isZoneDefense ? ['staff', 'pistol'] : isDefense ? ['pistol', 'rifle'] : ['pistol'];
       level.player.cur = isRadiation ? 'shotgun' : isTurretWar ? 'hammer' : isSoulCollector ? 'staff' : isHumans ? 'pistol' : isPortal ? 'pistol' : isBank ? 'staff' : isPvp ? (pvpVariant === 'overloaded' ? 'cannon' : 'staff') : isZoneDefense ? 'staff' : isDefense ? 'rifle' : 'pistol';
       level.player.grenades = 0;

@@ -9,6 +9,7 @@ import { starTotal, countryStars, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, STARS_PER_
 import { rescuedFriendCount, FRIEND_TOTAL } from '../friends.js';
 import { claimStarEggs } from '../eggs.js';
 import { hasLiberated } from '../net/cloudsave.js';
+import { countryPower } from '../countrypowers.js';
 
 export function showVictory(game) {
   if (!game.level || game.victoryShown) return;
@@ -125,6 +126,15 @@ export function showVictory(game) {
     // 🇪🇸/🇮🇹 більше не дають зброю — натомість монети (вогнемет/лазер тепер за зірковий рівень)
     game.save.coins += country.coinReward;
     game.hud.toast(t('🏆 {n} звільнено! +{c} монет 💰', { n: country.name, c: country.coinReward }));
+  }
+  // 🎖️ пасивка країни (v750): монети лишились, але тепер за країну дається ще й постійна
+  // сила. Сама сила виводиться з save.liberated (countrypowers.js) — тут лише повідомлення
+  // при ПЕРШОМУ звільненні, щоб дитина побачила, що саме отримала назавжди.
+  const powerReward = countryPower(country.id);
+  if (powerReward && !wasLiberated) {
+    game.hud.toast(t('{i} Нова сила назавжди: {n} — {d}', {
+      i: powerReward.icon, n: powerReward.name(), d: powerReward.desc(),
+    }));
   }
   // 🧪 Глава 3: перша перемога в Лігві Вірусу — медаль, пет і кристали
   if (country.id === 'LAB' && !wasLiberated) {

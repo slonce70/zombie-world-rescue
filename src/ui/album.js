@@ -7,6 +7,7 @@ import { claimBacklogEggs, eggOddsText, petLevel, PET_MAX_LEVEL, canFeed, feedCo
 import { HERO_SKINS, PETS } from '../characters.js';
 import { starTotal, CAMPAIGN_STAR_MAX } from '../stars.js';
 import { liberatedCount } from '../net/cloudsave.js';
+import { countryPowerCards } from '../countrypowers.js';
 import { CHAPTER3 } from '../chapter.js';
 import { SHOP_ITEMS } from '../shop.js';
 import { TITLES } from '../titles.js';
@@ -164,6 +165,27 @@ export function renderAlbum(game) {
     : `<div class="album-card locked"><div class="album-portrait silhouette">${icon}</div><div class="album-name">???</div><div class="album-hint">${hint}</div></div>`;
   const medalsHtml = medalCard(medals.includes(CHAPTER3.id), '🧪', CHAPTER3.medalName, t('Пройди Главу 3 у Лігві Вірусу'))
     + medalCard(medals.includes('WORLD'), '🌍', t('Рятівник світу'), t('Звільни всі 12 країн світу'));
+  // 🎖️ Сили країн: постійні пасивки за ESP/PRT/ITA/SWE/JPN/CHN. Профіль «Герой» — це вже
+  // місце «що я здобув і що лишилось», тож окремий оверлей не заводимо: та сама сітка
+  // карток «здобуто / силует + чесна підказка», що й друзі, скіни та петси.
+  const powerCards = countryPowerCards(save.liberated);
+  const powersGot = powerCards.filter((p) => p.earned).length;
+  const powersHtml = powerCards.map((p) => {
+    const country = COUNTRIES[p.country];
+    const countryName = country ? `${country.flag} ${country.name}` : p.country;
+    return p.earned
+      ? `<div class="album-card revealed" data-power="${p.id}">
+        <div class="album-portrait">${p.icon}</div>
+        <div class="album-name">${p.name()}</div>
+        <div class="album-role">${p.desc()}</div>
+        <div class="album-flag">${countryName}</div>
+      </div>`
+      : `<div class="album-card locked" data-power="${p.id}">
+        <div class="album-portrait silhouette">${p.icon}</div>
+        <div class="album-name">???</div>
+        <div class="album-hint">${t('Звільни країну: {country}', { country: countryName })}</div>
+      </div>`;
+  }).join('');
   // рекорди: найшвидша країна (мін time), найкраще комбо (макс по records)
   const records = save.records || {};
   let fastCid = null; let fastTime = Infinity; let bestCombo = 0;
@@ -186,6 +208,8 @@ export function renderAlbum(game) {
     ${barRow(`⭐ ${t('Рівень')} ${lvl}`, `${lvlPct}%`, lvlPct)}
     ${barRow(`⭐ ${t('Зірки кампанії')}`, `${starTotal(save)}/${CAMPAIGN_STAR_MAX}`, starPct)}
     ${barRow(`🌍 ${t('Країни світу')}`, `${heroLibN}/${CAMPAIGN_ORDER.length}`, libPct)}
+    <div class="hero-sec">${t('🎖️ Сили країн')} · ${powersGot}/${powerCards.length}</div>
+    <div class="album-grid">${powersHtml}</div>
     <div class="hero-sec">${t('🏅 Медалі')}</div>
     <div class="album-grid">${medalsHtml}</div>
     <div class="hero-sec">${t('🏆 Рекорди')}</div>

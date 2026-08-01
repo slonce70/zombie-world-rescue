@@ -2,6 +2,7 @@
 import { GADGETS, TOWER_SKINS } from './extras.js';
 import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
+import { countryPowerMods } from './countrypowers.js';
 
 export const SHOP_ITEMS = [
   // --- припаси ---
@@ -368,15 +369,20 @@ export class Shop {
         game.hud.toast(t('{i} Акція {name} {n}/3 куплена', { i: chain.icon, name: chain.name, n: chain.step }));
       }
     }
+    // 🎖️ пасивки звільнених країн: покупки нижче ПЕРЕРАХОВУЮТЬ швидкість/шкоду/спорядження
+    // з нуля, тож пасивку треба вносити тут же — інакше куплений посеред забігу апгрейд
+    // тихо стирав би її. Магазин доступний лише там, де пасивки й так діють (усі режими
+    // з фіксованим лоадаутом мають noShop, і buy() виходить на них ще вище).
+    const powers = countryPowerMods(save.liberated);
     switch (id) {
       case 'maxhp':
         player.maxHealth += 25;
         player.health += 25;
         break;
       case 'speed':
-        player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1);
+        player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1) * powers.speedMult;
         break;
-      case 'damage': player.damageMult = 1 + 0.15 * save.upgrades.damage; break;
+      case 'damage': player.damageMult = (1 + 0.15 * save.upgrades.damage) * powers.damageMult; break;
       case 'mapeditorplus':
         game.hud.toast(t('🏗️ Створювач карт+ відкрито: друга карта, нові обʼєкти, біоми й бос!'));
         break;
@@ -542,17 +548,17 @@ export class Shop {
         game.hud.toast(t('{i} {n} тепер твій! Назавжди!', { i: item.icon, n: item.name }));
         break;
       case 'vest':
-        player.applyGear(save.upgrades);
+        player.applyGear(save.upgrades, powers);
         player.armor = Math.min(player.maxArmor, player.armor + 50);
         game.hud.toast(t('🦺 Бронежилет одягнено! Подивись на себе — {k}', { k: keyHint('кнопка 📷', 'клавіша V') }));
         break;
       case 'helmet':
-        player.applyGear(save.upgrades);
+        player.applyGear(save.upgrades, powers);
         game.hud.toast(t('⛑️ Шолом одягнено! Подивись на себе — {k}', { k: keyHint('кнопка 📷', 'клавіша V') }));
         break;
       case 'sneakers':
-        player.applyGear(save.upgrades);
-        player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08;
+        player.applyGear(save.upgrades, powers);
+        player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08 * powers.speedMult;
         game.hud.toast(t('👟 Кросівки-ракети! Стрибай вище — {k}', { k: keyHint('кнопка ⬆️', 'Space') }));
         break;
       case 'shield':

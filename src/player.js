@@ -285,11 +285,15 @@ export class Player {
     this.ammo.bazooka.reserve = Math.min(WEAPONS.bazooka.cap, this.ammo.bazooka.reserve + n);
   }
 
-  // куплене спорядження: ефекти + видимі речі на герої (3-тя особа)
-  applyGear(upgrades) {
+  // куплене спорядження: ефекти + видимі речі на герої (3-тя особа).
+  // 🎖️ powers — набір пасивок звільнених країн (src/countrypowers.js) або null.
+  // Броня і шолом рахуються тут щоразу заново (і на старті рівня, і після покупки
+  // в магазині), тож пасивка мусить приїжджати сюди ж — інакше покупка жилета
+  // посеред забігу стирала б її.
+  applyGear(upgrades, powers = null) {
     const vest = upgrades.vest || 0;
-    this.maxArmor = 50 + vest * 50;
-    this.helmetMult = upgrades.helmet ? 0.85 : 1;
+    this.maxArmor = 50 + vest * 50 + ((powers && powers.maxArmor) || 0);
+    this.helmetMult = (upgrades.helmet ? 0.85 : 1) * ((powers && powers.damageTakenMult) || 1);
     this.jumpPower = (upgrades.sneakers ? 8.6 : 7.6) + (this.moon ? 1.8 : 0);
     for (const kind of ['vest', 'helmet', 'sneakers']) {
       if ((upgrades[kind] || 0) > 0 && !this.gearAttached[kind]) {

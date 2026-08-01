@@ -105,8 +105,10 @@ try {
     health: window.__game.level.player.health,
     coopRole: window.__game.level.coopRole,
   }));
-  check(roundA.maxHealth === 125 && roundA.health === 125,
-    'guard-хост: maxHealth 125 (100+25), health стартове теж 125', JSON.stringify(roundA));
+  // 🎖️ хост звільнив усі 12 країн, тож до ролі додається ще й пасивка Китаю (+20 макс. HP,
+  // src/countrypowers.js): 100 базових + 25 guard + 20 Велика стіна = 145.
+  check(roundA.maxHealth === 145 && roundA.health === 145,
+    'guard-хост: maxHealth 145 (100+25 guard+20 пасивка Китаю), health стартове теж 145', JSON.stringify(roundA));
 
   const roundB = await B.evaluate(() => ({
     maxHealth: window.__game.level.player.maxHealth,
@@ -126,7 +128,7 @@ try {
     maxHealth: window.__game.level.player.maxHealth,
     saved: window.__game.save.coopRole,
   }));
-  check(afterChange.maxHealth === 125 && afterChange.saved === 'scout',
+  check(afterChange.maxHealth === 145 && afterChange.saved === 'scout',
     'зміна ролі посеред рівня НЕ міняє maxHealth (снапшот на старті); сейв уже scout', JSON.stringify(afterChange));
 
   // повертаємось у лобі
@@ -160,8 +162,9 @@ try {
     pickupMult: window.__game.level.player.pickupMult,
   }));
   // без апгрейдів базовий speedMult = 1; scout → ×1.08. pickupMult 1.25.
-  check(scoutA.role === 'scout' && Math.abs(scoutA.speedMult - 1.08) < 1e-6 && Math.abs(scoutA.pickupMult - 1.25) < 1e-6,
-    'scout-хост: speedMult 1.08 + pickupMult 1.25', JSON.stringify(scoutA));
+  // 🎖️ у хоста звільнена ще й Іспанія → ×1.04 від пасивки «Порив кориди» (1.08 × 1.04 = 1.1232).
+  check(scoutA.role === 'scout' && Math.abs(scoutA.speedMult - 1.08 * 1.04) < 1e-6 && Math.abs(scoutA.pickupMult - 1.25) < 1e-6,
+    'scout-хост: speedMult 1.08 × 1.04 (пасивка Іспанії) + pickupMult 1.25', JSON.stringify(scoutA));
   check(scoutB.role === 'scout' && Math.abs(scoutB.speedMult - 1.08) < 1e-6 && Math.abs(scoutB.pickupMult - 1.25) < 1e-6,
     'scout-гість: speedMult 1.08 + pickupMult 1.25', JSON.stringify(scoutB));
 
