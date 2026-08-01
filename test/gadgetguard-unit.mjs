@@ -260,6 +260,20 @@ test('посилення: без прапорця його не буває на�
   assert.ok(quiet.ok && quiet.strong === false, 'не просив — слід лишається слабким');
 });
 
+test('межа довіри: guard вірить списку гіперзарядів, володіння він не перевіряє', () => {
+  // Список приходить із ростера, куди його поклав САМ гість (`hello.hyp`), а
+  // `sanitizeHypers` у net/coop.js звіряє id з каталогом магазину — тобто ФОРМУ, а
+  // не володіння. Тут фіксуємо саме це: guard бере список як факт. Це прийнятий
+  // розмін (інакше чесний гість втрачає куплений за 5000 монет гіперзаряд), а не
+  // недогляд — закрити його можна лише довіреним джерелом покупок.
+  // Якщо колись зʼявиться перевірка володіння, цей тест впаде — і це правильно:
+  // рішення має бути свідомим.
+  const g = createGadgetGuard();
+  const declared = checkGadget(g, 'turret', 1000, { strong: true, active: 0, hypers: ['turret'] });
+  assert.ok(declared.ok && declared.strong,
+    'оголошеного гіперзаряду досить — доказу покупки guard не питає');
+});
+
 test('гіперзаряди: заявлене в таблиці збігається з каталогом магазину', () => {
   const shopSrc = readFileSync(new URL('../src/shop.js', import.meta.url), 'utf8');
   assert.ok(/export const HYPER_IDS/.test(shopSrc) && /SHOP_ITEMS\.filter\(\(i\) => i\.hyper\)/.test(shopSrc),

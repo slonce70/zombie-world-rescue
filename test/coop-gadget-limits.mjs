@@ -254,6 +254,41 @@ try {
   check(meteor.meteorHyper === false, 'метеорит без оголошеного гіперзаряду лишається звичайним',
     JSON.stringify({ meteors: meteor.meteors, hyper: meteor.meteorHyper }));
 
+  // ── 6c′. МЕЖА ДОВІРИ: оголошення хост приймає на слово ─────────────────────
+  // Модифікований клієнт може оголосити гіперзаряд, якого НЕ купував: каталог
+  // магазину перевіряє форму (чи існує такий id), а не володіння. Фіксуємо саме
+  // фактичну поведінку — хост будує посилену версію. Це ПРИЙНЯТИЙ РОЗМІН, не баг:
+  // закрити його можна лише довіреним джерелом покупок (тікет 05, «Межа довіри»).
+  // Якщо колись зʼявиться перевірка володіння — цей тест впаде і змусить вирішити
+  // свідомо, а не мовчки.
+  const forged = await B.evaluate(async () => {
+    const { PROTO_VERSION } = await import('/src/net/protocol.js');
+    const s = window.__game.coop.session;
+    // те саме hello, тільки з дописаним чужим гіперзарядом (resume — щоб хост не
+    // перебудовував гостю рівень); у сейві гостя метеорита як не було, так і немає
+    s.transport.send(1, {
+      t: 'hello', ...s.myInfo(), hyp: ['turret', 'meteor'],
+      build: window.__APP_VERSION, proto: PROTO_VERSION, resume: 1,
+    }, true);
+    return { save: (window.__game.save.gadgetHypers || []).slice() };
+  });
+  check(!forged.save.includes('meteor'), 'гість цього гіперзаряду НЕ купував', JSON.stringify(forged.save));
+  const accepted = await waitFor(() => A.evaluate((p) => {
+    const r = window.__game.coop.session.roster.get(p) || {};
+    return Array.isArray(r.hyp) && r.hyp.includes('meteor');
+  }, pid), 15000 * SLOW, 'хост прийняв оголошення');
+  check(accepted, 'хост записав оголошений гіперзаряд у ростер');
+  // другий метеорит: чекаємо власне вікно частоти (18с), пересилаючи запит
+  const again = await waitFor(async () => {
+    await B.evaluate((sp) => window.__send('meteor', sp.x, sp.z, true), sFire);
+    await sleep(1500 * SLOW);
+    return (await view()).meteors > meteor.meteors;
+  }, 45000 * SLOW, 'другий метеорит');
+  const trusted = await view();
+  check(again && trusted.meteorHyper === true,
+    'МЕЖА ДОВІРИ: оголошений, але не куплений гіперзаряд хост приймає на слово',
+    JSON.stringify({ meteors: trusted.meteors, hyper: trusted.meteorHyper }));
+
   // ── 6d. Стеля КІМНАТИ: обʼєкти чужого (зниклого) номера гравця теж рахуються ─
   const roomMax = 48;
   const honestWalls = (await view()).walls; // барикади гостя, які дожили досюди
