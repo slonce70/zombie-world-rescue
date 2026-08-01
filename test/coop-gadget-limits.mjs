@@ -144,6 +144,34 @@ try {
   now = await view();
   check(now.made === 0, 'слід від гостя без роздачі картки не створює вогню', JSON.stringify(now));
 
+  // ── 4b. Спільна збірка забігу: право БЕЗ жодної роздачі ────────────────────
+  // Кооп-Експедиція і Фронт віддають гостю ту саму збірку забігу, що й хосту, тож
+  // хост звіряє слід із нею (`_sharedBuild`). Піднімати заради цього цілу експедицію
+  // дорого — підставляємо хосту саме те поле, яке той режим і кладе на рівень.
+  await A.evaluate(() => { window.__game.level.operation = { build: ['firetrail'] }; });
+  await B.evaluate(async (s) => {
+    for (let i = 0; i < 3; i++) {
+      window.__send('firetrail', s.x, s.z, true);
+      await new Promise((r) => setTimeout(r, 330));
+    }
+  }, sFire);
+  await until((v) => v.made >= 3, 'слід за спільною збіркою');
+  const shared = await view();
+  check(shared.made === 3, 'слід за спільною збіркою проходить без жодної роздачі', JSON.stringify(shared));
+  check(shared.strong === false, 'одне входження у збірці — слід слабкий попри hyper=1', JSON.stringify(shared));
+
+  // збірки не стало — право зникло разом з нею
+  await A.evaluate(() => { window.__game.level.operation = null; });
+  await B.evaluate(async (s) => {
+    for (let i = 0; i < 3; i++) {
+      window.__send('firetrail', s.x, s.z, true);
+      await new Promise((r) => setTimeout(r, 330));
+    }
+  }, sFire);
+  await sleep(700 * SLOW);
+  const dropped = await view();
+  check(dropped.made === shared.made, 'без спільної збірки слід знову відхиляється', JSON.stringify(dropped));
+
   // ── 5. Хост роздав картку саме цьому гостю (та сама подія, що у Штормі) ────
   await A.evaluate((p) => window.__game.level.netEv('dro', p, ['firetrail']), pid);
   await sleep(600 * SLOW);
@@ -153,9 +181,9 @@ try {
       await new Promise((r) => setTimeout(r, 330));
     }
   }, sFire);
-  await until((v) => v.made >= 5, 'пʼять чесних слідів');
+  await until((v) => v.made >= dropped.made + 5, 'пʼять чесних слідів');
   const honest = await view();
-  check(honest.made === 5, 'чесний слід у Штормі падає без жодного пропуску', JSON.stringify(honest));
+  check(honest.made - dropped.made === 5, 'чесний слід у Штормі падає без жодного пропуску', JSON.stringify(honest));
   check(honest.strong === false, 'картку роздали раз — слід лишається слабким попри hyper=1', JSON.stringify(honest));
 
   // ── 6. Пачка слідів: не по обʼєкту на повідомлення ─────────────────────────

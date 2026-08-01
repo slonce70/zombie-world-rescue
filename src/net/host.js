@@ -441,11 +441,25 @@ export class HostNet {
     // має зʼїдати бюджет чесного гостя. Понадлімітне повідомлення просто зникає.
     const verdict = checkGadget(this._guard(from), d.kind, performance.now(), {
       strong: !!d.hyper,
-      storm: !!level.storm,
+      build: this._sharedBuild(),
       active: this._liveGadgets(d.kind, from),
     });
     if (!verdict.ok) return;
     place(level.gadgets, d, from, verdict.strong);
+  }
+
+  // 🎒 СПІЛЬНА збірка забігу — друге джерело права на карткові ефекти (перше —
+  // роздача `dro`). Це рівно ті режими, де хост віддає збірку ВСІЙ кімнаті у spec
+  // і обидві сторони застосовують її на своєму гравцеві: Експедиція (`ex`) і Фронт
+  // (`fr`). Беремо саме ці масиви, а не `runBuild.ids` хоста: у Штормі збірка в
+  // кожного СВОЯ (право дає лише роздача), а у Фронті хост може взяти картку
+  // всередині рівня — гостю вона не діставалась, тож права давати не повинна.
+  // У кооп-кампанії збірки забігу гостю не створюють — тут null, і слід відхиляється.
+  _sharedBuild() {
+    const level = this.level;
+    if (level.expedition && Array.isArray(level.expedition.build)) return level.expedition.build;
+    if (level.operation && Array.isArray(level.operation.build)) return level.operation.build;
+    return null;
   }
 
   // скільки обʼєктів цього типу гість тримає живими у світі просто зараз.
