@@ -14,6 +14,7 @@ import {
 } from './frontsync.js';
 import { sanitizeCommunitySnapshot, sanitizeMapSize, sanitizeMapStyle } from '../../worker/community-schema.mjs';
 import { SPECIALIST_IDS, SPECIALISTS, sanitizeSpecialistId, specialistModifiers, specialistRank } from '../specialists.js';
+import { HYPER_IDS } from '../shop.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -94,6 +95,21 @@ function sanitizeHero(raw) {
   };
 }
 
+// ⚡ Гіперзаряди гравця в мережі (PROTO 26): гість оголошує їх при вході тим самим
+// шляхом, що нік і скін, а хост будує гіпер-турель і гіпер-метеорит лише тому, у кого
+// право справді є. Це САМООГОЛОШЕННЯ: модифікований клієнт може збрехати — свідомий
+// компроміс (мета — повернути чесному гравцю КУПЛЕНЕ, а не збудувати античит).
+// Але оголосити те, чого в грі не існує, не можна: чистимо каталогом магазину.
+function sanitizeHypers(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const id of raw) {
+    if (typeof id !== 'string' || !HYPER_IDS.includes(id) || out.includes(id)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
 export function sanitizeRosterEntry(raw, forcedPid = undefined) {
   const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const pid = validPid(forcedPid === undefined ? own(src, 'pid') : forcedPid);
@@ -109,6 +125,8 @@ export function sanitizeRosterEntry(raw, forcedPid = undefined) {
     tracer: rosterId(TRACERS, own(src, 'tracer'), 'classic'),
     dance: rosterId(DANCES, own(src, 'dance'), 'shuffle'),
     pet: rosterId(PETS, own(src, 'pet'), null),
+    // ⚡ куплені гіперзаряди: хост звіряє з ними прапорець посилення в каналі гаджетів
+    hyp: sanitizeHypers(own(src, 'hyp')),
     ready: own(src, 'ready') === true,
   };
 }
@@ -160,6 +178,8 @@ export class CoopSession {
       tracer: save.activeTracer || 'classic',
       dance: save.activeDance || 'shuffle',
       pet: save.activePet || null, // 🐾 id активного улюбленця — друзі бачать його поряд
+      // ⚡ гіперзаряди: щоб куплене працювало й тоді, коли ти ГІСТЬ, а не хост
+      hyp: Array.isArray(save.gadgetHypers) ? save.gadgetHypers : [],
     });
   }
 

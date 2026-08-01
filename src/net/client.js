@@ -78,6 +78,12 @@ export class GuestNet {
   sendUse(kind, extra = {}) { this.send({ t: 'use', kind, ...extra }); }
   sendGadget(kind, x, z, yaw, hyper = false) { this.send({ t: 'gadget', kind, x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10, yaw: Math.round(yaw * 100) / 100, hyper: hyper ? 1 : 0 }); }
   sendRespawned() { this.send({ t: 'respawned' }); }
+  // 🎲 вибір картки драфту (PROTO 26): хост роздав набір і має знати, ЩО саме з нього
+  // взяли — інакше він або вірить гостю на слово, або не пускає його карткові ефекти
+  // взагалі. Ефект картки (вогняний слід) хост ставить сам, тож звіряє вибір із набором.
+  sendDraftPick(id) {
+    this.session.transport.send(1, { t: 'dpk', id: String(id || '').slice(0, 32) }, true);
+  }
   // 🔨 удар молотом по зомбі-турелі: шкоду зараховує хост
   sendTurretHit(dmg) { this.send({ t: 'twh', dmg: Math.round(dmg) }); }
   sendRevive(pid) { this.send({ t: 'revdone', target: pid }); }

@@ -6,14 +6,21 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../src/net/gadgetguard.js', import.meta.url), 'utf8');
-const { GADGET_LIMITS, GADGET_KINDS, checkGadget, createGadgetGuard, grantDraftCards } = await import(
+const { GADGET_LIMITS, GADGET_KINDS, checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard } = await import(
   'data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 const hostSrc = readFileSync(new URL('../src/net/host.js', import.meta.url), 'utf8');
+const coopSrc = readFileSync(new URL('../src/net/coop.js', import.meta.url), 'utf8');
+const protoSrc = readFileSync(new URL('../src/net/protocol.js', import.meta.url), 'utf8');
 
 // зручні обгортки: гість шле повідомлення в момент `now`
 const ok = (guard, kind, now, opts) => checkGadget(guard, kind, now, opts).ok;
 const why = (guard, kind, now, opts) => checkGadget(guard, kind, now, opts).reason;
+// картка, яку хост роздав і гість підтвердив вибір
+const takeCard = (guard, id = 'firetrail', rest = ['dmg25', 'spd12']) => {
+  offerDraftCards(guard, [id, ...rest]);
+  return takeDraftCard(guard, id);
+};
 
 test('таблиця лімітів покриває ВСІ типи, які хост уміє ставити', () => {
   const block = hostSrc.match(/const GADGET_PLACERS = \{([\s\S]*?)\n\};/);
@@ -28,8 +35,17 @@ test('таблиця лімітів покриває ВСІ типи, які х�
   }
   // старий шлях «if (d.kind === ...)» більше не має існувати
   assert.ok(!/d\.kind === 'firetrail'/.test(hostSrc), 'вогняний слід іде тільки через таблицю');
-  // обидва джерела права мусять доїжджати до перевірки
-  assert.ok(/if \(args\[0\] === 'dro'\) grantDraftCards\(/.test(hostSrc), 'хост обліковує роздачі набору');
+  // усі джерела права мусять доїжджати до перевірки
+  assert.ok(/if \(args\[0\] === 'dro'\) offerDraftCards\(/.test(hostSrc), 'хост памʼятає роздані набори');
+  assert.ok(/case 'dpk'/.test(hostSrc) && /takeDraftCard\(this\._guard\(from\), d\.id\)/.test(hostSrc),
+    'хост приймає повідомлення про вибір картки');
+  assert.ok(/hypers: \(this\.session\.roster\.get\(from\) \|\| \{\}\)\.hyp/.test(hostSrc),
+    'хост бере гіперзаряди з ростера, а не з повідомлення');
+  assert.ok(/room: this\.roomGuard/.test(hostSrc) && /roomActive: this\._liveGadgets\(d\.kind, null\)/.test(hostSrc),
+    'хост передає стан і лічильник кімнати');
+  assert.ok(/PROTO_VERSION = 26/.test(protoSrc), 'версія протоколу піднята під нові повідомлення');
+  assert.ok(/hyp: sanitizeHypers\(own\(src, 'hyp'\)\)/.test(coopSrc), 'ростер чистить оголошені гіперзаряди');
+  assert.ok(/HYPER_IDS\.includes\(id\)/.test(coopSrc), 'чистить саме каталогом магазину');
   assert.ok(/build: this\._sharedBuild\(\)/.test(hostSrc), 'хост передає спільну збірку в перевірку');
   assert.ok(/level\.expedition && Array\.isArray\(level\.expedition\.build\)/.test(hostSrc)
     && /level\.operation && Array\.isArray\(level\.operation\.build\)/.test(hostSrc),
@@ -57,7 +73,7 @@ test('частота: пачка повідомлень пропускає рі�
 
 test('частота: злиплі повідомлення пускаємо в межах запасу жетонів', () => {
   const g = createGadgetGuard();
-  grantDraftCards(g, ['firetrail']);
+  takeCard(g);
   const burst = GADGET_LIMITS.firetrail.burst;
   // хост підвис і віддав кілька чесних слідів одним тиком — з нульовим інтервалом
   let passed = 0;
@@ -89,7 +105,7 @@ test('стеля живих обʼєктів: світ рахує стіни, gu
   // вогняний слід: власника у світі немає, живих рахує сам guard за часом життя.
   // Сама лише частота дала б 2400/150 = 16 плям одночасно — стеля тримає 12.
   const f = createGadgetGuard();
-  grantDraftCards(f, ['firetrail']);
+  takeCard(f);
   const { maxActive, lifeMs } = GADGET_LIMITS.firetrail;
   const step = 160; // швидше за легальні 300 мс, але вже в межах інтервалу 150 мс
   const alive = [];
@@ -118,9 +134,12 @@ test('право на картку: без роздачі і без спільн
   assert.equal(why(g, 'firetrail', 1000, { build: ['ricochet', 'crithit'] }), 'nocard',
     'збірка без цієї картки права не дає');
   assert.equal(why(g, 'firetrail', 1000, { build: 'firetrail' }), 'nocard', 'не масив — не збірка');
-  // а роздача — дає
-  grantDraftCards(g, ['firetrail']);
-  assert.ok(ok(g, 'firetrail', 1000), 'роздача набору дає право');
+  // сама лише роздача права НЕ дає — набір це пропозиція, а не вибір
+  offerDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
+  assert.equal(why(g, 'firetrail', 1000), 'nocard', 'показали — ще не значить узяв');
+  // а підтверджений вибір — дає
+  assert.ok(takeDraftCard(g, 'firetrail'), 'вибір із набору хост зараховує');
+  assert.ok(ok(g, 'firetrail', 1000), 'узята картка дає право');
 });
 
 test('право на картку: спільна збірка забігу дає право без жодної роздачі', () => {
@@ -149,72 +168,87 @@ test('право на картку: сила зі спільної збірки 
   assert.ok(r.ok && r.strong, 'двічі у збірці — сильний слід законний');
 });
 
-test('набір драфту дає право рівно на ОДНУ картку', () => {
+test('вибір картки: хост зараховує рівно те, що гість узяв із НАДІСЛАНОГО набору', () => {
   const g = createGadgetGuard();
-  grantDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
-  assert.equal(g.offers, 1, 'набір із трьох карток — це один вибір, а не три');
-  assert.ok(ok(g, 'firetrail', 1000), 'свій єдиний вибір гість може витратити на слід');
-  assert.equal(g.claimedN, 1, 'вибір списано рівно один раз');
-  assert.ok(ok(g, 'firetrail', 1000 + GADGET_LIMITS.firetrail.minGapMs),
-    'узяту картку далі ставимо вільно — вибір уже списаний');
-  assert.equal(g.claimedN, 1, 'повторний ужиток тієї ж картки бюджет не витрачає');
+  offerDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
+  assert.equal(takeDraftCard(g, 'ricochet'), false, 'картки не з набору не буває');
+  assert.equal(why(g, 'firetrail', 1000), 'nocard', 'і права вона не дає');
+  assert.ok(takeDraftCard(g, 'firetrail'), 'а свій вибір із набору — зараховуємо');
+  assert.ok(ok(g, 'firetrail', 1000), 'право на взяту картку є');
 
-  // той самий набір, але гість витратив свій вибір на іншу картку
-  const spent = createGadgetGuard();
-  grantDraftCards(spent, ['firetrail', 'dmg25', 'spd12']);
-  spent.claimed.dmg25 = true;
-  spent.claimedN = 1;
-  assert.equal(why(spent, 'firetrail', 1000), 'nocard', 'другої картки з одного набору не буває');
-  grantDraftCards(spent, ['firetrail', 'nades4', 'maxhp40']);
-  assert.ok(ok(spent, 'firetrail', 1000), 'новий набір — новий вибір');
+  // повтор того самого вибору права не додає: набір уже витрачений
+  assert.equal(takeDraftCard(g, 'firetrail'), false, 'повторне повідомлення про вибір ігнорується');
+  assert.equal(g.picked.firetrail, 1, 'зараховано рівно один раз');
+
+  // друга картка з ТОГО САМОГО набору теж не проходить — набору вже немає
+  assert.equal(takeDraftCard(g, 'dmg25'), false, 'двох карток з одного набору не буває');
+
+  // сміття і чужі набори
+  const other = createGadgetGuard();
+  offerDraftCards(other, ['ricochet', 'crithit', 'chillshot']);
+  assert.equal(takeDraftCard(other, 'firetrail'), false, 'сусідський набір права не дає');
+  offerDraftCards(other, []);
+  offerDraftCards(other, null);
+  offerDraftCards(other, [42, null, '']);
+  assert.equal(takeDraftCard(other, 'firetrail'), false, 'сміття замість набору теж');
+  assert.equal(takeDraftCard(other, ''), false, 'порожній вибір відхиляється');
+  assert.equal(takeDraftCard(null, 'firetrail'), false, 'без стану гостя — нічого');
 });
 
-test('дві роздачі однієї картки самі по собі не дають посилення', () => {
-  const g = createGadgetGuard();
-  grantDraftCards(g, ['firetrail', 'dmg25', 'spd12']);
-  grantDraftCards(g, ['firetrail', 'nades4', 'maxhp40']);
-  const r = checkGadget(g, 'firetrail', 1000, { strong: true });
-  assert.ok(r.ok, 'слід пускаємо');
-  assert.equal(r.strong, false, '«показали двічі» не означає «взяв двічі»');
+test('вибір картки: посилення тільки за ДВОМА підтвердженими виборами', () => {
+  const once = createGadgetGuard();
+  takeCard(once);
+  const r1 = checkGadget(once, 'firetrail', 1000, { strong: true });
+  assert.ok(r1.ok && r1.strong === false, 'узяв раз — слід слабкий');
 
-  // і скільки б наборів не роздали — право не накопичується понад їхню кількість
-  const many = createGadgetGuard();
-  for (let i = 0; i < 5; i++) grantDraftCards(many, ['firetrail', 'dmg25', 'spd12']);
-  assert.equal(many.offers, 5, 'пʼять наборів — пʼять виборів');
-  assert.equal(checkGadget(many, 'firetrail', 1000, { strong: true }).strong, false,
-    'посилення шляхом роздач не дається ніколи');
-  assert.equal(many.claimedN, 1, 'узята картка витратила рівно один вибір');
-  assert.ok(many.claimedN <= many.offers, 'взято не більше, ніж роздано');
+  // хост роздав набір із тією ж карткою вдруге, гість узяв її знову
+  const twice = createGadgetGuard();
+  takeCard(twice);
+  takeCard(twice, 'firetrail', ['nades4', 'maxhp40']);
+  assert.equal(twice.picked.firetrail, 2, 'два підтверджені вибори');
+  const r2 = checkGadget(twice, 'firetrail', 1000, { strong: true });
+  assert.ok(r2.ok && r2.strong, 'узяв двічі — сильний слід законний');
+
+  // а от ДВА НАБОРИ з тією ж карткою без другого вибору посилення не дають
+  const shown = createGadgetGuard();
+  offerDraftCards(shown, ['firetrail', 'dmg25', 'spd12']);
+  offerDraftCards(shown, ['firetrail', 'nades4', 'maxhp40']);
+  takeDraftCard(shown, 'firetrail');
+  const r3 = checkGadget(shown, 'firetrail', 1000, { strong: true });
+  assert.ok(r3.ok && r3.strong === false, '«показали двічі» не означає «взяв двічі»');
 });
 
-test('підроблений прапорець посилення не діє там, де в хоста немає даних', () => {
-  const g = createGadgetGuard();
-  // 🤖 турель і ☄️ метеорит: посилення дає КУПЛЕНИЙ гіперзаряд, хост про покупки
-  // гостя не знає — прапорець із повідомлення тут не значить нічого
-  const turret = checkGadget(g, 'turret', 1000, { strong: true, active: 0 });
-  assert.ok(turret.ok, 'звичайна турель гостя як ставилась, так і ставиться');
-  assert.equal(turret.strong, false, 'але гіперзарядженою вона від прапорця не стає');
+test('гіперзаряд гостя: посилення за оголошеним правом, а не за прапорцем', () => {
+  // 🤖 турель і ☄️ метеорит: посилення дає КУПЛЕНИЙ гіперзаряд, який гість оголошує
+  // при вході (санітизований каталогом магазину в net/coop.js)
+  const bought = createGadgetGuard();
+  const turret = checkGadget(bought, 'turret', 1000, { strong: true, active: 0, hypers: ['turret', 'clone'] });
+  assert.ok(turret.ok && turret.strong, 'чесно куплений гіперзаряд повертає гіпер-турель');
+  const meteor = checkGadget(bought, 'meteor', 1000, { strong: true, hypers: ['meteor'] });
+  assert.ok(meteor.ok && meteor.strong, 'те саме для метеорита');
 
-  const meteor = checkGadget(g, 'meteor', 1000, { strong: true });
-  assert.ok(meteor.ok, 'звичайний метеорит працює як раніше');
-  assert.equal(meteor.strong, false, 'гіпер-версія від прапорця не будується');
+  // без права — звичайна версія, але сам гаджет ставиться
+  const plain = createGadgetGuard();
+  const t2 = checkGadget(plain, 'turret', 1000, { strong: true, active: 0, hypers: [] });
+  assert.ok(t2.ok && t2.strong === false, 'без гіперзаряду турель звичайна');
+  const m2 = checkGadget(plain, 'meteor', 1000, { strong: true, hypers: ['turret'] });
+  assert.ok(m2.ok && m2.strong === false, 'чужий гіперзаряд метеориту не допомагає');
 
-  // те саме для решти типів каналу
-  assert.equal(checkGadget(g, 'wall', 1000, { strong: true, active: 0 }).strong, false, 'барикада');
-  assert.equal(checkGadget(g, 'tramp', 1000, { strong: true, active: 0 }).strong, false, 'батут');
+  // сміття замість списку
+  const junk = createGadgetGuard();
+  assert.equal(checkGadget(junk, 'turret', 1000, { strong: true, active: 0, hypers: 'turret' }).strong, false,
+    'не масив — не право');
+  assert.equal(checkGadget(junk, 'wall', 1000, { strong: true, active: 0, hypers: ['wall'] }).strong, false,
+    'у барикади посиленої версії не існує');
 });
 
-test('право на картку: пускаємо лише те, що хост роздав саме цьому гостю', () => {
+test('право на картку: воно у того гостя, який її взяв', () => {
   const mine = createGadgetGuard();
   const other = createGadgetGuard();
-  grantDraftCards(mine, ['firetrail', 'ricochet', 'crithit']);
-  grantDraftCards(other, ['ricochet', 'crithit', 'chillshot']);
-  assert.ok(ok(mine, 'firetrail', 2000), 'кому роздали — тому й можна');
-  assert.equal(why(other, 'firetrail', 2000), 'nocard', 'сусідський набір права не дає');
-  grantDraftCards(other, []);
-  grantDraftCards(other, null);
-  grantDraftCards(other, [42, null, '']);
-  assert.equal(why(other, 'firetrail', 3000), 'nocard', 'сміття в наборі права не дає');
+  takeCard(mine, 'firetrail', ['ricochet', 'crithit']);
+  takeCard(other, 'ricochet', ['crithit', 'chillshot']);
+  assert.ok(ok(mine, 'firetrail', 2000), 'хто взяв — тому й можна');
+  assert.equal(why(other, 'firetrail', 2000), 'nocard', 'сусідів вибір права не дає');
 });
 
 test('посилення: без прапорця його не буває навіть за авторитетних даних', () => {
@@ -226,9 +260,66 @@ test('посилення: без прапорця його не буває на�
   assert.ok(quiet.ok && quiet.strong === false, 'не просив — слід лишається слабким');
 });
 
+test('гіперзаряди: заявлене в таблиці збігається з каталогом магазину', () => {
+  const shopSrc = readFileSync(new URL('../src/shop.js', import.meta.url), 'utf8');
+  assert.ok(/export const HYPER_IDS/.test(shopSrc) && /SHOP_ITEMS\.filter\(\(i\) => i\.hyper\)/.test(shopSrc),
+    'каталог виводиться з самих товарів, а не переписаний руками');
+  const catalog = new Set([...shopSrc.matchAll(/hyper: '([a-z0-9]+)'/g)].map((m) => m[1]));
+  assert.ok(catalog.has('turret') && catalog.has('meteor'), 'у магазині є гіперзаряди турелі й метеорита');
+  for (const kind of GADGET_KINDS) {
+    const lim = GADGET_LIMITS[kind];
+    if (lim.hyper) assert.ok(catalog.has(kind), `${kind}: посилення заявлене, а гіперзаряду в магазині немає`);
+    else if (!lim.card) assert.ok(!catalog.has(kind), `${kind}: гіперзаряд у магазині є, а в таблиці не заявлений`);
+  }
+});
+
+test('стеля кімнати: не залежить від номера гравця', () => {
+  const { wall } = GADGET_LIMITS;
+  const a = createGadgetGuard();
+  assert.equal(why(a, 'wall', 1000, { active: 0, roomActive: wall.roomMax }), 'room',
+    'кімната вже повна — не пускаємо навіть гостя з чистими персональними лімітами');
+  assert.ok(ok(a, 'wall', 1000, { active: 0, roomActive: wall.roomMax - 1 }), 'під кімнатною стелею — можна');
+  // «вийшов — зайшов»: новий guard (новий pid), персональні ліміти чисті, кімната памʼятає
+  const rejoined = createGadgetGuard();
+  assert.equal(why(rejoined, 'wall', 1000, { active: 0, roomActive: wall.roomMax }), 'room',
+    'перепідключення кімнатну стелю не скидає');
+
+  // чесна кімната на чотирьох: троє гостей на СВОЇЙ персональній стелі мусять уміститись
+  for (const kind of GADGET_KINDS) {
+    const lim = GADGET_LIMITS[kind];
+    if (kind === 'tramp') continue; // світ і так тримає лише 3 батути на всіх
+    assert.ok(lim.roomMax >= lim.maxActive * 3, `${kind}: троє гостей мають уміщатись у кімнатну стелю`);
+  }
+});
+
+test('стеля кімнати: цикл «вийшов — зайшов» не обходить ліміт вогню', () => {
+  const { maxActive, roomMax, lifeMs } = GADGET_LIMITS.firetrail;
+  const room = createGadgetGuard();
+  let guest = createGadgetGuard();
+  takeCard(guest);
+  const alive = [];
+  let roomDenied = 0;
+  for (let i = 0; i < 600; i++) {
+    const now = 1000 + i * 40;
+    // «перепідключаємось» перед кожним повідомленням — найгірший випадок ревʼю:
+    // новий номер гравця, повне відро жетонів і чиста персональна стеля щоразу
+    guest = createGadgetGuard();
+    takeCard(guest);
+    const r = checkGadget(guest, 'firetrail', now, { room });
+    if (r.ok) {
+      alive.push(now);
+      const together = alive.filter((at) => now - at < lifeMs).length;
+      assert.ok(together <= roomMax, `живих у кімнаті не більше за стелю (${together})`);
+    } else if (r.reason === 'room') roomDenied++;
+  }
+  assert.ok(roomDenied > 0, 'саме кімнатна стеля і зупиняє ротацію');
+  assert.ok(alive.length < 600, 'обʼєкт на кожне повідомлення не створюється');
+  assert.ok(roomMax > maxActive, 'кімнатна стеля вища за персональну — чесним вона не заважає');
+});
+
 test('чесний темп: жодної відмови', () => {
   const g = createGadgetGuard();
-  grantDraftCards(g, ['firetrail']);
+  takeCard(g);
   let now = 0;
 
   // 🌋 слід у спринті: раз на 0.3с, десять секунд бігу
@@ -274,13 +365,13 @@ test('відмова нічого не витрачає й нічого не л�
   assert.ok(ok(g, 'wall', t0 + GADGET_LIMITS.wall.minGapMs), 'відмови не відсувають чесну установку');
   const denied = checkGadget(g, 'firetrail', t0);
   assert.deepEqual(denied, { ok: false, strong: false, reason: 'nocard' });
-  grantDraftCards(g, ['firetrail']);
+  takeCard(g);
   assert.ok(ok(g, 'firetrail', t0), 'відмова без права не зʼїла бюджет сліду');
 });
 
 test('перепідключення гостя починає з чистого стану', () => {
   const before = createGadgetGuard();
-  grantDraftCards(before, ['firetrail']);
+  takeCard(before);
   assert.ok(ok(before, 'firetrail', 1000));
   assert.ok(ok(before, 'wall', 1000));
 

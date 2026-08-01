@@ -152,7 +152,8 @@ check(r2.malicious && r2.malicious.skin === 'classic' && r2.malicious.tracer ===
   && r2.malicious.dance === 'shuffle' && r2.malicious.pet === null && r2.malicious.hero === null,
   'недовірені prototype-ключі косметики → безпечні defaults', JSON.stringify(r2.malicious));
 check(r2.malicious.rank === 3, 'ранг ростера клампиться до 1..3', String(r2.malicious.rank));
-check(JSON.stringify(r2.maliciousKeys) === JSON.stringify(['dance', 'hero', 'nick', 'pet', 'pid', 'rank', 'ready', 'role', 'skin', 'tracer']),
+// hyp — оголошені гіперзаряди (PROTO 26): хост звіряє з ними посилення гаджета
+check(JSON.stringify(r2.maliciousKeys) === JSON.stringify(['dance', 'hero', 'hyp', 'nick', 'pet', 'pid', 'rank', 'ready', 'role', 'skin', 'tracer']),
   'ростер відкидає невідомі поля', JSON.stringify(r2.maliciousKeys));
 check(r2.custom && r2.custom.hero.shirt === 0x234567 && r2.custom.hero.pants === 0xffffff
   && r2.custom.hero.shoes === 0x303642 && r2.custom.hero.hat === 'cap' && r2.custom.hero.face === 'cool',

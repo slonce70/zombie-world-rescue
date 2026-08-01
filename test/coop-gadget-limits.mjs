@@ -1,7 +1,8 @@
 // 🛡️🌐 Канал гаджетів у коопі: хост не вірить гостю на слово.
 // Чесний гість ставить свої речі як завжди; та сама сторона, що шле пачку
 // повідомлень, отримує рівно дозволене — решта тихо зникає (звʼязок не рветься).
-// Право на картковий слід виводиться з того, що хост САМ роздав (подія `dro`).
+// Право на картковий слід іде від ПІДТВЕРДЖЕНОГО вибору гостя (`dpk`) або спільної
+// збірки забігу; посилення гаджета — від гіперзаряду, який гість оголосив при вході.
 //
 // Повідомлення шлемо urgent-каналом (як `sendNade`): транспорт інакше складає їх
 // у пачку по 100 мс, і темп на боці хоста залежав би від тротлінгу фонової вкладки,
@@ -27,10 +28,13 @@ const hostView = (pid) => {
     fires: gd._meteorFires.length,
     made: window.__ft.n,
     strong: window.__ft.strong,
+    meteors: window.__mt.n,
+    meteorHyper: window.__mt.hyper,
+    roomWalls: gd.walls.length,
   };
 };
 
-// 4 РІЗНІ точки поруч із гостем, у які світ справді пускає гаджет (світ у обох той самий).
+// 5 РІЗНИХ точок поруч із гостем, у які світ справді пускає гаджет (світ у обох той самий).
 // Точки рознесені на 2.6 м, щоб барикада (колайдери ±0.85 м + радіус 0.55) не перекривала
 // сусідню: інакше перевірки були б беззмістовні — гаджет не ставав би через МІСЦЕ, а не
 // через ліміт. Радіус тримаємо ≤4 м, добре в межах хостового гейта відстані (6 м).
@@ -47,7 +51,7 @@ const pickSpots = () => {
       if (Math.hypot(s.x - x, s.z - z) > 0.4) continue;
       if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 2.6)) continue;
       out.push({ x, z });
-      if (out.length === 4) return out;
+      if (out.length === 5) return out;
     }
   }
   return out;
@@ -70,6 +74,15 @@ const armHost = () => {
     window.__ft.strong = window.__ft.strong || !!strong;
     return orig(x, z, strong);
   };
+  // ☄️ метеорит: гіпер-версія лишає вогнище вже після падіння, тож ловимо саме
+  // рішення хоста — з яким `hyper` він викликав метеорит гостя
+  window.__mt = { n: 0, hyper: null };
+  const origMeteor = gd.hostMeteor.bind(gd);
+  gd.hostMeteor = (x, z, hyper) => {
+    window.__mt.n++;
+    window.__mt.hyper = !!hyper;
+    return origMeteor(x, z, hyper);
+  };
 };
 
 try {
@@ -84,7 +97,11 @@ try {
     g.save.liberated = { UKR: true };
     return g.test.coopCreate('Тато');
   });
-  await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
+  // ⚡ гість чесно купив гіперзаряд ТУРЕЛІ (і тільки її) — оголошення їде в hello
+  await B.evaluate((c) => {
+    window.__game.save.gadgetHypers = ['turret'];
+    return window.__game.test.coopJoin(c, 'Влад');
+  }, code);
   await A.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, { timeout: 20000 * SLOW });
   await A.evaluate(() => {
     window.__game.test.coopSetMode('storm');
@@ -101,8 +118,8 @@ try {
   await A.evaluate(armHost);
   await B.evaluate(armGuest);
   const spots = await B.evaluate(pickSpots);
-  check(spots.length === 4, 'знайшли 4 вільні місця для гаджетів поруч із гостем', String(spots.length));
-  const [sWall, sTramp, sBurst, sFire] = spots;
+  check(spots.length === 5, 'знайшли 5 вільних місць для гаджетів поруч із гостем', String(spots.length));
+  const [sWall, sTramp, sBurst, sFire, sRoom] = spots;
   const view = () => A.evaluate(hostView, pid);
   // кадр хоста під софт-рендером буває довгим — на чесне чекаємо, а не спимо навмання
   const until = (fn, label) => waitFor(async () => fn(await view()), 12000 * SLOW, label);
@@ -172,8 +189,16 @@ try {
   const dropped = await view();
   check(dropped.made === shared.made, 'без спільної збірки слід знову відхиляється', JSON.stringify(dropped));
 
-  // ── 5. Хост роздав картку саме цьому гостю (та сама подія, що у Штормі) ────
+  // ── 5. Хост роздав набір, гість ОБРАВ картку (dpk, PROTO 26) ──────────────
   await A.evaluate((p) => window.__game.level.netEv('dro', p, ['firetrail']), pid);
+  const picked = await waitFor(() => B.evaluate(() => {
+    const g = window.__game;
+    const i = g.draft.isOpen ? g.draft.offered.findIndex((c) => c.id === 'firetrail') : -1;
+    if (i < 0) return false;
+    g.draft.pick(i); // рівно те, що робить тап по картці: стат локально + dpk хосту
+    return true;
+  }), 20000 * SLOW, 'гість обирає картку');
+  check(picked, 'гість отримав набір і обрав із нього картку');
   await sleep(600 * SLOW);
   await B.evaluate(async (s) => {
     for (let i = 0; i < 5; i++) {
@@ -184,7 +209,7 @@ try {
   await until((v) => v.made >= dropped.made + 5, 'пʼять чесних слідів');
   const honest = await view();
   check(honest.made - dropped.made === 5, 'чесний слід у Штормі падає без жодного пропуску', JSON.stringify(honest));
-  check(honest.strong === false, 'картку роздали раз — слід лишається слабким попри hyper=1', JSON.stringify(honest));
+  check(honest.strong === false, 'картку взяли раз — слід лишається слабким попри hyper=1', JSON.stringify(honest));
 
   // ── 6. Пачка слідів: не по обʼєкту на повідомлення ─────────────────────────
   await B.evaluate((s) => {
@@ -196,8 +221,8 @@ try {
     JSON.stringify({ honest: honest.made, burst: burst.made }));
   check(burst.fires <= 12, 'одночасно живих плям не більше за стелю', JSON.stringify(burst));
 
-  // ── 6b. Підроблений hyper: турель гостя не стає гіперзарядженою ────────────
-  // (батут колайдера не лишає, тож його місце вільне для турелі)
+  // ── 6b. Чесно куплений гіперзаряд гостя знову працює ──────────────────────
+  // (гість оголосив у hello тільки 'turret'; батут колайдера не лишає, тож його місце вільне)
   await B.evaluate((s) => window.__send('turret', s.x, s.z, true), sTramp);
   await until((v) => v.turrets >= 1, 'турель гостя');
   const turret = await A.evaluate((p) => {
@@ -212,13 +237,55 @@ try {
     return {
       guest: guest ? { hp: guest.hp, dmg: guest.dmg } : null,
       plain: own ? { hp: own.hp, dmg: own.dmg } : null,
+      declared: (g.coop.session.roster.get(p) || {}).hyp,
     };
   }, pid);
-  check(!!turret.guest, 'чесна турель гостя стала у хоста', JSON.stringify(turret));
-  // порівнюємо саме шкоду: у гіпер-турелі вона 25 замість 14, а от hp у неї МЕНШЕ
-  // (100 проти 120) і воно ще й тане від зомбі — за hp гіпер не впізнати
-  check(!!turret.guest && !!turret.plain && turret.guest.dmg === turret.plain.dmg,
-    'підроблений hyper турель не посилив — шкода звичайна', JSON.stringify(turret));
+  check(!!turret.guest, 'турель гостя стала у хоста', JSON.stringify(turret));
+  check(Array.isArray(turret.declared) && turret.declared.length === 1 && turret.declared[0] === 'turret',
+    'хост знає оголошений гіперзаряд гостя і тільки його', JSON.stringify(turret.declared));
+  // у гіпер-турелі шкода 25 замість 14 (а hp у неї МЕНШЕ — за hp гіпер не впізнати)
+  check(!!turret.guest && !!turret.plain && turret.guest.dmg > turret.plain.dmg,
+    'куплений гіперзаряд повернувся: турель гостя сильніша за звичайну', JSON.stringify(turret));
+
+  // ── 6c. А метеорит гіперзарядженим НЕ стає: цього гіперзаряду гість не оголошував
+  await B.evaluate((s) => window.__send('meteor', s.x, s.z, true), sFire);
+  await until((v) => v.meteors >= 1, 'метеорит гостя');
+  const meteor = await view();
+  check(meteor.meteorHyper === false, 'метеорит без оголошеного гіперзаряду лишається звичайним',
+    JSON.stringify({ meteors: meteor.meteors, hyper: meteor.meteorHyper }));
+
+  // ── 6d. Стеля КІМНАТИ: обʼєкти чужого (зниклого) номера гравця теж рахуються ─
+  const roomMax = 48;
+  const honestWalls = (await view()).walls; // барикади гостя, які дожили досюди
+  await A.evaluate((max) => {
+    const gd = window.__game.level.gadgets;
+    const q = window.__game.level.player.pos;
+    // ownerPid 3 — «гість, який уже вийшов»: його барикади лишаються у світі
+    window.__ghost = [];
+    while (gd.walls.length < max) {
+      gd.placeWallAt(q.x + 40, q.z + 40, 0, 3); // далеко від гравців: колайдери нікому не заважають
+      window.__ghost.push(gd.walls[gd.walls.length - 1].nid);
+    }
+  }, roomMax);
+  await B.evaluate((s) => window.__send('wall', s.x, s.z, false), sRoom);
+  await sleep(1200 * SLOW);
+  const full = await view();
+  check(full.roomWalls >= roomMax && full.walls === honestWalls,
+    'кімната повна — нової барикади гостя немає, попри чисті персональні ліміти',
+    JSON.stringify({ room: full.roomWalls, guest: full.walls }));
+
+  // прибираємо «чужі» барикади — і та сама барикада гостя проходить (контроль:
+  // блокувала саме стеля кімнати, а не частота)
+  await A.evaluate(() => {
+    const gd = window.__game.level.gadgets;
+    for (const nid of window.__ghost.slice().reverse()) {
+      const i = gd.walls.findIndex((w) => w.nid === nid);
+      if (i >= 0) gd._removeWall(i, false);
+    }
+  });
+  await B.evaluate((s) => window.__send('wall', s.x, s.z, false), sRoom);
+  const freed = await until((v) => v.walls > honestWalls, 'барикада гостя після звільнення кімнати');
+  check(freed, 'коли кімната звільнилась — та сама барикада стає');
 
   // ── 7. Хост сам собі авторитет: його гаджети лімітом не зачеплені ──────────
   const hostPlaced = await A.evaluate(() => {
@@ -236,6 +303,22 @@ try {
   });
   check(hostPlaced.now > hostPlaced.was, 'хост ставить свої барикади поспіль без обмежень',
     JSON.stringify(hostPlaced));
+
+  // ── 7b. Стара вкладка (PROTO 25) у кімнату не потрапляє й бачить пояснення ─
+  const older = await A.evaluate(() => {
+    const s = window.__game.coop.session;
+    const sent = [];
+    const orig = s.transport.send.bind(s.transport);
+    s.transport.send = (to, d, urgent) => { sent.push(d); return orig(to, d, urgent); };
+    // hello від клієнта попередньої версії: та сама збірка, старий протокол
+    s._hostHello(4, { t: 'hello', nick: 'Стара вкладка', proto: 25, build: window.__APP_VERSION });
+    s.transport.send = orig;
+    return { sent, msg: window.__game.coop._connErr(new Error('build:750')) };
+  });
+  check(older.sent.some((d) => d && d.t === 'reject' && d.why === 'build'),
+    'хост відмовляє клієнту зі старим протоколом', JSON.stringify(older.sent));
+  check(typeof older.msg === 'string' && older.msg.length > 0 && /R|обнов|Обнов|версі/i.test(older.msg),
+    'гість бачить зрозуміле пояснення, а не мовчазний збій', older.msg);
 
   // ── 8. Звʼязок цілий: гість і далі в кімнаті ───────────────────────────────
   const alive = await A.evaluate(() => ({

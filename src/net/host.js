@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 import { PING_PHRASES } from './coop.js';
-import { checkGadget, createGadgetGuard, grantDraftCards } from './gadgetguard.js';
+import { checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard } from './gadgetguard.js';
 import { t } from '../i18n.js';
 import { WEAPONS } from '../player.js';
 
@@ -63,6 +63,9 @@ export class HostNet {
     this._tmpV = new THREE.Vector3();
     this._hostShotCd = 0;
     this._fountainAt = new Map(); // pid -> час останнього fountain (анти-флуд декору)
+    // 🏠 стеля каналу гаджетів на ВСЮ кімнату: живе на рівні, а не на гості, тож
+    // цикл «вийшов — зайшов із новим pid» її не скидає (персональні ліміти скидає).
+    this.roomGuard = createGadgetGuard();
     this._destroyedWorldIds = new Set((level.world.destructibles || []).filter((d) => d.destroyed).map((d) => d.id));
 
     // адаптер власного гравця для AI-циклів (level.players)
@@ -115,10 +118,10 @@ export class HostNet {
   }
 
   ev(...args) {
-    // 🎲 роздача набору драфту гостю — ЄДИНЕ джерело його права на карткові ефекти.
-    // Ловимо саме тут, у момент відправки: формат повідомлень не змінюється,
-    // гість нічого зайвого не шле, а хост веде власний облік того, що роздав.
-    if (args[0] === 'dro') grantDraftCards(this._guard(args[1]), args[2]);
+    // 🎲 роздача набору драфту гостю: запамʼятовуємо, З ЧОГО він обиратиме. Права
+    // це ще не дає — його дасть підтверджений вибір (`dpk`), який ми звіримо саме
+    // з цим набором. Ловимо в момент відправки, щоб облік не розʼїхався з подією.
+    if (args[0] === 'dro') offerDraftCards(this._guard(args[1]), args[2]);
     this.evQueue.push(args);
   }
 
@@ -229,6 +232,13 @@ export class HostNet {
       }
       case 'use': return (this._onUse(from, d), true);
       case 'gadget': return (this._onGadget(from, d), true);
+      case 'dpk': {
+        // 🎲 гість повідомив, яку картку взяв (PROTO 26). Зараховуємо, лише якщо вона
+        // була в наборі, який хост САМ йому надіслав; набір при цьому витрачається,
+        // тож повтор права не додасть. Мовчазна відмова — як і скрізь у цьому каналі.
+        takeDraftCard(this._guard(from), d.id);
+        return true;
+      }
       case 'respawned': {
         // чистимо спавн лише якщо хост СПРАВДІ бачив гостя полеглим нещодавно (анти-гриф/анти-флуд):
         // інакше гість міг би спамити 'respawned', тримаючи зону вічно чистою і збиваючи лічильник орди
@@ -441,8 +451,11 @@ export class HostNet {
     // має зʼїдати бюджет чесного гостя. Понадлімітне повідомлення просто зникає.
     const verdict = checkGadget(this._guard(from), d.kind, performance.now(), {
       strong: !!d.hyper,
+      hypers: (this.session.roster.get(from) || {}).hyp,
       build: this._sharedBuild(),
       active: this._liveGadgets(d.kind, from),
+      room: this.roomGuard,
+      roomActive: this._liveGadgets(d.kind, null),
     });
     if (!verdict.ok) return;
     place(level.gadgets, d, from, verdict.strong);
@@ -462,15 +475,17 @@ export class HostNet {
     return null;
   }
 
-  // скільки обʼєктів цього типу гість тримає живими у світі просто зараз.
-  // Стіни, батути й турелі памʼятають власника — рахуємо по ньому; метеорит і
-  // вогняний слід власника не мають, їх guard рахує сам за часом життя.
+  // скільки обʼєктів цього типу живі у світі просто зараз: `pid` — лише гостя,
+  // `null` — усі, включно з обʼєктами хоста й тих, хто вже вийшов (стеля кімнати).
+  // Стіни, батути й турелі памʼятають власника; метеорит і вогняний слід власника
+  // не мають — їх guard рахує сам за часом життя.
   _liveGadgets(kind, pid) {
     const g = this.level.gadgets;
     if (!g) return 0;
-    if (kind === 'wall') return g.walls.filter((w) => w.ownerPid === pid).length;
-    if (kind === 'tramp') return g.tramps.filter((tr) => tr.ownerPid === pid).length;
-    if (kind === 'turret') return g.turrets.filter((tu) => tu.ownerPid === pid).length;
+    const mine = (o) => pid == null || o.ownerPid === pid;
+    if (kind === 'wall') return g.walls.filter(mine).length;
+    if (kind === 'tramp') return g.tramps.filter(mine).length;
+    if (kind === 'turret') return g.turrets.filter(mine).length;
     return 0;
   }
 

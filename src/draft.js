@@ -54,6 +54,10 @@ export class Draft {
     const level = this.game.level;
     const card = this.offered[idx];
     if (!card || !level) return;
+    // 🌐 кооп-гість: повідомляємо хосту, ЩО саме взяли (PROTO 26). Ефекти карток,
+    // які виконує хост (вогняний слід), інакше або не працювали б, або працювали б
+    // на слово гостя. Сам стат застосовуємо локально, як і раніше.
+    if (level.net && !level.net.authority && level.net.sendDraftPick) level.net.sendDraftPick(card.id);
     const combo = level.runBuild.apply(card, level.player);
     this.isOpen = false;
     this.el.classList.remove('show');
