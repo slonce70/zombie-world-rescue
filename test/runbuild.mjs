@@ -13,7 +13,12 @@ const { CARD_POOL, COMBOS, RunBuild, cardWeight } =
 let fail = 0;
 const check = makeCheck(() => fail++);
 const mkPlayer = () => ({ damageMult: 1, speedMult: 1, maxHealth: 100, health: 100, grenades: 2, maxArmor: 50, armor: 0 });
-const combatSnapshot = (p) => [p.damageMult, p.speedMult, p.maxHealth, p.health, p.grenades, p.armor, p.lifeSteal || 0];
+// «Бойовий стан» — усе, що картка може змінити на гравці. Бойові картки v750
+// міняють не числа, а поведінку пострілу й вбивства, тож їхні поля теж тут.
+const combatSnapshot = (p) => [
+  p.damageMult, p.speedMult, p.maxHealth, p.health, p.grenades, p.armor, p.lifeSteal || 0,
+  p.ricochet || 0, p.critEvery || 0, p.chillHit || 0, p.killBlast || 0, p.rocketEvery || 0,
+];
 
 // пул має ≥3 картки і покриває 3 теги
 check(CARD_POOL.length >= 3, 'у пулі ≥3 карток', CARD_POOL.length);

@@ -46,7 +46,9 @@ export class GuestNet {
 
   // ---------- наміри (викликаються ігровим кодом) ----------
   // hit: [nid, damage, headshot, legacyStun, legacyStunTime,
-  //       hitZone?, impactForce?, staggerTime?]
+  //       hitZone?, impactForce?, staggerTime?, chillSeconds?]
+  // Елементи додаються В КІНЕЦЬ і читаються хостом як необовʼязкові: короткий масив
+  // лишається валідним. 9-й (chillSeconds) — картка драфту «Крижані кулі», PROTO 25.
   shotReport(weapon, endPoint, hits, barrels, walls, ball) {
     const d = { t: 'shot', w: weaponToIdx(weapon) };
     if (endPoint) d.e = [Math.round(endPoint.x * 10) / 10, Math.round(endPoint.y * 10) / 10, Math.round(endPoint.z * 10) / 10];

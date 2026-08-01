@@ -66,6 +66,22 @@ export const CARD_POOL = [
     apply: (p) => { p.maxHealth += 40; p.health = p.maxHealth; p.lifeSteal = (p.lifeSteal || 0) + 2; } },
   { id: 'fortress', icon: '🏯', tag: 'tank', rarity: 'epic', name: '+50 макс. HP, броня і +2 HP за вбивство',
     apply: (p) => { p.maxHealth += 50; p.health = p.maxHealth; p.armor = p.maxArmor; p.lifeSteal = (p.lifeSteal || 0) + 2; } },
+  // 🎯 v750: картки, що змінюють САМ БІЙ, а не числа. Прецедент — lifeSteal:
+  // apply() ставить ПОЛЕ на гравці, а читає його вже наявна гілка коду
+  // (стрільба у player.js `_shoot`, смерть зомбі у main.js `zombieKilled`).
+  // Жодної нової підсистеми, теги й рідкості — зі старого словника,
+  // тож комбо за трьома однаковими тегами і крос-комбо працюють автоматично.
+  // Накопичувальні (як lifeSteal) — переживають restore() Експедиції з капом.
+  { id: 'ricochet', icon: '🪃', tag: 'speed', rarity: 'rare', name: 'Рикошет: куля відскакує в сусіда',
+    apply: (p) => { p.ricochet = Math.min(0.9, (p.ricochet || 0) + 0.5); } },
+  { id: 'crithit', icon: '🎯', tag: 'power', rarity: 'rare', name: 'Влучне око: кожне 3-тє влучання — крит',
+    apply: (p) => { p.critEvery = p.critEvery ? Math.max(2, p.critEvery - 1) : 3; p.critMult = 2; } },
+  { id: 'chillshot', icon: '🧊', tag: 'tank', rarity: 'rare', name: 'Крижані кулі: влучання морозять зомбі',
+    apply: (p) => { p.chillHit = Math.min(3, (p.chillHit || 0) + 1.2); } },
+  { id: 'killblast', icon: '🎇', tag: 'power', rarity: 'epic', name: 'Вибухове добивання: убитий зомбі вибухає',
+    apply: (p) => { p.killBlast = Math.min(165, (p.killBlast || 0) + 55); } },
+  { id: 'rocketvolley', icon: '🚀', tag: 'speed', rarity: 'epic', name: 'Ракетний залп: кожен 6-й постріл — ракета',
+    apply: (p) => { p.rocketEvery = p.rocketEvery ? Math.max(3, p.rocketEvery - 2) : 6; } },
 ];
 
 // 3 однотегові картки → комбо: гучний банер + реальний бонус. Кап тримає run-only силу в межах.

@@ -40,6 +40,10 @@ const SLOT_KEYS = { Digit1: 'pistol', Digit2: 'rifle', Digit3: 'shotgun', Digit4
 // 🟡 зброя з гільзами (лазер/вогнемет/посох/меч/молот/базука гільз не викидають)
 const SHELL_WEAPONS = new Set(['pistol', 'rifle', 'smg', 'shotgun', 'magnum', 'sniper']);
 const HIT_ZONE_MULT = { head: 2, arms: 0.85, legs: 0.75, body: 1 };
+// 🎲 числа бойових карток «Прокачки» (runbuild.js ставить лише прапорці-поля на гравці)
+const RICOCHET_RANGE = 6;      // 🪃 наскільки далеко від точки влучання шукаємо сусіда
+const CHILL_SLOW_MUL = 0.6;    // 🧊 множник швидкості замороженого зомбі (slowMul)
+const DRAFT_ROCKET_DMG = 110;  // 🚀 ракета картки — половина базуки (220)
 
 export class Player {
   constructor(level) {
@@ -88,6 +92,17 @@ export class Player {
     this._superSparkT = 0;
     this.stunAmmoT = 0; // 💫 гаджет «Оглушливі кулі»: кулі пістолета/магнума оглушують зомбі
     this.stunT = 0;
+    // 🎲 поля бойових карток «Прокачки» (src/runbuild.js). 0 — картку не брали.
+    // Живуть рівно один забіг: player перестворюється на старті рівня, save.json не чіпаємо.
+    this.lifeSteal = 0;   // 🧛 +HP за вбивство — читає main.js у `zombieKilled`
+    this.ricochet = 0;    // 🪃 частка шкоди, що відскакує в сусіда — `_shoot`
+    this.critEvery = 0;   // 🎯 кожне N-те влучання критичне — `_shoot`
+    this.critMult = 2;
+    this.chillHit = 0;    // 🧊 секунди сповільнення зомбі від влучання — `_shoot`
+    this.killBlast = 0;   // 🎇 шкода вибуху вбитого зомбі — main.js у `zombieKilled`
+    this.rocketEvery = 0; // 🚀 кожен N-й постріл летить ракетою — `_shoot`
+    this._critHitN = 0;   // лічильники карток (влучання / постріли за забіг)
+    this._rocketShotN = 0;
     this.invisibleT = 0;
     this.invisibleRegenRate = 0;
     this.appleT = 0; this.appleBonus = 20; // 🍎 золоте яблуко: тимчасовий maxHealth бонус згасає сам
@@ -892,6 +907,18 @@ export class Player {
     // 🚀 базука: летить ракета, шкода — вибухом
     if (w.rocket) { this._fireRocket(origin, dmgMult); return; }
 
+    // 🚀 картка «Ракетний залп»: кожен N-й постріл летить ракетою замість кулі.
+    // Іде ТИМ САМИМ каналом, що й базука (`_fireRocket`), тож у коопі гість шле
+    // ракету хосту (`sendRocket`), а вибух рахує хост — розсинхрону нема.
+    if (this.rocketEvery > 0) {
+      this._rocketShotN++;
+      if (this._rocketShotN >= this.rocketEvery) {
+        this._rocketShotN = 0;
+        this._fireRocket(origin, dmgMult, DRAFT_ROCKET_DMG);
+        return;
+      }
+    }
+
     // промені через приціл (дробовик — кілька шротин)
     const MAX_D = w.pellets ? 45 : 140;
     const pellets = w.pellets || 1;
@@ -981,20 +1008,33 @@ export class Player {
       } else if (hit) {
         endPoint = hit.point;
         const zone = hit.hitZone || (hit.headshot ? 'head' : 'body');
-        let dmg = w.dmg * dmgMult * (HIT_ZONE_MULT[zone] || 1);
+        // 🎯 картка «Влучне око»: кожне N-те влучання б'є вдвічі. Свідомо НЕ вмикає
+        // прапорець headshot — інакше картка накрутила б статистику хедшотів і ⭐2-ціль.
+        // Шкоду рахує стрілець, тож у коопі гість просто шле більше число в netHits.
+        const critHit = this.critEvery > 0 && (++this._critHitN % this.critEvery === 0);
+        let dmg = w.dmg * dmgMult * (HIT_ZONE_MULT[zone] || 1) * (critHit ? (this.critMult || 2) : 1);
         const impactForce = w.impact || 1;
         const staggerTime = this.cur === 'shotgun' && hit.t > 12 ? 0.12 : (w.stagger || 0);
         const damageOpts = { weaponId: this.cur, hitZone: zone, impactSide: hit.impactSide, impactForce, staggerTime };
         const armoredBefore = hit.zombie.shieldHp > 0 || hit.zombie.chestHp > 0 || hit.zombie.helmetHp > 0;
         const canStun = stunShot && !(hit.zombie.stats && hit.zombie.stats.stunImmune);
-        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, canStun ? 1 : 0, stunTime, zone, impactForce, staggerTime]);
+        // 🧊 картка «Крижані кулі»: влучання сповільнює зомбі. Поле те саме, що вже
+        // морозить крижана граната й імпульсна хвиля (slowT/slowMul) — паралельного нема.
+        const chill = this.chillHit > 0 ? this.chillHit : 0;
+        if (level.mirror) netHits.push([hit.zombie.nid, Math.round(dmg), hit.headshot ? 1 : 0, canStun ? 1 : 0, stunTime, zone, impactForce, staggerTime, chill]);
         else { hit.zombie.lastHitBy = 1; hit.zombie.damage(dmg, dir, hit.headshot, damageOpts); }
         // оглушення хост-авторитетне: соло/хост ставлять одразу, гість шле прапорець хосту (4-й елемент)
         if (canStun && !level.mirror && hit.zombie.state !== 'dead') hit.zombie.stunT = stunTime;
+        // заморозка — тим самим правилом: соло/хост ставлять одразу, гість шле 9-й елемент
+        if (chill && !level.mirror && hit.zombie.state !== 'dead') {
+          hit.zombie.slowT = Math.max(hit.zombie.slowT || 0, chill);
+          hit.zombie.slowMul = Math.min(hit.zombie.slowMul || 1, CHILL_SLOW_MUL);
+        }
+        if (chill && i < 3) level.effects.burst(hit.point, 0xa8e8ff, 4, { speed: 2.2, life: 0.4, size: 0.7 });
         const acc = dmgByZombie.get(hit.zombie) || { total: 0, point: hit.point, crit: false };
         acc.total += dmg;
         acc.point = hit.point;
-        acc.crit = acc.crit || hit.headshot;
+        acc.crit = acc.crit || hit.headshot || critHit;
         dmgByZombie.set(hit.zombie, acc);
         if (i < 3) level.effects.burst(hit.point, 0x86d14e, 6, { speed: 2.6, life: 0.45 });
         anyHit = true;
@@ -1031,6 +1071,13 @@ export class Player {
             pierceLeft--;
           }
         }
+
+        // 🪃 картка «Рикошет»: куля відскакує в найближчого ІНШОГО зомбі поруч.
+        // Рівно ОДИН відскок — рикошет не породжує рикошету, тож у натовпі
+        // це +1 ціль на кулю, а не ланцюгова реакція на всю карту.
+        if (this.ricochet > 0) {
+          this._ricochetShot(hit, w.dmg * dmgMult * this.ricochet, netHits, dmgByZombie, level);
+        }
       } else {
         endPoint = this._shootEnd.copy(origin).addScaledVector(dir, MAX_D);
       }
@@ -1052,6 +1099,38 @@ export class Player {
       level.stats.shotsHit++;
       level.bus.emit('hitmarker', anyHeadshot, this.cur, hitZone);
     }
+  }
+
+  // 🪃 відскок кулі в найближчого сусіда навколо точки влучання (картка «Рикошет»).
+  // Ціль має бути жива, інша, у межах RICOCHET_RANGE і без стіни на шляху.
+  // Шкоду, як і основне влучання, у коопі рахує хост: гість лише додає рядок у netHits.
+  _ricochetShot(hit, dmg, netHits, dmgByZombie, level) {
+    if (!level.zombies || dmg <= 0) return;
+    const from = hit.point;
+    let best = null;
+    let bestD = RICOCHET_RANGE;
+    for (const z of level.zombies.list) {
+      if (z === hit.zombie || z.state === 'dead' || z.gone) continue;
+      const d = Math.hypot(z.x - from.x, z.z - from.z);
+      if (d >= bestD) continue;
+      best = z;
+      bestD = d;
+    }
+    if (!best) return;
+    const to = new THREE.Vector3(best.x, best.y + best.rig.height * 0.55, best.z);
+    const dir = to.clone().sub(from);
+    const len = dir.length();
+    if (len < 0.01) return;
+    dir.divideScalar(len);
+    if (this.world.shotBlockDist(from, dir, len) < len - (best.rig.radius || 0)) return;
+    if (level.mirror) netHits.push([best.nid, Math.round(dmg), 0, 0, 0, 'body', 1, 0]);
+    else { best.lastHitBy = 1; best.damage(dmg, dir, false, { weaponId: this.cur, hitZone: 'body', impactForce: 1, staggerTime: 0 }); }
+    const acc = dmgByZombie.get(best) || { total: 0, point: to, crit: false };
+    acc.total += dmg;
+    acc.point = to;
+    dmgByZombie.set(best, acc);
+    level.effects.tracer(from, to);
+    level.effects.burst(to, 0x9ad9ff, 4, { speed: 2.4, life: 0.35, size: 0.7 });
   }
 
   _updateMeleeSwing(dt) {
@@ -1200,14 +1279,16 @@ export class Player {
   }
 
   // 🚀 базука: летить ракета (соло — локально, кооп — через мережу), шкода — вибухом при влучанні.
-  _fireRocket(origin, dmgMult) {
+  // baseDmg перекриває шкоду зброї — так картка «Ракетний залп» пускає ракету з будь-якого ствола.
+  _fireRocket(origin, dmgMult, baseDmg = null) {
     const w = this.weapon;
     const level = this.level;
+    const rocketDmg = (baseDmg == null ? w.dmg : baseDmg) * dmgMult;
     const dir = this.forwardVec(this._shootDir).clone().normalize();
     const ro = origin.clone().addScaledVector(dir, 0.7);
-    if (level.mirror) level.net.sendRocket(ro, dir, Math.round(w.dmg * dmgMult));
-    else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(w.dmg * dmgMult));
-    else level.effects.spawnRocket(ro, dir, w.dmg * dmgMult, null, 1, true);
+    if (level.mirror) level.net.sendRocket(ro, dir, Math.round(rocketDmg));
+    else if (level.net) level.net.spawnNetRocket(ro, dir, Math.round(rocketDmg));
+    else level.effects.spawnRocket(ro, dir, rocketDmg, null, 1, true);
     level.audio.rocket();
     this.camShake = Math.max(this.camShake, 0.5);
     this._applyRecoil(w);

@@ -17,6 +17,9 @@ const REMOTE_PROJECTILE_ORIGIN_MAX = 8;
 // (родинний кооп довіряє гостю, але NaN/Infinity/абсурд не мають псувати стан хоста)
 const clampDmg = (v) => Math.max(0, Math.min(2000, Number(v) || 0));
 const HIT_ZONES = new Set(['head', 'arms', 'legs', 'body']);
+// 🧊 заморозка від картки драфту: не довше 3с і той самий множник, що в player.js
+const CHILL_SLOW_MUL = 0.6;
+const clampChill = (v) => Math.max(0, Math.min(3, Number(v) || 0));
 const clampHitMeta = (h) => ({
   hitZone: HIT_ZONES.has(h[5]) ? h[5] : (h[2] ? 'head' : 'body'),
   impactForce: Math.max(0, Math.min(12, Number(h[6]) || 0)),
@@ -296,6 +299,14 @@ export class HostNet {
         zb.damage(clampDmg(h[1]), dir, !!h[2], opts);
         // 💫 гаджет «Оглушливі кулі» гостя: оглушуємо лише з пістолета/магнума
         if (h[3] && (weaponId === 'pistol' || weaponId === 'magnum') && zb.state !== 'dead' && !(zb.stats && zb.stats.stunImmune)) zb.stunT = h[4] === 1 ? 1 : 0.5;
+        // 🧊 картка драфту «Крижані кулі» гостя (9-й елемент, PROTO 25): сповільнення
+        // ставить ХОСТ тим самим полем slowT/slowMul, що й крижана граната — інакше
+        // гість бачив би заморожених зомбі, яких хост жене на повній швидкості.
+        const chill = clampChill(h[8]);
+        if (chill > 0 && zb.state !== 'dead') {
+          zb.slowT = Math.max(zb.slowT || 0, chill);
+          zb.slowMul = Math.min(zb.slowMul || 1, CHILL_SLOW_MUL);
+        }
       }
     }
     if (Array.isArray(d.bar)) for (const e of d.bar) {

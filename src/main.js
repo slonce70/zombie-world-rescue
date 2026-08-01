@@ -169,6 +169,10 @@ const MAP_SIZE_LABELS = {
 const MAP_STYLE_LABELS = {
   classic: t('Класична'), forest: t('Лісова'), lakes: t('Озерна'), stone: t('Камʼяна'),
 };
+// 🎇 картка драфта «Вибухове добивання»: радіус вибуху й вікно захисту від ланцюга
+// (зомбі, щойно зачеплений вибухом, сам уже не детонує — див. `_killBlast`)
+const KILL_BLAST_RADIUS = 4.5;
+const KILL_BLAST_WINDOW = 1000;
 const DEFAULT_EXPOSURE = 1.06;
 const BIOME_EXPOSURE = {
   summer: 1.08,
@@ -4385,6 +4389,9 @@ class Game {
         lp.maxHealth += lp.lifeSteal;
         lp.health += lp.lifeSteal;
       }
+      // 🎇 картка драфта «Вибухове добивання»: убитий зомбі вибухає (той самий гачок,
+      // що й вампіризм вище — гачок уже кіл-кредитований, чужі перемоги сюди не доходять)
+      if (lp.killBlast > 0) this._killBlast(level, z);
       if (level.noProgress) return;
       this.save.stats.killed++;
       // ⭐2 «Убий N елітних зомбі» — СОЛО тікає тут (свій кіл-кредит). У коопі командний
@@ -4713,6 +4720,45 @@ class Game {
   _secondaryDoneToast(level) { return secondaryDoneToast(this, level); }
 
   _trySuperPickup(level) { return level && level.expedition ? null : trySuperPickup(this, level); }
+
+  // 🎇 картка драфта «Вибухове добивання» (runbuild.js → player.killBlast).
+  // Візуал і спад шкоди — як у міни/гранати (burst + ring + audio.explosion,
+  // шкода 1 → 0.45 від центра до краю), але б'є ЛИШЕ по зомбі: вибух ляскає з
+  // кожної перемоги, тож він не має трощити власні барикади й ящики гравця.
+  // ⛓️ Ланцюга нема: усі, кого зачепило, дістають мітку `_blastT`, і їхня смерть
+  // уже не детонує (вікно покриває і мережевий оборот у коопі).
+  // 🤝 Кооп: у соло/хоста шкода лягає одразу; гість (mirror) шле її хосту тим самим
+  // каналом netHits, що й звичайні влучання — авторитет лишається за хостом
+  // (побічний ефект: хост чує зайвий «постріл» гостя — це дешевше за нове повідомлення).
+  _killBlast(level, zombie) {
+    const dmg = level.player.killBlast;
+    const now = performance.now();
+    if (!dmg || !level.zombies || (zombie._blastT && now - zombie._blastT < KILL_BLAST_WINDOW)) return;
+    const r = KILL_BLAST_RADIUS;
+    const targets = [];
+    for (const zb of level.zombies.list) {
+      if (zb === zombie || zb.state === 'dead' || zb.gone) continue;
+      const d = Math.hypot(zb.x - zombie.x, zb.z - zombie.z);
+      if (d >= r) continue;
+      zb._blastT = now;
+      targets.push({ zb, dmg: Math.round(dmg * (1 - (d / r) * 0.55)) });
+    }
+    level.audio.explosion();
+    level.effects.burst(new THREE.Vector3(zombie.x, zombie.y + 0.6, zombie.z), 0xff8a3d, 16, { speed: 5, up: 3.4, life: 0.6 });
+    level.effects.ring(new THREE.Vector3(zombie.x, zombie.y, zombie.z), 0xff8a3d, r);
+    if (!targets.length) return;
+    if (level.mirror) {
+      level.net.shotReport(level.player.cur, null, targets.map((h) => [h.zb.nid, h.dmg, 0, 0, 0, 'body', 6, 0.35]));
+      return;
+    }
+    for (const { zb, dmg: hitDmg } of targets) {
+      // як у звичайному вибуху: не малюємо число, якщо щит/нагрудник поглинає удар
+      const absorbed = zb.shieldHp > 0 || zb.chestHp > 0;
+      if (!absorbed) level.effects.damageNumber(new THREE.Vector3(zb.x, zb.y + zb.rig.height * 0.8, zb.z), hitDmg, false);
+      zb.lastHitBy = 1;
+      zb.damage(hitDmg, null, false, { weaponId: 'explosion', hitZone: 'body', impactForce: 8, staggerTime: 0.45 });
+    }
+  }
 
   _spawnSuperMirror(nid, x, z) { return spawnSuperMirror(this, nid, x, z); }
 

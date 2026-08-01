@@ -51,6 +51,72 @@ const vamp = await page.evaluate(() => {
 });
 check(vamp.health === 101 && vamp.maxHealth === 101, '+1 HP за вбивство збільшує max/current HP', JSON.stringify(vamp));
 
+// 🎇 бойова картка «Вибухове добивання» у РЕАЛЬНОМУ бою: беремо саме картку з пулу
+// через runBuild.apply (як робить драфт), убиваємо зомбі — сусід має отримати вибух,
+// а сам вибух не має детонувати далі (ланцюга нема).
+const blast = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  g.level.runBuild.apply(g.test.draftCard('killblast'), p);
+  const victim = g.test.spawnZombie('tank', p.pos.x + 10, p.pos.z);
+  const neighbour = g.test.spawnZombie('tank', p.pos.x + 12, p.pos.z);
+  const far = g.test.spawnZombie('tank', p.pos.x + 10, p.pos.z + 20);
+  neighbour.x = victim.x + 2; neighbour.z = victim.z;
+  const before = { neighbour: neighbour.hp, far: far.hp };
+  victim.lastHitBy = 1;
+  victim.damage(99999, null, false);
+  return {
+    field: p.killBlast,
+    neighbourHurt: neighbour.hp < before.neighbour,
+    farUntouched: far.hp === before.far,
+    neighbourBlastTag: !!neighbour._blastT,
+  };
+});
+check(blast.field === 55, 'картка «Вибухове добивання» поставила поле killBlast', blast.field);
+check(blast.neighbourHurt, 'вибух від убитого зомбі зачепив сусіда в реальному бою');
+check(blast.farUntouched, 'вибух не дістає далеких зомбі');
+check(blast.neighbourBlastTag, 'зачеплений вибухом позначений — ланцюгової детонації не буде');
+
+// ⛓️ натовп: ланцюгової детонації немає — гинуть лише сусіди в радіусі першого вибуху
+const chain = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  p.killBlast = 165; // максимум картки — вибух гарантовано добиває поранених
+  const line = [];
+  for (let i = 0; i < 10; i++) {
+    const z = g.test.spawnZombie('walker', p.pos.x - 40, p.pos.z + 40 + i * 3);
+    z.hp = 1;
+    line.push(z);
+  }
+  line[0].lastHitBy = 1;
+  line[0].damage(99999, null, false);
+  return {
+    near: line[1].state === 'dead',
+    survivors: line.slice(2).filter((z) => z.state !== 'dead').length,
+  };
+});
+check(chain.near, 'вибух добиває поранених сусідів у натовпі');
+check(chain.survivors === 8, 'ланцюгової реакції на весь натовп немає', chain.survivors);
+
+// 🪃 «Рикошет»: сусід збоку дістає відскок, хоча куля летить не в нього
+const ricochet = await page.evaluate(() => {
+  const g = window.__game;
+  const p = g.level.player;
+  p.killBlast = 0; // щоб рикошетна смерть не змішалась із вибухом
+  g.level.runBuild.apply(g.test.draftCard('ricochet'), p);
+  const target = g.test.spawnZombie('tank', p.pos.x, p.pos.z - 8);
+  const side = g.test.spawnZombie('tank', p.pos.x + 2.5, p.pos.z - 9);
+  p.yaw = Math.atan2(-(target.x - p.pos.x), -(target.z - p.pos.z));
+  p.pitch = 0;
+  p.cur = 'pistol';
+  const before = side.hp;
+  for (let i = 0; i < 6; i++) { p.curAmmo.mag = 12; p._shoot(); }
+  return { field: p.ricochet, sideHurt: side.hp < before, targetHurt: target.hp < target.maxHp };
+});
+check(ricochet.field === 0.5, 'картка «Рикошет» поставила поле ricochet', ricochet.field);
+check(ricochet.targetHurt, 'постріл влучив у ціль');
+check(ricochet.sideHurt, 'куля відскочила в сусіда збоку');
+
 // екран перемоги показує рядок «Твоя збірка»
 const victory = await page.evaluate(() => {
   const g = window.__game;

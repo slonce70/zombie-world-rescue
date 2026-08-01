@@ -6,6 +6,7 @@ import { starTotal } from './stars.js';
 import { WEAPONS } from './player.js';
 import { SOUL_COLLECTOR_UNLOCK_LEVEL } from './souls.js';
 import { rollMissionSet, MISSION_TYPES } from './missionpool.js';
+import { CARD_POOL } from './runbuild.js';
 import { t } from './i18n.js';
 
 export function buildTestApi(game) {
@@ -139,6 +140,9 @@ export function buildTestApi(game) {
     giveWeapon: (id) => g.unlockWeapon(id),
     throwGrenade: () => g.level.player.throwGrenade(),
     spawnZombie: (type, x, z) => g.level.zombies.spawn(type, x, z, {}),
+    // 🎲 картка «Прокачки» за id — щоб браузерний тест брав САМЕ ту картку з пулу,
+    // що й драфт, а не переставляв поля гравця руками (test/draft-campaign.mjs)
+    draftCard: (id) => CARD_POOL.find((c) => c.id === id) || null,
     airdropNow: () => { g.level.effects.airdropT = 0.05; },
     shopBuy: (id) => g.shop.buy(id),
     killZombiesNear: (x, z, r) => {
