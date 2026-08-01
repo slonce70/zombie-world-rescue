@@ -599,6 +599,8 @@ body.touch-mode #boss-bar-bg { height: 12px; }
 body.touch-mode #horde-counter { top: 108px; font-size: 14px; padding: 5px 14px; }
 body.touch-mode #combo { top: 46%; font-size: 26px; }
 body.touch-mode #xp-chip { display: none; }
+/* ⭐ чип складності лишається видимим і на телефоні — просто компактніший */
+body.touch-mode #diff-chip { font-size: 12px; padding: 3px 9px; }
 body.touch-mode #waypoint { font-size: 13px; }
 body.touch-mode.banner-active #waypoint.show { display: none; }
 .tb {
@@ -1508,6 +1510,13 @@ body.touch-mode #touch-coach.show { display: block; }
 .settings-advanced { margin-top: 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); }
 .settings-advanced > summary { display: flex; align-items: center; min-height: 44px; padding: 10px 14px; cursor: pointer; color: #8fb3d8; font-size: 12px; font-weight: 900; letter-spacing: .12em; }
 .settings-advanced .settings-grid { padding: 0 10px 10px; }
+
+/* ⭐ чип складності забігу: поруч із монетами й мінікартою, видно весь бій */
+#diff-chip {
+  background: rgba(38, 26, 13, 0.78); border: 2px solid rgba(255, 210, 63, 0.45);
+  border-radius: 12px; padding: 5px 12px; color: #ffe9a8; font-weight: 800; font-size: 14px;
+  text-align: center; white-space: nowrap; pointer-events: none;
+}
 
 /* 🤝 чип кімнати в HUD: код + лічильник + множник зомбі */
 #coop-room {

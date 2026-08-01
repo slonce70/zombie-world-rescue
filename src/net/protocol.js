@@ -2,7 +2,14 @@
 // Снапшоти (часті, ідемпотентні) їдуть масивами; події (рівно один раз) — списком кодів.
 
 // бампити РАЗОМ з APP_VERSION у main.js при зміні формату повідомлень
-export const PROTO_VERSION = 24; // v700: community snapshot + runId у start spec
+export const PROTO_VERSION = 25; // v750: зірка складності хоста (`ds`) у start spec / welcome / cfg
+
+// ⭐ зірка складності у мережі: ціле 1..5, будь-що інше → ★1.
+// Хост — єдине джерело: кладе своє значення у spec/welcome/cfg, гість лише читає.
+export function sanitizeDiffStar(value) {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : 1;
+}
 
 const ROOM_ALPHABET = 'ABCDEFHKLMNPRSTUWXYZ23456789'; // без плутаних O/0, I/1, G/6
 export function makeRoomCode(n = 4) {

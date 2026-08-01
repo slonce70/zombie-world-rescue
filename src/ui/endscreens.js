@@ -146,7 +146,9 @@ export function showVictory(game) {
       combo: game.level.combo.best,
     };
   }
-  // ⭐ бонус монет за складність: тільки соло-реплей на зірці >1 (★1 — без змін)
+  // ⭐ бонус монет за складність на КОЖНОМУ шляху, де зірка діє: перше проходження,
+  // реплей, кооп (зірка хоста), глава 2. На ★1 — без змін. Кооп: кожен рахує свій
+  // бонус від власних зароблених монет (level.diffStar у кімнаті однаковий).
   if (game.level.diffStar > 1) {
     const baseReward = s.coinsEarned;
     const bonus = Math.round(baseReward * 0.25 * (game.level.diffStar - 1));

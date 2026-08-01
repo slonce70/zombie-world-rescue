@@ -67,6 +67,7 @@ import {
 import { CoopUI } from './ui/coopui.js';
 import { CommunityUI } from './ui/communityui.js';
 import { parseCommunityLink, makeRunId } from './net/community.js';
+import { sanitizeDiffStar } from './net/protocol.js';
 import { LeagueUI } from './ui/leagueui.js';
 import { SaveUI } from './ui/saveui.js';
 import { RescueHQ } from './ui/hq.js';
@@ -999,9 +1000,9 @@ class Game {
           survivors: settlementInt(settlement.survivors, 9999),
         };
         if (out.goal !== null && typeof out.goal !== 'string') out.goal = null;
-        // ⭐ зірки складності (M7): тільки ціле 1..5; зіпсоване/чуже значення → ★1
-        if (typeof out.diffStar !== 'number' || !(out.diffStar >= 1 && out.diffStar <= 5)) out.diffStar = 1;
-        out.diffStar = Math.round(out.diffStar);
+        // ⭐ зірки складності: тільки ціле 1..5; зіпсоване/чуже значення → ★1
+        // (той самий санітайзер, що чистить зірку хоста з мережі)
+        out.diffStar = sanitizeDiffStar(out.diffStar);
         // ⭐ R3 зірки країн: об'єкт { cid: 0..3 }; зіпсоване/чуже значення → чисто
         if (!out.stars || typeof out.stars !== 'object' || Array.isArray(out.stars)) out.stars = {};
         for (const id of Object.keys(out.stars)) {
@@ -1245,6 +1246,12 @@ class Game {
         this.audio.click();
         this.saveGame();
         this._renderDifficultySettings();
+        // ⭐ кооп: хост змінив зірку — кімната має побачити її ще в лобі
+        const session = this.coop && this.coop.session;
+        if (session && session.role === 'host' && session.state === 'lobby') {
+          session.broadcastConfig();
+          if (session.onRoster) session.onRoster();
+        }
       });
     });
   }
@@ -3806,12 +3813,25 @@ class Game {
           : null,
       } : null,
     };
-    // ⭐ зірки складності (M7): діють ЛИШЕ при соло-реплеї вже звільненої країни.
-    // Перші проходження / шторм / арена / будь-який кооп → ★1 (без десинхрону).
+    // ⭐ зірки складності (v750): обрана зірка діє в УСІЙ кампанійній симуляції —
+    // перше проходження країни, реплей, операції «Живого фронту» і кооп.
+    // У коопі авторитет у ХОСТА: зірка приїжджає у spec (`ds`) тим самим шляхом, що ms/mt,
+    // тож гість НЕ рахує свою save.diffStar (інакше різні HP/типи зомбі в одній кімнаті).
+    // Поза системою (завжди ★1, власні правила складності): кімнатні режими, Шторм,
+    // Арена, світові боси, Експедиція, полігон гаджетів і кастомні карти. Етап Фронту,
+    // що йде за правилами кімнатного режиму (оборона/портал), теж лишається поза нею —
+    // там фіксований набір зброї й HP, і зірка зробила б його непрохідним.
+    // Глава 2 (заражені країни) лишає свій мінімум ★3.
     // ВАЖЛИВО: ставимо ДО new Zombies(...) — конструктор читає level.diffStar.
-    const coopActive = !!(this.coop && this.coop.session && this.coop.session.state !== 'idle');
-    const soloReplay = !operation && !opts.expedition && !isStorm && !isArena && !isKnockout && !isDefense && !isPvp && !isBank && !isPortal && !isMaze && !isHumans && !isSoulCollector && !isTurretWar && !isRadiation && !isWorldBoss && !coopActive && hasLiberated(this.save.liberated, countryId);
-    level.diffStar = isInfected ? Math.max(3, this.save.diffStar || 1) : soloReplay ? (this.save.diffStar || 1) : 1;
+    const isRoomMode = isStorm || isArena || isKnockout || isDefense || isPvp || isBank || isPortal
+      || isMaze || isHumans || isSoulCollector || isTurretWar || isRadiation || isWorldBoss;
+    const campaignSim = !isRoomMode && !opts.expedition && !isCustom && !isPlayground;
+    const chosenStar = isGuest
+      ? sanitizeDiffStar(coop.spec && coop.spec.ds)
+      : sanitizeDiffStar(this.save.diffStar);
+    level.diffStar = isInfected ? Math.max(3, chosenStar) : campaignSim ? chosenStar : 1;
+    // зірка бере участь у забігу (для HUD-чипа): кампанійна симуляція або глава 2
+    level.diffStarActive = campaignSim || isInfected;
     this._applyLevelExposure(countryId);
     level.world = new World(level.scene, country.seed,
       getBiome(isCustom ? (customMapData.biome === 'snow' ? 'POL' : 'UKR') : countryId, moonRegion && spaceWorld.palette),
@@ -4596,6 +4616,8 @@ class Game {
     if (isCommunityMap) this.community.onRunStarted(level);
     this.hud.update(0);
     this._applyKidMode({ silent: true }); // 🐣 клас kid-mode активний і в бою (тост — лише на ручне перемикання)
+    // ⭐ чип складності: видно весь забіг там, де зірка діє (0 — режим поза системою)
+    this.hud.setDiffStarChip(level.diffStarActive ? level.diffStar : 0);
     this.victoryShown = false;
     this._nightAnnounced = false;
     const toastMod = level.weeklyMod || this._modifierById(level.weeklyMutator && level.weeklyMutator.id);
@@ -4619,7 +4641,7 @@ class Game {
     const bannerTitle = level.expedition ? t('🧭 ЕКСПЕДИЦІЯ · ЕТАП {n}/{all}', { n: level.expedition.step + 1, all: EXPEDITION_STEPS }) : level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : level.storm ? t('⛈️ ШТОРМ') : `${country.flag} ${country.name.toUpperCase()}`;
     const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.radiation ? t('50 HP, дробовик з 10 патронами і один зомбі на 500 HP. Перемога: +50 монет радіації.') : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : level.storm ? t('Виживи у колі, що звужується. Рекорд — у Лігу!') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
-    // ⭐ тост складності: лише соло-реплей на зірці >1 (кооп/перший прохід — завжди ★1)
+    // ⭐ тост складності: скрізь, де зірка діє (кампанія, «Живий фронт», кооп зі зіркою хоста)
     if (level.diffStar > 1) {
       this.hud.toast(t('⭐ Складність {n} — вороги міцніші, монет більше!', { n: level.diffStar }));
     }

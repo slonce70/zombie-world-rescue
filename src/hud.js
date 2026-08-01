@@ -288,6 +288,15 @@ export class HUD {
     if (el) el.style.display = on ? '' : 'none';
   }
 
+  // ⭐ чип складності: поточна зірка забігу. n === 0 → режим поза системою зірок (ховаємо).
+  setDiffStarChip(n) {
+    const el = document.getElementById('diff-chip');
+    if (!el) return;
+    const star = Math.max(0, Math.min(5, Math.trunc(Number(n) || 0)));
+    el.textContent = t('⭐ Складність {n}', { n: star });
+    el.style.display = star > 0 ? 'block' : 'none';
+  }
+
   update(dt) {
     const level = this.game.level;
     if (!level) return;

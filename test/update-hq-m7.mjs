@@ -70,6 +70,69 @@ check(hqStars === 0, `у Штабі дубля зірок більше нема�
 await page.evaluate(() => { const b = document.querySelector('#settings-stars [data-star="4"]'); if (b) b.click(); });
 check((await page.evaluate(() => window.__game.save.diffStar)) === 4, 'клік ★4 ставить save.diffStar=4');
 
+// ============ ⭐ v750: ЗІРКА ДІЄ ТАМ, ДЕ ДИТИНА ГРАЄ ============
+console.log('▸ v750: зірка на першому проходженні, у кімнатних режимах і в коопі');
+await page.goto(`${BASE}/?test&fresh`);
+await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'globe', 30000, 'глобус');
+
+// перше проходження країни (liberated порожній) тепер поважає обрану зірку
+const firstRun = await page.evaluate(async () => {
+  const g = window.__game;
+  g.save.diffStar = 3;
+  g.save.liberated = {};
+  await g.startLevel('UKR');
+  const chip = document.getElementById('diff-chip');
+  return {
+    wasLiberated: !!g.save.liberated.UKR,
+    diffStar: g.level.diffStar,
+    active: g.level.diffStarActive === true,
+    chipText: chip ? chip.textContent : '',
+    chipShown: !!chip && chip.style.display !== 'none',
+  };
+});
+check(firstRun.wasLiberated === false && firstRun.diffStar === 3 && firstRun.active,
+  `★3 діє на ПЕРШОМУ проходженні країни (${JSON.stringify(firstRun)})`);
+check(firstRun.chipShown && /3/.test(firstRun.chipText),
+  `чип складності видно на HUD (${JSON.stringify(firstRun.chipText)})`);
+
+// кімнатний режим лишається поза системою зірок
+const roomMode = await page.evaluate(async () => {
+  const g = window.__game;
+  g.save.diffStar = 5;
+  g.endLevel();
+  await g.startLevel('UKR', { knockout: true });
+  const chip = document.getElementById('diff-chip');
+  const out = { diffStar: g.level.diffStar, active: g.level.diffStarActive === true, chipShown: !!chip && chip.style.display !== 'none' };
+  g.endLevel();
+  return out;
+});
+check(roomMode.diffStar === 1 && !roomMode.active && !roomMode.chipShown,
+  `нокаут лишається ★1 навіть при save.diffStar=5 (${JSON.stringify(roomMode)})`);
+
+// кооп: зірку задає ХОСТ і вона їде гостю мережею (cfg/welcome/start spec)
+const coopStar = await page.evaluate(async () => {
+  const { sanitizeDiffStar } = await import('/src/net/protocol.js');
+  const g = window.__game;
+  const s = g.coop.session;
+  const before = { role: s.role, star: s.hostDiffStar };
+  s.role = 'host';
+  g.save.diffStar = 4;
+  const host = s.difficultyStar();
+  s.role = 'guest';
+  s.hostDiffStar = 1;
+  s._onMessage(1, { t: 'cfg', countryId: 'UKR', mode: 'campaign', ds: 5 });
+  const guest = s.difficultyStar();
+  s._onMessage(1, { t: 'cfg', countryId: 'UKR', mode: 'campaign', ds: 99 });
+  const clamped = s.difficultyStar();
+  s.role = before.role;
+  s.hostDiffStar = before.star;
+  return { host, guest, clamped, sane: [sanitizeDiffStar(undefined), sanitizeDiffStar('4'), sanitizeDiffStar(0)] };
+});
+check(coopStar.host === 4, `хост віддає свою зірку в кімнату (${coopStar.host})`);
+check(coopStar.guest === 5, `гість бере зірку хоста з cfg, а не свою (${coopStar.guest})`);
+check(coopStar.clamped === 1 && JSON.stringify(coopStar.sane) === '[1,4,1]',
+  `санітайзер зірки: сміття → ★1 (${JSON.stringify(coopStar)})`);
+
 // ============ ПІДСУМОК ============
 console.log('');
 if (errors.length) {

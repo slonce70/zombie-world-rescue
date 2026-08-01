@@ -670,11 +670,17 @@ export class CoopUI {
     this.el.ready.setAttribute('aria-pressed', mine && mine.ready ? 'true' : 'false');
     this.el.start.disabled = ![...s.roster.values()].every((entry) => entry.ready);
     const modeTxt = s.mode === 'storm' ? t('⛈️ ШТОРМ') : s.mode === 'arena' ? t('👑 АРЕНУ БОСІВ') : s.mode === 'friendly-knockout' ? t('🤝 ДРУЖНІЙ НОКАУТ') : t('кампанію');
-    this.el.hint.textContent = isHost
+    const hint = isHost
       ? (s.roster.size > 1 ? t('Усі в зборі? Тисни СТАРТ!') : (this.publicOn
         ? t('Кімнату видно у списку — чекай гостей або продиктуй код 👆')
         : t('Продиктуй другу код кімнати 👆')))
       : t('Хост обрав {m} · {c} — чекаємо на СТАРТ…', { m: modeTxt, c: COUNTRIES[s.countryId] ? COUNTRIES[s.countryId].flag + ' ' + COUNTRIES[s.countryId].name : '' });
+    // ⭐ складність кімнати задає ХОСТ — гість мусить бачити її ДО старту, а не в бою
+    const star = s.difficultyStar ? s.difficultyStar() : 1;
+    const starTxt = isHost
+      ? t('⭐ Твоя складність: {n} — грає вся кімната', { n: star })
+      : t('⭐ Складність хоста: {n}', { n: star });
+    this.el.hint.textContent = `${hint} · ${starTxt}`;
   }
 
   // 🎭 ряд вибору кооп-ролі: 3 чипи (Захисник/Медик/Розвідник) + «без ролі».

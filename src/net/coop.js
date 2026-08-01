@@ -1,7 +1,7 @@
 // Сесія кооперативу: кімната, ростер, лобі. Живе на рівні гри (глобуса),
 // на кожен рівень створює HostNet або GuestNet.
 import { Transport } from './transport.js';
-import { makeRoomCode, makeRunId, PROTO_VERSION } from './protocol.js';
+import { makeRoomCode, makeRunId, PROTO_VERSION, sanitizeDiffStar } from './protocol.js';
 import { HostNet } from './host.js';
 import { GuestNet } from './client.js';
 import { t } from '../i18n.js';
@@ -125,6 +125,7 @@ export class CoopSession {
     this.net = null;           // HostNet | GuestNet поточного рівня
     this.countryId = 'UKR';
     this.mode = 'campaign';    // campaign | storm | arena | friendly-knockout
+    this.hostDiffStar = 1;     // ⭐ зірка складності ХОСТА (гість: з welcome/cfg; хост: див. difficultyStar())
     this.onRoster = null;      // () => {} — оновити лобі
     this.onCfg = null;         // (countryId)
     this.onEnd = null;         // (reason) — кімната померла
@@ -244,6 +245,7 @@ export class CoopSession {
     this.roster.clear();
     this.frontRun = null;
     this.communityMap = null;
+    this.hostDiffStar = 1;
     this.frontStartedOperationId = null;
     this.frontResumeReady.clear();
     this.frontResults.clear();
@@ -253,13 +255,28 @@ export class CoopSession {
   }
 
   // ---------- лобі (хост) ----------
+  // ⭐ зірка складності кімнати: авторитет у ХОСТА. Хост бере свою з сейва,
+  // гість — ту, що приїхала в welcome/cfg (і в start spec як `ds`).
+  difficultyStar() {
+    return sanitizeDiffStar(this.role === 'host' ? this.game.save.diffStar : this.hostDiffStar);
+  }
+
+  // конфіг кімнати одним місцем: країна + режим + карта спільноти + зірка складності
+  broadcastConfig() {
+    if (this.role !== 'host') return;
+    this.transport.broadcast({
+      t: 'cfg', countryId: this.countryId, mode: this.mode, cm: this.communityMap,
+      ds: this.difficultyStar(),
+    }, true);
+  }
+
   setCountry(countryId) {
     if (countryId !== this.countryId) {
       this.frontResumeReady.clear();
       this._resetReady();
     }
     this.countryId = countryId;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId, mode: this.mode, cm: this.communityMap }, true);
+    this.broadcastConfig();
   }
 
   setMode(mode) {
@@ -270,7 +287,7 @@ export class CoopSession {
     this.mode = mode;
     if (mode !== 'front') this.frontStartedOperationId = null;
     if (mode !== 'community-map') this.communityMap = null;
-    if (this.role === 'host') this.transport.broadcast({ t: 'cfg', countryId: this.countryId, mode, cm: this.communityMap }, true);
+    this.broadcastConfig();
   }
 
   // 🎭 моя кооп-роль (лобі): зберігаємо у сейв, оновлюємо ростер і синхронізуємо кімнату.
@@ -369,7 +386,8 @@ export class CoopSession {
     // (не шторм/арена/нокаут/оборона/радіація/турель/світовий бос). Той самий сід-патерн, що соло.
     const isPlainCampaign = !storm && !arena && !knockout && !defense && !radiation && !turretwar && !wb;
     const so = isPlainCampaign ? game._rollCoopSecondary(realCountry, game.seed + runIndex * 3) : null;
-    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, rid: makeRunId(), ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle) };
+    // ⭐ зірка складності їде тим самим шляхом, що ms/mt: значення ХОСТА, гість не рахує своє
+    const spec = { countryId: realCountry, seed: game.seed, runIndex, storm, arena, knockout, defense, radiation, turretwar, wb, weekly, mut, so, rid: makeRunId(), ms: sanitizeMapSize(game.save.mapSize), mt: sanitizeMapStyle(game.save.mapStyle), ds: this.difficultyStar() };
     this.transport.broadcast({ t: 'start', ...spec }, true);
     this.state = 'level';
     if (this.onStarted) this.onStarted();
@@ -453,6 +471,8 @@ export class CoopSession {
       rid: makeRunId(),
       ms: sanitizeMapSize(this.game.save.mapSize),
       mt: sanitizeMapStyle(this.game.save.mapStyle),
+      // ⭐ операції «Живого фронту» — теж кампанійна симуляція: зірка хоста на всю кімнату
+      ds: this.difficultyStar(),
     };
     const attempt = ++this.frontAttempt;
     this.frontResult = null;
@@ -609,6 +629,7 @@ export class CoopSession {
         this.countryId = d.countryId || 'UKR';
         if (d.mode) this.mode = d.mode;
         this.communityMap = d.cm == null ? null : sanitizeCommunitySnapshot(d.cm);
+        this.hostDiffStar = sanitizeDiffStar(d.ds); // ⭐ гість бачить зірку хоста ще в лобі
         if (d.ex) {
           this.game.save.expedition = sanitizeExpedition(d.ex);
           this.game._claimExpeditionMastery(this.game.save.expedition);
@@ -628,6 +649,7 @@ export class CoopSession {
         this.countryId = d.countryId;
         if (d.mode) this.mode = d.mode;
         this.communityMap = d.cm == null ? null : sanitizeCommunitySnapshot(d.cm);
+        this.hostDiffStar = sanitizeDiffStar(d.ds);
         if (this.onCfg) this.onCfg(d.countryId);
       } else if (d.t === 'start') {
         const fr = d.fr == null ? null : sanitizeFrontSpec(d.fr);
@@ -654,7 +676,9 @@ export class CoopSession {
           this.game.saveGame();
         }
         this.communityMap = cm;
-        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr, cm } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null, customMap: cm ? 'community' : undefined, communityMap: cm, communityRunId: cm ? d.rid : null });
+        // ⭐ складність забігу — виключно зі spec хоста (гість свою save.diffStar не рахує)
+        this.hostDiffStar = sanitizeDiffStar(d.ds);
+        this.game.startLevel(d.countryId, { coop: { session: this, role: 'guest', spec: { ...d, fr, cm, ds: this.hostDiffStar } }, storm: !!d.storm, arena: !!d.arena, knockout: d.knockout || null, defense: d.defense || null, radiation: !!d.radiation, turretwar: !!d.turretwar, worldBoss: d.wb || null, portal: !!d.portal, expedition: d.ex || null, operation: expandFrontSpec(fr), weekly: d.weekly || null, mut: d.mut || null, customMap: cm ? 'community' : undefined, communityMap: cm, communityRunId: cm ? d.rid : null });
       } else if (d.t === 'lvlend') {
         if (this.game.state === 'level') this.game.endLevel();
       } else if (d.t === 'xprun') {
@@ -729,6 +753,7 @@ export class CoopSession {
     this.transport.send(from, {
       t: 'welcome', pid: from, countryId: this.countryId, mode: this.mode,
       cm: this.mode === 'community-map' ? this.communityMap : null,
+      ds: this.difficultyStar(), // ⭐ зірка хоста видима гостю ще до старту
       roster: this._rosterList(),
       inLevel: this.state === 'level',
       ex: this.mode === 'expedition' ? sanitizeExpedition(this.game.save.expedition) : null,
