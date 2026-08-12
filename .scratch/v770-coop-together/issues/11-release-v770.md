@@ -13,9 +13,9 @@
 
 **Blocked by:** усі попередні
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Три місця версії збігаються
-- [ ] `node test/version-sync.mjs`, `node test/sw-cache.mjs`, `node test/i18n-parity.mjs` зелені
-- [ ] CHANGELOG написаний для дитини, а не для розробника
-- [ ] Стара вкладка отримує зрозуміле повідомлення
+- [x] Три місця версії збігаються
+- [x] `node test/version-sync.mjs`, `node test/sw-cache.mjs`, `node test/i18n-parity.mjs` зелені
+- [x] CHANGELOG написаний для дитини, а не для розробника
+- [x] Стара вкладка отримує зрозуміле повідомлення
