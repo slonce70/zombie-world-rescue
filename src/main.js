@@ -109,7 +109,7 @@ import {
 import {
   SOLO_MODE_GROUPS, HARD_VARIANTS, MODE_RULES, MODIFIERS, WEEKLY_MODIFIER_POOL,
   modeIdFromOpts, MODE_START_OPTS, SOLO_MODES, DAILY_CHALLENGE_POOL, MODE_MILESTONES, COOP_MODE_IDS,
-  DUEL_MAP, dailyChallengeFor,
+  DUEL_MAP, DUEL_RULES, dailyChallengeFor,
 } from './modes.js';
 import { renderAlbum, skinHint, petHint } from './ui/album.js';
 import {
@@ -1716,7 +1716,7 @@ class Game {
     // 🤝 Дуель дня: режим дня в усіх іде на ОДНАКОВІЙ карті. Розмір і стиль беремо
     // не з налаштувань гравця (вони зсувають арену), а фіксовані — інакше двоє
     // порівнювали б час, пройдений у різних світах.
-    const duel = modeId === this.dailyChallengeId() ? DUEL_MAP : null;
+    const duel = modeId === this.dailyChallengeId() ? { ...DUEL_MAP, duel: 1 } : null;
     return this.startLevel(countryId, { ...make(arg), ...duel });
   }
 
@@ -3782,7 +3782,10 @@ class Game {
     // джерело id мутатора: соло — гейтований календарний id; кооп — id зі spec хоста
     const mutatorSrcId = coop ? (opts.mut || null) : soloWeeklyModId;
     const weeklyMutator = this._buildWeeklyMutator(mutatorSrcId, { coop, isPlayground });
-    const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
+    const weekRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
+    // 🤝 день дуелі доважує «без гаджетів і бафів» — інакше Лабіринт (єдиний у пулі,
+    // де вони дозволені) давав би незрівнянний час при однаковій карті
+    const modeRules = opts.duel ? { ...weekRules, ...DUEL_RULES } : weekRules;
     const noProgress = isCustom;
     const noShop = noProgress || !!modeRules.noShop;
     document.body.classList.toggle('no-shop-mode', noShop);
@@ -3970,7 +3973,7 @@ class Game {
     // нескінченний, а бій у лабіринті необовʼязковий — забіг це не ламає.
     // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Експедиція,
     // «Живий фронт», кастомні карти) герой іде зі своїм спорядженням — там пасивки діють.
-    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation || isMaze;
+    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation || (isMaze && !!opts.duel);
     const powers = fixedLoadout ? null : countryPowerMods(this.save.liberated);
     level.countryPowers = powers;
     // застосовуємо куплені прокачування
@@ -5710,23 +5713,28 @@ class Game {
         </div>` : ''}
         <button type="button" id="btn-duel-play" class="btn btn-primary duel-play">▶ ${t('Грати {i} {m}', { i: mode.icon, m: esc(mode.name()) })}</button>`;
       el.hidden = false;
-      document.getElementById('btn-duel-play').addEventListener('click', () => {
+      // 🧷 Меню могло перемалюватись, поки летів запит у лобі: тоді `el` уже відчеплений
+      // від документа, і пошук по ВСЬОМУ документу віддає null. Тому шукаємо всередині
+      // самого `el` і мовчки виходимо, якщо його вже немає на сторінці — інакше
+      // «Cannot read properties of null» сипався б у консоль на кожному другому екрані.
+      if (!el.isConnected) return;
+      el.querySelector('#btn-duel-play').addEventListener('click', () => {
         this.audio.click();
         this._hideOverlay('overlay-solo');
         this._startSoloMode(modeId);
       });
       if (!askName) return;
-      const input = document.getElementById('duel-nick');
+      const input = el.querySelector('#duel-nick');
       const accept = () => {
         if (!net || !net.setNick(input.value)) {
-          document.getElementById('duel-nick-error').textContent = t('Напиши імʼя — хоча б 2 звичайні букви 🙂');
+          el.querySelector('#duel-nick-error').textContent = t('Напиши імʼя — хоча б 2 звичайні букви 🙂');
           input.focus();
           return;
         }
         this.audio.click();
         this._refreshDuelBoard();
       };
-      document.getElementById('btn-duel-nick').addEventListener('click', accept);
+      el.querySelector('#btn-duel-nick').addEventListener('click', accept);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') accept(); });
     });
   }

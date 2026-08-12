@@ -55,9 +55,7 @@ export const MODE_RULES = {
   'overloaded-pvp': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   bank: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   portal: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
-  // 🧩 Лабіринт у пулі дуелі дня — тож без гаджетів і бафів, як решта пулу:
-  // карта в усіх однакова, спорядження мусить бути теж (інакше час незрівнянний)
-  maze: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  maze: { noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   humans: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'overloaded-humans': { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'soul-collector': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
@@ -306,6 +304,13 @@ export const DAILY_CHALLENGE_POOL = ['knockout', 'defense', 'zone-defense', 'pvp
 //    зсували арену (layout.arena масштабується розміром). Тому в режимі дня їх
 //    беремо звідси, а не з сейва.
 export const DUEL_MAP = Object.freeze({ mapSize: 'standard', mapStyle: 'classic' });
+
+// 🧩 …і те саме для спорядження. Десять режимів пулу вже мають `noGadgets`/`noBuffs`
+// у своїх правилах, а Лабіринт — ні: він єдиний, де гаджети й бафи дозволені. У день
+// дуелі це робило час незрівнянним (карта та сама, спорядження різне), тож правила
+// доважуються РІВНО на день дуелі. Постійно вимикати їх у Лабіринті не можна: він
+// живе й поза дуеллю, а фіча працює один день з одинадцяти.
+export const DUEL_RULES = Object.freeze({ noGadgets: true, noBuffs: true });
 
 // Режим дня від індексу дня — чиста функція, на ній стоїть уся чесність дуелі
 export function dailyChallengeFor(dayIndex) {
