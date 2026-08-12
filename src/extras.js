@@ -1544,7 +1544,11 @@ export class Gadgets {
       this.level.bus.emit('toast', t('Тут не можна створити клона 🙈'));
       return false;
     }
-    while (this.clones.length) this._removeClone(0, false);
+    // 🎒 масив this.clones спільний із Загоном: прибираємо лише власних клонів гаджета,
+    // врятований напарник лишається в бою і не займає слота клона (їх завжди count)
+    for (let i = this.clones.length - 1; i >= 0; i--) {
+      if (!this.clones[i].squad) this._removeClone(i, false);
+    }
     const count = (this.level.game.save.gadgetHypers || []).includes('clone') ? 2 : 1;
     for (let i = 0; i < count; i++) {
       const off = (i - (count - 1) / 2) * 1.1;
