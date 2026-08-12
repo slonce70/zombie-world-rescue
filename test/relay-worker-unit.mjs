@@ -9,8 +9,16 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 const workerDir = new URL('../worker/', import.meta.url);
-const source = readFileSync(new URL('relay-worker.js', workerDir), 'utf8')
-  .replace(/ from '\.\//g, ` from '${workerDir}`);
+const rawSource = readFileSync(new URL('relay-worker.js', workerDir), 'utf8');
+// Бойова стеля MAX_ENTRIES навмисно велика — це запобіжник від нескінченного росту,
+// а не робочий ліміт. Заповнювати її по-справжньому означало б десятки тисяч сабмітів
+// на тест, тому в тестовій копії модуля підміняємо число на 5; саме значення перевіряє
+// окремий гейт «стеля ліги лишається запобіжником».
+const CAP = 5;
+const source = rawSource
+  .replace(/ from '\.\//g, ` from '${workerDir}`)
+  .replace(/const MAX_ENTRIES = [\d_]+;/, `const MAX_ENTRIES = ${CAP};`);
+assert.match(source, /const MAX_ENTRIES = 5;/, 'тестова копія мусить мати занижену стелю');
 const { League, Room } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 // ── Ліга ─────────────────────────────────────────────────────────────────────
@@ -31,29 +39,38 @@ function newLeague() {
 const storm = (cid, score, nick = 'Гравець') => ({ cid, nick, mode: 'storm', country: 'UKR', score });
 const rows = (league) => league.sql.exec("SELECT cid, score FROM entries WHERE mode = 'storm' AND country = 'UKR'").toArray();
 
+test('стеля ліги лишається запобіжником, а не робочим лімітом', () => {
+  const m = rawSource.match(/const MAX_ENTRIES = ([\d_]+);/);
+  assert.ok(m, 'у worker/relay-worker.js має бути стеля MAX_ENTRIES');
+  // відколи записи не витісняються, мала стеля замикає таблицю назавжди:
+  // реальні гравці не мусять у неї впиратись
+  assert.ok(Number(m[1].replace(/_/g, '')) >= 10_000,
+    `стеля ${m[1]} замала — популярна пара (режим, країна) перестане приймати гравців`);
+});
+
 test('переповнена ліга не стирає чужі рекорди', async () => {
   const league = newLeague();
-  // 500 справжніх гравців зі скромними результатами
-  for (let i = 0; i < 500; i++) assert.equal((await league.submit(storm(`cid-real-${i}`, 3))).status, 200);
-  assert.equal(rows(league).length, 500);
+  // повна таблиця справжніх гравців зі скромними результатами
+  for (let i = 0; i < CAP; i++) assert.equal((await league.submit(storm(`cid-real-${i}`, 3))).status, 200);
+  assert.equal(rows(league).length, CAP);
 
-  // накрутка: 50 нових cid з максимальним балом — жоден не має нікого виносити
-  for (let i = 0; i < 50; i++) await league.submit(storm(`cid-cheat-${i}`, 200, 'Читер'));
+  // накрутка: нові cid з максимальним балом — жоден не має нікого виносити
+  for (let i = 0; i < 5; i++) await league.submit(storm(`cid-cheat-${i}`, 200, 'Читер'));
   const after = rows(league);
-  assert.equal(after.length, 500, 'таблиця лишається на стелі, а не росте');
-  assert.equal(after.filter((r) => r.cid.startsWith('cid-real-')).length, 500,
+  assert.equal(after.length, CAP, 'таблиця лишається на стелі, а не росте');
+  assert.equal(after.filter((r) => r.cid.startsWith('cid-real-')).length, CAP,
     'жоден реальний запис не видалено');
   assert.ok(!after.some((r) => r.cid.startsWith('cid-cheat-')), 'новий cid у повну таблицю не пускаємо');
 });
 
 test('свій запис у повній таблиці оновлюється як раніше', async () => {
   const league = newLeague();
-  for (let i = 0; i < 500; i++) await league.submit(storm(`cid-real-${i}`, 3));
+  for (let i = 0; i < CAP; i++) await league.submit(storm(`cid-real-${i}`, 3));
   league._lastSubmit.clear(); // замість 10с реального чекання анти-спаму
-  const res = await league.submit(storm('cid-real-7', 42));
+  const res = await league.submit(storm('cid-real-2', 42));
   assert.equal(res.status, 200);
-  assert.equal(rows(league).find((r) => r.cid === 'cid-real-7').score, 42, 'кращий результат записався');
-  assert.equal(rows(league).length, 500);
+  assert.equal(rows(league).find((r) => r.cid === 'cid-real-2').score, 42, 'кращий результат записався');
+  assert.equal(rows(league).length, CAP);
   const body = await res.json();
   assert.equal(body.me.score, 42);
   assert.equal(body.top[0].score, 42);

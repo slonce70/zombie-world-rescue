@@ -2067,7 +2067,10 @@ export class World {
 
   // верх підлоги/даху в точці; обирається найвища поверхня, до якої можна "дотягтись" з висоти y.
   // Дахи зі схилом (slope) — висота росте до гребеня, як у справжнього даху.
-  floorAt(x, z, y = 1.5) {
+  // tol — наскільки ВИЩЕ за y ще вважається «своєю» поверхнею. За замовчуванням 1.0:
+  // це висота сходинки, на яку сходять ноги гравця. Снаряди мусять передавати свій,
+  // значно менший допуск — інакше поміст над ними ловить їх у польоті (див. effects.js).
+  floorAt(x, z, y = 1.5, tol = 1.0) {
     let best = -Infinity;
     for (const f of this.floors) {
       const dx = x - f.x, dz = z - f.z;
@@ -2078,7 +2081,7 @@ export class World {
         const top = f.slope
           ? f.top + f.slope * (1 - Math.abs(lz) / (f.d / 2))
           : f.top;
-        if (top <= y + 1.0 && top > best) best = top;
+        if (top <= y + tol && top > best) best = top;
       }
     }
     return best;

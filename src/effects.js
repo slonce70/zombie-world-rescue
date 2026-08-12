@@ -14,6 +14,14 @@ function segPointDist2(a, b, px, py, pz) {
   return dx * dx + dy * dy + dz * dz;
 }
 
+// 💣 Допуск підлоги для всього, що літає й падає. floorAt за замовчуванням має 1.0 —
+// це висота сходинки під ногами гравця, і для снаряда вона завелика: поверхня майже
+// за метр НАД ним рахувалась би землею (ракета вибухала в повітрі під навісом ринку,
+// граната стрибала на поміст над собою). Снаряду потрібен лише один кадр падіння
+// (0.3 м ≈ 18 м/с при 60 fps), щоб не проскочити крізь поміст, — і це втричі менше
+// за найтісніший зазор під помостами, через який ловилась стеля.
+const PROJ_FLOOR_TOL = 0.3;
+
 let glowTexture = null;
 function getGlowTexture() {
   if (!glowTexture) {
@@ -1330,7 +1338,7 @@ export class Effects {
       s.mesh.rotation.z += s.spin * 0.7 * dt;
       const sy = Math.max(
         this.world.groundH(s.mesh.position.x, s.mesh.position.z),
-        this.world.floorAt(s.mesh.position.x, s.mesh.position.z, s.mesh.position.y)
+        this.world.floorAt(s.mesh.position.x, s.mesh.position.z, s.mesh.position.y, PROJ_FLOOR_TOL)
       ) + 0.03;
       if (s.mesh.position.y < sy) {
         s.mesh.position.y = sy;
@@ -1392,7 +1400,7 @@ export class Effects {
         if (segPointDist2(this._sbOld, mp, ppos.x, ppos.y + 1.1, ppos.z) < rr) hit = true;
       }
       // підлоги й дахи зупиняють снаряд так само, як ландшафт (як у м'яча)
-      const mg = Math.max(this.world.groundH(mp.x, mp.z), this.world.floorAt(mp.x, mp.z, mp.y));
+      const mg = Math.max(this.world.groundH(mp.x, mp.z), this.world.floorAt(mp.x, mp.z, mp.y, PROJ_FLOOR_TOL));
       if (!hit && mp.y < mg + pr.size * 0.5) hit = true;
       if (pr.spin) pr.mesh.rotation.x += dt * 9; // багет крутиться в польоті
       if (hit || pr.life <= 0) {
@@ -1424,7 +1432,7 @@ export class Effects {
       rk.traveled += frameDist;
       const rp = rk.mesh.position;
       // ракета детонує і від підлоги/даху, не лише від ландшафту
-      const rg = Math.max(this.world.groundH(rp.x, rp.z), this.world.floorAt(rp.x, rp.z, rp.y));
+      const rg = Math.max(this.world.groundH(rp.x, rp.z), this.world.floorAt(rp.x, rp.z, rp.y, PROJ_FLOOR_TOL));
       if (!boom && rp.y < rg + 0.15) boom = true;
       // 🚀 зведення: у перші ~3 м ракета НЕ детонує від землі/стіни/повітря (щоб дитина не
       // підірвала себе зблизька, F10), АЛЕ пряме влучання у ворога детонує завжди (ревью).
@@ -1473,7 +1481,7 @@ export class Effects {
       // граната лягає на дах, поміст чи підлогу будинку, а не провалюється до ландшафту
       const gy = Math.max(
         this.world.groundH(g.mesh.position.x, g.mesh.position.z),
-        this.world.floorAt(g.mesh.position.x, g.mesh.position.z, g.mesh.position.y)
+        this.world.floorAt(g.mesh.position.x, g.mesh.position.z, g.mesh.position.y, PROJ_FLOOR_TOL)
       ) + 0.13;
       if (g.mesh.position.y < gy) {
         g.mesh.position.y = gy;
@@ -1518,7 +1526,7 @@ export class Effects {
       bl.mesh.position.addScaledVector(bl.v, dt);
       const bg = Math.max(
         this.world.groundH(bl.mesh.position.x, bl.mesh.position.z),
-        this.world.floorAt(bl.mesh.position.x, bl.mesh.position.z, bl.mesh.position.y)
+        this.world.floorAt(bl.mesh.position.x, bl.mesh.position.z, bl.mesh.position.y, PROJ_FLOOR_TOL)
       ) + 0.45;
       if (bl.mesh.position.y < bg) {
         bl.mesh.position.y = bg;
