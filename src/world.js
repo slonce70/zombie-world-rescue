@@ -3644,10 +3644,14 @@ export class World {
       flame.position.set(tx, dungeonY + 2.7, tz);
       tunnel.add(flame);
     }
-    for (const lx of [chamberX - 5, chamberX + 5]) {
-      const light = new THREE.PointLight(0xff8a36, 1.25, 18, 2);
-      light.position.set(lx, dungeonY + 3.4, tunnelEndZ);
-      tunnel.add(light);
+    // Реальні точкові світла у залі — лише на явному «high», як лампи в будинках:
+    // смолоскипи вище світяться власним емісивним матеріалом і видні на всіх пресетах.
+    if (this.quality.lights) {
+      for (const lx of [chamberX - 5, chamberX + 5]) {
+        const light = new THREE.PointLight(0xff8a36, 1.25, 18, 2);
+        light.position.set(lx, dungeonY + 3.4, tunnelEndZ);
+        tunnel.add(light);
+      }
     }
     this.staticGroup.add(tunnel);
 

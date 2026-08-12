@@ -167,7 +167,6 @@ export class Effects {
     this._up = new THREE.Vector3(0, 1, 0);
     this._tmpDir = new THREE.Vector3();
     this._sbOld = new THREE.Vector3(); // позиція снаряда ДО руху (swept-перевірка влучання)
-    this._hidePos = new THREE.Vector3(0, -100, 0); // scratch для приховування інстансів
 
     // спалах пострілу
     this.flashLight = new THREE.PointLight(0xffc966, 0, 9);
@@ -1233,11 +1232,13 @@ export class Effects {
         }
       }
     }
-    // приховуємо решту інстансів
-    this._m4.compose(this._hidePos, this._q, this._s.set(0.001, 0.001, 0.001));
-    for (let i = idx; i < this.MAX_P; i++) this.pMesh.setMatrixAt(i, this._m4);
-    this.pMesh.instanceMatrix.needsUpdate = true;
-    if (this.pMesh.instanceColor) this.pMesh.instanceColor.needsUpdate = true;
+    // малюємо рівно стільки інстансів, скільки живих частинок — решту не чіпаємо взагалі
+    // (при нулі живих кадр не пише жодної матриці й нічого не вантажить на GPU)
+    this.pMesh.count = idx;
+    if (idx) {
+      this.pMesh.instanceMatrix.needsUpdate = true;
+      if (this.pMesh.instanceColor) this.pMesh.instanceColor.needsUpdate = true;
+    }
 
     if (this._meteors.length) this._updateMeteors(dt);
 

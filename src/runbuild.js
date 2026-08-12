@@ -117,6 +117,21 @@ export const COMBOS = {
     } },
 };
 
+// 🧛 Вампіризм. Картки ставлять lifeSteal, а приріст здоров'я за вбивство рахує main.js
+// у `zombieKilled`. Стеля приросту максимального HP — щоб поле не росло безмежно, як усі
+// інші накопичувальні поля карток вище (ricochet 0.9, chillHit 3, killBlast 165,
+// fireTrail 18, airJumps 2). Лікування за вбивство працює далі, просто не піднімає стелю.
+export const VAMP_MAX_HP_GAIN = 200;
+
+export function applyLifeSteal(p) {
+  const gain = Math.min(p.lifeSteal, VAMP_MAX_HP_GAIN - (p.vampHp || 0));
+  if (gain > 0) {
+    p.vampHp = (p.vampHp || 0) + gain;
+    p.maxHealth += gain;
+  }
+  p.health = Math.min(p.maxHealth, p.health + p.lifeSteal);
+}
+
 // 🧬 База проти бонусу забігу. Базові множники (куплені апгрейди + пасивки країн)
 // рахуються З НУЛЯ і на старті рівня, і після КОЖНОЇ покупки в магазині. А бонуси
 // забігу — картки вище, ранг спеціаліста, рівень бійця Експедиції, кооп-роль scout —

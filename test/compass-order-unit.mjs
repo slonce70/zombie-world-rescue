@@ -1,0 +1,60 @@
+// 🧭 Порядок пріоритетів компаса «що далі». Головна підказка гри мусить вести по
+// кампанії, а не у вітрину: 🎯 на товарі в магазині не сміє перебивати наступну країну.
+// src/main.js тягне Three.js і браузер, тож беремо ЛИШЕ тіло _nextActionInfo() з
+// живого файлу (той самий прийом, що в missionpool-prompt-unit.mjs) і годуємо його
+// двійниками залежностей — без рендера й без DOM.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const src = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const start = src.indexOf('  _nextActionInfo() {');
+const end = src.indexOf('\n  }\n', start) + 4;
+assert.ok(start > 0 && end > start, 'метод _nextActionInfo() знайдено в src/main.js');
+const body = src.slice(start, end).replace('_nextActionInfo() {', 'function nextActionInfo() {');
+
+const CAMPAIGN_ORDER = ['UKR', 'POL', 'DEU'];
+const COUNTRIES = {
+  UKR: { flag: '🇺🇦', name: 'Україна' },
+  POL: { flag: '🇵🇱', name: 'Польща' },
+  DEU: { flag: '🇩🇪', name: 'Німеччина' },
+};
+// двійник t(): переклад не цікавить, але підстановку {f}/{n} робимо як справжній i18n
+const t = (s, params) => (params
+  ? s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? params[k] : m))
+  : s);
+const SOLO_MODES = [];
+
+// goalInfo повертає незавершену ціль магазину — саме вона раніше стояла першою
+const shopGoal = { done: false, remaining: 300, item: { icon: '🔫', name: 'Автомат' } };
+const build = (goal) => new Function(
+  'goalInfo', 't', 'seasonState', 'CAMPAIGN_ORDER', 'COUNTRIES', 'SOLO_MODES',
+  `${body}\nreturn nextActionInfo;`,
+)(() => goal, t, () => ({ claimable: 0, next: null, index: 0 }), CAMPAIGN_ORDER, COUNTRIES, SOLO_MODES);
+
+const fakeGame = (liberated) => ({
+  save: { liberated, infected: { done: true }, weekly: {} },
+  quests: { list: [] },
+  _weekIndex: () => 1000,
+  weeklyChallengeId: () => '__none',
+  dailyChallengeId: () => '__none',
+});
+
+test('крок кампанії стоїть вище за ціль магазину', () => {
+  const info = build(shopGoal).call(fakeGame({}));
+  assert.equal(info.icon, '🧭', `компас повів не в кампанію: ${JSON.stringify(info)}`);
+  assert.equal(info.title, 'Далі');
+  assert.ok(info.text.includes('Україна'), 'кличе у першу незвільнену країну');
+});
+
+test('ціль магазину лишається підказкою — але вже після кампанії', () => {
+  const lib = { UKR: true, POL: true, DEU: true, LOST: true, LAB: true };
+  const info = build(shopGoal).call(fakeGame(lib));
+  assert.equal(info.title, 'Ціль магазину', `ціль магазину зникла: ${JSON.stringify(info)}`);
+});
+
+test('без цілі магазину кампанія веде так само', () => {
+  const info = build(null).call(fakeGame({ UKR: true }));
+  assert.equal(info.icon, '🧭');
+  assert.ok(info.text.includes('Польща'), 'наступна незвільнена — Польща');
+});

@@ -109,6 +109,7 @@ export class Player {
     // 🎲 поля бойових карток «Прокачки» (src/runbuild.js). 0 — картку не брали.
     // Живуть рівно один забіг: player перестворюється на старті рівня, save.json не чіпаємо.
     this.lifeSteal = 0;   // 🧛 +HP за вбивство — читає main.js у `zombieKilled`
+    this.vampHp = 0;      // 🧛 скільки максимального HP вже дав вампіризм (стеля в runbuild.js)
     this.ricochet = 0;    // 🪃 частка шкоди, що відскакує в сусіда — `_shoot`
     this.critEvery = 0;   // 🎯 кожне N-те влучання критичне — `_shoot`
     this.critMult = 2;

@@ -714,9 +714,10 @@ body.kid-mode #touch-right { grid-template-columns: repeat(3, 60px); gap: 8px; }
 /* компактний HUD на малих екранах */
 @media (max-width: 900px), (max-height: 560px) {
   #mission-panel { min-width: 180px; max-width: 230px; padding: 8px 10px; }
-  .story-objective { font-size: 11px; padding-bottom: 5px; margin-bottom: 3px; }
-  .mission { font-size: 11.5px; padding: 2px 0; }
-  .panel-title { font-size: 10px; margin-bottom: 4px; }
+  /* «що робити» — головний текст гри, тож на телефоні він НЕ дрібніший за решту HUD */
+  .story-objective { font-size: 14px; padding-bottom: 5px; margin-bottom: 3px; }
+  .mission { font-size: 14px; padding: 2px 0; }
+  .panel-title { font-size: 12px; margin-bottom: 4px; }
   #minimap { width: 120px; height: 120px; }
   #coins { font-size: 16px; padding: 5px 12px; }
   #health { width: 190px; }

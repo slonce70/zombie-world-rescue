@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../src/runbuild.js', import.meta.url), 'utf8');
-const { CARD_POOL, COMBOS, RunBuild, cardWeight } = await import(
+const { CARD_POOL, COMBOS, RunBuild, cardWeight, applyLifeSteal, VAMP_MAX_HP_GAIN } = await import(
   'data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 // мінімальний двійник гравця: ті самі поля, що ставить Player у конструкторі
@@ -276,4 +276,31 @@ test('COMBOS лишились чотирма і не зачіпають поля
     assert.equal(p.secondWind, 0, 'комбо не роздає безкоштовних порятунків');
     assert.equal(p.coinMagnet, 0);
   }
+});
+
+// 🧛 v752: вампіризм піднімав maxHealth без стелі — vamp2+fortress на 300 вбивств
+// давали +1200 HP. Тепер приріст капнутий, як усі накопичувальні поля карток.
+test('вампіризм має стелю приросту максимального HP', () => {
+  const p = fakePlayer();
+  p.lifeSteal = 4;                       // vamp2 (+2) + fortress (+2)
+  const base = p.maxHealth;
+  for (let i = 0; i < 300; i++) applyLifeSteal(p);
+  assert.equal(p.maxHealth, base + VAMP_MAX_HP_GAIN, 'стеля приросту не тримає');
+  assert.ok(p.health <= p.maxHealth, 'здоровʼя не сміє перелізти власну стелю');
+});
+
+test('вампіризм до стелі працює як раніше, а після — далі лікує', () => {
+  const p = fakePlayer();
+  p.lifeSteal = 3;
+  p.health = 50;
+  applyLifeSteal(p);
+  assert.equal(p.maxHealth, 103, 'перше вбивство мусить дати +3 до стелі');
+  assert.equal(p.health, 53, 'перше вбивство мусить вилікувати на 3');
+  // добиваємо до стелі й перевіряємо, що лікування живе далі
+  for (let i = 0; i < 300; i++) applyLifeSteal(p);
+  const capped = p.maxHealth;
+  p.health = 10;
+  applyLifeSteal(p);
+  assert.equal(p.maxHealth, capped, 'після стелі maxHealth стоїть');
+  assert.equal(p.health, 13, 'після стелі вампіризм усе одно лікує');
 });

@@ -13,7 +13,7 @@ import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
 import { Draft } from './draft.js';
-import { RunBuild, applyBaseMults } from './runbuild.js';
+import { RunBuild, applyBaseMults, applyLifeSteal } from './runbuild.js';
 import { advanceMomentum, tickMomentum } from './combatmomentum.js';
 import {
   EXPEDITION_NODE_TYPES, EXPEDITION_STEPS, chooseExpeditionNode, completeExpeditionNode,
@@ -393,6 +393,13 @@ class Game {
       this.endLevel();
     });
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
+      // 🖱️ десктоп: коуч дотику тут ні до чого — розкриваємо готовий список клавіш
+      // просто в меню паузи (гра лишається на паузі, поки дитина читає)
+      if (!this.touch) {
+        const keys = document.getElementById('pause-keys');
+        keys.style.display = keys.style.display === 'none' ? 'grid' : 'none';
+        return;
+      }
       this.paused = false;
       this._hideOverlay('overlay-pause');
       this._showTouchCoach(true);
@@ -1469,15 +1476,6 @@ class Game {
   }
 
   _nextActionInfo() {
-    const gi = goalInfo(this);
-    if (gi && !gi.done) {
-      const unit = gi.item.crystalPrice ? '💎' : '₴';
-      return {
-        icon: '🎯',
-        title: t('Ціль магазину'),
-        text: t('{i} {n}: ще {r} {u}', { i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: unit }),
-      };
-    }
     // 🗓️ незабрана нагорода сезону — найдешевша дія, кличемо одразу
     const season = seasonState(this.save, this._weekIndex());
     if (season.claimable > 0) {
@@ -1495,6 +1493,17 @@ class Game {
         icon: '🧭',
         title: t('Далі'),
         text: t('{f} {n}: звільни країну', { f: c.flag, n: c.name }),
+      };
+    }
+    // 🎯 ціль магазину — НИЖЧЕ кроку кампанії: 🎯 на товарі не має перебивати
+    // головну підказку гри й вести дитину у вітрину замість наступної країни
+    const gi = goalInfo(this);
+    if (gi && !gi.done) {
+      const unit = gi.item.crystalPrice ? '💎' : '₴';
+      return {
+        icon: '🎯',
+        title: t('Ціль магазину'),
+        text: t('{i} {n}: ще {r} {u}', { i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: unit }),
       };
     }
     // 🗓️ кампанію пройдено — веде сезон: він розганяє по режимах
@@ -4428,10 +4437,7 @@ class Game {
       if (this.touch) this.touch.vibeKill(z.type === 'boss');
       // 🧛 картка драфта «+1 HP за вбивство» (run-only, лише соло — runBuild нема в коопі)
       const lp = level.player;
-      if (lp.lifeSteal > 0 && lp.health > 0) {
-        lp.maxHealth += lp.lifeSteal;
-        lp.health += lp.lifeSteal;
-      }
+      if (lp.lifeSteal > 0 && lp.health > 0) applyLifeSteal(lp);
       // 🎇 картка драфта «Вибухове добивання»: убитий зомбі вибухає (той самий гачок,
       // що й вампіризм вище — гачок уже кіл-кредитований, чужі перемоги сюди не доходять)
       if (lp.killBlast > 0) this._killBlast(level, z);
