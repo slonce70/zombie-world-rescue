@@ -7,7 +7,7 @@ const check = makeCheck(() => failed++);
 await page.goto(`${BASE}/?test&fresh&seed=25`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Перегружена зомбі проти людей: тумблер 💀 зʼявляється після 12 країн');
+console.log('▸ Перевантажений бій зомбі проти людей: тумблер 💀 зʼявляється після 12 країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
   const eleven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true, TUR: true, EGY: true, JPN: true, CHN: true };

@@ -7,7 +7,7 @@ const check = makeCheck(() => failed++);
 await page.goto(`${BASE}/?test&fresh&seed=11`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Тумблер 💀 Перегруженого ПВП зʼявляється після 8 звільнених країн');
+console.log('▸ Тумблер 💀 Перевантаженого ПВП зʼявляється після 8 звільнених країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
   const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
@@ -30,7 +30,7 @@ check(!menu.beforeExists, 'до 8 країн тумблера 💀 немає', 
 check(menu.afterExists, 'після 8 країн картка ПВП має тумблер 💀 Складно', JSON.stringify(menu));
 check(menu.normalExists && !menu.normalLockedAt8, 'звичайне ПВП відкрите разом із тумблером (з 8 країн)', JSON.stringify(menu));
 
-console.log('▸ Старт Перегруженого ПВП: 35x35, 2500 HP, гармата+меч, зомбі 3000 HP');
+console.log('▸ Старт Перевантаженого ПВП: 35x35, 2500 HP, гармата+меч, зомбі 3000 HP');
 await page.evaluate(() => window.__game.test.startOverloadedPvp());
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.pvp, null, { timeout: 30000 });
 const started = await page.evaluate(() => {

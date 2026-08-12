@@ -307,7 +307,7 @@ export class DynamicMissions {
       m.waveT = 0;
       m.zone = this._makeDefenseZone(m);
     } else if (type === 'hunt') {
-      m.title = t('Перемож 3 елітних зомбі');
+      m.title = t('Переможи 3 елітних зомбі');
       m.killed = 0;
       m.elites = this._spawnElites(m);
     } else if (type === 'nests' || type === 'bases') {
@@ -1110,7 +1110,7 @@ export class DynamicMissions {
       live.title = t('🎁 Заражений ящик! Відкрий і відбий охорону');
       live.prompt = t('Натисни {k} — відкрити заражений ящик', { k: interactKey() });
     } else {
-      live.title = t('🏆 Золота орда! Перемож хвилю за бонус');
+      live.title = t('🏆 Золота орда! Переможи хвилю за бонус');
       this._spawnLivingWorldWave(live, 7, true);
       live.state = 'fight';
     }

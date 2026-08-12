@@ -126,7 +126,7 @@ const SECONDARY_OBJECTIVES = [
     id: 'bossfast', ev: 'bossDied', icon: '⏱️', diffStar: 3, coop: true,
     target: () => 1, n: () => 9,
     gate: (level, n) => ((level.stats && level.stats.time) || 0) <= n * 60,
-    label: (n) => t('Перемож боса за {n} хвилин', { n }),
+    label: (n) => t('Переможи боса за {n} хвилин', { n }),
   },
   {
     id: 'pistol', ev: 'kill', icon: '🔫', diffStar: 3, coop: false,
@@ -139,7 +139,7 @@ const SECONDARY_OBJECTIVES = [
     id: 'nogadget', ev: 'bossDied', icon: '🧰', diffStar: 4, coop: false,
     target: () => 1,
     gate: (level) => !level.gadgetUsed,
-    label: () => t('Перемож боса без гаджета'),
+    label: () => t('Переможи боса без гаджета'),
   },
   {
     // поріг пострілів відсікає читерський «один влучний постріл = 100 %»

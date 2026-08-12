@@ -7,7 +7,7 @@ const check = makeCheck(() => failed++);
 await page.goto(`${BASE}/?test&fresh&seed=12`, { waitUntil: 'commit', timeout: 60000 });
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 
-console.log('▸ Перегружена оборона відкривається після 8 звільнених країн');
+console.log('▸ Перевантажена оборона відкривається після 8 звільнених країн');
 const menu = await page.evaluate(() => {
   const g = window.__game;
   const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
@@ -30,7 +30,7 @@ check(!menu.beforeExists, 'до 8 країн тумблера 💀 немає', 
 check(menu.afterExists, 'після 8 країн картка Оборони має тумблер 💀 Складно', JSON.stringify(menu));
 check(menu.normalExists && !menu.normalLockedAt8, 'звичайна Оборона відкрита разом із тумблером', JSON.stringify(menu));
 
-console.log('▸ Старт Перегруженої оборони: 500 HP вежі, 250 HP гравця, 3 хвилі');
+console.log('▸ Старт Перевантаженої оборони: 500 HP вежі, 250 HP гравця, 3 хвилі');
 await page.evaluate(() => window.__game.test.startOverloadedDefense());
 await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.defense, null, { timeout: 30000 });
 const started = await page.evaluate(() => {

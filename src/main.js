@@ -2434,14 +2434,14 @@ class Game {
 
   startOverloadedKnockout() {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast(t('💥🤝 Перегружений нокаут поки доступний тільки у соло.'));
+      this.hud.toast(t('💥🤝 Перевантажений нокаут поки доступний тільки у соло.'));
       this.audio.denied();
       return;
     }
     const lib = liberatedCount(this.save.liberated);
     if (lib < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES) {
       this.audio.denied();
-      this.hud.toast(t('💥 Перегружений нокаут відкриється після {n} звільнених країн!', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES }));
+      this.hud.toast(t('💥 Перевантажений нокаут відкриється після {n} звільнених країн!', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2472,14 +2472,14 @@ class Game {
 
   startOverloadedDefense() {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast(t('🏰🤝 Перегружена оборона поки доступна тільки у соло.'));
+      this.hud.toast(t('🏰🤝 Перевантажена оборона поки доступна тільки у соло.'));
       this.audio.denied();
       return;
     }
     const lib = liberatedCount(this.save.liberated);
     if (lib < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES) {
       this.audio.denied();
-      this.hud.toast(t('🏰 Перегружена оборона відкриється після {n} звільнених країн!', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES }));
+      this.hud.toast(t('🏰 Перевантажена оборона відкриється після {n} звільнених країн!', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2509,14 +2509,14 @@ class Game {
 
   startOverloadedPvp() {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast(t('💣🤝 Перегружене ПВП поки доступне тільки у соло.'));
+      this.hud.toast(t('💣🤝 Перевантажене ПВП поки доступне тільки у соло.'));
       this.audio.denied();
       return;
     }
     const lib = liberatedCount(this.save.liberated);
     if (lib < OVERLOADED_PVP_UNLOCK_COUNTRIES) {
       this.audio.denied();
-      this.hud.toast(t('💣 Перегружене ПВП відкриється після {n} звільнених країн!', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES }));
+      this.hud.toast(t('💣 Перевантажене ПВП відкриється після {n} звільнених країн!', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -2569,14 +2569,14 @@ class Game {
 
   startOverloadedHumans() {
     if (this.coop && this.coop.session.state !== 'idle') {
-      this.hud.toast(t('💥🤝 Перегружена зомбі проти людей поки доступна тільки у соло.'));
+      this.hud.toast(t('💥🤝 Перевантажений бій зомбі проти людей поки доступний тільки у соло.'));
       this.audio.denied();
       return;
     }
     const lib = liberatedCount(this.save.liberated);
     if (lib < OVERLOADED_HUMANS_UNLOCK_COUNTRIES) {
       this.audio.denied();
-      this.hud.toast(t('💥 Перегружена зомбі проти людей відкриється після {n} звільнених країн!', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES }));
+      this.hud.toast(t('💥 Перевантажений бій зомбі проти людей відкриється після {n} звільнених країн!', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES }));
       return;
     }
     this.audio.click();
@@ -3713,7 +3713,7 @@ class Game {
       : isWorldBoss
       ? t('🌋 СВІТОВИЙ БОС')
       : isPvp
-      ? (pvpVariant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП'))
+      ? (pvpVariant === 'overloaded' ? t('💣 Перевантажене ПВП') : t('⚔️ ПВП'))
       : isBank
       ? t('🏦 БАНК')
       : isPortal
@@ -3721,7 +3721,7 @@ class Game {
       : isMaze
       ? t('🧩 ЛАБІРИНТ')
       : isHumans
-      ? (isOverloadedHumans ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ'))
+      ? (isOverloadedHumans ? t('💥 Перевантажений бій зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ'))
       : isSoulCollector
       ? t('👻 ЗБИРАЧ ДУШ')
       : isTurretWar
@@ -3733,9 +3733,9 @@ class Game {
       : isCustomPlay
       ? t('🗺️ МОЯ КАРТА')
       : isDefense
-      ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА'))
+      ? (isZoneDefense ? t('⭕ Оборона в зоні') : isOverloadedDefense ? t('🏰 Перевантажена оборона') : t('🛡️ ОБОРОНА'))
       : isKnockout
-      ? (isFriendlyKnockout ? t('🤝 Дружній нокаут') : isOverloadedKnockout ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ'))
+      ? (isFriendlyKnockout ? t('🤝 Дружній нокаут') : isOverloadedKnockout ? t('💥 Перевантажений нокаут') : t('🥊 НОКАУТ'))
       : isArena
       ? t('👑 АРЕНА БОСІВ')
       : isStorm
@@ -4519,7 +4519,7 @@ class Game {
       this.hud.toast(t('Суперсила скінчилась'));
     });
     level.bus.on('gadgetUsed', (id) => {
-      level.gadgetUsed = true; // ⭐2 «Перемож боса без гаджета» — прапорець забігу (v750)
+      level.gadgetUsed = true; // ⭐2 «Переможи боса без гаджета» — прапорець забігу (v750)
       if (!level.playground && !level.noProgress) {
         this.save.stats.gadgetUses++;
         if (id === 'clone') this.save.stats.cloneUses++;
@@ -4709,7 +4709,7 @@ class Game {
       this._showOverlay('overlay-start');
     }
     const bannerSub = typeof country.banner === 'function' ? country.banner() : country.banner;
-    const bannerTitle = level.expedition ? t('🧭 ЕКСПЕДИЦІЯ · ЕТАП {n}/{all}', { n: level.expedition.step + 1, all: EXPEDITION_STEPS }) : level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перегружена зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перегружене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перегружена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перегружений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : level.storm ? t('⛈️ ШТОРМ') : `${country.flag} ${country.name.toUpperCase()}`;
+    const bannerTitle = level.expedition ? t('🧭 ЕКСПЕДИЦІЯ · ЕТАП {n}/{all}', { n: level.expedition.step + 1, all: EXPEDITION_STEPS }) : level.infected ? t('🧟 ГЛАВА 2: ЗАРАЖЕНА КРАЇНА') : level.worldBoss ? level.worldBoss.cfg.name() : level.radiation ? t('☢️ РАДІАЦІЯ') : level.soulCollector ? t('👻 ЗБИРАЧ ДУШ') : level.humans ? (level.humans.variant === 'overloaded' ? t('💥 Перевантажений бій зомбі проти людей') : t('⚔️ ЗОМБІ ПРОТИ ЛЮДЕЙ')) : level.turretwar ? t('🗼 ОБОРОНА ТУРЕЛІ') : level.maze ? t('🧩 ЛАБІРИНТ') : level.portal ? t('🌀 ПОРТАЛ') : level.bank ? t('🏦 БАНК') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('💣 Перевантажене ПВП') : t('⚔️ ПВП')) : level.defense ? (level.defense.variant === 'zone' ? t('⭕ Оборона в зоні') : level.defense.variant === 'overloaded' ? t('🏰 Перевантажена оборона') : t('🛡️ ОБОРОНА')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('🤝 Дружній нокаут') : level.knockout.variant === 'overloaded' ? t('💥 Перевантажений нокаут') : t('🥊 НОКАУТ')) : level.playground ? t('🧪 Полігон гаджетів') : level.storm ? t('⛈️ ШТОРМ') : `${country.flag} ${country.name.toUpperCase()}`;
     const bannerText = level.infected ? t('Темрява, сильніші вороги і додатковий робот. Очисти країну від зараження!') : level.worldBoss ? level.worldBoss.cfg.mechanic() : level.radiation ? t('50 HP, дробовик з 10 патронами і один зомбі на 500 HP. Перемога: +50 монет радіації.') : level.soulCollector ? t('20 привидів, 50 HP, посох і меч. Перемога дає 3 душі.') : level.humans ? (level.humans.variant === 'overloaded' ? t('45 клонів, 5 стрільців, 125 зомбі, 5 боксерів і робот 1795 HP.') : t('30 клонів проти 65 зомбі і робота. Поразка забирає 100 монет.')) : level.turretwar ? t('Знеси зомбі-турель молотом і роботом раніше, ніж впаде твоя! Хвилі зомбі кожні 10с.') : level.maze ? t('Знайди 3 ключі, відкрий вихід і виживи.') : level.portal ? t('Закрий 3 портали, поки вони випускають хвилі зомбі.') : level.bank ? t('Захисти свій банк і знищ банк зомбі. Кожні 5 секунд біля банку зомбі зʼявляються 5 зомбі.') : level.pvp ? (level.pvp.variant === 'overloaded' ? t('Гармата і меч проти зомбі на 3000 HP. У тебе 2500 HP і щит.') : t('Посох проти зомбі на 250 HP. У тебе 50 HP.')) : level.defense ? (level.defense.variant === 'zone' ? t('Протримайся 125 секунд у синьому колі.') : level.defense.variant === 'overloaded' ? t('3 хвилі. Захисти вежу 500 HP: у тебе 250 HP, у зомбі 234 HP.') : t('Захисти вежу: 250 HP, пістолет і автомат')) : level.knockout ? (level.knockout.variant === 'friendly' ? t('20 зомбі для гри з другом, тільки пістолет.') : level.knockout.variant === 'overloaded' ? t('20 зомбі, 150 HP, 1 пістолет, без магазину й гаджетів') : t('10 зомбі, 1 пістолет, без магазину й гаджетів')) : level.playground ? t('Спробуй будь-який гаджет без нагород і ризику') : level.storm ? t('Виживи у колі, що звужується. Рекорд — у Лігу!') : bannerSub;
     this.hud.banner(bannerTitle, bannerText, 4.5);
     // ⭐ тост складності: скрізь, де зірка діє (кампанія, «Живий фронт», кооп зі зіркою хоста)

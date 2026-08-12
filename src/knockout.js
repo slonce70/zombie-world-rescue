@@ -13,7 +13,7 @@ const KNOCKOUT_CONFIGS = {
     loadoutText: 'Тільки пістолет. Без магазину, гаджетів і бафів.',
   },
   overloaded: {
-    title: 'Перегружений нокаут',
+    title: 'Перевантажений нокаут',
     zombies: 20,
     playerHp: 150,
     loadoutText: '20 зомбі, 150 HP, тільки пістолет. Без магазину, гаджетів і бафів.',

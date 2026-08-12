@@ -18,23 +18,27 @@ export const SEASON_EPOCH_WEEK = 107697;
 
 // Пул завдань. metric — звідки читати поточне значення в сейві.
 // Кожне веде в СВІЙ режим, щоб сезон розганяв гравця по каталогу, а не по одному місцю.
+//
+// Формулювання: заголовок пишеться під СВІЙ target (title завжди кличеться як
+// def.title(def.target)), тому сходинки на одну перемогу просто не показують число —
+// дитина читає живу фразу, а не «1 раз(и)». Міняєш target — переписуй і фразу.
 export const SEASON_POOL = [
-  { id: 'knockout1', icon: '🥊', metric: 'mode', mode: 'knockout', target: 1, title: (n) => t('Перемож у Нокауті {n} раз(и)', { n }) },
-  { id: 'defense1', icon: '🛡️', metric: 'mode', mode: 'defense', target: 1, title: (n) => t('Витримай Оборону {n} раз(и)', { n }) },
-  { id: 'zone2', icon: '⭕', metric: 'mode', mode: 'zone-defense', target: 2, title: (n) => t('Утримай зону {n} раз(и)', { n }) },
-  { id: 'portal1', icon: '🌀', metric: 'mode', mode: 'portal', target: 1, title: (n) => t('Закрий портали {n} раз(и)', { n }) },
-  { id: 'maze1', icon: '🧩', metric: 'mode', mode: 'maze', target: 1, title: (n) => t('Пройди Лабіринт {n} раз(и)', { n }) },
-  { id: 'bank1', icon: '🏦', metric: 'mode', mode: 'bank', target: 1, title: (n) => t('Захисти Банк {n} раз(и)', { n }) },
-  { id: 'pvp1', icon: '⚔️', metric: 'mode', mode: 'pvp', target: 1, title: (n) => t('Виграй дуель {n} раз(и)', { n }) },
-  { id: 'turretwar1', icon: '🗼', metric: 'mode', mode: 'turretwar', target: 1, title: (n) => t('Відстій турель {n} раз(и)', { n }) },
-  { id: 'radiation1', icon: '☢️', metric: 'mode', mode: 'radiation', target: 1, title: (n) => t('Виживи в Радіації {n} раз(и)', { n }) },
-  { id: 'humans1', icon: '🧍', metric: 'mode', mode: 'humans', target: 1, title: (n) => t('Приведи людей до перемоги {n} раз(и)', { n }) },
-  { id: 'souls1', icon: '👻', metric: 'mode', mode: 'soul-collector', target: 1, title: (n) => t('Збери душі {n} раз(и)', { n }) },
-  { id: 'storm1', icon: '⛈️', metric: 'mode', mode: 'storm', target: 1, title: (n) => t('Переживи Шторм {n} раз(и)', { n }) },
+  { id: 'knockout1', icon: '🥊', metric: 'mode', mode: 'knockout', target: 1, title: () => t('Виграй бій у Нокауті') },
+  { id: 'defense1', icon: '🛡️', metric: 'mode', mode: 'defense', target: 1, title: () => t('Витримай Оборону') },
+  { id: 'zone2', icon: '⭕', metric: 'mode', mode: 'zone-defense', target: 2, title: (n) => t('Утримай зону {n} рази', { n }) },
+  { id: 'portal1', icon: '🌀', metric: 'mode', mode: 'portal', target: 1, title: () => t('Закрий портали') },
+  { id: 'maze1', icon: '🧩', metric: 'mode', mode: 'maze', target: 1, title: () => t('Пройди Лабіринт') },
+  { id: 'bank1', icon: '🏦', metric: 'mode', mode: 'bank', target: 1, title: () => t('Захисти Банк') },
+  { id: 'pvp1', icon: '⚔️', metric: 'mode', mode: 'pvp', target: 1, title: () => t('Виграй дуель') },
+  { id: 'turretwar1', icon: '🗼', metric: 'mode', mode: 'turretwar', target: 1, title: () => t('Захисти турель від зомбі') },
+  { id: 'radiation1', icon: '☢️', metric: 'mode', mode: 'radiation', target: 1, title: () => t('Виживи в Радіації') },
+  { id: 'humans1', icon: '🧍', metric: 'mode', mode: 'humans', target: 1, title: () => t('Приведи людей до перемоги') },
+  { id: 'souls1', icon: '👻', metric: 'mode', mode: 'soul-collector', target: 1, title: () => t('Збери душі') },
+  { id: 'storm1', icon: '⛈️', metric: 'mode', mode: 'storm', target: 1, title: () => t('Переживи Шторм') },
   { id: 'country1', icon: '🌍', metric: 'liberated', target: 1, title: (n) => t('Звільни {n} країну', { n }) },
-  { id: 'kills300', icon: '🧟', metric: 'kills', target: 300, title: (n) => t('Перемож {n} зомбі', { n }) },
+  { id: 'kills300', icon: '🧟', metric: 'kills', target: 300, title: (n) => t('Переможи {n} зомбі', { n }) },
   { id: 'friend1', icon: '🤝', metric: 'friends', target: 1, title: (n) => t('Визволь {n} друга з клітки', { n }) },
-  { id: 'arena1', icon: '👑', metric: 'mode', mode: 'arena', target: 1, title: (n) => t('Пройди Арену босів {n} раз(и)', { n }) },
+  { id: 'arena1', icon: '👑', metric: 'mode', mode: 'arena', target: 1, title: () => t('Пройди Арену босів') },
 ];
 
 // 💎 нагорода сходинки: росте до кінця сезону, кожна четверта дає яйце петса

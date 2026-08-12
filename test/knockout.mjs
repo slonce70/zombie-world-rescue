@@ -34,7 +34,7 @@ check(menuLock.beforeExists && !menuLock.beforeLocked, 'режим доступ�
 check(menuLock.afterExists && !menuLock.afterLocked && menuLock.passLevel >= 20,
   'режим лишається доступним і на 20 рівні', JSON.stringify(menuLock));
 
-console.log('▸ Тумблер 💀 Перегруженого Нокауту зʼявляється після 8 звільнених країн');
+console.log('▸ Тумблер 💀 Перевантаженого Нокауту зʼявляється після 8 звільнених країн');
 const overloadedMenu = await page.evaluate(() => {
   const g = window.__game;
   const seven = { UKR: true, POL: true, DEU: true, FRA: true, ESP: true, PRT: true, ITA: true };
@@ -97,7 +97,7 @@ const buffs = await page.evaluate(() => {
 });
 check(Object.values(buffs).every((n) => n === 0), 'бафи в Нокауті не застосовуються', JSON.stringify(buffs));
 
-console.log('▸ Старт Перегруженого Нокауту: 20 зомбі і 150 HP');
+console.log('▸ Старт Перевантаженого Нокауту: 20 зомбі і 150 HP');
 await page.evaluate(async () => {
   const g = window.__game;
   g.endLevel();

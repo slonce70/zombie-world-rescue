@@ -28,7 +28,7 @@ const TYPE_INFO = Object.freeze({
   zombie: { icon: '🧟', name: 'Зомбі', radius: CUSTOM_MAP_RADII.zombie },
   rock: { icon: '🪨', name: 'Камінь', radius: CUSTOM_MAP_RADII.rock },
   task: { icon: '⭐', name: 'Завдання', radius: CUSTOM_MAP_RADII.task },
-  airdrop: { icon: '🪂', name: 'Аірдроп', radius: CUSTOM_MAP_RADII.airdrop, plus: true, max: CUSTOM_MAP_TYPE_LIMITS.airdrop },
+  airdrop: { icon: '🪂', name: 'Ящик з парашутом', radius: CUSTOM_MAP_RADII.airdrop, plus: true, max: CUSTOM_MAP_TYPE_LIMITS.airdrop },
   church: { icon: '⛪', name: 'Церква', radius: CUSTOM_MAP_RADII.church, plus: true, max: CUSTOM_MAP_TYPE_LIMITS.church },
   largehouse: { icon: '🏘️', name: 'Велика хата', radius: CUSTOM_MAP_RADII.largehouse, max: CUSTOM_MAP_TYPE_LIMITS.largehouse },
 });
@@ -38,7 +38,7 @@ const QUEST_INFO = Object.freeze({
   collect: { icon: '📦', title: 'Збери 4 ящики припасів', total: 4 },
   repair: { icon: '📡', title: 'Полагодь радіовежу', total: 1 },
   lights: { icon: '🔦', title: 'Засвіти 3 ліхтарі', total: 3 },
-  elites: { icon: '👹', title: 'Перемож 3 елітних зомбі', total: 3 },
+  elites: { icon: '👹', title: 'Переможи 3 елітних зомбі', total: 3 },
   warehouse: { icon: '🏭', title: 'Зачисть склад від зомбі', total: 8 },
   rebuild: { icon: '🏗️', title: 'Знайди сокиру й кірку та віднови центр міста', total: 3, plus: true },
 });
@@ -290,7 +290,7 @@ export class CustomMapMode {
     if (result.code === 'object_limit') return t('Ліміт карти: {n} обʼєктів', { n: this.maxObjects });
     if (result.code === 'task_limit') return t('На карті може бути максимум 3 завдання');
     if (result.code === 'type_limit') {
-      return t(candidate.type === 'airdrop' ? 'На карті може бути максимум 2 аірдропи'
+      return t(candidate.type === 'airdrop' ? 'На карті може бути максимум 2 ящики з парашутом'
         : candidate.type === 'church' ? 'На карті може бути максимум 1 церква' : 'На карті може бути максимум 5 великих хат');
     }
     if (result.code === 'spawn') return t('Залиш місце для появи гравця');
@@ -469,7 +469,7 @@ export class CustomMapMode {
     return holders;
   }
 
-  // аірдроп custom-карти дає ЛИШЕ run-local патрони і лікування — жодних монет і прогресу
+  // ящик з парашутом на custom-карті дає ЛИШЕ run-local патрони і лікування — жодних монет і прогресу
   _openAirdrop(drop, { local = true } = {}) {
     if (drop.opened) return false;
     drop.opened = true;
@@ -479,7 +479,7 @@ export class CustomMapMode {
       this.level.player.addAmmo(30);
       this.level.player.heal(30);
       this.level.audio.pickup();
-      this.level.game.hud.toast(t('🪂 Аірдроп: +30 патронів · +30 здоровʼя'));
+      this.level.game.hud.toast(t('🪂 Ящик з парашутом: +30 патронів · +30 здоровʼя'));
     }
     return true;
   }
@@ -494,7 +494,7 @@ export class CustomMapMode {
     const level = this.level;
     if (d.a === 'airdrop') {
       const drop = this.airdrops[index];
-      // ефекти аірдропа лишаються в гостя (він застосував їх локально) —
+      // ефекти ящика з парашутом лишаються в гостя (він застосував їх локально) —
       // авторитет лише фіксує сам факт відкриття у спільному стані
       if (drop && !drop.opened && near(drop.x, drop.z, 3.5)) this._openAirdrop(drop, { local: false });
       return;
@@ -574,12 +574,12 @@ export class CustomMapMode {
     }
     for (const [index, drop] of this.airdrops.entries()) {
       if (drop.opened || !near(drop, 3.5)) continue;
-      this.prompt = { text: t('Натисни {k} — відкрити аірдроп', { k: interactKey() }), hold: false };
+      this.prompt = { text: t('Натисни {k} — відкрити ящик з парашутом', { k: interactKey() }), hold: false };
       if (pressE) {
         player.addAmmo(30);
         player.heal(30);
         level.audio.pickup();
-        level.game.hud.toast(t('🪂 Аірдроп: +30 патронів · +30 здоровʼя'));
+        level.game.hud.toast(t('🪂 Ящик з парашутом: +30 патронів · +30 здоровʼя'));
         send('airdrop', { i: index });
       }
     }
@@ -681,7 +681,7 @@ export class CustomMapMode {
     }
     for (const drop of this.airdrops) {
       if (drop.opened || Math.hypot(this.level.player.pos.x - drop.x, this.level.player.pos.z - drop.z) >= 3.5) continue;
-      this.prompt = { text: t('Натисни {k} — відкрити аірдроп', { k: interactKey() }), hold: false };
+      this.prompt = { text: t('Натисни {k} — відкрити ящик з парашутом', { k: interactKey() }), hold: false };
       if (allowControl && input.pressed('KeyE')) {
         this._openAirdrop(drop);
         input.justPressed.delete('KeyE');

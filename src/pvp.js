@@ -16,7 +16,7 @@ const PVP_CONFIGS = {
     zombieZ: -8,
   },
   overloaded: {
-    title: 'Перегружене ПВП',
+    title: 'Перевантажене ПВП',
     roomSize: 35,
     zombieType: 'robot',
     zombieHp: 3000,

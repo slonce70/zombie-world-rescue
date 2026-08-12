@@ -9,7 +9,7 @@ const HUMANS_ROOM_CENTER = { x: 1400, z: 0 };
 const CLONE_FOOT_LIFT = 0.16;
 const HUMANS_CFG = {
   normal: { title: 'ЗОМБІ ПРОТИ ЛЮДЕЙ', clones: 30, shooters: 0, zombies: 65, boxers: 0, robotHp: null },
-  overloaded: { title: 'Перегружена зомбі проти людей', clones: 45, shooters: 5, zombies: 125, boxers: 5, robotHp: 1795 },
+  overloaded: { title: 'Перевантажений бій зомбі проти людей', clones: 45, shooters: 5, zombies: 125, boxers: 5, robotHp: 1795 },
 };
 
 export class HumansMode {

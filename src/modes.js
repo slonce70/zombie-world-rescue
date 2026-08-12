@@ -203,7 +203,7 @@ export const SOLO_MODES = [
     start: (game) => game.startSoulCollector(),
   },
   {
-    id: 'overloaded-knockout', icon: '💥', name: () => t('Перегружений нокаут'),
+    id: 'overloaded-knockout', icon: '💥', name: () => t('Перевантажений нокаут'),
     locked: ({ libN }) => libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_KNOCKOUT_UNLOCK_COUNTRIES, c: libN })
@@ -229,7 +229,7 @@ export const SOLO_MODES = [
     start: (game) => game.startTurretWar(),
   },
   {
-    id: 'overloaded-defense', icon: '🏰', name: () => t('Перегружена оборона'),
+    id: 'overloaded-defense', icon: '🏰', name: () => t('Перевантажена оборона'),
     locked: ({ libN }) => libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_DEFENSE_UNLOCK_COUNTRIES
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_DEFENSE_UNLOCK_COUNTRIES, c: libN })
@@ -237,7 +237,7 @@ export const SOLO_MODES = [
     start: (game) => game.startOverloadedDefense(),
   },
   {
-    id: 'overloaded-pvp', icon: '💣', name: () => t('Перегружене ПВП'),
+    id: 'overloaded-pvp', icon: '💣', name: () => t('Перевантажене ПВП'),
     locked: ({ libN }) => libN < OVERLOADED_PVP_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_PVP_UNLOCK_COUNTRIES
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_PVP_UNLOCK_COUNTRIES, c: libN })
@@ -269,7 +269,7 @@ export const SOLO_MODES = [
     start: (game) => game.startHumans(),
   },
   {
-    id: 'overloaded-humans', icon: '💥', name: () => t('Перегружена зомбі проти людей'),
+    id: 'overloaded-humans', icon: '💥', name: () => t('Перевантажений бій зомбі проти людей'),
     locked: ({ libN }) => libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES,
     desc: ({ libN }) => libN < OVERLOADED_HUMANS_UNLOCK_COUNTRIES
       ? t('Відкриється після {n} звільнених країн (у тебе: {c})', { n: OVERLOADED_HUMANS_UNLOCK_COUNTRIES, c: libN })

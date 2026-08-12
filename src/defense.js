@@ -17,7 +17,7 @@ const DEFENSE_CONFIGS = {
     loadoutText: 'Пістолет і автомат. Без магазину, гаджетів і бафів.',
   },
   overloaded: {
-    title: 'Перегружена оборона',
+    title: 'Перевантажена оборона',
     towerHp: 500,
     waveSizes: [7, 7, 6],
     zombieHp: 234,
