@@ -17,6 +17,27 @@ function safeHudText(s, max) {
   return nickIsBad(x) ? '' : x;
 }
 
+// 🔢 число ВІД ХОСТА: скінченне і в межах, інакше — безпечний дефолт (не виняток:
+// кооп не має рватись через один кривий пакет). Дзеркало clampDmg/clampChill з
+// host.js, але для напрямку хост→гість: частина цих чисел тече в game.save, а
+// звідти в хмару (net/cloudsave.js) — зіпсований сейв переживе забіг назавжди.
+export function hostNum(v, min, max, def = 0) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return def;
+  return n < min ? min : n > max ? max : n;
+}
+export const hostInt = (v, min, max, def = 0) => Math.round(hostNum(v, min, max, def));
+
+const MAX_DMG = 2000;      // як clampDmg у host.js
+const MAX_HEAL = 1000;     // найбільша чесна аптечка — 30
+const MAX_STUN = 5;        // секунди; Infinity = вічний параліч
+const MAX_POS = 5000;      // мапа на порядок менша
+const MAX_COINS = 5000;    // найщедріша чесна виплата (бос-раш/хвиля шторму) — сотні
+const MAX_PICKUP = 1000;   // монета 5, броня 40, набої 30
+const MAX_TIME = 86400;    // секунди забігу; йде в рекорди шторму/арени
+const MAX_COUNT = 9999;    // лічильники для HUD (зомбі в хорді/хвилі)
+const MAX_WAVE = 999;      // хвиля шторму / номер боса — теж у сейв (stormBest)
+
 export class GuestNet {
   constructor(session, level, spec) {
     this.session = session;
@@ -162,14 +183,16 @@ export class GuestNet {
       case 'hurt': {
         const p = this.level.player;
         if (p && p.health > 0) {
-          p.takeDamage(d.dmg, d.fx, d.fz);
-          if (d.stun && p.health > 0) p.stunT = Math.max(p.stunT || 0, d.stun);
+          // шкода/напрямок/паралізація від хоста: сміття → 0 (удар без наслідків),
+          // а не NaN у здоровʼї героя, після якого HUD і смерть ламаються назавжди
+          p.takeDamage(hostInt(d.dmg, 0, MAX_DMG), hostNum(d.fx, -MAX_POS, MAX_POS), hostNum(d.fz, -MAX_POS, MAX_POS));
+          if (d.stun && p.health > 0) p.stunT = Math.max(p.stunT || 0, hostNum(d.stun, 0, MAX_STUN));
         }
         return true;
       }
       case 'healed': {
         const p = this.level.player;
-        if (p) p.heal(d.amt);
+        if (p) p.heal(hostInt(d.amt, 0, MAX_HEAL));
         return true;
       }
       case 'revived': {
@@ -194,14 +217,17 @@ export class GuestNet {
   _applySnapshot(s) {
     // відкидаємо застарілі/позачергові снапшоти (окремі ~100мс пачки, гонка під час reconnect),
     // щоб позиції/HP/час не «відкочувались» назад
-    if (s.n != null) {
+    // seq мусить бути числом: NaN отруїв би порівняння назавжди, а Infinity
+    // «заморозив» би гостя (кожен наступний чесний снапшот здавався б старим)
+    if (Number.isFinite(s.n)) {
       if (this._lastSnapSeq != null && s.n <= this._lastSnapSeq) return;
       this._lastSnapSeq = s.n;
     }
     this.lastSnapAt = performance.now();
     this.lost = false;
     const level = this.level;
-    level.stats.time = s.tm;
+    // час забігу йде в рекорди (save.stormBest / save.arenaBest) — не довіряємо наосліп
+    level.stats.time = hostNum(s.tm, 0, MAX_TIME);
     const me = this.myPid();
     const seen = new Set();
     for (const t of s.pl) {
@@ -221,7 +247,7 @@ export class GuestNet {
     // безпечно виводиться з progress≥target, щоб ⭐2 зарахувалась на перемозі.
     if (s.so != null && level.secondaryObjective) {
       const so = level.secondaryObjective;
-      so.progress = Math.min(so.target, s.so | 0);
+      so.progress = hostInt(s.so, 0, so.target);
       if (so.progress >= so.target) so.done = true;
     }
     if (s.ball && level.effects.ball) {
@@ -232,17 +258,27 @@ export class GuestNet {
     }
     if (s.h) {
       level.zombies.hordeActive = !!s.h[0];
-      level.zombies.hordeRemaining = s.h[1];
+      level.zombies.hordeRemaining = hostInt(s.h[1], 0, MAX_COUNT);
     }
+    // ⛈️ шторм: st[3] (хвиля) їде в save.stormBest, у віхи-нагороди й у XP —
+    // клампимо ДО applyNet, бо далі число живе вже як «своє»
     if (s.st && level.storm && level.storm.applyNet) {
-      level.storm.applyNet(s.st);
+      level.storm.applyNet([
+        hostNum(s.st[0], 0, 1000, 1000), // радіус кола: сміття → велике коло (шкоди поза колом не буде)
+        s.st[1],
+        hostNum(s.st[2], 0, 3600),
+        hostInt(s.st[3], 0, MAX_WAVE),
+        hostInt(s.st[4], 0, MAX_COUNT),
+        s.st[5],
+      ]);
       if (s.st[5] === 1 && !this._endedRun) {
         this._endedRun = true;
         this.game._endStormRun();
       }
     }
+    // 👑 арена: br[0] (скільки босів пройдено) — це XP наприкінці забігу
     if (s.br && level.bossRush) {
-      level.bossRush.applyNet(s.br);
+      level.bossRush.applyNet([hostInt(s.br[0], 0, MAX_WAVE), s.br[1], hostNum(s.br[2], 0, 3600), s.br[3]]);
       if (s.br[3] === 1 && !this._endedRun) {
         this._endedRun = true;
         this.game._endArenaRun();
@@ -254,9 +290,10 @@ export class GuestNet {
   // доставка тієї самої пачки (reconnect) не має кредитувати нагороду двічі. seq без
   // значення (старий формат/сміття) — пропускаємо грант як раніше, без дедуплікації.
   _chestEvOnce(kind, seq) {
-    if (!Number.isFinite(seq)) return true;
+    const n = Number(seq);
+    if (!Number.isFinite(n)) return true;
     if (!this._seenChestEv) this._seenChestEv = new Set();
-    const key = `${kind}:${seq}`;
+    const key = `${kind}:${n}`;
     if (this._seenChestEv.has(key)) return false;
     this._seenChestEv.add(key);
     return true;
@@ -284,12 +321,14 @@ export class GuestNet {
         if (zr) level.effects.totemBurst(new THREE.Vector3(zr.x, zr.y + 1.2, zr.z));
         break;
       }
-      case 'it': level.effects.spawnNetItem(a[0], a[1], a[2], a[3], a[4], a[5], a[6]); break;
+      // цінність предмета лежить у гостя до підбору (пес/помічник збирає локально) — клампимо на вході
+      case 'it': level.effects.spawnNetItem(a[0], a[1], a[2], a[3], a[4], hostInt(a[5], 0, MAX_PICKUP), a[6]); break;
       case 'lt': {
         const item = level.effects.removeItemByNid(a[0]);
         // подія могла продублюватись (reconnect/повторна пачка) — кредитуємо ЛИШЕ якщо предмет ще існував,
-        // інакше монета/аптечка/набої/зброя зарахувалися б удруге з одного підбору
-        if (item && a[1] === me && level.effects.onPickup) level.effects.onPickup(a[2], a[3]);
+        // інакше монета/аптечка/набої/зброя зарахувалися б удруге з одного підбору.
+        // a[3] — цінність: для монети це +save.coins, тож стеля обовʼязкова
+        if (item && a[1] === me && level.effects.onPickup) level.effects.onPickup(a[2], hostInt(a[3], 0, MAX_PICKUP));
         else if (item && a[2] === 'coin') level.audio.coin();
         break;
       }
@@ -339,7 +378,8 @@ export class GuestNet {
         break;
       }
       case 'md': {
-        if (level.missions.netMissionDone) level.missions.netMissionDone(a[0], a[1], a[2]);
+        // a[1] — нагорода місії, і вона йде прямо в save.coins (missionpool: addCoins(reward))
+        if (level.missions.netMissionDone) level.missions.netMissionDone(a[0], hostInt(a[1], 0, MAX_COINS), a[2]);
         break;
       }
       case 'mb': {
@@ -405,7 +445,7 @@ export class GuestNet {
         break;
       }
       case 'hw': level.bus.emit('hordeWarning', 5); break;
-      case 'hs': level.audio.horde(); level.bus.emit('hordeStart', a[0]); break;
+      case 'hs': level.audio.horde(); level.bus.emit('hordeStart', hostInt(a[0], 0, MAX_COUNT)); break;
       case 'he': level.bus.emit('hordeEnd'); break;
       case 'proj': {
         level.effects.spawnProjectile(
@@ -426,8 +466,8 @@ export class GuestNet {
         break;
       }
       case 'sbb': {
-        // міні-бос шторму (на майбутнє) / святковий бонус
-        level.addCoins(a[0] || 120);
+        // міні-бос шторму (на майбутнє) / святковий бонус — теж прямо в save.coins
+        level.addCoins(hostInt(a[0], 0, MAX_COINS, 120));
         break;
       }
       default: break;
@@ -441,13 +481,13 @@ export class GuestNet {
     this._lastSnapSeq = null;
     // скидаємо прапорець завершення рану, щоб реконект-гість сходився до фінального екрана
     this._endedRun = false;
-    level.stats.time = st.tm || 0;
+    level.stats.time = hostNum(st.tm, 0, MAX_TIME);
     // зомбі
     level.zombies.clearAllPuppets();
     for (const [nid, type, x, z, o] of st.zoms) level.zombies.spawnPuppet(nid, type, x, z, o);
     // предмети
     level.effects.clearNetItems();
-    for (const [nid, kind, x, z, y, value, life] of st.items) level.effects.spawnNetItem(nid, kind, x, z, y, value, life);
+    for (const [nid, kind, x, z, y, value, life] of st.items) level.effects.spawnNetItem(nid, kind, x, z, y, hostInt(value, 0, MAX_PICKUP), life);
     // світ
     const w = st.world;
     if (w.barn) { level.world.openBarn(); if (level.missions.netBarnOpened) level.missions.netBarnOpened(true); }
@@ -491,7 +531,7 @@ export class GuestNet {
         level.secondaryObjective = so;
       }
       if (so) {
-        so.progress = Math.min(so.target, st.so[2] | 0);
+        so.progress = hostInt(st.so[2], 0, so.target);
         so.done = !!st.so[3];
       }
     }
