@@ -147,6 +147,20 @@ export function saveHasProgress(s) {
     || (Array.isArray(s.weapons) && s.weapons.some((id) => id !== 'pistol')); // здобута/розблокована зброя
 }
 
+// 🧳 Що дитина реально втратить, якщо накотити сюди гру з іншого пристрою.
+// Тільки видиме й дороге — країни, монети, зірки, улюбленці: попередження мусить
+// називати конкретні речі, які шкода, а не «весь прогрес». Чисті дані: назви
+// петів і переклад підставляє UI (saveui.js).
+export function progressLoss(save) {
+  const s = save && typeof save === 'object' ? save : {};
+  return {
+    countries: liberatedCount(s.liberated),
+    coins: s.coins | 0,
+    stars: Object.values(s.stars || {}).reduce((sum, v) => sum + (v | 0), 0),
+    pets: Array.isArray(s.pets) ? s.pets.slice() : [],
+  };
+}
+
 export class CloudSave {
   constructor(game) {
     this.game = game;

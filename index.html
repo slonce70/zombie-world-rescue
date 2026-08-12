@@ -539,27 +539,56 @@
     </div>
   </div>
 
-  <!-- Мій прогрес: хмарний сейв, код відновлення, файл-копія -->
+  <!-- Моя гра всюди: хмарний сейв, код переїзду, файл-копія -->
   <div id="overlay-progress" class="overlay">
     <div class="overlay-card panel-card">
       <div class="panel-header">
-        <h2>💾 МІЙ ПРОГРЕС</h2>
+        <h2>💾 МОЯ ГРА ВСЮДИ</h2>
         <button class="btn-x panel-close" data-close="overlay-progress">✕</button>
       </div>
-      <p class="panel-sub">Прогрес сам летить у хмару. Запиши свій код відновлення — і повернеш гру на будь-якому пристрої!</p>
+      <p class="panel-sub">Грай на планшеті, а потім на компі — це буде та сама гра. Твої країни, монети й улюбленці переїдуть за одним кодом із 8 знаків.</p>
       <div id="cloud-status" class="cloud-status"></div>
-      <div class="progress-row">
-        <button id="btn-cloud-code" class="btn">🔑 Мій код відновлення</button>
-        <div id="cloud-code" class="cloud-code"></div>
+
+      <div id="progress-steps">
+        <div class="transfer-step">
+          <div class="step-title">1. ТУТ, НА ЦЬОМУ ПРИСТРОЇ</div>
+          <p class="step-text">Візьми свій код і запиши його на папірці або покажи мамі чи татові. Це ключ від твоєї гри — стороннім не давай.</p>
+          <div class="progress-row">
+            <button id="btn-cloud-code" class="btn btn-primary">🔑 Показати мій код</button>
+            <div id="cloud-code" class="cloud-code"></div>
+            <button id="btn-cloud-copy" class="btn" hidden>📋 Скопіювати</button>
+          </div>
+        </div>
+
+        <div class="transfer-step">
+          <div class="step-title">2. НА ІНШОМУ ПРИСТРОЇ</div>
+          <p class="step-text">Відкрий там гру, зайди в це саме віконце й набери код. Твоя гра переїде туди — а тут вона теж залишиться.</p>
+          <div class="progress-row">
+            <input id="cloud-code-input" class="coop-input" maxlength="9" placeholder="КОД (8 знаків)" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <button id="btn-cloud-claim" class="btn">📥 Перенести гру сюди</button>
+          </div>
+        </div>
+
+        <div class="transfer-extra">
+          <div class="step-title">📁 ЩЕ Й КОПІЯ У ФАЙЛ</div>
+          <div class="progress-row">
+            <button id="btn-save-export" class="btn">⬇️ Копія у файл</button>
+            <button id="btn-save-import" class="btn">⬆️ Відновити з файлу</button>
+            <input id="save-file-input" type="file" accept=".json,application/json" style="display:none">
+          </div>
+        </div>
       </div>
-      <div class="progress-row">
-        <input id="cloud-code-input" class="coop-input" maxlength="9" placeholder="КОД (8 знаків)" autocomplete="off">
-        <button id="btn-cloud-claim" class="btn">📥 Відновити за кодом</button>
-      </div>
-      <div class="progress-row">
-        <button id="btn-save-export" class="btn">⬇️ Копія у файл</button>
-        <button id="btn-save-import" class="btn">⬆️ Відновити з файлу</button>
-        <input id="save-file-input" type="file" accept=".json,application/json" style="display:none">
+
+      <!-- ✋ Головне місце панелі: дитина мусить побачити, ЩО САМЕ зникне, ДО заміни -->
+      <div id="progress-warn" class="transfer-warn" hidden>
+        <div class="warn-title">✋ ЗАЧЕКАЙ! ТУТ УЖЕ Є ТВОЯ ГРА</div>
+        <p class="warn-text">Якщо перенести сюди іншу гру, ось що зникне з цього пристрою назавжди:</p>
+        <ul id="progress-warn-list" class="warn-list"></ul>
+        <p id="progress-warn-ask" class="warn-ask"></p>
+        <div class="progress-row">
+          <button id="btn-progress-keep" class="btn btn-primary">↩️ Ні, залишити цю гру</button>
+          <button id="btn-progress-replace" class="btn btn-danger">🗑️ Так, замінити</button>
+        </div>
       </div>
     </div>
   </div>
