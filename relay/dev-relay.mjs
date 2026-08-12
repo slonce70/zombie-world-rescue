@@ -78,6 +78,24 @@ function recordDayScore(now, nick, score) {
   list.sort((a, b) => b.score - a.score);
   lobbyTop3 = list.slice(0, 3);
 }
+// 🌍 лічильник світу (дзеркало Lobby DO): скільки людей врятували сьогодні.
+// Стелі — ті самі, що у воркері; тут усе в памʼяті, бо dev-relay і так без сховища.
+const SAVED_PER_PING = 60;
+const SAVED_PER_DAY = 500;
+let lobbySaved = 0;
+let lobbySavedDay = '';
+let lobbySavedByCid = new Map();
+function recordSaved(now, cid, raw) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (day !== lobbySavedDay) { lobbySavedDay = day; lobbySaved = 0; lobbySavedByCid = new Map(); }
+  const already = lobbySavedByCid.get(cid) | 0;
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n <= 0) return;
+  const add = Math.max(0, Math.min(n, SAVED_PER_PING, SAVED_PER_DAY - already));
+  if (!add) return;
+  lobbySavedByCid.set(cid, already + add);
+  lobbySaved += add;
+}
 
 function lobbyView(now) {
   for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
@@ -88,10 +106,13 @@ function lobbyView(now) {
   }
   const day = new Date(now).toISOString().slice(0, 10);
   if (day !== lobbyTop3Day) { lobbyTop3Day = day; lobbyTop3 = []; } // добова ротація як у DO
+  if (day !== lobbySavedDay) { lobbySavedDay = day; lobbySaved = 0; lobbySavedByCid = new Map(); }
   return {
     online: lobbyPlayers.size,
     today: lobbyToday.size,
     top3: lobbyTop3,
+    worldSaved: lobbySaved,
+    worldSavedWeek: lobbySaved, // dev-relay історії не тримає: тиждень = сьогодні
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
     profiles: [...lobbyProfiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
@@ -110,6 +131,7 @@ function lobbyPing(d) {
   lobbyProfiles.set(cid, cleanProfileSrv(nick, d.profile, now));
   recordToday(now, cid);
   if (d.day && typeof d.day === 'object') recordDayScore(now, d.day.nick || nick, d.day.score);
+  if (d.saved) recordSaved(now, cid, d.saved);
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);
     const r = lobbyRooms.get(code);

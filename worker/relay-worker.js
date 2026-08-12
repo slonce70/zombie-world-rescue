@@ -339,6 +339,28 @@ const LOBBY_TTL = 40_000;
 const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
   'front', 'community-map', 'friendly-knockout', 'friendly-defense', 'friendly-zone-defense', 'weekly-coop']);
 
+// 🌍 «Скільки людей світ урятував сьогодні» — публічне число на глобусі, тож клієнт
+// тут НЕДОВІРЕНЕ джерело (як гість для хоста): усе клампиться на боці воркера.
+//
+// Стеля на ОДИН пінг виведена з гри, а не зі стелі. За один рівень фізично рятується
+// щонайбільше 11 людей: хлів/місячний модуль `rescue` — 3 (spawnCivilians),
+// підземелля замку `castle` — 3 (_rescueCastlePeople), маєток `manor` — 5
+// (_spawnManorCivilians); корабель TUR і музиканти — теж по 3. Найдовший забіг —
+// експедиція з EXPEDITION_STEPS = 5 етапів → 5 × 11 = 55. Округлено вгору до 60,
+// щоб чесний гравець ніколи не впирався, навіть якщо клієнт шле внесок раз на забіг.
+export const SAVED_PER_PING = 60;
+// Стеля на добу з одного cid: 45 забігів по 11 людей — це вже ~4 години суцільної гри,
+// більше за реальний день дитини. Округлено до 500.
+export const SAVED_PER_DAY = 500;
+const SAVED_WEEK_DAYS = 7;
+// Скільки з цього пінгу справді зарахувати: сміття → 0, забагато → стеля,
+// вичерпана добова квота cid → 0. Чиста функція — її й перевіряє юніт.
+export function clampSaved(raw, already) {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.max(0, Math.min(n, SAVED_PER_PING, SAVED_PER_DAY - Math.max(0, already | 0)));
+}
+
 export class Lobby {
   constructor(state) {
     this.state = state;
@@ -356,6 +378,11 @@ export class Lobby {
     this._top3 = [];        // [{nick, score}] відсортовано за спаданням
     this._top3Day = '';     // яку добу тримає кеш
     this._top3Loaded = false;
+    // 🌍 лічильник світу: ще одне поле тієї самої добової комірки day:<UTC-дата>.
+    this._saved = 0;              // скільки людей врятовано сьогодні (кеш комірки)
+    this._savedByCid = new Map(); // cid -> зараховано сьогодні; дзеркало ключів sv:<день>:<cid>
+    this._savedWeek = {};         // день -> підсумок, останні 7 діб (щоб клієнт мав ціль тижня)
+    this._savedQueue = null;      // хвіст черги внесків (див. _recordSaved)
   }
 
   _dayKey(now) {
@@ -383,14 +410,59 @@ export class Lobby {
 
   async _readTop3(day) {
     const stored = await this.state.storage.get('day:' + day);
-    this._top3 = Array.isArray(stored) ? stored : [];
+    // сумісність: до v780 в комірці лежав ГОЛИЙ масив топ-3, тепер — {top3, saved}
+    const cell = Array.isArray(stored) ? { top3: stored } : (stored && typeof stored === 'object' ? stored : {});
+    this._top3 = Array.isArray(cell.top3) ? cell.top3 : [];
+    this._saved = Math.max(0, cell.saved | 0);
+    this._savedByCid = new Map(); // нова доба / після гібернації — квоти беремо зі storage
+    const week = await this.state.storage.get('savedWeek');
+    this._savedWeek = (week && typeof week === 'object') ? { ...week } : {};
     this._top3Day = day;
     this._top3Loaded = true;
     // прибираємо вчорашні ключі, щоб storage не ріс нескінченно
-    const old = await this.state.storage.list({ prefix: 'day:' });
     const stale = [];
+    const old = await this.state.storage.list({ prefix: 'day:' });
     for (const key of old.keys()) if (key !== 'day:' + day) stale.push(key);
+    const oldSaved = await this.state.storage.list({ prefix: 'sv:' });
+    for (const key of oldSaved.keys()) if (!key.startsWith('sv:' + day + ':')) stale.push(key);
     if (stale.length) await this.state.storage.delete(stale);
+  }
+
+  // добова комірка: топ-3 і лічильник світу лежать разом, один запис
+  async _saveDayCell(day) {
+    await this.state.storage.put('day:' + day, { top3: this._top3, saved: this._saved });
+  }
+
+  // 🌍 внесок гравця у лічильник світу. Беремо мінімум із того, що каже клієнт,
+  // стелі на пінг і залишку добової квоти цього cid.
+  // Внески йдуть ЧЕРГОЮ: квота — це read-modify-write, і конвеєр паралельних пінгів
+  // прочитав би storage ще до першого запису, тобто обійшов би добову стелю.
+  // ponytail: черга одна на весь DO; чесний клієнт шле внесок раз на забіг, тож дешево.
+  // Якщо колись стане вузьким місцем — черга по cid.
+  _recordSaved(now, cid, raw) {
+    const next = Promise.resolve(this._savedQueue).then(() => this._recordSavedNow(now, cid, raw));
+    this._savedQueue = next.catch(() => {});
+    return next;
+  }
+
+  async _recordSavedNow(now, cid, raw) {
+    await this._loadTop3(now);
+    const day = this._dayKey(now);
+    const key = `sv:${day}:${cid}`;
+    // квоту тримаємо і в памʼяті, і в storage: памʼять — гарячий кеш,
+    // storage переживає гібернацію DO і перезапуск воркера.
+    const already = Math.max(this._savedByCid.get(cid) | 0, (await this.state.storage.get(key)) | 0);
+    const add = clampSaved(raw, already);
+    if (!add) return;
+    if (this._savedByCid.size > 5000) this._savedByCid.clear();
+    this._savedByCid.set(cid, already + add);
+    this._saved += add;
+    this._savedWeek[day] = this._saved;
+    const days = Object.keys(this._savedWeek).sort();
+    for (const d of days.slice(0, Math.max(0, days.length - SAVED_WEEK_DAYS))) delete this._savedWeek[d];
+    await this.state.storage.put(key, already + add);
+    await this._saveDayCell(day);
+    await this.state.storage.put('savedWeek', this._savedWeek);
   }
 
   // Приймаємо «денний результат» {nick, score} і тримаємо топ-3 за сьогодні у storage.
@@ -411,7 +483,7 @@ export class Lobby {
     list.sort((a, b) => b.score - a.score);
     this._top3 = list.slice(0, 3);
     this._top3Day = day;
-    await this.state.storage.put('day:' + day, this._top3);
+    await this._saveDayCell(day);
   }
 
   // нормальний клієнт пінгує раз на ~8с; 30/10с з однієї IP — щедрий запас, але стеля проти флуду
@@ -457,7 +529,13 @@ export class Lobby {
         code, host: r.host, mode: r.mode, country: r.country,
         n: r.n, state: r.state, build: r.build,
       }));
-    return { online: this.players.size, today: this.todaySet.size, top3: this._top3, players, profiles, rooms };
+    // worldSaved — сьогодні, worldSavedWeek — останні 7 діб (порожній світ виглядає
+    // сумно: клієнт показує тижневе, коли добове замале)
+    const week = Object.values(this._savedWeek).reduce((sum, n) => sum + Math.max(0, n | 0), 0);
+    return {
+      online: this.players.size, today: this.todaySet.size, top3: this._top3,
+      worldSaved: this._saved, worldSavedWeek: week, players, profiles, rooms,
+    };
   }
 
   json(obj, status = 200) {
@@ -490,6 +568,8 @@ export class Lobby {
         // 🏆 денний результат для «топ-3 сьогодні» (клієнт шле свій кращий штормовий за сьогодні)
         if (d.day && typeof d.day === 'object') await this._recordDayScore(now, d.day.nick || nick, d.day.score);
         else await this._loadTop3(now); // однаково піднімаємо кеш, щоб _view повернув свіжий top3
+        // 🌍 внесок у лічильник світу: скільки людей гравець урятував за забіг
+        if (d.saved) await this._recordSaved(now, cid, d.saved);
         if (this.players.size > 500) this._prune(now);
         // хост закрив кімнату — прибираємо одразу, не чекаючи TTL
         if (d.close) {
