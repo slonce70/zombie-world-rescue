@@ -1480,8 +1480,14 @@ export class Gadgets {
 
   // 🎒 Загін: врятований друг іде поруч. Об'єкт має ту саму форму, що клон гаджета,
   // тож ним керує наявний _updateClones — інший тільки прапорець squad і хук здібності.
-  spawnSquad(countryIds) {
-    const p = this.level.player;
+  //
+  // 🌐 `owner` — ЗА КИМ напарник іде і КОГО лікує: локальний гравець (соло і власний
+  // Загін хоста) або RemotePlayer гостя, чий Загін веде хост. В обох є pos і yaw,
+  // у RemotePlayer ще й pid. Дефолт лишає соло-виклик (main.js) байт-у-байт тим самим.
+  spawnSquad(countryIds, owner = this.level.player) {
+    const p = owner;
+    const local = owner === this.level.player;
+    const ownerPid = owner.pid || 1;
     for (let i = 0; i < countryIds.length; i++) {
       const cid = countryIds[i];
       const friend = FRIENDS[cid];
@@ -1503,6 +1509,7 @@ export class Gadgets {
       const member = {
         x, z, y, hp: SQUAD_MAX_HP, hitT: 0, rig, mesh: rig.group,
         squad: friend.squad, countryId: cid, downT: 0, abilityT: 0,
+        owner, ownerPid,
       };
       member.syncToFloor = () => {
         member.y = this._floorY(member.x, member.z, member.y) + CLONE_FOOT_LIFT;
@@ -1513,7 +1520,8 @@ export class Gadgets {
         member.hp -= dmg;
       };
       this.clones.push(member);
-      this.level.bus.emit('toast', t('{n} йде з тобою!', { n: friend.name() }));
+      // тост — про СВОГО друга: напарника гостя хост веде мовчки, гість дізнається сам
+      if (local) this.level.bus.emit('toast', t('{n} йде з тобою!', { n: friend.name() }));
     }
   }
 
@@ -1526,10 +1534,14 @@ export class Gadgets {
     const cfg = SQUAD_ARCHETYPES[member.squad];
     if (!cfg) return;
     if (member.squad === 'heal') {
-      const p = level.player;
+      const p = member.owner || level.player;
       if (p.health > 0 && p.health < p.maxHealth
         && Math.hypot(p.pos.x - member.x, p.pos.z - member.z) <= cfg.radius) {
-        p.heal(cfg.healPerSec);
+        // 🌐 здоровʼя гостя живе в гостя: локальне p.heal() віддаленому власнику нічого
+        // не дасть — хост шле подію 'healed' саме йому (дзеркало hurtPlayer). Той самий
+        // маршрут, що в цілющого тотема нижче.
+        if (p === level.player || p.pid === 1 || !level.net || !level.net.authority) p.heal(cfg.healPerSec);
+        else level.net.healPlayer(p, cfg.healPerSec);
         level.effects.burst(member.mesh.position.clone().setY(member.y + 1.4), 0x6dff9c, 6,
           { speed: 1.6, up: 2, life: 0.5 });
       }
@@ -1845,7 +1857,10 @@ export class Gadgets {
         if (c.hp <= 0) {
           c.downT = SQUAD_DOWN_SECS;
           setAnim(c.rig, 'idle');
-          level.bus.emit('toast', t('Напарник упав — встане за {n} с', { n: SQUAD_DOWN_SECS }));
+          // тост — лише про СВОГО напарника: чужий Загін хост веде мовчки (як і спавн)
+          if (!c.owner || c.owner === level.player) {
+            level.bus.emit('toast', t('Напарник упав — встане за {n} с', { n: SQUAD_DOWN_SECS }));
+          }
           updateRig(c.rig, dt);
           continue;
         }
@@ -1853,10 +1868,12 @@ export class Gadgets {
       } else if (c.hp <= 0) { this._removeClone(i, true); continue; }
 
       const nearest = this._nearestZombie(c.x, c.z);
-      // далеко від бою — повертаємось до гравця, щоб напарник не губився на карті
+      // далеко від бою — повертаємось до ВЛАСНИКА, щоб напарник не губився на карті
+      // (клон гаджета сюди не заходить: у нього c.squad немає)
       const far = !nearest || Math.hypot(nearest.x - c.x, nearest.z - c.z) > SQUAD_LEASH_DIST;
+      const owner = c.owner || level.player;
       const target = (c.squad && far)
-        ? { x: level.player.pos.x, z: level.player.pos.z, follow: true }
+        ? { x: owner.pos.x, z: owner.pos.z, follow: true }
         : nearest;
       if (!target) { setAnim(c.rig, 'idle'); updateRig(c.rig, dt); continue; }
       const dx = target.x - c.x, dz = target.z - c.z;
@@ -1900,7 +1917,9 @@ export class Gadgets {
         const visible = melee || level.world.shotBlockDist(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(dx, 0, dz).normalize(), dist) >= dist - 0.2;
         if (!visible) { c.hitT = 0.25; updateRig(c.rig, dt); continue; }
         c.hitT = melee ? 0.7 : 0.9;
-        target.lastHitBy = 1;
+        // кіл-кредит іде ВЛАСНИКУ напарника, як у турелі (placeTurretAt/ownerPid).
+        // Соло і клон гаджета: ownerPid немає або він 1 — рівно як було.
+        target.lastHitBy = c.ownerPid || 1;
         const dmg = c.squad === 'fighter' ? SQUAD_ARCHETYPES.fighter.damage : (melee ? 10 : 5);
         target.damage(melee ? dmg : Math.round(dmg * 0.5), new THREE.Vector3(dx, 0, dz).normalize(), false);
         setAnim(c.rig, melee ? 'attack' : 'aim');
