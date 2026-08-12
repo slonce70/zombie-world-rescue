@@ -10,6 +10,8 @@ import { rescuedFriendCount, FRIEND_TOTAL } from '../friends.js';
 import { claimStarEggs } from '../eggs.js';
 import { hasLiberated } from '../net/cloudsave.js';
 import { countryPower } from '../countrypowers.js';
+import { captureFrame, victoryCardText } from './sharecard.js';
+import { loadNick } from '../net/coop.js';
 
 export function showVictory(game) {
   if (!game.level || game.victoryShown) return;
@@ -19,6 +21,10 @@ export function showVictory(game) {
     return;
   }
   game.victoryShown = true;
+  // 📸 «Похвалитися» є лише на перемозі КРАЇНИ — етапи фронту й експедиції листівки не мають
+  const shareBtn = document.getElementById('btn-victory-share');
+  if (shareBtn) shareBtn.style.display = 'none';
+  game._victoryCard = null;
   // якщо гравця встигли вдарити в момент перемоги — скасовуємо смерть
   game.deathT = -1;
   game._hideOverlay('overlay-death');
@@ -74,6 +80,9 @@ export function showVictory(game) {
     game._showOverlay('overlay-victory');
     return;
   }
+  // 📸 кадр для листівки знімаємо ТУТ — оверлей ще не показаний, гра ще на екрані.
+  // Рівно один раз за перемогу; PNG кодується аж на тапі «Похвалитися».
+  const victoryFrame = captureFrame(game.renderer, game.level.scene, game.level.player?.camera);
   const wasLiberated = !!game.save.liberated[country.id];
   game.save.liberated[country.id] = true;
   if (!wasLiberated && !(game.save.upgrades.mapeditor > 0)) {
@@ -238,6 +247,18 @@ export function showVictory(game) {
   const retryBtn = document.getElementById('btn-victory-retry');
   nextBtn.style.display = solo && nextTarget(game.save.liberated) !== null ? '' : 'none';
   retryBtn.style.display = solo ? '' : 'none';
+  // 📸 листівка: усе, що потрібно намалювати, збираємо тут; малювання — на тапі кнопки
+  game._victoryCard = {
+    frame: victoryFrame,
+    ...victoryCardText({
+      flag: country.flag, country: country.name, nick: loadNick(),
+      timeSec: s.time, stars: starInfo ? starInfo.thisRun : countryStars(game.save, country.id),
+      starMax: STARS_PER_COUNTRY, kills: s.kills,
+    }),
+    filename: `zombie-rescue-${country.id}.png`,
+    text: t('Я звільнив {n} у грі «Операція: Порятунок Світу»!', { n: country.name }),
+  };
+  if (shareBtn) shareBtn.style.display = '';
   game._showOverlay('overlay-victory');
   // ⭐ «майже досяг»: тост про перший титул із прогресом ≥80% (раз на сесію, тротл через Set)
   if (!game._almostTitleToasts) game._almostTitleToasts = new Set();

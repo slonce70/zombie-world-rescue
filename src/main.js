@@ -113,6 +113,7 @@ import {
   showVictory, maybeWorldSaved, showWorldSaved, grantInfectedWin,
   awardStars, claimStarThresholds, renderVictoryStars,
 } from './ui/endscreens.js';
+import { shareCard } from './ui/sharecard.js';
 import { buildTestApi } from './testapi.js';
 import { CUSTOM_COUNTRY, CustomMapMode, sanitizeCustomMap } from './custommap.js';
 import {
@@ -425,6 +426,16 @@ class Game {
       this._hideOverlay('overlay-victory');
       this.endLevel();
       inf ? this.startInfected(cid) : this.startLevel(cid);
+    });
+    // 📸 «Похвалитися»: малюємо листівку зі знятого кадру і віддаємо системному share
+    // (фолбек — завантаження файлу). Кнопка блокується на час, щоб подвійний тап
+    // на тачі не почав кодувати PNG двічі.
+    document.getElementById('btn-victory-share').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || !this._victoryCard) return;
+      this.audio.click();
+      btn.disabled = true;
+      try { await shareCard(this, this._victoryCard); } finally { btn.disabled = false; }
     });
     document.getElementById('btn-victory-next').addEventListener('click', () => {
       if (this.level && this.level.operation) return this._leaveFrontResult('overlay-victory');

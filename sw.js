@@ -106,6 +106,7 @@ const SHELL = [
   './src/ui/coopui.js',
   './src/ui/communityui.js',
   './src/ui/share.js',
+  './src/ui/sharecard.js',
   './src/ui/leagueui.js',
   './src/ui/saveui.js',
   './src/ui/hq.js',
