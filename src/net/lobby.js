@@ -10,6 +10,41 @@ import { syncTitles, titleName } from '../titles.js';
 
 const PING_MS = 8000;
 
+// 🌍 Лічильник світу: скільки людей УСІ гравці врятували сьогодні (воркер віддає
+// worldSaved за добу і worldSavedWeek за 7 діб).
+//
+// Порожній світ виглядає сумно: якщо за добу набралось менше за поріг, показуємо
+// тижневе число замість добового. Поріг = 100 людей. За один забіг фізично рятується
+// щонайбільше ~11 людей на рівень (хлів/маєток/підземелля/корабель), тобто навіть
+// найдовша експедиція — це ~55. Добове число нижче сотні означає «сьогодні грали
+// один-двоє» — таке «світ урятував 14 людей» радше засмутить, ніж підштовхне.
+// Тижневе завжди ≥ добового, тож текст ніколи не показує менше число.
+export const WORLD_DAY_MIN = 100;
+
+// 12480 → «12 480»: діти читають великі числа групами по три.
+const groups = (n) => String(n).replace(/\B(?=(\d{3})+$)/g, ' ');
+
+// Готовий рядок для глобуса з відповіді лобі (або '' — тоді блок не показується:
+// немає інтернету, немає даних, або світ сьогодні й за тиждень нікого не врятував).
+export function worldSavedText(d) {
+  const day = Math.max(0, (d && d.worldSaved) | 0);
+  const week = Math.max(0, (d && d.worldSavedWeek) | 0);
+  if (day >= WORLD_DAY_MIN) return t('🌍 Сьогодні врятовано людей: {n}', { n: groups(day) });
+  if (week > 0) return t('🌍 За тиждень врятовано людей: {n}', { n: groups(week) });
+  return '';
+}
+
+// Одне читання лобі без пінг-циклу: на глобусі мультиплеєр не пінгує, а число
+// показати треба. Фейл тихий — null, і блок просто ховається.
+export async function fetchLobbyState() {
+  try {
+    const res = await fetch(`${apiBase()}/lobby/state`);
+    return res.ok ? await res.json() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export class LobbyClient {
   constructor(game) {
     this.game = game;
@@ -43,6 +78,15 @@ export class LobbyClient {
   announceDayScore(wave) {
     const score = Math.max(1, Math.min(200, wave | 0));
     this._ping({ day: { nick: cleanNick(loadNick()) || t('Гравець'), score } });
+  }
+
+  // 🌍 Внесок у лічильник світу: скільки людей справді звільнено на рівні.
+  // Теж разовий пінг поза розкладом — рівень закінчився, панель лобі вже не пінгує.
+  // Стелю тримає воркер (клієнт тут недовірене джерело), нам досить не слати сміття.
+  announceSaved(n) {
+    const saved = Math.max(0, n | 0);
+    if (!saved) return; // нікого не врятували — воркер не турбуємо
+    this._ping({ saved });
   }
 
   async _ping(extra = {}) {

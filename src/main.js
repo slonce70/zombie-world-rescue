@@ -67,6 +67,7 @@ import {
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
 } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
+import { fetchLobbyState, worldSavedText } from './net/lobby.js';
 import { CommunityUI } from './ui/communityui.js';
 import { parseCommunityLink, makeRunId } from './net/community.js';
 import { sanitizeDiffStar } from './net/protocol.js';
@@ -1572,6 +1573,35 @@ class Game {
     return `<div id="player-compass" class="player-compass"><b>${a.icon} ${a.title}</b><span>${a.text}</span></div>`;
   }
 
+  // 🌍 Внесок у лічильник світу. ЧЕСНА метрика: рахуємо тих, кого дитина фізично
+  // звільнила на цьому рівні — цивільні з хліва/маєтку/підземелля замку/корабля TUR
+  // виходять і йдуть за гравцем, тобто missions.civilians і є списком врятованих.
+  // Нічого не «оцінюємо» за хвилями чи вбивствами: у сейві лічильника людей немає.
+  _announceWorldSaved() {
+    const level = this.level;
+    const civs = level && level.missions && level.missions.civilians;
+    if (!civs || !civs.length) return;
+    // кооп: тих самих людей бачить у себе кожен у кімнаті (netBarnOpened спавнить
+    // копії гостю) — рахує лише авторитет, інакше світ «врятував» їх двічі-чотири
+    if (level.net && !level.net.authority) return;
+    if (this.coop && this.coop.lobbyNet) this.coop.lobbyNet.announceSaved(civs.length);
+  }
+
+  // 🌍 Число на глобусі. Одне читання лобі на хвилину: глобус показується після
+  // кожного рівня, а лічильник світу так швидко не міняється.
+  _refreshWorldSaved() {
+    const el = document.getElementById('world-saved');
+    if (!el) return;
+    const now = Date.now();
+    if (this._worldSavedT && now - this._worldSavedT < 60000) return;
+    this._worldSavedT = now;
+    fetchLobbyState().then((d) => {
+      const text = worldSavedText(d);
+      el.textContent = text;
+      el.hidden = !text; // без інтернету блок просто не показується
+    });
+  }
+
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
@@ -1605,6 +1635,8 @@ class Game {
       this._refreshCampChip();
       // 🗓️ ціль тижня — оновлюємо текст/бар
       this._refreshWeeklyGoalUI();
+      // 🌍 скільки людей світ урятував — спільне число під ціллю тижня
+      this._refreshWorldSaved();
       if (this._newVersion) this._onNewVersion(this._newVersion);
       if (this.frontui) this.frontui.render(this.getFrontViewModel());
       const editorBtn = document.getElementById('btn-map-editor');
@@ -4881,6 +4913,7 @@ class Game {
   unlockWeapon(id) { return unlockWeapon(this, id); }
 
   endLevel() {
+    this._announceWorldSaved(); // 🌍 поки рівень цілий: скільки людей на ньому звільнено
     const leavingExpedition = !!(this.level && this.level.expedition);
     const leavingFront = !!(this.level && this.level.operation);
     const leavingFrontCoop = !!(this.level && this.level.net);

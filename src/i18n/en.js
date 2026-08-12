@@ -1669,6 +1669,8 @@ export const EN = {
 "🎁 Подарунок дня!": "🎁 Daily gift!",
 "Подарунок дня — забрати": "Daily gift — claim",
 "🗓️ Ціль тижня: 0/300 🧟": "🗓️ Weekly goal: 0/300 🧟",
+"🌍 Сьогодні врятовано людей: {n}": "🌍 People rescued today: {n}",
+"🌍 За тиждень врятовано людей: {n}": "🌍 People rescued this week: {n}",
 "🎁 ПОДАРУНОК ДНЯ": "🎁 DAILY GIFT",
 "Заходь щодня — і забирай подарунки! Пропустив день? Нічого страшного, стрик зачекає 😊": "Come by every day and grab your gifts! Missed a day? No worries, your streak will wait 😊",
 "🎁 Забрати": "🎁 Claim",

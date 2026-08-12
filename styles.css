@@ -87,6 +87,11 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 #weekly-goal .wg-label { display: block; text-align: center; }
 #weekly-goal .wg-bar { margin-top: 5px; height: 6px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
 #weekly-goal .wg-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #4fd07a, #8ef0a8); transition: width .3s ease; }
+/* 🌍 лічильник світу — спільне число всіх гравців під ціллю тижня */
+#world-saved {
+  background: var(--ui-bg); border: 2px solid var(--ui-border); border-radius: 12px;
+  padding: 7px 16px; color: #ffe9a8; font-weight: 800; font-size: 14px; text-align: center;
+}
 /* 🎁 модалка подарунка: тижневий грід 7 клітинок */
 .gift-week { text-align: center; font-weight: 900; color: var(--accent); margin: 4px 0 10px; }
 .gift-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 14px; }
@@ -1578,6 +1583,7 @@ body.touch-mode #touch-coach.show { display: block; }
   #gift-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #camp-quest-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #weekly-goal { padding: 5px 12px; min-width: 0; font-size: 12px; }
+  #world-saved { padding: 5px 12px; font-size: 12px; white-space: nowrap; }
   /* ⭐ лічильник зірок (v289) подовжив рядок прогресу — на вузькому портреті
      стискаємо в один рядок, інакше блок росте і піднімає ГРАТИ над beacon-зоною */
   #globe-progress { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
@@ -1600,6 +1606,7 @@ body.touch-mode #touch-coach.show { display: block; }
   #gift-chip.show { display: none; }
   #camp-quest-chip.show { display: none; }
   #weekly-goal { display: none; }
+  #world-saved { display: none; }
   #globe-progress { font-size: 14px; padding: 6px 14px; }
   .globe-play { font-size: 14px; padding: 9px 18px; }
   .country-item { padding: 5px 9px; }
