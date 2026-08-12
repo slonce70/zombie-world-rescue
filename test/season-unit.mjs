@@ -93,27 +93,57 @@ test('new season resets steps and takes a fresh snapshot', () => {
   assert.ok(state.steps.every((s) => s.progress === 0), 'нова база — прогрес з нуля');
 });
 
-test('done but unclaimed step survives the season boundary', () => {
+test('done but unclaimed step moves into the new season instead of freezing it', () => {
   const save = { modeWins: {}, liberated: {}, stats: { killed: 0 }, friends: {} };
   ensureSeason(save, W);
   const target = seasonSteps(0).find((s) => s.metric === 'mode');
   save.modeWins[target.mode] = target.target;   // сходинка виконана, «Забрати» не тиснули
 
   ensureSeason(save, W + SEASON_WEEKS);         // сезон змінився
-  assert.equal(save.season.i, 0, 'сезон чекає на клейм, а не спалює нагороду');
-  const held = seasonState(save, W + SEASON_WEEKS);
-  assert.equal(held.claimable, 1, 'незабрана нагорода лишається доступною');
-  assert.ok(held.steps.find((s) => s.id === target.id).done);
-
-  const reward = claimSeasonStep(save, W + SEASON_WEEKS, target.id);
-  assert.ok(reward && reward.crystals > 0, 'нагороду видано через межу сезону');
-
-  ensureSeason(save, W + SEASON_WEEKS);         // забрали — сезон котиться далі
-  assert.equal(save.season.i, 1);
+  assert.equal(save.season.i, 1, 'сезон котиться далі, а не чекає на клейм');
   assert.deepEqual(save.season.claimed, [], 'клейми нового сезону чисті');
-  const fresh = seasonState(save, W + SEASON_WEEKS);
-  assert.ok(fresh.steps.every((s) => s.progress === 0), 'нова база — прогрес з нуля');
-  assert.equal(claimSeasonStep(save, W + SEASON_WEEKS, target.id), null, 'повторно нагороду не дають');
+  assert.deepEqual(save.season.carry.map((c) => c.id), [target.id], 'незабране переїхало');
+
+  const held = seasonState(save, W + SEASON_WEEKS);
+  assert.equal(held.index, 1);
+  assert.equal(held.claimable, 1, 'незабрана нагорода лишається доступною в новому сезоні');
+  const moved = held.steps.find((s) => s.carried);
+  assert.ok(moved && moved.done && !moved.claimed && moved.title === target.title(target.target));
+  assert.ok(held.steps.filter((s) => !s.carried).every((s) => s.progress === 0), 'нова база — прогрес з нуля');
+
+  const reward = claimSeasonStep(save, W + SEASON_WEEKS, moved.id);
+  assert.ok(reward && reward.crystals > 0, 'нагороду видано через межу сезону');
+  assert.equal(claimSeasonStep(save, W + SEASON_WEEKS, moved.id), null, 'повторно нагороду не дають');
+  assert.equal(seasonState(save, W + SEASON_WEEKS).claimable, 0);
+  assert.deepEqual(save.season.carry, [], 'забране зі списку переносу зникло');
+});
+
+test('carried reward never blocks the next rollover and does not pile up', () => {
+  const save = { modeWins: {}, liberated: {}, stats: { killed: 0 }, friends: {} };
+  ensureSeason(save, W);
+  const target = seasonSteps(0).find((s) => s.metric === 'mode');
+  save.modeWins[target.mode] = target.target;
+
+  ensureSeason(save, W + SEASON_WEEKS);         // сезон 2: нагорода переїхала
+  ensureSeason(save, W + SEASON_WEEKS * 2);     // сезон 3: так і не забрали
+  assert.equal(save.season.i, 2, 'перенесене не тримає сезон');
+  assert.deepEqual(save.season.carry.map((c) => c.id), [target.id], 'дублікатів не з\'явилось');
+  assert.equal(seasonState(save, W + SEASON_WEEKS * 2).claimable, 1, 'нагорода й далі чекає');
+
+  // сходинку нового сезону забрали — вона в claimed і НЕ переїжджає далі
+  const fresh = seasonSteps(2).find((s) => s.metric === 'mode' && s.id !== target.id);
+  save.modeWins[fresh.mode] = (save.modeWins[fresh.mode] | 0) + fresh.target;
+  assert.ok(claimSeasonStep(save, W + SEASON_WEEKS * 2, fresh.id));
+  ensureSeason(save, W + SEASON_WEEKS * 3);
+  assert.deepEqual(save.season.carry.map((c) => c.id), [target.id], 'забране не переносять');
+});
+
+test('old save without carry keeps working', () => {
+  const save = { modeWins: {}, liberated: {}, stats: { killed: 0 }, friends: {}, season: { i: 0, base: {}, claimed: [] } };
+  const state = seasonState(save, W);
+  assert.equal(state.index, 0);
+  assert.ok(Array.isArray(save.season.carry), 'carry добудовано без втрати сезону');
+  assert.deepEqual(save.season.claimed, []);
 });
 
 test('rewards grow and the last step carries the season title', () => {

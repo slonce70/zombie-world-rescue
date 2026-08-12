@@ -53,6 +53,9 @@ export function stepReward(step) {
   };
 }
 
+// Префікс id для нагород, перенесених із минулого сезону (див. ensureSeason).
+const CARRY_PREFIX = 'carry:';
+
 export function seasonIndex(weekIndex) {
   const week = Number.isFinite(Number(weekIndex)) ? Number(weekIndex) : SEASON_EPOCH_WEEK;
   return Math.max(0, Math.floor((week - SEASON_EPOCH_WEEK) / SEASON_WEEKS));
@@ -90,21 +93,27 @@ export function ensureSeason(save, weekIndex) {
     ? save.season : null;
   if (current && (current.i | 0) === index && current.base && typeof current.base === 'object') {
     if (!Array.isArray(current.claimed)) current.claimed = [];
+    if (!Array.isArray(current.carry)) current.carry = [];
     return current;
   }
-  // Сходинка НЕ згорає (шапка модуля): як у weeklycamp.ensureWeeklyCamp, сезон із
-  // виконаною й НЕзабраною сходинкою не змінюється — нагорода чекає на клейм.
-  // Забрані сходинки не тримають сезон: після останнього клейму він котиться далі.
+  // Сходинка НЕ згорає (шапка модуля), але й сезон не стоїть на місці: виконані та
+  // НЕзабрані сходинки ПЕРЕЇЖДЖАЮТЬ у новий сезон списком carry і чекають на клейм там.
+  // Забрані не переносяться — двічі за одне не платимо. Дедуп по id не дає списку рости
+  // вічно (більше за пул він не стане), тож перенесене ніколи не блокує наступний сезон.
+  const carry = [];
   if (current && current.base && typeof current.base === 'object') {
     if (!Array.isArray(current.claimed)) current.claimed = [];
     const claimed = new Set(current.claimed);
-    const pending = seasonSteps(current.i | 0)
-      .some((def) => !claimed.has(def.id) && gainedIn(save, current.base, def) >= def.target);
-    if (pending) return current;
+    seasonSteps(current.i | 0).forEach((def, i) => {
+      if (!claimed.has(def.id) && gainedIn(save, current.base, def) >= def.target) carry.push({ id: def.id, s: i });
+    });
+    for (const old of (Array.isArray(current.carry) ? current.carry : [])) {
+      if (old && typeof old.id === 'string' && !carry.some((c) => c.id === old.id)) carry.push({ id: old.id, s: old.s | 0 });
+    }
   }
   const base = {};
   for (const def of seasonSteps(index)) base[def.id] = metricValue(save, def);
-  save.season = { i: index, base, claimed: [] };
+  save.season = { i: index, base, claimed: [], carry };
   return save.season;
 }
 
@@ -126,6 +135,26 @@ export function seasonState(save, weekIndex) {
       reward: stepReward(i),
     };
   });
+  // Перенесені з минулих сезонів: уже виконані, лишилось лише забрати. Id із префіксом,
+  // щоб клейм не сплутав їх з однойменною сходинкою нового сезону (пул у сезонів спільний).
+  const carried = (season.carry || []).map((c) => {
+    const def = SEASON_POOL.find((d) => d.id === c.id);
+    if (!def) return null;
+    const i = Math.max(0, Math.min(SEASON_STEPS - 1, c.s | 0));
+    return {
+      i,
+      id: CARRY_PREFIX + def.id,
+      icon: def.icon,
+      title: def.title(def.target),
+      target: def.target,
+      progress: def.target,
+      done: true,
+      claimed: false,
+      carried: true,
+      reward: stepReward(i),
+    };
+  }).filter(Boolean);
+  steps.push(...carried);
   return {
     index: season.i,
     steps,
@@ -140,6 +169,8 @@ export function claimSeasonStep(save, weekIndex, stepId) {
   const state = seasonState(save, weekIndex);
   const step = state.steps.find((s) => s.id === stepId);
   if (!step || !step.done || step.claimed) return null;
-  save.season.claimed = [...new Set([...(save.season.claimed || []), stepId])];
+  // Перенесену нагороду просто знімаємо зі списку — вона не належить сходинкам цього сезону.
+  if (step.carried) save.season.carry = (save.season.carry || []).filter((c) => CARRY_PREFIX + c.id !== stepId);
+  else save.season.claimed = [...new Set([...(save.season.claimed || []), stepId])];
   return { ...step.reward, step: step.i, id: step.id };
 }

@@ -331,7 +331,7 @@ const MEGA_QUESTS = [
   },
   {
     id: 'titles3', icon: '🏷️', ev: 'titles', target: 3,
-    title: () => t('МЕГА: збери {n} титули', { n: 3 }),
+    title: () => t('МЕГА: здобудь ще {n} титули', { n: 3 }),
     current: (save) => (save.titles || []).length,
     reward: {
       coins: 5000,

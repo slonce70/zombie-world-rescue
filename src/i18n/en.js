@@ -2216,7 +2216,7 @@ export const EN = {
 "Мандрівник": "Traveler",
 "Маска, калюжа радіації після kill і радіаційне відродження": "Mask, radiation puddle on kill and a radiation respawn",
 "Мега-квест: переможи Боса Радіації 5 разів": "Mega Quest: defeat the Radiation Boss 5 times",
-"МЕГА: збери {n} титули": "MEGA: collect {n} titles",
+"МЕГА: здобудь ще {n} титули": "MEGA: earn {n} more titles",
 "МЕГА: переможи Боса Радіації {n} разів": "MEGA: defeat the Radiation Boss {n} times",
 "МЕГАБОКС": "MEGA BOX",
 "Медаль «Очищувач зараження»": "“Infection Cleaner” medal",

@@ -25,8 +25,10 @@ const t = (s, params) => (params
   : s);
 const SOLO_MODES = [];
 
-// goalInfo повертає незавершену ціль магазину — саме вона раніше стояла першою
-const shopGoal = { done: false, remaining: 300, item: { icon: '🔫', name: 'Автомат' } };
+// goalInfo повертає незавершену ціль магазину — саме вона раніше стояла першою.
+// far — накопичено 30% ціни, near — 90%: правило «майже зібрано» пускає вперед лише near.
+const shopGoal = { done: false, need: 1000, have: 300, remaining: 700, item: { icon: '🔫', name: 'Автомат' } };
+const shopGoalNear = { done: false, need: 1000, have: 900, remaining: 100, item: { icon: '🔫', name: 'Автомат' } };
 const build = (goal) => new Function(
   'goalInfo', 't', 'seasonState', 'CAMPAIGN_ORDER', 'COUNTRIES', 'SOLO_MODES',
   `${body}\nreturn nextActionInfo;`,
@@ -57,4 +59,17 @@ test('без цілі магазину кампанія веде так само
   const info = build(null).call(fakeGame({ UKR: true }));
   assert.equal(info.icon, '🧭');
   assert.ok(info.text.includes('Польща'), 'наступна незвільнена — Польща');
+});
+
+test('майже зібрана ціль магазину не мовчить до кінця кампанії', () => {
+  const info = build(shopGoalNear).call(fakeGame({}));
+  assert.equal(info.title, 'Ціль магазину', `майже зібрана ціль не спливла: ${JSON.stringify(info)}`);
+  assert.ok(info.text.includes('100'), 'показує, скільки лишилось докопити');
+});
+
+test('рівно на межі 80% ціль уже підказують, нижче — ні', () => {
+  const at80 = { done: false, need: 1000, have: 800, remaining: 200, item: { icon: '🔫', name: 'Автомат' } };
+  const below = { done: false, need: 1000, have: 799, remaining: 201, item: { icon: '🔫', name: 'Автомат' } };
+  assert.equal(build(at80).call(fakeGame({})).title, 'Ціль магазину');
+  assert.equal(build(below).call(fakeGame({})).icon, '🧭', 'далека ціль кампанію не перебиває');
 });

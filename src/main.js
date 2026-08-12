@@ -393,11 +393,11 @@ class Game {
       this.endLevel();
     });
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
-      // 🖱️ десктоп: коуч дотику тут ні до чого — розкриваємо готовий список клавіш
-      // просто в меню паузи (гра лишається на паузі, поки дитина читає)
+      // 🖱️ десктоп: коуч дотику тут ні до чого. Список клавіш і так видимий у паузі —
+      // кнопка лише згортає/розгортає його (гра лишається на паузі, поки дитина читає)
       if (!this.touch) {
         const keys = document.getElementById('pause-keys');
-        keys.style.display = keys.style.display === 'none' ? 'grid' : 'none';
+        keys.style.display = getComputedStyle(keys).display === 'none' ? 'grid' : 'none';
         return;
       }
       this.paused = false;
@@ -1485,6 +1485,19 @@ class Game {
         text: t('{i} {n} — забери нагороду!', { i: season.next.icon, n: season.next.title }),
       };
     }
+    // 🎯 ціль магазину — НИЖЧЕ кроку кампанії: 🎯 на товарі не має перебивати головну
+    // підказку гри й вести дитину у вітрину замість наступної країни. Виняток — ціль
+    // МАЙЖЕ зібрана (у кишені вже ≥80% ціни): лишився один забіг, і нагадати про неї
+    // саме зараз корисніше, ніж мовчати про 🎯 до кінця всієї кампанії.
+    const gi = goalInfo(this);
+    const goalTip = () => ({
+      icon: '🎯',
+      title: t('Ціль магазину'),
+      text: t('{i} {n}: ще {r} {u}', {
+        i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: gi.item.crystalPrice ? '💎' : '₴',
+      }),
+    });
+    if (gi && !gi.done && gi.need > 0 && gi.have >= gi.need * 0.8) return goalTip();
     const lib = this.save.liberated || {};
     const next = CAMPAIGN_ORDER.find((id) => !lib[id]);
     if (next) {
@@ -1495,17 +1508,7 @@ class Game {
         text: t('{f} {n}: звільни країну', { f: c.flag, n: c.name }),
       };
     }
-    // 🎯 ціль магазину — НИЖЧЕ кроку кампанії: 🎯 на товарі не має перебивати
-    // головну підказку гри й вести дитину у вітрину замість наступної країни
-    const gi = goalInfo(this);
-    if (gi && !gi.done) {
-      const unit = gi.item.crystalPrice ? '💎' : '₴';
-      return {
-        icon: '🎯',
-        title: t('Ціль магазину'),
-        text: t('{i} {n}: ще {r} {u}', { i: gi.item.icon, n: gi.item.name, r: gi.remaining, u: unit }),
-      };
-    }
+    if (gi && !gi.done) return goalTip();
     // 🗓️ кампанію пройдено — веде сезон: він розганяє по режимах
     if (season.next) {
       return {
