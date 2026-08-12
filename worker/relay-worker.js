@@ -603,7 +603,10 @@ export class Lobby {
 
   // 📇 правила чистки профілю — спільні з dev-relay у worker/profile.mjs
 
-  _view(now) {
+  // cid — ЛИШЕ того, хто питає (є тільки в /lobby/ping): ним позначаємо його власний
+  // рядок дуелі прапорцем me. Сам ідентифікатор нікуди не їде, а відповідь щоразу
+  // будується заново, тож у кеш чи в чужу відповідь прапорець потрапити не може.
+  _view(now, cid) {
     this._prune(now);
     const players = [];
     for (const p of this.players.values()) {
@@ -626,8 +629,9 @@ export class Lobby {
     return {
       online: this.players.size, today: this.todaySet.size, top3: this._top3,
       worldSaved: this._saved, worldSavedWeek: week,
-      // c (cid) і ip — службові поля власника запису, назовні не їдуть
-      duel: this._duel.map(({ c, ip, ...row }) => row),
+      // c (cid) і ip — службові поля власника запису, назовні не їдуть; замість них —
+      // порахований сервером me для того, хто питає (на /lobby/state його немає взагалі)
+      duel: this._duel.map(({ c, ip, ...row }) => (cid && c === cid ? { ...row, me: true } : row)),
       players, profiles, rooms,
     };
   }
@@ -693,7 +697,7 @@ export class Lobby {
             });
           }
         }
-        return this.json(this._view(now));
+        return this.json(this._view(now, cid));
       }
     } catch (e) {
       return this.json({ error: 'bad' }, 400);

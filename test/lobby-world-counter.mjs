@@ -260,9 +260,30 @@ test('дошка дуелі не віддає назовні cid і IP влас�
   }));
   const body = await res.json();
   assert.equal(body.duel.length, 1);
-  assert.deepEqual(Object.keys(body.duel[0]).sort(), ['m', 'ms', 'nick', 'w'],
+  assert.deepEqual(Object.keys(body.duel[0]).sort(), ['m', 'me', 'ms', 'nick', 'w'],
     'cid — це «пароль» хмарного сейва, у публічній відповіді його бути не може');
   assert.equal(body.duel[0].nick, 'Влад');
+});
+
+test('свій рядок дуелі позначено me — і лише тому, хто питає', async () => {
+  const lobby = newLobby(newStore());
+  const ping = (cid, nick) => lobby.fetch(new Request('https://x/lobby/ping', {
+    method: 'POST',
+    headers: { 'CF-Connecting-IP': IP },
+    body: JSON.stringify({ cid, nick, duel: { nick, mode: 'bank', ms: 60_000, won: true } }),
+  }));
+  await ping(CID, 'Влад');
+  const mine = (await (await ping(CID, 'Влад')).json()).duel;
+  assert.deepEqual(mine.filter((e) => e.me).map((e) => e.nick), ['Влад'], 'свій рядок — me');
+  // сусід питає тим самим ендпоінтом: me стоїть на ЙОГО рядку, не на Владовому
+  const theirs = (await (await ping('cid-oleg-0001', 'Олег')).json()).duel;
+  assert.deepEqual(theirs.filter((e) => e.me).map((e) => e.nick), ['Олег']);
+  // і жодного cid у тілі — прапорець рахує сервер
+  assert.deepEqual(Object.keys(theirs.find((e) => e.me)).sort(), ['m', 'me', 'ms', 'nick', 'w']);
+  // /lobby/state — GET без cid: зірки немає ні на чиєму рядку
+  const state = await (await lobby.fetch(new Request('https://x/lobby/state'))).json();
+  assert.equal(state.duel.length, 2);
+  assert.ok(!state.duel.some((e) => e.me), 'анонімне читання нікого не позначає');
 });
 
 test('дошка дуелі належить cid: чужий пінг не переписує запис', async () => {

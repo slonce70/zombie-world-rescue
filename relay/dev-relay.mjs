@@ -122,7 +122,9 @@ function recordSaved(now, cid, raw) {
   lobbySaved += add;
 }
 
-function lobbyView(now) {
+// cid — лише того, хто питає (тобто тільки на /lobby/ping): звідси прапорець me
+// на його власному рядку дуелі. Дзеркало _view у Lobby DO.
+function lobbyView(now, cid) {
   for (const [cid, p] of lobbyPlayers) if (now - p.ts > LOBBY_TTL) lobbyPlayers.delete(cid);
   for (const [code, r] of lobbyRooms) if (now - r.ts > LOBBY_TTL) lobbyRooms.delete(code);
   if (lobbyProfiles.size > 800) {
@@ -139,7 +141,8 @@ function lobbyView(now) {
     top3: lobbyTop3,
     worldSaved: lobbySaved,
     worldSavedWeek: lobbySaved, // dev-relay історії не тримає: тиждень = сьогодні
-    duel: lobbyDuel.map(({ c, ...row }) => row), // c (cid власника) назовні не їде
+    // c (cid власника) назовні не їде — замість нього порахований сервером me
+    duel: lobbyDuel.map(({ c, ...row }) => (cid && c === cid ? { ...row, me: true } : row)),
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
     profiles: [...lobbyProfiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
@@ -179,7 +182,7 @@ function lobbyPing(d) {
       });
     }
   }
-  return lobbyView(now);
+  return lobbyView(now, cid);
 }
 const CORS = {
   'Access-Control-Allow-Origin': '*',
