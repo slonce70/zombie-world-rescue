@@ -1,6 +1,6 @@
 // Глобальна карта: 3D-глобус, захоплені країни, прогресія кампанії
 import * as THREE from 'three';
-import { t } from './i18n.js';
+import { t, keyHint } from './i18n.js';
 import { COUNTRIES, CAMPAIGN_ORDER, nextTarget, isCountryOpen } from './countries.js';
 import { countryStars, STARS_PER_COUNTRY } from './stars.js';
 import { frontCountryState } from './worldfront.js';
@@ -293,7 +293,12 @@ export class Globe {
     this.spaceShip.scale.setScalar(0.85 + Math.min(3, ship.level) * 0.12);
     if (title) title.innerHTML = world ? `${world.icon} ОПЕРАЦІЯ: <span class="accent">${world.name.toUpperCase()}</span>` : '🧟 ОПЕРАЦІЯ: <span class="accent">ПОРЯТУНОК СВІТУ</span>';
     if (sub) sub.textContent = world ? `Корабель рівня ${ship.level} · деталі ${ship.parts}/4 · засновуй колонії та відкривай наступну планету.` : 'Зомбі захопили планету! Рятуй країни — сам або з друзями.';
-    if (hint) hint.textContent = world ? `🖱️ Обертай ${world.name} · натисни на державу, щоб висадитися!` : '🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!';
+    // 🖱️ миші на планшеті немає — підказка називає жест (як main.js робить на старті)
+    if (hint) {
+      hint.textContent = world
+        ? keyHint('👆 Крути {w} · тисни на державу, щоб висадитися!', '🖱️ Обертай {w} · натисни на державу, щоб висадитися!', { w: world.name })
+        : keyHint('👆 Крути глобус · 🔴 червона країна — тисни і визволяй!', '🖱️ Обертай глобус · 🔴 червона країна — там зомбі, натисни і звільни!');
+    }
     if (toggle) {
       const next = this._nextMode();
       const nextWorld = next === 'earth' ? null : getSpaceWorld(next.toUpperCase());
