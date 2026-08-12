@@ -13,7 +13,7 @@ import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Shop, goalInfo, SHOP_ITEMS } from './shop.js';
 import { Draft } from './draft.js';
-import { RunBuild } from './runbuild.js';
+import { RunBuild, applyBaseMults } from './runbuild.js';
 import { advanceMomentum, tickMomentum } from './combatmomentum.js';
 import {
   EXPEDITION_NODE_TYPES, EXPEDITION_STEPS, chooseExpeditionNode, completeExpeditionNode,
@@ -3880,8 +3880,7 @@ class Game {
     const u = this.save.upgrades;
     level.player.maxHealth = 100 + (u.maxhp || 0) * 25 + (powers ? powers.maxHealth : 0);
     level.player.health = level.player.maxHealth;
-    level.player.speedMult = (1 + (u.speed || 0) * 0.1) * (u.sneakers ? 1.08 : 1) * (powers ? powers.speedMult : 1);
-    level.player.damageMult = (1 + (u.damage || 0) * 0.15) * (powers ? powers.damageMult : 1);
+    applyBaseMults(level.player, u, powers);
     level.player.healMult = powers ? powers.healMult : 1;
     // спорядження: бронежилет, шолом, кросівки (видно на герої)
     level.player.applyGear(u, powers);

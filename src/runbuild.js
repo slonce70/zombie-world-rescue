@@ -117,6 +117,38 @@ export const COMBOS = {
     } },
 };
 
+// 🧬 База проти бонусу забігу. Базові множники (куплені апгрейди + пасивки країн)
+// рахуються З НУЛЯ і на старті рівня, і після КОЖНОЇ покупки в магазині. А бонуси
+// забігу — картки вище, ранг спеціаліста, рівень бійця Експедиції, кооп-роль scout —
+// живуть у ТОМУ САМОМУ полі гравця, щоб усі місця читання (`player.js`, `main.js`,
+// `turretwar.js`) лишились без змін. Тож перед перерахунком бази запам'ятовуємо, у
+// скільки разів забіг її підняв, і одразу повертаємо цей множник назад — інакше
+// покупка «Швидкість»/«Шкода»/«Кросівки» стирала б картки драфту.
+// Стелі — ті самі числа, що в Math.min() карток: перерахунок бази не проносить бонус
+// вище них. Але й ніколи не відбирає вже здобуте, тож підняті комбо (2.2 / 6) стоять.
+export const RUN_MULT_CAP = { speedMult: 1.8, damageMult: 4 };
+
+export function applyBaseMults(p, upgrades, powers = null) {
+  const u = upgrades || {};
+  rebaseMult(p, 'speedMult', (1 + (u.speed || 0) * 0.1) * (u.sneakers ? 1.08 : 1) * (powers ? powers.speedMult : 1));
+  rebaseMult(p, 'damageMult', (1 + (u.damage || 0) * 0.15) * (powers ? powers.damageMult : 1));
+}
+
+function rebaseMult(p, key, base) {
+  if (!p._baseMult) p._baseMult = {};
+  const run = (p[key] || 1) / (p._baseMult[key] || 1); // у скільки разів забіг підняв базу
+  p._baseMult[key] = base;
+  p[key] = Math.max(p[key] || 1, Math.min(RUN_MULT_CAP[key], base * run));
+}
+
+// 🦘 те саме для стрибка, тільки картки ДОДАЮТЬ (+1.2 / +2.2), а не множать: спорядження
+// рахує applyGear з нуля, тож доданок забігу переносимо на нову базу (кросівки: 7.6 → 8.6).
+export function applyBaseJump(p, base) {
+  const run = p.jumpPower - (p._baseJump ?? p.jumpPower);
+  p._baseJump = base;
+  p.jumpPower = base + run;
+}
+
 export class RunBuild {
   constructor() {
     this.tags = { power: 0, speed: 0, tank: 0 };

@@ -7,6 +7,7 @@ import { t } from './i18n.js';
 import { momentumStats } from './combatmomentum.js';
 import { BASTION_STAR_POWERS } from './specialists.js';
 import { tier2Mods, neutralTier2Mods, rangeDamageMult } from './tier2.js';
+import { applyBaseJump } from './runbuild.js';
 
 export const WEAPONS = {
   fists: { name: 'Кулаки', icon: '👊', dmg: 50, rpm: 60, mag: 10, spread: 0, auto: false, reloadT: 1.5, recoil: 0.04, kick: 1, recover: 6, impact: 5, stagger: 0.3, infinite: true, melee: true, range: 3, rectWidth: 1, cleave: Infinity },
@@ -317,7 +318,9 @@ export class Player {
     // броня рахується з нуля щоразу: жилет + пасивка Італії + 🧱 Панцир
     this.maxArmor = 50 + vest * 50 + ((powers && powers.maxArmor) || 0) + t2.maxArmor;
     this.helmetMult = (upgrades.helmet ? 0.85 : 1) * ((powers && powers.damageTakenMult) || 1);
-    this.jumpPower = (upgrades.sneakers ? 8.6 : 7.6) + (this.moon ? 1.8 : 0);
+    // 🦘 стрибок теж рахується з нуля, а картки драфту до нього ДОДАЮТЬ — тож базу
+    // міняємо через applyBaseJump, інакше покупка жилета стирала б бонус картки
+    applyBaseJump(this, (upgrades.sneakers ? 8.6 : 7.6) + (this.moon ? 1.8 : 0));
     this.armorRegen = t2.armorRegen;
     this.reloadMult = t2.reloadMult;
     this._applyAmmoBelt(t2.ammoMult);

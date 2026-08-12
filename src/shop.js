@@ -4,6 +4,7 @@ import { HERO_SKINS, PETS } from './characters.js';
 import { t, keyHint } from './i18n.js';
 import { countryPowerMods } from './countrypowers.js';
 import { TIER2, TIER2_ITEMS, tier2Item, tier2Lock } from './tier2.js';
+import { applyBaseMults } from './runbuild.js';
 
 export const SHOP_ITEMS = [
   // --- припаси ---
@@ -449,9 +450,9 @@ export class Shop {
         player.health += 25;
         break;
       case 'speed':
-        player.speedMult = (1 + 0.1 * save.upgrades.speed) * (save.upgrades.sneakers ? 1.08 : 1) * powers.speedMult;
+      case 'damage':
+        applyBaseMults(player, save.upgrades, powers);
         break;
-      case 'damage': player.damageMult = (1 + 0.15 * save.upgrades.damage) * powers.damageMult; break;
       case 'mapeditorplus':
         game.hud.toast(t('🏗️ Створювач карт+ відкрито: друга карта, нові обʼєкти, біоми й бос!'));
         break;
@@ -627,7 +628,7 @@ export class Shop {
         break;
       case 'sneakers':
         player.applyGear(save.upgrades, powers);
-        player.speedMult = (1 + 0.1 * (save.upgrades.speed || 0)) * 1.08 * powers.speedMult;
+        applyBaseMults(player, save.upgrades, powers);
         game.hud.toast(t('👟 Кросівки-ракети! Стрибай вище — {k}', { k: keyHint('кнопка ⬆️', 'Space') }));
         break;
       // 🏅 усі шість покупок ярусу 2 рахує applyGear із save.upgrades — там само, де вже
