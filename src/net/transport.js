@@ -1,6 +1,7 @@
 // Транспорт кооперативу: один WebSocket до relay-сервера.
 // Relay тупий: пересилає {to, d} → {from, d}, кімната = код. Хост має id 1.
-// URL relay: ?relay=... → localStorage zr-relay → DEFAULT_RELAY (Cloudflare Worker).
+// URL relay: ?relay=... → localStorage zr-relay → DEFAULT_RELAY (Cloudflare Worker),
+// причому підміна адреси приймається ЛИШЕ на локальному хості (див. relayAllowed).
 //
 // 📦 Батчинг: вихідні повідомлення збираються в пачку і летять раз на ~100мс
 // (або миттєво для службових). Це втричі менше запитів до Durable Object —
@@ -9,7 +10,17 @@
 const DEFAULT_RELAY = 'wss://zr-relay.slonce70.workers.dev';
 const BATCH_MS = 100;
 
+// Адреса relay — це адреса для ВСІХ мережевих викликів гри (apiBase нижче), у тому числі
+// для хмарного сейва: чужий `?relay=` у підкинутому посиланні забрав би cid і весь прогрес.
+// Тому підміну приймаємо тільки там, де вона потрібна розробнику — на локальному хості
+// (порожній hostname — це file://). На бойовому домені завжди вшита DEFAULT_RELAY.
+function relayAllowed() {
+  const h = typeof location === 'undefined' ? null : location.hostname;
+  return h === '' || h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]';
+}
+
 function relayUrl() {
+  if (!relayAllowed()) return DEFAULT_RELAY;
   const p = new URLSearchParams(location.search).get('relay');
   if (p) return p;
   try {
