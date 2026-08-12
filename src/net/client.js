@@ -441,6 +441,9 @@ export class GuestNet {
       case 'ewc': if (this._chestEvOnce('ewc', a[0])) game._grantEliteChestCoop(); break;
       // золоту скриню взято → нагорода кожному локально (a[0] — seq, exactly-once)
       case 'gch': if (this._chestEvOnce('gch', a[0])) game._grantGoldenChestCoop(); break;
+      // 🥚 v780 «привів друга»: рішення ухвалив ХОСТ (coop.js, claimInviteEgg) — гість лише
+      // виконує. Числа з пакета не беремо жодного: склад нагороди локальний, a[0] — seq.
+      case 'ieg': if (this._chestEvOnce('ieg', a[0])) game._grantInviteEgg(); break;
       // 🌟 v297 «Сила разом»: хост заспавнив супер-пікап → малюємо дзеркальну зірку (лише візуал)
       case 'spx': game._spawnSuperMirror(a[0], a[1], a[2]); break;
       // 🌟 хост вирішив, хто схопив: despawn у всіх; активація сили в грабера, банер решті

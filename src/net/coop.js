@@ -181,6 +181,13 @@ export class CoopSession {
     this.frontStartedOperationId = null;
     this.frontResumeReady = new Map(); // pid -> { operationId, ready } during relay resume grace
     this._helloAt = new Map(); // pid -> час останнього hello (кулдаун у _hostHello)
+    // 🎁 v780 «Запрошення з нагородою» — уся атрибуція «хто кого привів» живе ТУТ.
+    // Гість: нік із листівки (?from=), лише поточне посилання. Хост: pid-и тих, хто
+    // прийшов за листівкою, і прапорець «нагороду вже видано». Нічого з цього не їде
+    // в ростер, у лобі чи в сейв і нічого не переживає кімнату (див. _reset).
+    this.invitedBy = null;
+    this._invited = new Set();
+    this.inviteEggDone = false;
     this.frontResults = new Set();
     this.frontResult = null;
     this.frontAttempt = 0;
@@ -250,6 +257,7 @@ export class CoopSession {
       t: 'hello', ...this.myInfo(),
       build: this.game.constructor.APP_VERSION ?? window.__APP_VERSION,
       proto: PROTO_VERSION,
+      from: this.invitedBy, // 🎁 нік із листівки (або null) — далі ростера не йде
     }, true);
     // чекаємо welcome (хост може бути зайнятий боєм — даємо запас)
     await new Promise((resolve, reject) => {
@@ -303,6 +311,10 @@ export class CoopSession {
     this.frontResults.clear();
     this.frontResult = null;
     this.frontAttempt = 0;
+    // 🎁 кімната закрилась — звʼязок «хто кого привів» зник разом із нею
+    this.invitedBy = null;
+    this._invited.clear();
+    this.inviteEggDone = false;
     if (this.net) { this.net.dispose(); this.net = null; }
   }
 
@@ -657,7 +669,7 @@ export class CoopSession {
     if (this.net && this.net.onMessage(from, d)) return;
 
     if (this.role === 'host') {
-      if (d.t === 'hello') this._hostHello(from, d);
+      if (d.t === 'hello') { this._noteInvite(from, d.from); this._hostHello(from, d); }
       else if (d.t === 'bye') this._dropGuest(from, 'left');
       else if (d.t === 'role') this._hostSetGuestRole(from, d.r, d.rank);
       else if (d.t === 'ready') this._hostSetGuestReady(from, d.ready);
@@ -760,6 +772,35 @@ export class CoopSession {
         this._roomOver(d.why || 'closed');
       }
     }
+  }
+
+  // 🎁 Хто прийшов за листівкою. Гість, що тиснув ?coopjoin=CODE&from=НІК, привозить
+  // нік того, хто його покликав; звіряємо зі СВОЇМ і памʼятаємо рівно pid — у памʼяті
+  // кімнати, поруч із ростером. Дзвонимо ДО _hostHello: там гість уже в ростері.
+  //
+  // ⚠️ Це САМООГОЛОШЕННЯ — та сама межа довіри, що й `hyp` (див. sanitizeHypers):
+  // доказу «я справді прийшов за посиланням» у хоста немає й бути не може. Ціна брехні
+  // обмежена конструкцією: рішення і одноразовість лишаються за хостом (claimInviteEgg),
+  // тож модифікований гість може вибити щонайбільше одне яйце на кімнату — і лише
+  // разом із хостом, а не собі окремо.
+  _noteInvite(from, fromNick) {
+    if (this.roster.has(from)) return; // не вхід, а повтор/реконект — атрибуцію вже вирішили
+    const who = cleanNick(fromNick);
+    if (who && who === this.nick) this._invited.add(from);
+  }
+
+  // 🥚 Рішення про нагороду за приведеного друга — ХОСТ, рівно один раз на кімнату.
+  // true → хост нараховує яйце собі (main._grantInviteEgg), а гість отримує подію `ieg`
+  // тим самим каналом, що гранти скринь (exactly-once по seq у client.js).
+  // Одноразовість тримає this.inviteEggDone: другий забіг у ТІЙ САМІЙ кімнаті нагороди
+  // не дає, а нова кімната починається з чистого _reset.
+  claimInviteEgg() {
+    if (this.role !== 'host' || this.inviteEggDone) return false;
+    const pid = [...this._invited].find((p) => this.roster.has(p));
+    if (!pid) return false;
+    this.inviteEggDone = true;
+    this.transport.send(pid, { t: 'ev', l: [['ieg', 1]] }, true);
+    return true;
   }
 
   _hostHello(from, d) {
@@ -870,6 +911,9 @@ export class CoopSession {
     // кулдаун hello йде разом із гостем: інакше повернення тим самим pid одразу
     // після розриву впиралось би у власний слід і hello не пройшов би
     this._helloAt.delete(pid);
+    // 🎁 і атрибуція запрошення: pid звільнився, наступна дитина в цьому слоті —
+    // вже інша людина, чужого «привів друга» вона не успадковує
+    this._invited.delete(pid);
     this.roster.delete(pid);
     this._resetReady();
     this._broadcastRoster();
@@ -925,6 +969,7 @@ export class CoopSession {
         this.transport.send(1, {
           t: 'hello', ...this.myInfo(),
           build: window.__APP_VERSION, proto: PROTO_VERSION, resume: 1,
+          from: this.invitedBy, // після розриву оголошуємось так само, як при вході
         }, true);
         if (this.net) this.net.connectionBack();
         return;

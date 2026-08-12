@@ -1912,6 +1912,8 @@ export const EN = {
 "Мої ліхтарики світять кожному другові табору — заходь! 🏮": "My lanterns shine for every friend of the camp — come in! 🏮",
 "🥚 Ти заробив {n} яйце петса! Відкрий у Альбомі → 🐾 Петси": "🥚 You earned {n} pet egg! Open it in the Album → 🐾 Pets",
 "🥚 {who} дарує тобі яйце петса! Відкрий у Альбомі → 🐾 Петси": "🥚 {who} gives you a pet egg! Open it in the Album → 🐾 Pets",
+"🥚 ГРАЛИ РАЗОМ — ЯЙЦЕ ОБОМ!": "🥚 PLAYED TOGETHER — AN EGG FOR BOTH!",
+"Друг прийшов за запрошенням. Відкрий у Альбомі → 🐾 Петси": "Your friend came from your invite. Open it in the Album → 🐾 Pets",
 "Друг": "Friend",
 "🥚 З ЯЙЦЯ!": "🥚 FROM THE EGG!",
 "{i} {n} вже з тобою — це корм!": "{i} {n} is already with you — it's food!",
