@@ -22,12 +22,19 @@
 
 Спавну тут ще немає — тільки дані. Тікет має бути зеленим сам по собі.
 
+## Відхилення від тексту тікета (для 05–07)
+
+Ключ у ростері — `sq`, а не `squad`. `_rosterList()` проганяє вже чистий запис
+через `sanitizeRosterEntry` ще раз перед розсилкою, тож ключ на вході й на виході
+мусить збігатися (як у `pet` і `hyp`) — інакше склад мовчки губився б дорогою до
+гостей. Читати склад напарників гостя треба з `session.roster.get(pid).sq`.
+
 **Blocked by:** —
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `sanitizeSquadNet` ріже сміття, дублі й довжину
-- [ ] Склад Загону гостя доїжджає в ростер хоста
-- [ ] `PROTO_VERSION` = 27, коментар пояснює, що саме змінилось
-- [ ] Юніт на `sanitizeSquadNet`, у `quick`
-- [ ] `node test/coop.mjs`, `node test/coop-nick.mjs` зелені
+- [x] `sanitizeSquadNet` ріже сміття, дублі й довжину
+- [x] Склад Загону гостя доїжджає в ростер хоста
+- [x] `PROTO_VERSION` = 27, коментар пояснює, що саме змінилось
+- [x] Юніт на `sanitizeSquadNet`, у `quick` (дописаний у наявний `test/squad-unit.mjs`)
+- [ ] `node test/coop.mjs`, `node test/coop-nick.mjs` зелені — локально не запускались (Playwright без Chromium), лишається за CI

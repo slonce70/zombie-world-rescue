@@ -45,7 +45,14 @@ test('таблиця лімітів покриває ВСІ типи, які х�
     'хост бере гіперзаряди з ростера, а не з повідомлення');
   assert.ok(/room: this\.roomGuard/.test(hostSrc) && /roomActive: this\._liveGadgets\(d\.kind, null\)/.test(hostSrc),
     'хост передає стан і лічильник кімнати');
-  assert.ok(/PROTO_VERSION = 26/.test(protoSrc), 'версія протоколу піднята під нові повідомлення');
+  // Версія протоколу: пінимо не цифру (кожен бамп наступав би на ці граблі), а
+  // РОЗСИНХРОН — що номер узагалі є і що кооп жене в мережу саме його, а не свою копію.
+  const proto = Number((protoSrc.match(/export const PROTO_VERSION = (\d+);/) || [])[1]);
+  assert.ok(Number.isInteger(proto) && proto > 0, 'PROTO_VERSION мусить бути цілим номером');
+  assert.ok(/import \{[^}]*\bPROTO_VERSION\b[^}]*\} from '\.\/protocol\.js'/.test(coopSrc),
+    'кооп мусить брати номер із protocol.js, а не тримати власну копію');
+  assert.ok(/proto: PROTO_VERSION/.test(coopSrc), 'гість шле в hello саме цей номер');
+  assert.ok(/d\.proto !== PROTO_VERSION/.test(coopSrc), 'а хост звіряє вхідний hello з ним же');
   assert.ok(/hyp: sanitizeHypers\(own\(src, 'hyp'\)\)/.test(coopSrc), 'ростер чистить оголошені гіперзаряди');
   assert.ok(/HYPER_IDS\.includes\(id\)/.test(coopSrc), 'чистить саме каталогом магазину');
   assert.ok(/build: this\._sharedBuild\(\)/.test(hostSrc), 'хост передає спільну збірку в перевірку');

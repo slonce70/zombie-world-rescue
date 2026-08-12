@@ -15,6 +15,7 @@ import {
 import { sanitizeCommunitySnapshot, sanitizeMapSize, sanitizeMapStyle } from '../../worker/community-schema.mjs';
 import { SPECIALIST_IDS, SPECIALISTS, sanitizeSpecialistId, specialistModifiers, specialistRank } from '../specialists.js';
 import { HYPER_IDS } from '../shop.js';
+import { sanitizeSquad, sanitizeSquadNet } from '../squad.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
@@ -146,6 +147,9 @@ export function sanitizeRosterEntry(raw, forcedPid = undefined) {
     pet: rosterId(PETS, own(src, 'pet'), null),
     // ⚡ куплені гіперзаряди: хост звіряє з ними прапорець посилення в каналі гаджетів
     hyp: sanitizeHypers(own(src, 'hyp')),
+    // 🎒 склад Загону: хост веде напарників гостя сам, тож бере їх звідси (див. sanitizeSquadNet).
+    // Ключ той самий на вході й на виході — _rosterList() чистить уже чистий запис ще раз.
+    sq: sanitizeSquadNet(own(src, 'sq')),
     ready: own(src, 'ready') === true,
   };
 }
@@ -199,6 +203,9 @@ export class CoopSession {
       pet: save.activePet || null, // 🐾 id активного улюбленця — друзі бачать його поряд
       // ⚡ гіперзаряди: щоб куплене працювало й тоді, коли ти ГІСТЬ, а не хост
       hyp: Array.isArray(save.gadgetHypers) ? save.gadgetHypers : [],
+      // 🎒 склад Загону: оголошуємо з ВЛАСНОГО сейва (тут врятовані й слоти відомі),
+      // а хост його ще раз ріже sanitizeSquadNet — сейва гостя в нього немає
+      sq: sanitizeSquad(save),
     });
   }
 

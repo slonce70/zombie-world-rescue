@@ -51,6 +51,29 @@ export function sanitizeSquad(save) {
   return clean.slice(0, squadSlots(save));
 }
 
+// 🌐 Стеля складу в мережі: та сама двійка, що й максимум слотів у соло (squadSlots).
+export const SQUAD_NET_MAX = 2;
+
+// 🤝 Оголошення складу Загону гостем (PROTO 27). ЧИСТА функція: ні сейва, ні DOM.
+//
+// ⚠️ МЕЖА ДОВІРИ, і вона тут навмисна — та сама, що в `sanitizeHypers` (net/coop.js).
+// Сейв гостя живе у гостя, тож хост перевіряє ФОРМУ (чи існує такий друг і чи має він
+// архетип), а не ВОЛОДІННЯ (чи справді гість його врятував і чи відкрив другий слот).
+// Тому це НЕ `sanitizeSquad(save)`: та читає врятованих із сейва ГРАВЦЯ і лишається
+// для соло. Ціна брехні — щонайбільше чужий напарник у дитячій кімнаті, з тими самими
+// авторитарними в хоста лікуванням/шкодою; ціна недовіри — чесний гість не бачить
+// свого друга взагалі.
+export function sanitizeSquadNet(ids) {
+  if (!Array.isArray(ids)) return [];
+  const out = [];
+  for (const id of ids) {
+    if (typeof id !== 'string' || out.includes(id) || !squadArchetype(id)) continue;
+    out.push(id);
+    if (out.length >= SQUAD_NET_MAX) break;
+  }
+  return out;
+}
+
 // Перемикач «йде зі мною / лишається в таборі». Повертає НОВИЙ масив.
 export function toggleSquadMember(save, countryId) {
   const current = sanitizeSquad(save);

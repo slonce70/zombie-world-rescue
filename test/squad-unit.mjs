@@ -31,8 +31,8 @@ let resolved = squadSrc;
 for (const [spec, code] of stubs) resolved = resolved.replace(spec, asData(code));
 const squad = await import(asData(resolved));
 const {
-  SQUAD_ARCHETYPES, SQUAD_MAX_HP, SQUAD_DOWN_SECS,
-  squadSlots, squadArchetype, sanitizeSquad, toggleSquadMember,
+  SQUAD_ARCHETYPES, SQUAD_MAX_HP, SQUAD_DOWN_SECS, SQUAD_NET_MAX,
+  squadSlots, squadArchetype, sanitizeSquad, sanitizeSquadNet, toggleSquadMember,
 } = squad;
 
 const saveWith = (ids, squadIds = []) => ({
@@ -82,6 +82,46 @@ test('toggle adds, removes and rotates when slots are full', () => {
   assert.deepEqual(toggleSquadMember(six, 'POL'), ['UKR', 'POL'], 'на 6 друзях два слоти');
   assert.deepEqual(toggleSquadMember({ ...six, squad: ['UKR', 'POL'] }, 'DEU'), ['POL', 'DEU'],
     'слоти повні — найстаріший поступається');
+});
+
+// ---------- v770: гість оголошує склад Загону, хост його чистить ----------
+
+test('оголошений склад: сміття, дублі й довжина ріжуться без жодного сейва', () => {
+  assert.equal(SQUAD_NET_MAX, 2, 'стеля в мережі — та сама, що максимум слотів у соло');
+  assert.deepEqual(sanitizeSquadNet(['UKR', 'POL']), ['UKR', 'POL'], 'порядок гостя зберігається');
+  assert.deepEqual(sanitizeSquadNet(['UKR', 'POL', 'DEU']), ['UKR', 'POL'], 'третій напарник відрізаний');
+  assert.deepEqual(sanitizeSquadNet(['UKR', 'UKR', 'POL']), ['UKR', 'POL'], 'дубль не з’їдає слот');
+  assert.deepEqual(sanitizeSquadNet(['NOPE', 'LOST', 'UKR']), ['UKR'], 'без архетипу і поза каталогом — ні');
+  assert.deepEqual(sanitizeSquadNet([42, null, undefined, {}, ['UKR'], '', 'UKR']), ['UKR'], 'не рядок — не друг');
+  for (const junk of [undefined, null, 'UKR', {}, 0, { 0: 'UKR', length: 1 }]) {
+    assert.deepEqual(sanitizeSquadNet(junk), [], 'не масив — порожньо');
+  }
+});
+
+test('оголошений склад: хост звіряє ФОРМУ, а не володіння — і це навмисно', () => {
+  // Сейв гостя живе у гостя: доказу «я справді врятував Стефанка» в хоста немає й
+  // бути не може (та сама межа, що в sanitizeHypers). Модифікований клієнт може
+  // оголосити двох чужих напарників — лікування і шкода в них однаково авторитарні
+  // в хоста. Якщо колись зʼявиться довірене джерело прогресу, цей тест впаде — і це
+  // правильно: рішення має бути свідомим.
+  assert.deepEqual(sanitizeSquadNet(['JPN', 'CHN']), ['JPN', 'CHN'],
+    'оголошення досить — сейва хост не питає');
+  // а соло-шлях лишається суворим: там сейв Є, і він перевіряється
+  assert.deepEqual(sanitizeSquad(saveWith(['UKR'], ['JPN'])), [], 'у соло неврятований не йде в бій');
+});
+
+test('склад Загону доїжджає в ростер хоста тим самим ключем', () => {
+  const coopSrc = readFileSync(new URL('net/coop.js', root), 'utf8');
+  const protoSrc = readFileSync(new URL('net/protocol.js', root), 'utf8');
+  // `sq` приїхав у 27 — старі вкладки мусять отримати відмову, а не мовчазний збій.
+  // Пінимо «не нижче», а не саме 27: наступний бамп протоколу нічого тут не ламає.
+  const proto = Number((protoSrc.match(/export const PROTO_VERSION = (\d+);/) || [])[1]);
+  assert.ok(proto >= 27, `склад Загону в hello вимагає протоколу ≥27 (зараз ${proto})`);
+  assert.ok(/sq: sanitizeSquad\(save\)/.test(coopSrc), 'гість оголошує склад зі свого сейва');
+  assert.ok(/sq: sanitizeSquadNet\(own\(src, 'sq'\)\)/.test(coopSrc), 'хост чистить оголошене каталогом');
+  // _rosterList() проганяє вже чистий запис через sanitizeRosterEntry ще раз — якщо
+  // ключ на вході й на виході розійдеться, склад мовчки згубиться дорогою до гостей
+  assert.ok(!/squad: sanitizeSquadNet/.test(coopSrc), 'ключ ростера мусить збігатися з ключем hello');
 });
 
 test('archetype lookup is safe for unknown countries', () => {
