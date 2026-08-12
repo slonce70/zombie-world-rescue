@@ -9,6 +9,7 @@ import { starTotal, countryStars, CAMPAIGN_STAR_MAX, STAR_THRESHOLDS, STARS_PER_
 import { rescuedFriendCount, FRIEND_TOTAL } from '../friends.js';
 import { claimStarEggs } from '../eggs.js';
 import { hasLiberated } from '../net/cloudsave.js';
+import { isFirstSteps } from '../firststeps.js';
 import { countryPower } from '../countrypowers.js';
 import { captureFrame, victoryCardText } from './sharecard.js';
 import { loadNick } from '../net/coop.js';
@@ -84,10 +85,17 @@ export function showVictory(game) {
   // Рівно один раз за перемогу; PNG кодується аж на тапі «Похвалитися».
   const victoryFrame = captureFrame(game.renderer, game.level.scene, game.level.player?.camera);
   const wasLiberated = !!game.save.liberated[country.id];
+  // 🐣 мить, коли гра відкривається: до цієї перемоги пів меню було сховане (firststeps.js)
+  const openedUp = isFirstSteps(game.save.liberated);
   game.save.liberated[country.id] = true;
   if (!wasLiberated && !(game.save.upgrades.mapeditor > 0)) {
     game.save.upgrades.mapeditor = 1;
     game.hud.toast(t('🧱 Створювач карт відкрито! Повернися на глобус → Меню.'));
+  }
+  // 👋 коротке привітання рівно один раз назавжди — разові підказки вже вміють це самі
+  if (openedUp) {
+    game.hud.hintOnce('firstSteps', t('🎉 ГРУ ВІДКРИТО!'),
+      t('У ☰ Меню зʼявились Зоряний шлях, Гардероб, Альбом, База й Ліга — зазирни!'));
   }
   if (game.level.moonRegion) {
     const worldId = game.level.spaceWorld?.id || 'MOON';

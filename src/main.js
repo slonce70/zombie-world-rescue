@@ -37,6 +37,7 @@ import { getMoonRegion, getSpaceWorld } from './moonregions.js';
 import { MoonHazards } from './moonhazards.js';
 import { Bus, RNG, disposeObject } from './utils.js';
 import { COUNTRIES, CAMPAIGN_ORDER, getBiome, isCountryOpen, nextTarget } from './countries.js';
+import { isFirstSteps, FIRST_STEPS_HIDDEN } from './firststeps.js';
 import { countryPowerMods } from './countrypowers.js';
 import { TouchControls, isTouchDevice } from './touch.js';
 import { Progress, DailyQuests, DailyGift, GIFT_TABLE, PASS_REWARDS, PASS_MAX_LEVEL, xpForLevel, XP_VALUES } from './progress.js';
@@ -1487,6 +1488,13 @@ class Game {
   }
 
   _nextActionInfo() {
+    // 🐣 перші п'ять хвилин: доки не звільнено жодної країни, компас показує РІВНО одну
+    // ціль — Україну. Сезон і ціль магазину зараз сховані, вести в них нікуди.
+    // У ?test гейт не діє: браузерні батареї працюють із порожнім сейвом (як gift-модалка).
+    if (!this.testMode && isFirstSteps(this.save.liberated)) {
+      const first = COUNTRIES[CAMPAIGN_ORDER[0]];
+      return { icon: '🧭', title: t('Далі'), text: t('{f} {n}: звільни країну', { f: first.flag, n: first.name }) };
+    }
     // 🗓️ незабрана нагорода сезону — найдешевша дія, кличемо одразу
     const season = seasonState(this.save, this._weekIndex());
     if (season.claimable > 0) {
@@ -1616,6 +1624,15 @@ class Game {
       if (biomeBtn) { biomeBtn.hidden = !plusOwned; biomeBtn.textContent = customMap.biome === 'snow' ? t('❄️ Снігова карта') : t('☀️ Літня карта'); }
       if (playBtn) playBtn.hidden = !editorOwned || !customMap.objects.length;
       if (deleteBtn) deleteBtn.hidden = !editorOwned || !customMap.objects.length;
+      // 🐣 перші п'ять хвилин: доки не звільнено жодної країни, на екрані лишається одна
+      // ціль і одна кнопка. Ховаємо атрибутом hidden — після України той самий список
+      // повертає все на місце, а гравець із прогресом нічого й не помічає.
+      // ?test лишає меню повним — інакше батареї з порожнім сейвом клікають у сховане
+      const firstSteps = !this.testMode && isFirstSteps(this.save.liberated);
+      for (const id of FIRST_STEPS_HIDDEN) {
+        const el = document.getElementById(id);
+        if (el) el.hidden = firstSteps;
+      }
     }
     if (this.coop) this.coop.updateRoomChip();
   }

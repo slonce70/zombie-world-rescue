@@ -59,6 +59,8 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
   box-shadow: 0 6px 18px rgba(255,140,40,.45); animation: gift-pulse 1.6s ease-in-out infinite;
 }
 #gift-chip.show { display: inline-flex; }
+/* 🐣 перші п'ять хвилин: hidden мусить перебивати .show (однакова вага — вирішує порядок) */
+#gift-chip[hidden] { display: none; }
 @keyframes gift-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 /* 🏕️ чіп-нагадування квесту табору — видно лише коли квест виконано й не забрано */
 #camp-quest-chip {

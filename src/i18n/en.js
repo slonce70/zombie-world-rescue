@@ -587,6 +587,8 @@ export const EN = {
 "▶️ Грати власну карту": "▶️ Play Custom Map",
 "🔒 Спершу звільни першу країну — Створювач карт відкриється автоматично.": "🔒 Liberate your first country to unlock Map Creator automatically.",
 "🧱 Створювач карт відкрито! Повернися на глобус → Меню.": "🧱 Map Creator unlocked! Return to the globe → Menu.",
+"🎉 ГРУ ВІДКРИТО!": "🎉 THE GAME IS OPEN!",
+"У ☰ Меню зʼявились Зоряний шлях, Гардероб, Альбом, База й Ліга — зазирни!": "The ☰ Menu now has Star Path, Wardrobe, Album, Base and League — take a look!",
 "🧱 СТВОРЮВАЧ КАРТ ·": "🧱 MAP CREATOR ·",
 "· ОБРАНО:": "· SELECTED:",
 "✋ Поставити": "✋ Place",

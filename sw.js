@@ -37,6 +37,7 @@ const SHELL = [
   './src/moonhazards.js',
   './src/utils.js',
   './src/countries.js',
+  './src/firststeps.js',
   './src/countrypowers.js',
   './src/tier2.js',
   './src/mapsize.js',

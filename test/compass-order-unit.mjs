@@ -29,10 +29,12 @@ const SOLO_MODES = [];
 // far — накопичено 30% ціни, near — 90%: правило «майже зібрано» пускає вперед лише near.
 const shopGoal = { done: false, need: 1000, have: 300, remaining: 700, item: { icon: '🔫', name: 'Автомат' } };
 const shopGoalNear = { done: false, need: 1000, have: 900, remaining: 100, item: { icon: '🔫', name: 'Автомат' } };
+// 🐣 гейт «перших п'яти хвилин» — той самий, що в src/firststeps.js
+const isFirstSteps = (liberated) => !Object.values(liberated || {}).some(Boolean);
 const build = (goal) => new Function(
-  'goalInfo', 't', 'seasonState', 'CAMPAIGN_ORDER', 'COUNTRIES', 'SOLO_MODES',
+  'goalInfo', 't', 'seasonState', 'CAMPAIGN_ORDER', 'COUNTRIES', 'SOLO_MODES', 'isFirstSteps',
   `${body}\nreturn nextActionInfo;`,
-)(() => goal, t, () => ({ claimable: 0, next: null, index: 0 }), CAMPAIGN_ORDER, COUNTRIES, SOLO_MODES);
+)(() => goal, t, () => ({ claimable: 0, next: null, index: 0 }), CAMPAIGN_ORDER, COUNTRIES, SOLO_MODES, isFirstSteps);
 
 const fakeGame = (liberated) => ({
   save: { liberated, infected: { done: true }, weekly: {} },
@@ -61,8 +63,10 @@ test('без цілі магазину кампанія веде так само
   assert.ok(info.text.includes('Польща'), 'наступна незвільнена — Польща');
 });
 
+// v760: до першої звільненої країни компас веде РІВНО в Україну (розділи ще сховані),
+// тож «майже зібрану ціль» перевіряємо з другої країни — саме там правило й працює.
 test('майже зібрана ціль магазину не мовчить до кінця кампанії', () => {
-  const info = build(shopGoalNear).call(fakeGame({}));
+  const info = build(shopGoalNear).call(fakeGame({ UKR: true }));
   assert.equal(info.title, 'Ціль магазину', `майже зібрана ціль не спливла: ${JSON.stringify(info)}`);
   assert.ok(info.text.includes('100'), 'показує, скільки лишилось докопити');
 });
@@ -70,6 +74,12 @@ test('майже зібрана ціль магазину не мовчить д
 test('рівно на межі 80% ціль уже підказують, нижче — ні', () => {
   const at80 = { done: false, need: 1000, have: 800, remaining: 200, item: { icon: '🔫', name: 'Автомат' } };
   const below = { done: false, need: 1000, have: 799, remaining: 201, item: { icon: '🔫', name: 'Автомат' } };
-  assert.equal(build(at80).call(fakeGame({})).title, 'Ціль магазину');
-  assert.equal(build(below).call(fakeGame({})).icon, '🧭', 'далека ціль кампанію не перебиває');
+  assert.equal(build(at80).call(fakeGame({ UKR: true })).title, 'Ціль магазину');
+  assert.equal(build(below).call(fakeGame({ UKR: true })).icon, '🧭', 'далека ціль кампанію не перебиває');
+});
+
+test('перші п\'ять хвилин: до першої країни компас показує рівно одну ціль', () => {
+  const info = build(shopGoalNear).call(fakeGame({}));
+  assert.equal(info.icon, '🧭', `новачка повели не в Україну: ${JSON.stringify(info)}`);
+  assert.ok(info.text.includes('Україна'), 'ціль одна — перша країна кампанії');
 });
