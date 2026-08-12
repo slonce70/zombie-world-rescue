@@ -177,8 +177,19 @@ export class Room {
     let id, validResume = false;
     if (create) {
       if (peers.has(1)) return new Response('taken', { status: 409 });
+      // 🛡️ create НЕ обходить анти-перехоплення слота хоста: якщо кімната ще жива і секрет
+      // слота 1 уже виданий, то це не «нова кімната», а вікно грейсу зниклого хоста
+      // (30с до alarm). Слот 1 у ньому дістає лише той, хто принесе той самий секрет,
+      // решта — 409 (клієнт create() перебирає інший код кімнати).
+      const claimed = (await this.state.storage.get('alive')) && (await this.state.storage.get('key:1'));
+      if (claimed) {
+        if (!resumeKey || resumeKey !== claimed) return new Response('taken', { status: 409 });
+        validResume = true; // хост повернувся зі своїм ключем — лишаємо той самий секрет
+      }
       id = 1;
-      await this.state.storage.put('nextId', 2);
+      // nextId скидаємо ЛИШЕ для справді нової кімнати: у живій кімнаті гості вже мають
+      // свої pid, і скидання в 2 видало б наступному гостю чужий id (колізія).
+      if (!(await this.state.storage.get('nextId'))) await this.state.storage.put('nextId', 2);
       await this.state.storage.put('alive', true);
     } else {
       const alive = await this.state.storage.get('alive');
@@ -664,6 +675,7 @@ export class SaveVault {
 // Кращий результат на гравця (cid) у кожному режимі+країні.
 // ============================================================
 const MODES = { storm: 'desc', arena: 'asc', coopstorm: 'desc' }; // як сортувати score
+const MAX_ENTRIES = 500; // стеля записів на (mode, country); показуємо однаково лише топ-50
 // 🤝 командні режими: запис показуємо лише коли реально грали разом (team ≥ 2)
 const TEAM_MODES = new Set(['coopstorm']);
 
@@ -759,6 +771,16 @@ export class League {
     const cur = this.sql.exec(
       'SELECT score FROM entries WHERE cid = ? AND mode = ? AND country = ?', cid, mode, country
     ).toArray();
+    // 🛡️ стеля таблиці тримається на кількості УНІКАЛЬНИХ cid, а не на витісненні найгірших:
+    // новий гравець не потрапляє у переповнену (mode, country), але й НІКОГО звідти не виносить.
+    // Раніше надлишок різався за рангом — і накрутка стирала рекорди справжніх гравців назавжди.
+    // Накрутити СВОЄ місце все ще можна: рахунок без підпису — свідомо прийнята ціна (TODO.md).
+    if (!cur.length) {
+      const full = this.sql.exec(
+        'SELECT COUNT(*) AS n FROM entries WHERE mode = ? AND country = ?', mode, country
+      ).toArray();
+      if ((full[0].n | 0) >= MAX_ENTRIES) return this.rankResponse(mode, country, cid);
+    }
     const better = !cur.length || (MODES[mode] === 'desc' ? score > cur[0].score : score < cur[0].score);
     if (better) {
       this.sql.exec(
@@ -770,16 +792,6 @@ export class League {
     } else {
       // нік міг змінитись — оновлюємо м'яко
       this.sql.exec('UPDATE entries SET nick = ? WHERE cid = ? AND mode = ? AND country = ?', nick, cid, mode, country);
-    }
-    // показуємо лише топ-50 → тримаємо щонайбільше 500 на (mode,country), решту прибираємо
-    const ord = MODES[mode] === 'desc' ? 'DESC' : 'ASC';
-    const cnt = this.sql.exec('SELECT COUNT(*) AS n FROM entries WHERE mode = ? AND country = ?', mode, country).toArray();
-    if ((cnt[0].n | 0) > 500) {
-      this.sql.exec(
-        `DELETE FROM entries WHERE mode = ? AND country = ? AND cid IN (
-           SELECT cid FROM entries WHERE mode = ? AND country = ? ORDER BY score ${ord} LIMIT -1 OFFSET 500)`,
-        mode, country, mode, country
-      );
     }
     return this.rankResponse(mode, country, cid);
   }
