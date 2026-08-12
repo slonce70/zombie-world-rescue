@@ -227,8 +227,10 @@ export const MSG_GAPS = { lvlready: 600, ping: 900, twh: 100 };
 // `seen` — Map(pid → { тип: час }), живе на хості; гість вийшов — рядок видалили.
 // Тип без рядка в MSG_GAPS не стримується взагалі.
 export function throttleMsg(seen, pid, type, now) {
+  // 🧷 hasOwn, а не просто читання: `d.t = 'constructor'` дало б truthy-функцію з
+  // ланцюга прототипів, швидкий вихід не спрацював би, а `now - last` стало б NaN
+  if (!Object.hasOwn(MSG_GAPS, type)) return true;
   const gap = MSG_GAPS[type];
-  if (!gap) return true;
   if (!seen || typeof seen.get !== 'function' || !Number.isFinite(now)) return true;
   let byType = seen.get(pid);
   if (!byType) seen.set(pid, byType = Object.create(null));

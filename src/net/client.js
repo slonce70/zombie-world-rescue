@@ -192,7 +192,10 @@ export class GuestNet {
       }
       case 'healed': {
         const p = this.level.player;
-        if (p) p.heal(hostInt(d.amt, 0, MAX_HEAL));
+        // 🩹 саме hostNum, а не hostInt: цілющий тотем шле 5*dt (0.083 HP на кадр),
+        // і округлення зʼїдало б лікування в нуль (а при 10 FPS давало б удвічі
+        // забагато). Player.heal рахує дробами — межа 0..MAX_HEAL лишається.
+        if (p) p.heal(hostNum(d.amt, 0, MAX_HEAL));
         return true;
       }
       case 'revived': {

@@ -160,7 +160,9 @@ test('лікування не спрацьовує далеко від влас�
 test('число лікування клампиться на боці ГОСТЯ, а не довіряється хосту', () => {
   const client = readFileSync(new URL('../src/net/client.js', import.meta.url), 'utf8');
   assert.match(client, /case 'healed':/, 'канал лікування вже є — новий тип не потрібен');
-  assert.match(client, /p\.heal\(hostInt\(d\.amt, 0, MAX_HEAL\)\)/, 'amt проходить через межу довіри');
+  // саме hostNum: межа 0..MAX_HEAL лишається, а от округлення зʼїдало б дробове
+  // лікування щокадру (тотем шле 5*dt) — див. test/guest-trust-unit.mjs
+  assert.match(client, /p\.heal\(hostNum\(d\.amt, 0, MAX_HEAL\)\)/, 'amt проходить через межу довіри');
 });
 
 // ---------- клон гаджета не зачеплений ----------

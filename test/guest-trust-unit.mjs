@@ -156,7 +156,31 @@ test('шкода/лікування/паралізація від хоста п�
   assert.match(src, /p\.takeDamage\(hostInt\(d\.dmg, 0, MAX_DMG\)/, 'hurt: dmg клампиться');
   assert.match(src, /hostNum\(d\.fx, -MAX_POS, MAX_POS\), hostNum\(d\.fz, -MAX_POS, MAX_POS\)/, 'hurt: напрямок теж');
   assert.match(src, /hostNum\(d\.stun, 0, MAX_STUN\)/, 'hurt: stun має стелю — інакше вічний параліч');
-  assert.match(src, /p\.heal\(hostInt\(d\.amt, 0, MAX_HEAL\)\)/, 'healed: amt клампиться');
+  assert.match(src, /p\.heal\(hostNum\(d\.amt, 0, MAX_HEAL\)\)/,
+    'healed: amt клампиться — але БЕЗ округлення (див. тест про тотем)');
+});
+
+test('лікування тотемом накопичується дробами, а не зникає в нулі', () => {
+  // 🩹 Цілющий тотем шле healPlayer(pl, 5 * dt) ЩОКАДРУ: при 60 FPS це 0.083 HP.
+  // hostInt округляв би такий пакет у 0 — смужка гостя не рухалась би взагалі,
+  // а при 10 FPS Math.round(0.5) = 1 давало б удвічі більше за чесні 5 HP/с.
+  const g = fakeGuest();
+  for (const fps of [60, 30, 10]) {
+    g.log.healed.length = 0;
+    const dt = 1 / fps;
+    for (let i = 0; i < fps; i++) GuestNet.prototype.onMessage.call(g, 1, { t: 'healed', amt: 5 * dt });
+    const total = g.log.healed.reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(total - 5) < 1e-9, `${fps} FPS: за секунду тотем мусить дати рівно 5 HP, а не ${total}`);
+  }
+  // межа лишилась на місці: чит-хост не вилікує гостя на мільйон
+  GuestNet.prototype.onMessage.call(g, 1, { t: 'healed', amt: 1e9 });
+  assert.equal(g.log.healed.at(-1), 1000, 'стеля MAX_HEAL діє так само, як діяла');
+  GuestNet.prototype.onMessage.call(g, 1, { t: 'healed', amt: -50 });
+  assert.equal(g.log.healed.at(-1), 0, 'відʼємне «лікування» (тобто шкода в обхід hurt) — нуль');
+  for (const junk of [NaN, Infinity, {}, 'ой', undefined]) {
+    GuestNet.prototype.onMessage.call(g, 1, { t: 'healed', amt: junk });
+    assert.equal(g.log.healed.at(-1), 0, `сміття ${String(junk)} — нуль, а не NaN у здоровʼї`);
+  }
 });
 
 test('усе, що тече в save.coins, має стелю', () => {

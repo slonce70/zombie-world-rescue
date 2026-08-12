@@ -21,6 +21,12 @@ const CLONE_FOOT_LIFT = 0.16;
 // знати, бабуся це чи дитина. Дешевше за 6-те поле в кожному записі.
 const SQ_DOWN = 1, SQ_RUN = 2, SQ_ATTACK = 4, SQ_GRANNY = 8;
 
+// 🎒🌐 стеля довжини списку Загону від хоста: 2 напарники × 4 гравці = 8 чесних
+// записів (squadNet більше й не вміє зібрати). Симетрія до MAX_NET_HITS у host.js:
+// кожен небачений nid — це makeCivilian + bakeRig, тобто гуманоїд з нуля, дорожче
+// за зомбі. Зламаний хост із сотнями nid поклав би вкладку гостя за кадр.
+const MAX_NET_SQUAD = 8;
+
 // ============================================================
 // 🦙 Мегабокс: святкова скриня з pity-механікою
 // ============================================================
@@ -1596,7 +1602,7 @@ export class Gadgets {
   // Формат запису: [nid, x, z, yaw, st] — ті самі 5 полів, що в турелей і зомбі.
   netSquad(list) {
     const seen = new Set();
-    for (const e of list || []) {
+    for (const e of (Array.isArray(list) ? list : []).slice(0, MAX_NET_SQUAD)) {
       // числа від хоста: NaN/Infinity зламали б трансформ рига назавжди (той самий
       // принцип, що hostNum у client.js — але тут досить просто пропустити запис)
       if (!Array.isArray(e) || !e.slice(0, 4).every(Number.isFinite)) continue;

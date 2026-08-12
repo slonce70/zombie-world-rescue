@@ -495,3 +495,19 @@ test('стан кулдаунів чиститься разом із госте�
   assert.ok(throttleMsg(null, 1, 'ping', 0), 'без мапи — просто пускаємо');
   assert.ok(throttleMsg(new Map(), 1, 'ping', NaN), 'без часу — теж');
 });
+
+test('тип із ланцюга прототипів — не рядок таблиці', () => {
+  // `d.t` приходить із мережі: 'constructor' повертав би truthy-функцію як gap,
+  // швидкий вихід не спрацьовував, `now - last` давало NaN — і повідомлення йшло далі
+  const seen = new Map();
+  for (const type of ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf']) {
+    for (let i = 0; i < 5; i++) {
+      assert.equal(throttleMsg(seen, 2, type, 1000), true,
+        `${type} мусить поводитись як звичайний нетабличний тип, а не як рядок таблиці`);
+    }
+  }
+  // і жоден із них не отруїв мапу кулдаунів чесних типів
+  assert.ok(throttleMsg(seen, 2, 'ping', 1000), 'перший чесний ping після цього проходить');
+  assert.ok(!throttleMsg(seen, 2, 'ping', 1000), 'а дубль — ні, кулдаун живий');
+  assert.match(source, /Object\.hasOwn\(MSG_GAPS, type\)/, 'перевірка мусить бути власною, а не по ланцюгу');
+});

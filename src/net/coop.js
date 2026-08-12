@@ -19,6 +19,10 @@ import { sanitizeSquad, sanitizeSquadNet } from '../squad.js';
 
 const NICK_KEY = 'zr-nick';
 const JOIN_WELCOME_TIMEOUT_MS = 30000;
+// 🚪 мінімальний інтервал між ПОВТОРНИМИ hello від того, хто вже в ростері
+// (_hostHello). Чесний повтор буває лише на реконекті, а там пауза між спробами
+// від 1200 мс — запас є; 60 Гц спаму тостами й ростером не лишається нічого.
+const HELLO_GAP = 1000;
 
 // 🎭 кооп-ролі v1: дитина в лобі обирає «ким я буду» (ідентичність + маленький САМО-баф).
 // Роль знімається СНАПШОТОМ на старті рівня (див. main._buildLevel), змінити посеред бою не діє.
@@ -176,6 +180,7 @@ export class CoopSession {
     this.communityMap = null;  // 🏘️ точний знімок карти спільноти цієї кімнати
     this.frontStartedOperationId = null;
     this.frontResumeReady = new Map(); // pid -> { operationId, ready } during relay resume grace
+    this._helloAt = new Map(); // pid -> час останнього hello (кулдаун у _hostHello)
     this.frontResults = new Set();
     this.frontResult = null;
     this.frontAttempt = 0;
@@ -294,6 +299,7 @@ export class CoopSession {
     this.hostDiffStar = 1;
     this.frontStartedOperationId = null;
     this.frontResumeReady.clear();
+    this._helloAt.clear();
     this.frontResults.clear();
     this.frontResult = null;
     this.frontAttempt = 0;
@@ -757,6 +763,18 @@ export class CoopSession {
   }
 
   _hostHello(from, d) {
+    // 🚪 Кулдаун ПОВТОРНОГО hello. Це єдині двері в хост без ліміту: гість, уже
+    // прийнятий у кімнату, проходить гард ростера (host.js) і throttleMsg (у
+    // MSG_GAPS немає рядка `hello` — і не може бути: перший hello до троттлера не
+    // доїжджає взагалі, host.js віддає false раніше). А кожен hello — це ростер
+    // усій кімнаті, тост і клац у хоста, а при реконекті ще й повний start spec.
+    // Гейт стосується ЛИШЕ тих, хто вже в ростері: перший hello від невідомого
+    // pid мусить проходити завжди, інакше вхід у кімнату зламається назавжди.
+    // Чесний повтор — це реконект, а там між спробами щонайменше 1200 мс.
+    const now = performance.now();
+    const lastHello = this._helloAt.get(from);
+    if (this.roster.has(from) && lastHello !== undefined && now - lastHello < HELLO_GAP) return;
+    this._helloAt.set(from, now);
     const appV = window.__APP_VERSION;
     if (d.proto !== PROTO_VERSION || d.build !== appV) {
       this.transport.send(from, { t: 'reject', why: 'build', hostBuild: appV }, true);
@@ -849,6 +867,9 @@ export class CoopSession {
     if (why === 'lost' && this.mode === 'front' && operationId) {
       this.frontResumeReady.set(pid, { operationId, ready: r.ready === true });
     } else this.frontResumeReady.delete(pid);
+    // кулдаун hello йде разом із гостем: інакше повернення тим самим pid одразу
+    // після розриву впиралось би у власний слід і hello не пройшов би
+    this._helloAt.delete(pid);
     this.roster.delete(pid);
     this._resetReady();
     this._broadcastRoster();

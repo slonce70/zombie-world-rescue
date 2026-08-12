@@ -25,6 +25,11 @@ assert.ok(bits, 'у src/extras.js мають бути біти стану нап
 const SQ = Function(`const ${bits[1]}; return { SQ_DOWN, SQ_RUN, SQ_ATTACK, SQ_GRANNY };`)();
 Object.assign(globalThis, SQ);
 
+// стеля довжини списку — теж СПРАВЖНЯ з extras.js (netSquad читає її як модульну константу)
+const MAX_NET_SQUAD = Number((src.match(/const MAX_NET_SQUAD = (\d+);/) || [])[1]);
+assert.ok(Number.isInteger(MAX_NET_SQUAD), 'у src/extras.js має бути стеля MAX_NET_SQUAD');
+globalThis.MAX_NET_SQUAD = MAX_NET_SQUAD;
+
 globalThis.CLONE_FOOT_LIFT = 0.16;
 globalThis.damp = (a, b) => b;          // тест перевіряє напрямок, не криву згладжування
 globalThis.dampAngle = (a, b) => b;
@@ -111,6 +116,26 @@ test('напарник зник зі снапшота — ріг знято і �
   assert.ok(gone.disposed, 'disposeObject на знятому ригу — інакше течуть GPU-ресурси');
   g.netSquad([]);
   assert.equal(g._netSquad.size, 0, 'порожній список прибирає всіх');
+});
+
+test('довжина списку від хоста має стелю — симетрія до MAX_NET_HITS', () => {
+  const cap = MAX_NET_SQUAD;
+  assert.ok(cap >= 8, 'стеля мусить умістити 2 напарники × 4 гравці');
+  const g = gadgets();
+  // зламаний хост: 500 унікальних nid, кожен — makeCivilian + bakeRig з нуля
+  g.netSquad(Array.from({ length: 500 }, (_, i) => [i, 0, 0, 0, 0]));
+  assert.equal(g._netSquad.size, cap, 'рігів створено рівно по стелю');
+  assert.equal(g.level.scene.added.length, cap, 'і в сцену додано стільки ж');
+  // чесний максимум проходить недоторканим
+  const honest = gadgets();
+  honest.netSquad(Array.from({ length: cap }, (_, i) => [i, i, i, 0, 0]));
+  assert.equal(honest._netSquad.size, cap, 'повний Загін кімнати не обрізається');
+  // не-масив теж не валить гостя (у for…of число кинуло б TypeError)
+  for (const junk of [null, undefined, 7, 'сміття', {}]) {
+    const j = gadgets();
+    j.netSquad(junk);
+    assert.equal(j._netSquad.size, 0, `${String(junk)} — просто порожній список`);
+  }
 });
 
 test('криві числа від хоста не доходять до трансформа рига', () => {
