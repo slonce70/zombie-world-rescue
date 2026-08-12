@@ -101,11 +101,11 @@ try {
   check('гість отримав пінг хоста як тост', got2,
     JSON.stringify(await guestPage.evaluate(() => window.__pings || [])));
 
-  // ============ 🎡 КОЛЕСО ПІНГІВ (Task 2: UI) ============
-  // 7. відкриваємо колесо на хості — має бути 5 кнопок-фраз
+  // ============ 🎡 КОЛЕСО СТІКЕРІВ (Task 2: UI) ============
+  // 7. відкриваємо колесо на хості — має бути 12 кнопок-стікерів
   await hostPage.evaluate(() => window.__game.coop.openPingWheel && window.__game.coop.openPingWheel());
   const n = await hostPage.evaluate(() => document.querySelectorAll('#ping-wheel .ping-btn').length);
-  check('колесо пінгів має 5 фраз', n === 5, `${n}`);
+  check('колесо стікерів має 12 штук', n === 12, `${n}`);
   const open = await hostPage.evaluate(() => document.getElementById('overlay-ping').classList.contains('show'));
   check('оверлей пінгів відкрито', open === true);
   // клік по фразі #1 шле пінг і закриває оверлей

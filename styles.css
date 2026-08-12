@@ -1537,12 +1537,17 @@ body.touch-mode #touch-coach.show { display: block; }
 }
 .coop-room-share:hover, .coop-room-share:focus { background: rgba(77, 214, 168, 0.3); outline: none; }
 
-/* 📣 колесо пінгів: 5 фраз великими кнопками (зручно з телефона) */
+/* 📣 колесо стікерів: сітка 3×4 на 12 штук — велика емодзі, підпис дрібним під нею.
+   3 колонки тримаємо й на телефоні: на 375px кнопка виходить ~95px, палець влучає. */
+#ping-wheel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
 .ping-btn {
-  font-size: 18px; display: block; width: 100%; margin: 6px 0; padding: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: 72px; padding: 8px 4px;
   border-radius: 12px; border: none; background: rgba(255, 255, 255, 0.1);
-  color: #fff; cursor: pointer; text-align: left;
+  color: #fff; cursor: pointer; text-align: center;
+  font-size: 12px; font-weight: 700; line-height: 1.15;
 }
+.ping-btn i { font-style: normal; font-size: 28px; line-height: 1; }
 .ping-btn:hover { background: rgba(255, 255, 255, 0.18); }
 
 @media (max-width: 900px) {

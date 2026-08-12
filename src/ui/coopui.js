@@ -276,7 +276,9 @@ export class CoopUI {
     }
   }
 
-  // 📣 колесо пінгів: 5 фіксованих фраз з PING_PHRASES, клік → sendPing + закрити
+  // 📣 колесо стікерів: 12 фіксованих з PING_PHRASES, клік → sendPing + закрити.
+  // Сітка 3×4 (див. #ping-wheel у styles.css): велика емодзі, підпис дрібним під нею —
+  // щоб влізло в телефон без скролу і читалось без читання.
   openPingWheel() {
     if (this.session.state !== 'level') return;
     const wheel = document.getElementById('ping-wheel');
@@ -284,7 +286,7 @@ export class CoopUI {
     this.game.audio.click();
     let html = '';
     PING_PHRASES.forEach((p, i) => {
-      html += `<button class="ping-btn" data-i="${i}">${p.icon} ${this._esc(p.text)}</button>`;
+      html += `<button class="ping-btn" data-i="${i}"><i>${p.icon}</i>${this._esc(p.text)}</button>`;
     });
     wheel.innerHTML = html;
     wheel.querySelectorAll('.ping-btn').forEach((b) => {
