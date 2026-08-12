@@ -1327,7 +1327,10 @@ export class Effects {
       s.mesh.position.addScaledVector(s.v, dt);
       s.mesh.rotation.x += s.spin * dt;
       s.mesh.rotation.z += s.spin * 0.7 * dt;
-      const sy = this.world.groundH(s.mesh.position.x, s.mesh.position.z) + 0.03;
+      const sy = Math.max(
+        this.world.groundH(s.mesh.position.x, s.mesh.position.z),
+        this.world.floorAt(s.mesh.position.x, s.mesh.position.z, s.mesh.position.y)
+      ) + 0.03;
       if (s.mesh.position.y < sy) {
         s.mesh.position.y = sy;
         s.v.y *= -0.3;
@@ -1387,7 +1390,9 @@ export class Effects {
         // dmg=0 (дзеркало): зникає біля свого гравця без шкоди
         if (segPointDist2(this._sbOld, mp, ppos.x, ppos.y + 1.1, ppos.z) < rr) hit = true;
       }
-      if (!hit && mp.y < this.world.groundH(mp.x, mp.z) + pr.size * 0.5) hit = true;
+      // підлоги й дахи зупиняють снаряд так само, як ландшафт (як у м'яча)
+      const mg = Math.max(this.world.groundH(mp.x, mp.z), this.world.floorAt(mp.x, mp.z, mp.y));
+      if (!hit && mp.y < mg + pr.size * 0.5) hit = true;
       if (pr.spin) pr.mesh.rotation.x += dt * 9; // багет крутиться в польоті
       if (hit || pr.life <= 0) {
         this.burst(mp, pr.color, 7, { speed: 2.5, up: 2, life: 0.4, size: 0.9 });
@@ -1417,7 +1422,9 @@ export class Effects {
       rk.mesh.position.addScaledVector(rk.v, dt);
       rk.traveled += frameDist;
       const rp = rk.mesh.position;
-      if (!boom && rp.y < this.world.groundH(rp.x, rp.z) + 0.15) boom = true;
+      // ракета детонує і від підлоги/даху, не лише від ландшафту
+      const rg = Math.max(this.world.groundH(rp.x, rp.z), this.world.floorAt(rp.x, rp.z, rp.y));
+      if (!boom && rp.y < rg + 0.15) boom = true;
       // 🚀 зведення: у перші ~3 м ракета НЕ детонує від землі/стіни/повітря (щоб дитина не
       // підірвала себе зблизька, F10), АЛЕ пряме влучання у ворога детонує завжди (ревью).
       if (boom && !hitZombie && rk.traveled < 3) boom = false;
@@ -1462,7 +1469,11 @@ export class Effects {
       }
       g.mesh.position.addScaledVector(g.v, dt);
       g.mesh.rotation.x += dt * 6;
-      const gy = this.world.groundH(g.mesh.position.x, g.mesh.position.z) + 0.13;
+      // граната лягає на дах, поміст чи підлогу будинку, а не провалюється до ландшафту
+      const gy = Math.max(
+        this.world.groundH(g.mesh.position.x, g.mesh.position.z),
+        this.world.floorAt(g.mesh.position.x, g.mesh.position.z, g.mesh.position.y)
+      ) + 0.13;
       if (g.mesh.position.y < gy) {
         g.mesh.position.y = gy;
         if (Math.abs(g.v.y) > 2) this.audio.bounce();
