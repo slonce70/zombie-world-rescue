@@ -117,6 +117,10 @@ export class HostNet {
     if (rp) {
       // якщо їхав на самокаті — припаркувати
       this._dismountPid(pid, rp.pos.x, rp.pos.z);
+      // 🎒 Загін гостя веде хост, тож і прибирає його теж хост — ДО rp.dispose():
+      // інакше owner напарника вказував би на мертвий риг, і напарник застиг би
+      // біля останньої позиції гостя до кінця забігу.
+      if (this.level.gadgets) this.level.gadgets.removeSquadOf(pid);
       rp.dispose();
       this.remotes.delete(pid);
       this._rebuildPlayers();
@@ -197,6 +201,7 @@ export class HostNet {
         if (!(Number.isFinite(d.x) && Number.isFinite(d.y) && Number.isFinite(d.z)
               && Number.isFinite(d.yaw) && Number.isFinite(d.pi))) return true;
         let rp = this.remotes.get(from);
+        let fresh = false;
         if (!rp) {
           const info = this.session.roster.get(from) || {};
           rp = new RemotePlayer(level, from, info);
@@ -205,6 +210,7 @@ export class HostNet {
           rp.coinMagnet = false;
           this.remotes.set(from, rp);
           this._rebuildPlayers();
+          fresh = true;
         }
         const hp = Math.max(0, Math.min(100000, Number(d.hp) || 0));
         const mhp = Math.max(1, Math.min(100000, Number(d.mhp) || 100));
@@ -216,6 +222,9 @@ export class HostNet {
         rp.coinMagnet = (d.f & 2048) !== 0;
         rp._lastP = performance.now();
         if (rp.health <= 0) this._downedAt.set(from, rp._lastP); // зафіксували факт смерті — для 'respawned'
+        // 🎒 перший пакет позиції = гість збудував рівень і стоїть у світі. Саме тут
+        // спавнимо його Загін: раніше (на lvlready) позиція власника ще (0,-100,0).
+        if (fresh) this._spawnGuestSquad(from, rp);
         return true;
       }
       case 'shot': return (this._onShot(from, d), true);
@@ -334,6 +343,18 @@ export class HostNet {
       }
       default: return false;
     }
+  }
+
+  // 🎒 Загін ГОСТЯ веде хост: зомбі й шкода авторитарні саме тут, тож напарник гостя —
+  // звичайний обʼєкт світу (заразом безкоштовно оживають lure і fighter). Нової довіри
+  // це не потребує: єдиний вхід — оголошення складу при вході, уже зрізане
+  // sanitizeSquadNet у ростері. Режими з noGadgets лишаються без Загону в усіх —
+  // симетрія з соло (main.js), де кімнатні режими свідомо про обмежене спорядження.
+  _spawnGuestSquad(pid, rp) {
+    const level = this.level;
+    if (!level.gadgets || level.noGadgets || level.playground) return;
+    const ids = (this.session.roster.get(pid) || {}).sq;
+    if (Array.isArray(ids) && ids.length) level.gadgets.spawnSquad(ids, rp);
   }
 
   _onShot(from, d) {
@@ -666,6 +687,11 @@ export class HostNet {
       z.push(t);
     }
     const snap = { t: 's', n: this.seq, tm: r1(level.stats.time), pl, z };
+    // 🎒 напарники Загону: ≤8 записів по 5 полів — поруч із десятками зомбі це нічого.
+    // Порожній Загін ключа не додає, але гість усе одно зве netSquad([]) — інакше
+    // останній напарник, що зник, лишився б у нього назавжди.
+    const sq = level.gadgets ? level.gadgets.squadNet() : [];
+    if (sq.length) snap.sq = sq;
     if (level.missions && level.missions.netState) snap.m = level.missions.netState();
     // ⭐ v298 «Зірки разом»: КОМАНДНИЙ прогрес вторинної цілі → чип гостя тікає наживо
     // (виконання дублює подія `soc`, але прогрес живе тут). Дефініцію гість уже має зі spec.
@@ -728,6 +754,8 @@ export class HostNet {
       walls: level.gadgets.walls.map((w) => [w.nid, w.x, w.z, w.yaw, Math.round(w.hp)]),
       tramps: level.gadgets.tramps.map((t) => [t.nid, t.pad.x, t.pad.z]),
       turrets: level.gadgets.turrets.map((t) => [t.nid, t.ownerPid, r1(t.x), r1(t.z)]),
+      // 🎒 mid-join/реконект бачить уже наявних напарників, а не порожнечу
+      squad: level.gadgets.squadNet(),
       scooters: level.vehicles.list.map((r, i) => [i, r1(r.x), r1(r.z), r.riderPid || (r.taken ? 1 : 0)]),
       airdrop: eff.airdrop ? [r1(eff.airdrop.x), r1(eff.airdrop.z), eff.airdrop.landed ? 1 : 0] : 0,
       megabox: level.megabox ? { x: r1(level.megabox.x), z: r1(level.megabox.z), opened: level.megabox.opened ? 1 : 0 } : 0,

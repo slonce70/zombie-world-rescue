@@ -241,6 +241,9 @@ export class GuestNet {
       if (!seen.has(pid)) { rp.dispose(); this.remotes.delete(pid); }
     }
     level.zombies.applySnapshot(s.z);
+    // 🎒 напарники Загону (свої і чужі) — дзеркало хоста. Кличемо ЗАВЖДИ, навіть без
+    // ключа `sq`: інакше напарник, що зник у хоста, лишився б у гостя назавжди.
+    if (level.gadgets) level.gadgets.netSquad(s.sq || []);
     if (s.m && level.missions.applyNet) level.missions.applyNet(s.m);
     // ⭐ v298 «Зірки разом»: КОМАНДНИЙ прогрес цілі — чип гостя тікає наживо. Виконання
     // окремо підтверджує подія `soc` (тік+дзвіночок), але якщо її пропустили — done тут
@@ -498,6 +501,7 @@ export class GuestNet {
     for (const [wid, x, z, yaw] of w.walls || []) level.gadgets.netWall(wid, 0, x, z, yaw);
     for (const [tid, x, z] of w.tramps || []) level.gadgets.netTramp(tid, 0, x, z);
     for (const [tnid, owner, x, z] of w.turrets || []) level.gadgets.netTurret(tnid, owner, x, z);
+    level.gadgets.netSquad(w.squad || []); // 🎒 mid-join/реконект: наявні напарники одразу
     for (const [idx, x, z, rider] of w.scooters || []) {
       const r = level.vehicles.list[idx];
       if (!r) continue;

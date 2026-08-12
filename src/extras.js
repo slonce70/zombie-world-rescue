@@ -12,9 +12,14 @@ import { FRIENDS } from './friends.js';
 import {
   SQUAD_ARCHETYPES, SQUAD_DOWN_SECS, SQUAD_FOLLOW_DIST, SQUAD_LEASH_DIST, SQUAD_MAX_HP,
 } from './squad.js';
-import { disposeObject } from './utils.js';
+import { damp, dampAngle, disposeObject } from './utils.js';
 
 const CLONE_FOOT_LIFT = 0.16;
+
+// 🎒🌐 байт стану напарника Загону в снапшоті: пакує хост (squadNet), розпаковує
+// гість (netSquad). Три біти анімації + вид рига — гість малює ріг сам і мусить
+// знати, бабуся це чи дитина. Дешевше за 6-те поле в кожному записі.
+const SQ_DOWN = 1, SQ_RUN = 2, SQ_ATTACK = 4, SQ_GRANNY = 8;
 
 // ============================================================
 // 🦙 Мегабокс: святкова скриня з pity-механікою
@@ -698,6 +703,10 @@ export class Gadgets {
     this.walls = [];
     this.turrets = [];
     this.clones = [];
+    // 🌐 напарники Загону З МЕРЕЖІ (лише в гостя): nid -> {rig, позиція, ціль, стан}.
+    // Окремий контейнер, а не this.clones, саме тому, що це НЕ обʼєкт світу: у нього
+    // немає ні hp, ні AI, ні шкоди — його не має бачити жоден хостовий цикл.
+    this._netSquad = new Map();
     this.totems = [];
     this.damageTotems = [];
     this.towers = [];
@@ -808,6 +817,7 @@ export class Gadgets {
         t.idleSpin += dt;
         if (t.idleSpin > 2.5) t.mesh.head.rotation.y += dt * 0.6;
       }
+      this._updateNetSquad(dt); // 🎒 напарники Загону — теж дзеркало, без AI
       return;
     }
     // 🤖 турелі: стрільба/тиск/життя (рахує лише хост/соло)
@@ -1510,6 +1520,9 @@ export class Gadgets {
         x, z, y, hp: SQUAD_MAX_HP, hitT: 0, rig, mesh: rig.group,
         squad: friend.squad, countryId: cid, downT: 0, abilityT: 0,
         owner, ownerPid,
+        // 🌐 стабільний id на напарника (як nid у стін і турелей) + вид рига: обидва
+        // їдуть у снапшот, бо гість малює ріг САМ і мусить знати, кого саме.
+        nid: ++this._gidSeq, civKind: friend.kind,
       };
       member.syncToFloor = () => {
         member.y = this._floorY(member.x, member.z, member.y) + CLONE_FOOT_LIFT;
@@ -1548,6 +1561,86 @@ export class Gadgets {
       return;
     }
     // 🎈 lure не має тика: він працює пасивно — зомбі обирають його ціллю у zombies.js
+  }
+
+  // 🎒🌐 гість вийшов — його напарники йдуть з ним. Без цього owner вказував би на
+  // вже disposed RemotePlayer і напарник застиг би біля останньої позиції назавжди.
+  removeSquadOf(ownerPid) {
+    for (let i = this.clones.length - 1; i >= 0; i--) {
+      const c = this.clones[i];
+      if (c.squad && c.ownerPid === ownerPid) this._removeClone(i, false);
+    }
+  }
+
+  // 🌐 хост: напарники Загону для снапшота і для captureState (mid-join). Формат —
+  // [nid, x, z, yaw, st], рівно ті самі 5 полів, що вже несуть турелі й зомбі.
+  // Стеля обсягу: 2 напарники × 4 гравці = 8 записів поруч із десятками зомбі.
+  squadNet() {
+    const out = [];
+    for (const c of this.clones) {
+      if (!c.squad) continue;
+      const mode = c.rig && c.rig.anim ? c.rig.anim.mode : 'idle';
+      let st = 0;
+      if (c.downT > 0) st |= SQ_DOWN;
+      else if (mode === 'run') st |= SQ_RUN;
+      else if (mode === 'attack') st |= SQ_ATTACK;
+      if (c.civKind === 'granny') st |= SQ_GRANNY;
+      out.push([c.nid, Math.round(c.x * 10) / 10, Math.round(c.z * 10) / 10,
+        Math.round(c.mesh.rotation.y * 100) / 100, st]);
+    }
+    return out;
+  }
+
+  // 🌐 гість: напарники Загону зі снапшота — ЛИШЕ картинка. Ні шкоди, ні лікування,
+  // ні AI: усе це рахує хост, звідки приходять позиція, поворот і байт стану.
+  // Формат запису: [nid, x, z, yaw, st] — ті самі 5 полів, що в турелей і зомбі.
+  netSquad(list) {
+    const seen = new Set();
+    for (const e of list || []) {
+      // числа від хоста: NaN/Infinity зламали б трансформ рига назавжди (той самий
+      // принцип, що hostNum у client.js — але тут досить просто пропустити запис)
+      if (!Array.isArray(e) || !e.slice(0, 4).every(Number.isFinite)) continue;
+      const [nid, x, z, yaw] = e;
+      const st = e[4] | 0;
+      seen.add(nid);
+      let m = this._netSquad.get(nid);
+      if (!m) {
+        const rig = makeCivilian((st & SQ_GRANNY) ? 'granny' : 'kid', {
+          f: Math.random, next: Math.random,
+          range: (a, b) => a + (b - a) * Math.random(),
+          int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+          chance: (q) => Math.random() < q,
+          pick: (arr) => arr[Math.floor(Math.random() * arr.length) % arr.length],
+        });
+        this.level.scene.add(rig.group);
+        m = { rig, x, z, yaw };
+        this._netSquad.set(nid, m);
+      }
+      m.tx = x; m.tz = z; m.tyaw = yaw; m.st = st;
+    }
+    for (const [nid, m] of this._netSquad) {
+      if (seen.has(nid)) continue;
+      this.level.scene.remove(m.rig.group);
+      disposeObject(m.rig.group); // риги живуть увесь забіг — без цього течуть на кожен реконект
+      this._netSquad.delete(nid);
+    }
+  }
+
+  // згладжування між снапшотами (12 Гц) — та сама схема, що в RemotePlayer.update
+  _updateNetSquad(dt) {
+    for (const m of this._netSquad.values()) {
+      if (Math.hypot(m.tx - m.x, m.tz - m.z) > 12) { m.x = m.tx; m.z = m.tz; } // телепорт при великій похибці
+      m.x = damp(m.x, m.tx, 14, dt);
+      m.z = damp(m.z, m.tz, 14, dt);
+      m.yaw = dampAngle(m.yaw, m.tyaw, 12, dt);
+      const g = m.rig.group;
+      g.position.set(m.x, this._floorY(m.x, m.z, g.position.y) + CLONE_FOOT_LIFT, m.z);
+      g.rotation.y = m.yaw;
+      const running = (m.st & SQ_RUN) !== 0;
+      setAnim(m.rig, (m.st & SQ_DOWN) ? 'die' : (m.st & SQ_ATTACK) ? 'attack' : running ? 'run' : 'idle');
+      m.rig.anim.speed = running ? 5.5 : 0;
+      updateRig(m.rig, dt);
+    }
   }
 
   _spawnClone() {
@@ -1856,7 +1949,9 @@ export class Gadgets {
         }
         if (c.hp <= 0) {
           c.downT = SQUAD_DOWN_SECS;
-          setAnim(c.rig, 'idle');
+          // 'die' — це поза «лежить», а не смерть: за SQUAD_DOWN_SECS напарник встає.
+          // Без неї збитий друг стояв би стовпом, і в коопі гість бачив би те саме.
+          setAnim(c.rig, 'die');
           // тост — лише про СВОГО напарника: чужий Загін хост веде мовчки (як і спавн)
           if (!c.owner || c.owner === level.player) {
             level.bus.emit('toast', t('Напарник упав — встане за {n} с', { n: SQUAD_DOWN_SECS }));
