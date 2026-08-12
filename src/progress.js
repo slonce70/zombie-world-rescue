@@ -464,10 +464,15 @@ export class DailyQuests {
         q.progress = 0;
         q.done = false;
         q.doneAt = 0;
+        // 🏷️ квест із похідним прогресом (рахує наявне в сейві, як титули, що ніколи не
+        // зникають) після рефрешу мусить вимагати НОВОГО прогресу — інакше він закривався б
+        // сам собою кожні дві доби. Відмічаємо поточне значення як базу відліку.
+        if (def.current) q.base = Math.max(0, def.current(save) | 0);
         changed = true;
       }
       if (!def.current) continue;
-      const current = Math.max(0, Math.min(def.target, def.current(save) | 0));
+      // base відсутній у старих сейвах — там нуль, тобто рахунок як і був до цієї відмітки
+      const current = Math.max(0, Math.min(def.target, (def.current(save) | 0) - (q.base | 0)));
       if (current > q.progress) { q.progress = current; changed = true; }
       if (!q.done && q.progress >= def.target && this.megaUnlocked) {
         q.done = true;
