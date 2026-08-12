@@ -74,6 +74,9 @@ const metricValue = (save, def) => {
   return 0;
 };
 
+// Скільки набрано ЗА сезон: поточний лічильник мінус знімок на старті сезону.
+const gainedIn = (save, base, def) => Math.max(0, metricValue(save, def) - ((base[def.id] | 0) || 0));
+
 // Знімок лічильників на старті сезону: прогрес рахується ВІД нього, тож старі
 // перемоги не закривають сходинки наперед.
 export function ensureSeason(save, weekIndex) {
@@ -85,6 +88,16 @@ export function ensureSeason(save, weekIndex) {
     if (!Array.isArray(current.claimed)) current.claimed = [];
     return current;
   }
+  // Сходинка НЕ згорає (шапка модуля): як у weeklycamp.ensureWeeklyCamp, сезон із
+  // виконаною й НЕзабраною сходинкою не змінюється — нагорода чекає на клейм.
+  // Забрані сходинки не тримають сезон: після останнього клейму він котиться далі.
+  if (current && current.base && typeof current.base === 'object') {
+    if (!Array.isArray(current.claimed)) current.claimed = [];
+    const claimed = new Set(current.claimed);
+    const pending = seasonSteps(current.i | 0)
+      .some((def) => !claimed.has(def.id) && gainedIn(save, current.base, def) >= def.target);
+    if (pending) return current;
+  }
   const base = {};
   for (const def of seasonSteps(index)) base[def.id] = metricValue(save, def);
   save.season = { i: index, base, claimed: [] };
@@ -95,7 +108,7 @@ export function seasonState(save, weekIndex) {
   const season = ensureSeason(save, weekIndex);
   const claimed = new Set((season.claimed || []).filter((id) => typeof id === 'string'));
   const steps = seasonSteps(season.i).map((def, i) => {
-    const gained = Math.max(0, metricValue(save, def) - ((season.base[def.id] | 0) || 0));
+    const gained = gainedIn(save, season.base, def);
     const progress = Math.min(def.target, gained);
     return {
       i,

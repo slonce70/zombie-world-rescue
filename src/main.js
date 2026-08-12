@@ -337,7 +337,8 @@ class Game {
     };
     this.input.onLockChange = (locked) => {
       // 🎁 v300: церемонія скрині сама відпускає lock (v295) — це НЕ вихід гравця, паузу не відкривати
-      if (!locked && this.state === 'level' && !this.shop.isOpen && !this._chestState
+      // 🎲 v752: драфт теж сам кличе exitLock() — інакше меню паузи вилазило б під його картками
+      if (!locked && this.state === 'level' && !this.shop.isOpen && !this._chestState && !this.draft.isOpen
         && this.deathT < 0 && !this.victoryShown && !this.testMode
         && !document.getElementById('overlay-start').classList.contains('show')) {
         this.showPause();

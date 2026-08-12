@@ -181,12 +181,15 @@ export class Shop {
     this._confirmId = null;
     this.el.classList.remove('show');
     this.game.audio.click();
-    if (this.game.level && !this.game.paused) this.game.input.request();
+    // 🎲 v752: під магазином міг лишитись драфт — pointer lock забрав би в нього кліки по картках
+    if (this.game.level && !this.game.paused && !this.game.draft?.isOpen) this.game.input.request();
   }
 
   toggle() {
     if (this.isOpen) this.close();
-    else this.open();
+    // 🎲 v752: поверх драфту магазин не відкривається — гейт тут, а не в KeyB, бо той самий
+    // toggle() смикає й тач-кнопка «🛒». Закрити вже відкритий магазин драфт не заважає.
+    else if (!this.game.draft?.isOpen) this.open();
   }
 
   priceOf(item) {

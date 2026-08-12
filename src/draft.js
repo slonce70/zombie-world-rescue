@@ -53,7 +53,8 @@ export class Draft {
     if (this._expire) { clearTimeout(this._expire); this._expire = null; }
     const level = this.game.level;
     const card = this.offered[idx];
-    if (!card || !level) return;
+    // невалідний індекс: оверлей мусить зникнути, інакше isOpen лишає сим замороженим назавжди
+    if (!card || !level) { this.close(); return; }
     // 🌐 кооп-гість: повідомляємо хосту, ЩО саме взяли (PROTO 26). Ефекти карток,
     // які виконує хост (вогняний слід), інакше або не працювали б, або працювали б
     // на слово гостя. Сам стат застосовуємо локально, як і раніше.
