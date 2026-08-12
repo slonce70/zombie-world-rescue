@@ -21,6 +21,15 @@ const CLONE_FOOT_LIFT = 0.16;
 // знати, бабуся це чи дитина. Дешевше за 6-те поле в кожному записі.
 const SQ_DOWN = 1, SQ_RUN = 2, SQ_ATTACK = 4, SQ_GRANNY = 8;
 
+// 🔫🌐 біти ВИДИМОЇ дії: постріл і зелена іскра лікування. Обидва тримаються не
+// позою анімації (вона живе один кадр і снапшот на 12 Гц її не ловить), а власним
+// коротким таймером `actT` — див. _updateClones. Гість малює ефект РІВНО на
+// вмиканні біта: тримати його «поки біт увімкнено» означало б кулемет з одного
+// пострілу. Вікно 0.25 с коротше за паузу між ударами (0.7–0.9 с), тож біт
+// гарантовано встигає згаснути, і наступний постріл дає новий фронт.
+const SQ_SHOT = 16, SQ_HEAL = 32;
+const SQ_ACT_SECS = 0.25;
+
 // 🎒🌐 стеля довжини списку Загону від хоста: 2 напарники × 4 гравці = 8 чесних
 // записів (squadNet більше й не вміє зібрати). Симетрія до MAX_NET_HITS у host.js:
 // кожен небачений nid — це makeCivilian + bakeRig, тобто гуманоїд з нуля, дорожче
@@ -1539,8 +1548,13 @@ export class Gadgets {
         member.hp -= dmg;
       };
       this.clones.push(member);
-      // тост — про СВОГО друга: напарника гостя хост веде мовчки, гість дізнається сам
-      if (local) this.level.bus.emit('toast', t('{n} йде з тобою!', { n: friend.name() }));
+      // тост — про СВОГО друга. У гостя Загін спавнить ХОСТ (local === false), тож
+      // локальний bus нікому нічого не скаже: шлемо повідомлення саме тому гостю
+      // спільним каналом тостів (гість чистить текст через safeHudText). Один раз
+      // на спавн — рівно як у соло.
+      const hello = t('{n} йде з тобою!', { n: friend.name() });
+      if (local) this.level.bus.emit('toast', hello);
+      else if (this.level.net && this.level.net.toastTo) this.level.net.toastTo(ownerPid, hello);
     }
   }
 
@@ -1563,6 +1577,9 @@ export class Gadgets {
         else level.net.healPlayer(p, cfg.healPerSec);
         level.effects.burst(member.mesh.position.clone().setY(member.y + 1.4), 0x6dff9c, 6,
           { speed: 1.6, up: 2, life: 0.5 });
+        // 🌐 той самий біт-канал, що й постріл: гість, якого лікує ЙОГО ж напарник,
+        // без цього бачив би, як смужка росте, і жодної зеленої іскри
+        member.actT = SQ_ACT_SECS; member.actFx = 'heal';
       }
       return;
     }
@@ -1588,8 +1605,13 @@ export class Gadgets {
       const mode = c.rig && c.rig.anim ? c.rig.anim.mode : 'idle';
       let st = 0;
       if (c.downT > 0) st |= SQ_DOWN;
-      else if (mode === 'run') st |= SQ_RUN;
-      else if (mode === 'attack') st |= SQ_ATTACK;
+      else {
+        if (mode === 'run') st |= SQ_RUN;
+        // біт дії — з таймера, а не з пози: удар/постріл ставить анімацію на один кадр,
+        // і блок руху наступного кадру її затирає. Біг лишається окремим бітом, інакше
+        // напарник, що стріляє на бігу, застигав би в гостя на кожному пострілі.
+        if (c.actT > 0) st |= c.actFx === 'shot' ? SQ_SHOT : c.actFx === 'heal' ? SQ_HEAL : SQ_ATTACK;
+      }
       if (c.civKind === 'granny') st |= SQ_GRANNY;
       out.push([c.nid, Math.round(c.x * 10) / 10, Math.round(c.z * 10) / 10,
         Math.round(c.mesh.rotation.y * 100) / 100, st]);
@@ -1619,10 +1641,14 @@ export class Gadgets {
           pick: (arr) => arr[Math.floor(Math.random() * arr.length) % arr.length],
         });
         this.level.scene.add(rig.group);
-        m = { rig, x, z, yaw };
+        // `st` одразу: інакше перший же снапшот виглядав би як фронт біта дії, і
+        // напарник «стріляв» би в момент появи (а на mid-join — уся кімната разом)
+        m = { rig, x, z, yaw, st };
         this._netSquad.set(nid, m);
       }
+      const rise = st & ~m.st; // фронт: біт щойно ввімкнувся
       m.tx = x; m.tz = z; m.tyaw = yaw; m.st = st;
+      if (rise & (SQ_SHOT | SQ_HEAL)) this._netSquadFx(m, rise);
     }
     for (const [nid, m] of this._netSquad) {
       if (seen.has(nid)) continue;
@@ -1630,6 +1656,28 @@ export class Gadgets {
       disposeObject(m.rig.group); // риги живуть увесь забіг — без цього течуть на кожен реконект
       this._netSquad.delete(nid);
     }
+  }
+
+  // 🔫🌐 гість: видима частина дії напарника — трасер+постріл або зелена іскра лікування.
+  // Кличеться РІВНО на фронті біта (див. netSquad), як обробка `sh` для віддаленого гравця.
+  // Ціль пострілу окремо не мережиться: напарник дивиться рівно на неї (yaw їде в снапшоті),
+  // тож найближчий зомбі — вона і є. Промах на кадр дешевший за подію на кожен постріл.
+  _netSquadFx(m, bits) {
+    const level = this.level;
+    const y = m.rig.group.position.y;
+    if (bits & SQ_HEAL) {
+      level.effects.burst(new THREE.Vector3(m.x, y + 1.4, m.z), 0x6dff9c, 6, { speed: 1.6, up: 2, life: 0.5 });
+      return;
+    }
+    const from = new THREE.Vector3(m.x, y + 1.25, m.z);
+    const zb = this._nearestZombie(m.x, m.z);
+    // без зомбі (щойно помер у хоста) трасер летить уперед по yaw — краще, ніж нічого
+    const to = zb
+      ? new THREE.Vector3(zb.x, zb.y + (zb.rig ? zb.rig.height * 0.6 : 1), zb.z)
+      : new THREE.Vector3(m.x - Math.sin(m.yaw) * 12, from.y, m.z - Math.cos(m.yaw) * 12);
+    level.effects.tracer(from, to);
+    const p = level.player.pos;
+    if (Math.hypot(m.x - p.x, m.z - p.z) < 55) level.audio.shot('pistol'); // як у netTurretShot
   }
 
   // згладжування між снапшотами (12 Гц) — та сама схема, що в RemotePlayer.update
@@ -1936,6 +1984,10 @@ export class Gadgets {
     const level = this.level;
     for (let i = this.clones.length - 1; i >= 0; i--) {
       const c = this.clones[i];
+      // 🔫🌐 біт видимої дії гасне САМ, ще до всіх `continue` нижче: інакше напарник,
+      // який щойно вистрелив і втратив ціль, лишився б у гостя з увімкненим бітом
+      // назавжди — і наступного фронту (а отже й пострілу) гість більше не побачив би.
+      if (c.actT > 0) c.actT -= dt;
       let pressure = 0;
       for (const z of level.zombies.list) {
         if (z.state === 'dead' || !z.aggroed) continue;
@@ -1991,6 +2043,10 @@ export class Gadgets {
           c.mesh.position.set(c.x, c.y, c.z);
         }
         setAnim(c.rig, 'run');
+        // 🏃 конвенція проєкту: anim.speed = РЕАЛЬНА швидкість (player.js, zombies.js,
+        // main.js). Без цього лишався дефолт 0 → Math.max(0.5, 0) у characters.js, тобто
+        // крок в ~11 разів рідший за біг: врятований друг і клон гаджета ковзали.
+        c.rig.anim.speed = step / dt;
       } else {
         setAnim(c.rig, 'idle');
       }
@@ -2024,6 +2080,8 @@ export class Gadgets {
         const dmg = c.squad === 'fighter' ? SQUAD_ARCHETYPES.fighter.damage : (melee ? 10 : 5);
         target.damage(melee ? dmg : Math.round(dmg * 0.5), new THREE.Vector3(dx, 0, dz).normalize(), false);
         setAnim(c.rig, melee ? 'attack' : 'aim');
+        // 🌐 біт для снапшота: у гостя саме з нього народжуються трасер і звук
+        c.actT = SQ_ACT_SECS; c.actFx = melee ? 'melee' : 'shot';
         if (!melee) {
           level.effects.tracer(new THREE.Vector3(c.x, c.y + 1.25, c.z), new THREE.Vector3(target.x, target.y + target.rig.height * 0.6, target.z));
           level.audio.shot('pistol');

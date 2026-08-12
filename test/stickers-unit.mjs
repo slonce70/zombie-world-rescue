@@ -43,6 +43,34 @@ test('анти-спам стікерів лишився 1.2 с', () => {
   assert.match(coopSrc, /now - this\._lastPing < 1200/);
 });
 
-test('колесо — сітка, а не стовпчик: 12 кнопок мусять влізти в телефон без скролу', () => {
-  assert.match(cssSrc, /#ping-wheel\s*\{[^}]*grid-template-columns:\s*repeat\(3, 1fr\)/);
+// заявлене «влізуть без скролу» перевіряємо арифметикою по самому CSS, а не оком:
+// колонки × висота кнопки × проміжки мусять лишитись у бюджеті висоти на телефоні.
+// Найтісніший екран у наших рук — 375×667 (iPhone SE); картка оверлея з заголовком
+// і полями лишає сітці приблизно 460 px. Хтось зробить кнопку вищою або колонку
+// вужчою — тест впаде тут, а не в дитини під час гри.
+const PHONE_GRID_BUDGET = 460;
+
+function cssNum(re, what) {
+  const m = cssSrc.match(re);
+  assert.ok(m, `у styles.css має бути ${what}`);
+  return Number(m[1]);
+}
+
+test('12 стікерів влізають у телефон без скролу: 3 колонки × 4 ряди в бюджеті висоти', () => {
+  const cols = cssNum(/#ping-wheel\s*\{[^}]*grid-template-columns:\s*repeat\((\d+), 1fr\)/, 'сітка #ping-wheel');
+  const gap = cssNum(/#ping-wheel\s*\{[^}]*gap:\s*(\d+)px/, 'проміжок у сітці');
+  // box-sizing: border-box глобально (styles.css:11), тож поля вже всередині min-height
+  const rowH = cssNum(/\.ping-btn\s*\{[^}]*min-height:\s*(\d+)px/, 'висота кнопки .ping-btn');
+  assert.ok(cols >= 3, `${cols} колонки — на 12 стікерів це вже стовпчик, буде скрол`);
+  const rows = Math.ceil(PING_PHRASES.length / cols);
+  const total = rows * rowH + (rows - 1) * gap;
+  assert.ok(total <= PHONE_GRID_BUDGET,
+    `${rows} рядів × ${rowH}px = ${total}px — більше за бюджет ${PHONE_GRID_BUDGET}px, на телефоні буде скрол`);
+});
+
+test('заголовок оверлея — про стікери, а не про старий пінг', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const header = html.match(/<div id="overlay-ping"[\s\S]*?<h2>([^<]+)<\/h2>/);
+  assert.ok(header, 'оверлей #overlay-ping має заголовок');
+  assert.match(header[1], /СТІКЕР/, `заголовок «${header[1].trim()}» лишився від колеса фраз`);
 });

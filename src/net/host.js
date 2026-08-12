@@ -573,6 +573,13 @@ export class HostNet {
     }
   }
 
+  // 🎒 тост ОДНОМУ гостю (Загін гостя спавнить хост — сам гість про друга не знає).
+  // Канал той самий, що в банерів шторму: подія 'toast', але адресна, не broadcast.
+  toastTo(pid, text) {
+    if (pid === 1) { if (this.game && this.game.hud) this.game.hud.toast(text); return; }
+    this.session.transport.send(pid, { t: 'ev', l: [['toast', text]] }, true);
+  }
+
   healPlayer(proxy, amt) {
     if (proxy.pid === 1) this.level.player.heal(amt);
     else this.session.transport.send(proxy.pid, { t: 'healed', amt });

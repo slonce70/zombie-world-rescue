@@ -1397,7 +1397,7 @@ export const EN = {
 "Взаємодія": "Interact",
 "Стрибок": "Jump",
 "Приціл": "Scope",
-"📣 ПІНГ КОМАНДІ": "📣 PING THE TEAM",
+"🎟️ СТІКЕРИ": "🎟️ STICKERS",
 "Швеція": "Sweden",
 "🇸🇪 ШВЕЦІЮ ЗВІЛЬНЕНО!": "🇸🇪 SWEDEN LIBERATED!",
 "👑 СНІГОВИЙ ЯРЛ": "👑 SNOW JARL",

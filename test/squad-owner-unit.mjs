@@ -32,6 +32,8 @@ globalThis.t = (s, v) => (v ? `${s}:${JSON.stringify(v)}` : s);
 globalThis.SQUAD_ARCHETYPES = SQUAD_ARCHETYPES;
 globalThis.SQUAD_MAX_HP = SQUAD_MAX_HP;
 globalThis.CLONE_FOOT_LIFT = 0.16;
+// вікно біта видимої дії — справжнє з extras.js (лікування ставить його для гостя)
+globalThis.SQ_ACT_SECS = Number((src.match(/const SQ_ACT_SECS = ([\d.]+);/) || [])[1]);
 globalThis.makeCivilian = () => ({
   group: { position: { set: () => {}, clone: () => ({ setY: () => ({}) }) } },
 });
