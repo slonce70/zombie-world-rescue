@@ -4161,9 +4161,11 @@ class Game {
     level.vehicles = new Vehicles(level);
     level.gadgets = new Gadgets(level);
     this._startGadgetChallenge(level, level.playgroundGadget);
-    // 🎒 Загін: врятовані друзі йдуть у бій. СОЛО і лише там, де дозволені гаджети —
-    // кімнатні режими з noGadgets свідомо про обмеження спорядження.
-    if (!coop && !isGuest && !isPlayground && !level.noGadgets) {
+    // 🎒 Загін: врятовані друзі йдуть у бій. Соло І кооп (v770) — лише там, де
+    // дозволені гаджети: кімнатні режими з noGadgets свідомо про обмеження спорядження.
+    // Гість тут НЕ спавнить нічого: його напарників веде хост за оголошеним складом
+    // (`sq` у ростері), інакше поруч стояли б два комплекти — свій і хостовий.
+    if (!isGuest && !isPlayground && !level.noGadgets) {
       const squad = sanitizeSquad(this.save);
       if (squad.length) level.gadgets.spawnSquad(squad);
     }
