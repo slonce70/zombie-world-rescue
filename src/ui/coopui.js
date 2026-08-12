@@ -13,6 +13,7 @@ import { frontStageLabel } from './frontui.js';
 import { frontCountryCopy } from './frontcopy.js';
 import { specialistRank } from '../specialists.js';
 import { shareLink } from './share.js';
+import { inviteCardText, shareCard } from './sharecard.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -62,6 +63,7 @@ export class CoopUI {
       start: $('btn-lobby-start'),
       leave: $('btn-lobby-leave'),
       invite: $('btn-coop-invite'),
+      inviteCard: $('btn-coop-card'),
       hint: $('lobby-hint'),
     };
 
@@ -112,6 +114,7 @@ export class CoopUI {
     this.el.lobbyPub.addEventListener('change', () => { game.audio.click(); onPub(this.el.lobbyPub.checked); });
 
     this.el.invite.addEventListener('click', () => this._shareInvite());
+    this.el.inviteCard.addEventListener('click', () => this._shareInviteCard());
 
     this.el.start.addEventListener('click', () => {
       if (this.session.role === 'host') {
@@ -205,6 +208,21 @@ export class CoopUI {
       text: t('Гайда грати разом проти зомбі! 🧟 Тисни — і ти в моїй грі:'),
       url: this._inviteUrl(code),
     });
+  }
+
+  // 🖼️ Та сама механіка, але картинкою: код кімнати великими літерами + посилання.
+  // Малювання й фолбек — спільні з листівкою перемоги (ui/sharecard.js).
+  async _shareInviteCard() {
+    const code = this.session && this.session.room;
+    if (!code) return; // нема кімнати → нічого не робимо
+    this.game.audio.click();
+    const btn = this.el.inviteCard;
+    btn.disabled = true; // PNG кодується не миттєво — не даємо натиснути двічі
+    try {
+      await shareCard(this.game, inviteCardText({
+        code, nick: loadNick(), url: this._inviteUrl(code),
+      }));
+    } finally { btn.disabled = false; }
   }
 
   // ---------- публічність ----------

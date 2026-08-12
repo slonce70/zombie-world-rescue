@@ -35,6 +35,27 @@ export function victoryCardText({ flag, country, nick, timeSec, stars, starMax =
   };
 }
 
+// 🧮 рядки листівки-запрошення в кімнату — та сама композиція, але без кадру гри:
+// у лобі його ще немає. Код кімнати йде в `headline` найбільшим кеглем (щоб читався
+// з екрана телефону через кімнату), посилання ?coopjoin=CODE — у `meta` й у тексті шеру.
+export function inviteCardText({ code, nick, url }) {
+  const room = String(code || '').trim().toUpperCase();
+  const link = String(url || '').trim();
+  return {
+    frame: null,          // фон — простий градієнт drawCard, кадру гри в лобі немає
+    flag: '',             // верх картинки лишаємо коду
+    headline: room,
+    headlinePx: 210,      // найбільший елемент листівки
+    sub: t('🤝 Приєднуйся до моєї кімнати!'),
+    stars: t('{n} чекає на тебе', { n: trimNick(nick) }),
+    meta: link,
+    brand: t('Операція: Порятунок Світу'),
+    filename: `zombie-rescue-room-${room || 'coop'}.png`,
+    text: [t('Гайда грати разом проти зомбі! 🧟 Код кімнати: {c}', { c: room }), link]
+      .filter(Boolean).join(' ').trim(),
+  };
+}
+
 // 📸 Знімок кадру. renderer.render() і drawImage у ОДНОМУ таску — WebGL-буфер ще живий,
 // тож preserveDrawingBuffer не потрібен. Викликати РІВНО ОДИН раз у момент перемоги:
 // це один зайвий рендер і один блит на GPU, без PNG-кодування (воно аж на тапі кнопки).
@@ -75,7 +96,7 @@ function line(g, text, y, px, color, weight = '800') {
 }
 
 // 🎨 Малює листівку. `frame` — канвас-знімок (може бути null: тоді просто градієнт).
-export function drawCard({ frame, flag, headline, sub, stars, meta, brand }) {
+export function drawCard({ frame, flag, headline, sub, stars, meta, brand, headlinePx = 104 }) {
   const c = document.createElement('canvas');
   c.width = c.height = CARD;
   const g = c.getContext('2d');
@@ -109,8 +130,10 @@ export function drawCard({ frame, flag, headline, sub, stars, meta, brand }) {
   g.shadowColor = 'rgba(0,0,0,0.8)';
   g.shadowBlur = 18;
   line(g, flag, 178, 132, '#ffffff');
-  line(g, headline, 300, 104, GOLD);          // назва країни — найбільша, читається мініатюрою
-  line(g, sub, 372, 50, '#cfe6ff', '700');
+  line(g, headline, 300, headlinePx, GOLD);   // головний рядок — найбільший, читається мініатюрою
+  // підзаголовок відсувається разом із кеглем головного рядка: у запрошення код кімнати
+  // вдвічі більший за назву країни, і на базовому відступі підпис ліз би йому під ноги
+  line(g, sub, 372 + Math.max(0, (headlinePx - 104) * 0.34), 50, '#cfe6ff', '700');
   line(g, stars, 838, 92, '#ffffff', '700');
   line(g, meta, 936, 48, '#ffffff', '700');
   line(g, brand, 1012, 34, 'rgba(255,255,255,0.75)', '600');

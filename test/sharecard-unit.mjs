@@ -12,7 +12,7 @@ const asData = (code) => 'data:text/javascript;base64,' + Buffer.from(code).toSt
 const resolved = src
   .replace('./_i18n.mjs', asData("export const t = (s, p) => (p ? s.replace(/\\{(\\w+)\\}/g, (_, k) => p[k]) : s);"))
   .replace('./_share.mjs', asData('export const shareImageFile = async () => "shared";'));
-const { fmtTime, trimNick, victoryCardText, CARD } = await import(asData(resolved));
+const { fmtTime, trimNick, victoryCardText, inviteCardText, CARD } = await import(asData(resolved));
 
 test('час на листівці — той самий M:SS, що на екрані перемоги', () => {
   assert.equal(fmtTime(0), '0:00');
@@ -51,6 +51,32 @@ test('розкладка листівки: країна великим, решт
   assert.equal(c.meta, 'Влад · ⏱ 4:32 · 🧟 87');
   assert.equal(c.brand, 'Операція: Порятунок Світу');
   assert.equal(CARD, 1080, 'PNG 1080×1080 — влазить і в сторіс, і в чат');
+});
+
+test('листівка-запрошення: код найбільшим рядком, посилання поруч', () => {
+  const url = 'https://example.org/zwr/?coopjoin=AB3D';
+  const c = inviteCardText({ code: 'ab3d', nick: 'Влад', url });
+  assert.equal(c.headline, 'AB3D', 'код кімнати — капсом і головним рядком');
+  assert.ok(c.headlinePx > 104, `код більший за назву країни: ${c.headlinePx}`);
+  assert.equal(c.frame, null, 'у лобі кадру гри ще немає');
+  assert.equal(c.flag, '', 'верх листівки віддано коду');
+  assert.equal(c.meta, url, 'посилання ?coopjoin= намальоване на картинці');
+  assert.equal(c.stars, 'Влад чекає на тебе');
+  assert.equal(c.brand, 'Операція: Порятунок Світу');
+  assert.ok(c.text.includes('AB3D') && c.text.endsWith(url), `у тексті шеру код і лінк: ${c.text}`);
+  assert.equal(c.filename, 'zombie-rescue-room-AB3D.png');
+});
+
+test('запрошення не малює чужий чи порожній код', () => {
+  // код завжди береться з переданого — жодних дефолтів «на минулу кімнату»
+  assert.equal(inviteCardText({ code: 'ZZ99' }).headline, 'ZZ99');
+  assert.equal(inviteCardText({ code: ' q7k2 ' }).headline, 'Q7K2', 'пробіли не потрапляють у код');
+  const empty = inviteCardText({});
+  assert.equal(empty.headline, '', 'без кімнати — порожньо, а не «undefined»');
+  assert.equal(empty.meta, '');
+  assert.equal(empty.filename, 'zombie-rescue-room-coop.png');
+  assert.ok(!empty.text.endsWith(' '), 'без лінка текст не тягне хвостовий пробіл');
+  assert.equal(inviteCardText({ code: 'AB3D' }).stars, 'Рятівник чекає на тебе', 'порожній нік → Рятівник');
 });
 
 test('розкладка не ламається на порожніх і кривих даних', () => {
