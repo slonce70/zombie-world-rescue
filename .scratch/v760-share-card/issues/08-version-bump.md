@@ -17,7 +17,7 @@ Changelog пишеться з погляду гравця, мовою, зроз�
 
 **Blocked by:** 01, 02, 03, 04, 05, 06, 07 — їде останнім.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `APP_VERSION`, `version.json`, `sw.js` CACHE = 760
 - [ ] `PROTO_VERSION` лишився 26
