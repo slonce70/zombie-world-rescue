@@ -13,7 +13,7 @@ import { frontStageLabel } from './frontui.js';
 import { frontCountryCopy } from './frontcopy.js';
 import { specialistRank } from '../specialists.js';
 import { shareLink } from './share.js';
-import { inviteCardText, shareCard } from './sharecard.js';
+import { inviteCardText, prepareCard, shareCard } from './sharecard.js';
 
 const PUBLIC_KEY = 'zr-public';
 const MODE_ICON = {
@@ -218,10 +218,12 @@ export class CoopUI {
     this.game.audio.click();
     const btn = this.el.inviteCard;
     btn.disabled = true; // PNG кодується не миттєво — не даємо натиснути двічі
+    // готова листівка з _openLobby; якщо кімната встигла змінитись — малюємо на місці
+    const ready = this._inviteCard;
+    const card = ready && ready.headline === String(code).trim().toUpperCase()
+      ? ready : this._inviteCardText(code);
     try {
-      await shareCard(this.game, inviteCardText({
-        code, nick: loadNick(), url: this._inviteUrl(code),
-      }));
+      await shareCard(this.game, card);
     } finally { btn.disabled = false; }
   }
 
@@ -547,6 +549,14 @@ export class CoopUI {
     this._renderLobby();
     this.game._showOverlay('overlay-lobby', this.el.open);
     this._syncPolling();
+    // 🖼️ листівку-запрошення малюємо вже тут (фоном) — на тапі кнопки має лишитись
+    // самий navigator.share, інакше Safari/iOS втрачає жест користувача
+    const code = this.session && this.session.room;
+    this._inviteCard = code ? prepareCard(this._inviteCardText(code)) : null;
+  }
+
+  _inviteCardText(code) {
+    return inviteCardText({ code, nick: loadNick(), url: this._inviteUrl(code) });
   }
 
   _renderLobby() {

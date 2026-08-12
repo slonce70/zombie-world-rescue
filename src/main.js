@@ -2678,6 +2678,9 @@ class Game {
     if (this._overlayFocus) this._overlayFocus.delete(id);
     // закрили гардероб — гасимо 3D-прев'ю (вигляд героя застосується при вході в рівень)
     if (id === 'overlay-wardrobe') this._stopHeroPreview();
+    // 📸 пішли з перемоги — відпускаємо листівку: там канвас-кадр 1080×1080 (~4.4 МБ)
+    // і готовий PNG, які інакше висіли б у пам'яті до наступної перемоги
+    if (id === 'overlay-victory') this._victoryCard = null;
   }
 
   // ---------- 🛰️ Живий фронт ----------

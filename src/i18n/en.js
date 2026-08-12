@@ -1353,6 +1353,7 @@ export const EN = {
 "Я звільнив {n} у грі «Операція: Порятунок Світу»!": "I liberated {n} in Operation: World Rescue!",
 "🖼️ Картинку збережено — надішли її другу!": "🖼️ Picture saved — send it to a friend!",
 "😕 Не вдалося зберегти картинку": "😕 Could not save the picture",
+"⏳ Картинка ще малюється — тисни ще раз за мить": "⏳ The picture is still being drawn — tap again in a moment",
 "Мій герой": "My Hero",
 "Твої кольори": "Your colors",
 "Штани": "Pants",

@@ -11,8 +11,9 @@ const src = readFileSync(new URL('../src/ui/sharecard.js', import.meta.url), 'ut
 const asData = (code) => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
 const resolved = src
   .replace('./_i18n.mjs', asData("export const t = (s, p) => (p ? s.replace(/\\{(\\w+)\\}/g, (_, k) => p[k]) : s);"))
-  .replace('./_share.mjs', asData('export const shareImageFile = async () => "shared";'));
-const { fmtTime, trimNick, victoryCardText, inviteCardText, CARD } = await import(asData(resolved));
+  .replace('./_share.mjs', asData('globalThis.__shared = [];'
+    + 'export const shareImageFile = async (g, blob) => { globalThis.__shared.push(blob); return "shared"; };'));
+const { fmtTime, trimNick, victoryCardText, inviteCardText, shareCard, CARD } = await import(asData(resolved));
 
 test('час на листівці — той самий M:SS, що на екрані перемоги', () => {
   assert.equal(fmtTime(0), '0:00');
@@ -77,6 +78,29 @@ test('запрошення не малює чужий чи порожній ко
   assert.equal(empty.filename, 'zombie-rescue-room-coop.png');
   assert.ok(!empty.text.endsWith(' '), 'без лінка текст не тягне хвостовий пробіл');
   assert.equal(inviteCardText({ code: 'AB3D' }).stars, 'Рятівник чекає на тебе', 'порожній нік → Рятівник');
+});
+
+// 🕰️ Головне в шері з телефона: navigator.share() мусить піти в тому ж таску, що й тап.
+// Тому готовий blob віддається БЕЗ жодного await, а не готовий — не мовчить.
+test('готовий blob іде в share синхронно — iOS не встигає забрати жест', () => {
+  globalThis.__shared.length = 0;
+  const toasts = [];
+  const game = { hud: { toast: (m) => toasts.push(m) } };
+  const done = shareCard(game, { blob: 'PNG', filename: 'a.png', text: 'hi' });
+  assert.equal(globalThis.__shared.length, 1, 'share мусить викликатись ще до першої мікрозадачі');
+  assert.equal(globalThis.__shared[0], 'PNG', 'віддаємо підготовлену картинку, а не малюємо заново');
+  assert.equal(toasts.length, 0);
+  return done;
+});
+
+test('тап раніше за готовність картинки — зрозумілий тост, а не тиша', async () => {
+  globalThis.__shared.length = 0;
+  const toasts = [];
+  const game = { hud: { toast: (m) => toasts.push(m) } };
+  assert.equal(await shareCard(game, { pending: true }), 'pending');
+  assert.equal(globalThis.__shared.length, 0, 'поки PNG не готовий — нічого не шеримо');
+  assert.equal(toasts.length, 1, 'кнопка не мовчить');
+  assert.ok(toasts[0].includes('ще малюється'), toasts[0]);
 });
 
 test('розкладка не ламається на порожніх і кривих даних', () => {

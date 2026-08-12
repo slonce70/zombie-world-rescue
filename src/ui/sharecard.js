@@ -147,10 +147,34 @@ function cardBlob(canvas) {
   });
 }
 
-// 📤 Намалювати й віддати: navigator.share({files}) → фолбек «завантажити файл» (у share.js).
+// ⏳ Готуємо PNG ЗАЗДАЛЕГІДЬ — на перемозі й при відкритті лобі, задовго до тапу.
+// Навіщо: Safari/iOS дозволяє navigator.share() лише в тому ж таску, що й жест, а
+// малювання+кодування 1080×1080 — це await, після якого дозвіл згорає і листівка падає
+// у фолбек «Файли» замість системного «поділитися». Робота фонова (setTimeout), щоб не
+// гальмувати показ екрана перемоги; `pending` виставляється одразу — тап раніше за
+// готовність побачить зрозумілий тост, а не тишу.
+export function prepareCard(card) {
+  if (!card) return card;
+  card.pending = true;
+  card.blob = null;
+  setTimeout(async () => {
+    try { card.blob = await cardBlob(drawCard(card)); } catch (e) { card.blob = null; }
+    card.pending = false;
+  }, 0);
+  return card;
+}
+
+// 📤 Віддати: navigator.share({files}) → фолбек «завантажити файл» (у share.js).
 // `card` — те саме, що приймає drawCard, плюс filename/text.
 export async function shareCard(game, card) {
   if (!card) return 'failed';
+  if (card.pending) {
+    game.hud.toast(t('⏳ Картинка ще малюється — тисни ще раз за мить'));
+    return 'pending';
+  }
+  // ⚠️ ЖОДНОГО await до shareImageFile, коли blob уже готовий — інакше губиться жест
+  if (card.blob) return shareImageFile(game, card.blob, { filename: card.filename, text: card.text });
+  // картинку не готували наперед (або підготовка не вдалася) — малюємо тут, як раніше
   const blob = await cardBlob(drawCard(card));
   return shareImageFile(game, blob, { filename: card.filename, text: card.text });
 }

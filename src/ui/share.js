@@ -31,7 +31,12 @@ export async function shareLink(game, { title, text, url, copiedMessage } = {}) 
 // обов'язковий: share з файлами є далеко не всюди (десктопний Firefox, старі WebView).
 // Повертає 'shared' | 'downloaded' | 'failed' — виклик ніколи не кидає.
 export async function shareImageFile(game, blob, { filename = 'zombie-rescue.png', title, text } = {}) {
-  if (!blob) return 'failed';
+  // toBlob не впорався (брак пам'яті під канвас, старий WebView) — мовчазна кнопка в
+  // дитячій грі неприпустима, тож той самий тост про невдачу, що й у кінці функції
+  if (!blob) {
+    game.hud.toast(t('😕 Не вдалося зберегти картинку'));
+    return 'failed';
+  }
   try {
     const file = new File([blob], filename, { type: blob.type || 'image/png' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {

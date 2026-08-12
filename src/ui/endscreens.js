@@ -11,7 +11,7 @@ import { claimStarEggs } from '../eggs.js';
 import { hasLiberated } from '../net/cloudsave.js';
 import { isFirstSteps } from '../firststeps.js';
 import { countryPower } from '../countrypowers.js';
-import { captureFrame, victoryCardText } from './sharecard.js';
+import { captureFrame, prepareCard, victoryCardText } from './sharecard.js';
 import { loadNick } from '../net/coop.js';
 
 export function showVictory(game) {
@@ -255,8 +255,9 @@ export function showVictory(game) {
   const retryBtn = document.getElementById('btn-victory-retry');
   nextBtn.style.display = solo && nextTarget(game.save.liberated) !== null ? '' : 'none';
   retryBtn.style.display = solo ? '' : 'none';
-  // 📸 листівка: усе, що потрібно намалювати, збираємо тут; малювання — на тапі кнопки
-  game._victoryCard = {
+  // 📸 листівка: збираємо тут і одразу ставимо в чергу на малювання (фоном, prepareCard),
+  // щоб на тапі «Похвалитися» лишився самий share — без await, який iOS не пробачає
+  game._victoryCard = prepareCard({
     frame: victoryFrame,
     ...victoryCardText({
       flag: country.flag, country: country.name, nick: loadNick(),
@@ -265,7 +266,7 @@ export function showVictory(game) {
     }),
     filename: `zombie-rescue-${country.id}.png`,
     text: t('Я звільнив {n} у грі «Операція: Порятунок Світу»!', { n: country.name }),
-  };
+  });
   if (shareBtn) shareBtn.style.display = '';
   game._showOverlay('overlay-victory');
   // ⭐ «майже досяг»: тост про перший титул із прогресом ≥80% (раз на сесію, тротл через Set)
