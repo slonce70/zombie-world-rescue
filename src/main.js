@@ -67,7 +67,7 @@ import {
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
 } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
-import { fetchLobbyState, worldSavedText } from './net/lobby.js';
+import { fetchLobbyState, worldSavedText, duelRows, duelTime } from './net/lobby.js';
 import { CommunityUI } from './ui/communityui.js';
 import { parseCommunityLink, makeRunId } from './net/community.js';
 import { sanitizeDiffStar } from './net/protocol.js';
@@ -109,6 +109,7 @@ import {
 import {
   SOLO_MODE_GROUPS, HARD_VARIANTS, MODE_RULES, MODIFIERS, WEEKLY_MODIFIER_POOL,
   modeIdFromOpts, MODE_START_OPTS, SOLO_MODES, DAILY_CHALLENGE_POOL, MODE_MILESTONES, COOP_MODE_IDS,
+  DUEL_MAP, dailyChallengeFor,
 } from './modes.js';
 import { renderAlbum, skinHint, petHint } from './ui/album.js';
 import {
@@ -1702,7 +1703,11 @@ class Game {
     const make = MODE_START_OPTS[modeId];
     if (!make) return false;
     const countryId = arg && COUNTRIES[arg] ? arg : 'UKR';
-    return this.startLevel(countryId, make(arg));
+    // 🤝 Дуель дня: режим дня в усіх іде на ОДНАКОВІЙ карті. Розмір і стиль беремо
+    // не з налаштувань гравця (вони зсувають арену), а фіксовані — інакше двоє
+    // порівнювали б час, пройдений у різних світах.
+    const duel = modeId === this.dailyChallengeId() ? DUEL_MAP : null;
+    return this.startLevel(countryId, { ...make(arg), ...duel });
   }
 
   // ---------- 🎮 меню «Грати» (соло-режими) ----------
@@ -1762,6 +1767,7 @@ class Game {
       <section class="solo-recommended" aria-labelledby="solo-recommended-title">
         <h3 id="solo-recommended-title">${t('СЬОГОДНІ')}</h3>
         ${recommendedIds.map((id) => modeHtml(byId.get(id))).join('')}
+        <div id="duel-board" class="duel-board" hidden></div>
       </section>
       ${catGroups.map((g) => `
       <details class="solo-category" data-category="${g.id}">
@@ -1770,6 +1776,7 @@ class Game {
           ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
         </section>
       </details>`).join('')}`;
+    this._refreshDuelBoard();
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';
@@ -5266,7 +5273,7 @@ class Game {
   }
 
   dailyChallengeId() {
-    return DAILY_CHALLENGE_POOL[this._dayIndex() % DAILY_CHALLENGE_POOL.length];
+    return dailyChallengeFor(this._dayIndex());
   }
 
   // 🎁 модалка подарунка дня: грід 7 клітинок поточного тижня, підсвічений сьогоднішній день
@@ -5615,7 +5622,50 @@ class Game {
     if (best != null) {
       out.bestRow = `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>`;
     }
+    // 🤝 Дуель дня: спробу в режимі дня шлемо в лобі й одразу показуємо, як пройшли інші.
+    // Програш шлемо теж (won=false) — це не покарання, а «я сьогодні теж грав»:
+    // дитина має бачити, що друг заходив, навіть якщо не дійшов до кінця.
+    if (daily) this._announceDuel(modeId, won ? timeMs : null, won);
     return out;
+  }
+
+  // 🤝 Результат дуелі дня їде наявним каналом лобі (/lobby/ping, поле `duel`) —
+  // тим самим разовим пінгом, що й денний топ-3 Шторму. Нового бекенду немає.
+  _announceDuel(modeId, timeMs, won) {
+    const net = this.coop && this.coop.lobbyNet;
+    if (!net) return;
+    const ms = Math.max(0, timeMs | 0);
+    net.announceDuel(modeId, ms, won).then((d) => {
+      const me = net.nick();
+      const other = duelRows(d, modeId).find((e) => e.nick !== me);
+      if (!other) return;
+      this.hud.toast(t('🤝 Дуель дня: ти — {me}, {nick} — {them}', {
+        me: duelTime(ms, won), nick: other.nick, them: duelTime(other.ms, other.w),
+      }));
+    });
+  }
+
+  // 🤝 Дошка дуелі в меню «Грати»: хто сьогодні пройшов режим дня і за скільки.
+  // Читаємо тим самим /lobby/state, що й лічильник світу — окремого каналу немає.
+  // Без інтернету блок просто не показується.
+  _refreshDuelBoard() {
+    const el = document.getElementById('duel-board');
+    if (!el) return;
+    const modeId = this.dailyChallengeId();
+    const mode = SOLO_MODES.find((m) => m.id === modeId);
+    if (!mode) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+    const me = this.coop && this.coop.lobbyNet ? this.coop.lobbyNet.nick() : '';
+    fetchLobbyState().then((d) => {
+      const rows = duelRows(d, modeId);
+      const rowsHtml = rows.length
+        ? rows.map((e) => `<div class="duel-row${e.nick === me ? ' me' : ''}"><span>${e.nick === me ? '⭐ ' : ''}${esc(e.nick)}</span><b>${esc(duelTime(e.ms, e.w))}</b></div>`).join('')
+        : `<div class="duel-row empty">${t('Сьогодні ще ніхто не грав — будь першим!')}</div>`;
+      el.innerHTML = `<div class="duel-title">🤝 ${t('ДУЕЛЬ ДНЯ')}</div>
+        <div class="duel-hint">${t('{i} {m}: сьогодні в усіх однакова карта. Пройди і порівняй з друзями!', { i: mode.icon, m: mode.name() })}</div>
+        ${rowsHtml}`;
+      el.hidden = false;
+    });
   }
 
   _endStormRun() {

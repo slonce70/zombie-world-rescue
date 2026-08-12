@@ -361,6 +361,35 @@ export function clampSaved(raw, already) {
   return Math.max(0, Math.min(n, SAVED_PER_PING, SAVED_PER_DAY - Math.max(0, already | 0)));
 }
 
+// 🤝 Дуель дня: спільна дошка результатів режиму дня. Лежить у ТІЙ САМІЙ добовій
+// комірці day:<UTC-дата>, що й топ-3 і лічильник світу — нового сховища не заводимо.
+// Клієнт тут недовірене джерело: нік, режим і час клампимо на боці воркера.
+export const DUEL_BOARD_MAX = 16;
+export const DUEL_MS_MAX = 3_600_000; // година — довше за будь-який кімнатний режим
+// Дзеркало DAILY_CHALLENGE_POOL із src/modes.js: воркер не може імпортувати код гри,
+// тож список продубльовано — а test/duel-day-unit.mjs звіряє обидва, щоб не розійшлись.
+// Без білого списку один клієнт міг би забити дошку вигаданими «режимами».
+export const DUEL_MODES = new Set(['knockout', 'defense', 'zone-defense', 'pvp', 'bank',
+  'portal', 'maze', 'humans', 'soul-collector', 'radiation', 'turretwar']);
+// Один запис на пару «нік + режим», і це КРАЩА спроба дня: пройдений забіг б'є
+// непройдений, серед пройдених — швидший. Слабший пізніший забіг нічого не затирає
+// (програш не карається — він просто не псує вже показаний результат).
+export function mergeDuel(board, raw, cleanNick) {
+  const list = Array.isArray(board) ? board : [];
+  const nick = cleanNick(raw && raw.nick);
+  const mode = String((raw && raw.mode) || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 20);
+  if (!nick || !DUEL_MODES.has(mode)) return list;
+  const won = !!(raw && raw.won);
+  const msRaw = Math.floor(Number(raw && raw.ms));
+  const next = { nick, m: mode, ms: Number.isFinite(msRaw) ? Math.max(0, Math.min(DUEL_MS_MAX, msRaw)) : 0, w: won };
+  const better = (a, b) => (a.w !== b.w ? a.w : ((a.ms || Infinity) < (b.ms || Infinity)));
+  const prev = list.find((e) => e.nick === nick && e.m === mode);
+  if (prev && !better(next, prev)) return list;
+  return list.filter((e) => e !== prev).concat([next])
+    .sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0) || ((a.ms || Infinity) - (b.ms || Infinity)))
+    .slice(0, DUEL_BOARD_MAX);
+}
+
 export class Lobby {
   constructor(state) {
     this.state = state;
@@ -383,6 +412,7 @@ export class Lobby {
     this._savedByCid = new Map(); // cid -> зараховано сьогодні; дзеркало ключів sv:<день>:<cid>
     this._savedWeek = {};         // день -> підсумок, останні 7 діб (щоб клієнт мав ціль тижня)
     this._savedQueue = null;      // хвіст черги внесків (див. _recordSaved)
+    this._duel = [];              // 🤝 дошка дуелі дня: [{nick, m, ms, w}] у тій самій комірці
   }
 
   _dayKey(now) {
@@ -414,6 +444,7 @@ export class Lobby {
     const cell = Array.isArray(stored) ? { top3: stored } : (stored && typeof stored === 'object' ? stored : {});
     this._top3 = Array.isArray(cell.top3) ? cell.top3 : [];
     this._saved = Math.max(0, cell.saved | 0);
+    this._duel = Array.isArray(cell.duel) ? cell.duel : [];
     this._savedByCid = new Map(); // нова доба / після гібернації — квоти беремо зі storage
     const week = await this.state.storage.get('savedWeek');
     this._savedWeek = (week && typeof week === 'object') ? { ...week } : {};
@@ -430,7 +461,16 @@ export class Lobby {
 
   // добова комірка: топ-3 і лічильник світу лежать разом, один запис
   async _saveDayCell(day) {
-    await this.state.storage.put('day:' + day, { top3: this._top3, saved: this._saved });
+    await this.state.storage.put('day:' + day, { top3: this._top3, saved: this._saved, duel: this._duel });
+  }
+
+  // 🤝 спроба в «дуелі дня» — та сама комірка доби, той самий один запис
+  async _recordDuel(now, nick, raw) {
+    await this._loadTop3(now);
+    const next = mergeDuel(this._duel, { ...raw, nick }, cleanNickSrv);
+    if (next === this._duel) return; // сміття або гірша спроба — сховище не чіпаємо
+    this._duel = next;
+    await this._saveDayCell(this._dayKey(now));
   }
 
   // 🌍 внесок гравця у лічильник світу. Беремо мінімум із того, що каже клієнт,
@@ -534,7 +574,7 @@ export class Lobby {
     const week = Object.values(this._savedWeek).reduce((sum, n) => sum + Math.max(0, n | 0), 0);
     return {
       online: this.players.size, today: this.todaySet.size, top3: this._top3,
-      worldSaved: this._saved, worldSavedWeek: week, players, profiles, rooms,
+      worldSaved: this._saved, worldSavedWeek: week, duel: this._duel, players, profiles, rooms,
     };
   }
 
@@ -568,6 +608,8 @@ export class Lobby {
         // 🏆 денний результат для «топ-3 сьогодні» (клієнт шле свій кращий штормовий за сьогодні)
         if (d.day && typeof d.day === 'object') await this._recordDayScore(now, d.day.nick || nick, d.day.score);
         else await this._loadTop3(now); // однаково піднімаємо кеш, щоб _view повернув свіжий top3
+        // 🤝 спроба в «дуелі дня»: режим дня, час і чи пройдено
+        if (d.duel && typeof d.duel === 'object') await this._recordDuel(now, d.duel.nick || nick, d.duel);
         // 🌍 внесок у лічильник світу: скільки людей гравець урятував за забіг
         if (d.saved) await this._recordSaved(now, cid, d.saved);
         if (this.players.size > 500) this._prune(now);

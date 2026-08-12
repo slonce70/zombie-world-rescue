@@ -34,6 +34,29 @@ export function worldSavedText(d) {
   return '';
 }
 
+// 🤝 ДУЕЛЬ ДНЯ. Дошка результатів режиму дня приїжджає полем `duel` у тій самій
+// відповіді лобі, що й топ-3 Шторму, — окремого каналу немає.
+// Запис: {nick, m: <id режиму>, ms: <час, 0 = без часу>, w: <пройшов>}.
+//
+// Фільтруємо за режимом СВОГО дня: доба у воркері рахується за UTC, а режим дня —
+// за локальною датою гравця, тож біля півночі в одній комірці можуть лежати два
+// режими. Показуємо лише той, який дитина справді сьогодні грає.
+export function duelRows(d, modeId) {
+  const list = Array.isArray(d && d.duel) ? d.duel : [];
+  return list
+    .filter((e) => e && e.nick && e.m === modeId)
+    .sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0) || ((a.ms | 0) || Infinity) - ((b.ms | 0) || Infinity));
+}
+
+// Результат людською мовою: час, «пройшов» без часу, або «спробував».
+// Програш НЕ карається і не називається поразкою — це гра для дітей, не рейтинг.
+export function duelTime(ms, won) {
+  if (!won) return t('спробував');
+  const n = Math.max(0, ms | 0);
+  if (!n) return t('пройшов');
+  return `${Math.floor(n / 60000)}:${String(Math.floor((n % 60000) / 1000)).padStart(2, '0')}`;
+}
+
 // Одне читання лобі без пінг-циклу: на глобусі мультиплеєр не пінгує, а число
 // показати треба. Фейл тихий — null, і блок просто ховається.
 export async function fetchLobbyState() {
@@ -73,11 +96,21 @@ export class LobbyClient {
   // кімнату закрито — прибрати зі списку, не чекаючи TTL
   announceClose(code) { this._ping({ close: code }); }
 
+  // нік, під яким гравець видно в лобі (і в дошці дуелі)
+  nick() { return cleanNick(loadNick()) || t('Гравець'); }
+
   // 🏆 «топ-3 сьогодні»: шлемо свій штормовий результат у денний рейтинг лобі.
   // Разовий пінг поза розкладом — навіть якщо панель зараз не пінгує (кінець забігу).
   announceDayScore(wave) {
     const score = Math.max(1, Math.min(200, wave | 0));
-    this._ping({ day: { nick: cleanNick(loadNick()) || t('Гравець'), score } });
+    this._ping({ day: { nick: this.nick(), score } });
+  }
+
+  // 🤝 Дуель дня: спроба в режимі дня. Той самий разовий пінг, що й денний топ —
+  // у відповіді вже лежить оновлена дошка, тож окремого читання не треба.
+  async announceDuel(mode, ms, won) {
+    await this._ping({ duel: { nick: this.nick(), mode, ms: Math.max(0, ms | 0), won: !!won } });
+    return this.data;
   }
 
   // 🌍 Внесок у лічильник світу: скільки людей справді звільнено на рівні.
@@ -100,7 +133,7 @@ export class LobbyClient {
     try {
       const body = {
         cid: ensureCid(this.game),
-        nick: cleanNick(loadNick()) || t('Гравець'),
+        nick: this.nick(),
         profile: this._profile(),
         ...(this._pendingExtra || {}),
         ...extra,

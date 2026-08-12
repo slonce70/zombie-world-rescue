@@ -170,5 +170,6 @@ test('стара комірка day: з голим масивом топ-3 не 
   assert.deepEqual(lobby._view(T0).top3, [{ nick: 'Влад', score: 40 }]);
   assert.equal(lobby._view(T0).worldSaved, 0);
   await lobby._recordSaved(T0, CID, 5);
-  assert.deepEqual(store.get('day:' + day), { top3: [{ nick: 'Влад', score: 40 }], saved: 5 });
+  // у комірці доби разом із топ-3 і лічильником світу лежить ще й дошка «дуелі дня»
+  assert.deepEqual(store.get('day:' + day), { top3: [{ nick: 'Влад', score: 40 }], saved: 5, duel: [] });
 });

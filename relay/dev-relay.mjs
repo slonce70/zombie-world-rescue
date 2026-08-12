@@ -78,6 +78,29 @@ function recordDayScore(now, nick, score) {
   list.sort((a, b) => b.score - a.score);
   lobbyTop3 = list.slice(0, 3);
 }
+// 🤝 дошка «дуелі дня» (дзеркало mergeDuel у Lobby DO): результати режиму дня за добу.
+// Логіка дослівно та сама — один запис на пару «нік+режим», і це краща спроба дня.
+const DUEL_BOARD_MAX = 16;
+const DUEL_MS_MAX = 3_600_000;
+const DUEL_MODES = new Set(['knockout', 'defense', 'zone-defense', 'pvp', 'bank',
+  'portal', 'maze', 'humans', 'soul-collector', 'radiation', 'turretwar']);
+let lobbyDuel = [];
+let lobbyDuelDay = '';
+function recordDuel(now, nick, raw) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (day !== lobbyDuelDay) { lobbyDuelDay = day; lobbyDuel = []; }
+  const cleaned = cleanNickSrv(nick);
+  const mode = String(raw.mode || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 20);
+  if (!cleaned || !DUEL_MODES.has(mode)) return;
+  const msRaw = Math.floor(Number(raw.ms));
+  const next = { nick: cleaned, m: mode, ms: Number.isFinite(msRaw) ? Math.max(0, Math.min(DUEL_MS_MAX, msRaw)) : 0, w: !!raw.won };
+  const better = (a, b) => (a.w !== b.w ? a.w : ((a.ms || Infinity) < (b.ms || Infinity)));
+  const prev = lobbyDuel.find((e) => e.nick === cleaned && e.m === mode);
+  if (prev && !better(next, prev)) return;
+  lobbyDuel = lobbyDuel.filter((e) => e !== prev).concat([next])
+    .sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0) || ((a.ms || Infinity) - (b.ms || Infinity)))
+    .slice(0, DUEL_BOARD_MAX);
+}
 // 🌍 лічильник світу (дзеркало Lobby DO): скільки людей врятували сьогодні.
 // Стелі — ті самі, що у воркері; тут усе в памʼяті, бо dev-relay і так без сховища.
 const SAVED_PER_PING = 60;
@@ -107,12 +130,14 @@ function lobbyView(now) {
   const day = new Date(now).toISOString().slice(0, 10);
   if (day !== lobbyTop3Day) { lobbyTop3Day = day; lobbyTop3 = []; } // добова ротація як у DO
   if (day !== lobbySavedDay) { lobbySavedDay = day; lobbySaved = 0; lobbySavedByCid = new Map(); }
+  if (day !== lobbyDuelDay) { lobbyDuelDay = day; lobbyDuel = []; }
   return {
     online: lobbyPlayers.size,
     today: lobbyToday.size,
     top3: lobbyTop3,
     worldSaved: lobbySaved,
     worldSavedWeek: lobbySaved, // dev-relay історії не тримає: тиждень = сьогодні
+    duel: lobbyDuel,
     players: [...lobbyPlayers.values()].slice(0, 60).map((p) => p.nick),
     profiles: [...lobbyProfiles.values()].sort((a, b) => b.ts - a.ts).slice(0, 60),
     rooms: [...lobbyRooms.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, 20)
@@ -131,6 +156,7 @@ function lobbyPing(d) {
   lobbyProfiles.set(cid, cleanProfileSrv(nick, d.profile, now));
   recordToday(now, cid);
   if (d.day && typeof d.day === 'object') recordDayScore(now, d.day.nick || nick, d.day.score);
+  if (d.duel && typeof d.duel === 'object') recordDuel(now, d.duel.nick || nick, d.duel);
   if (d.saved) recordSaved(now, cid, d.saved);
   if (d.close) {
     const code = String(d.close).toUpperCase().slice(0, 8);

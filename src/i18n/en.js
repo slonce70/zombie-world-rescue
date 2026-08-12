@@ -2920,4 +2920,10 @@ export const EN = {
 "⭐ Зірки: {n}": "⭐ Stars: {n}",
 "🐾 Улюбленці: {list}": "🐾 Pets: {list}",
 "🎒 Усе, що ти тут зібрав": "🎒 Everything you collected here",
+"ДУЕЛЬ ДНЯ": "DUEL OF THE DAY",
+"спробував": "gave it a go",
+"пройшов": "completed",
+"🤝 Дуель дня: ти — {me}, {nick} — {them}": "🤝 Duel of the day: you — {me}, {nick} — {them}",
+"Сьогодні ще ніхто не грав — будь першим!": "Nobody has played yet today — be the first!",
+"{i} {m}: сьогодні в усіх однакова карта. Пройди і порівняй з друзями!": "{i} {m}: everyone gets the same map today. Play it and compare with friends!",
 };

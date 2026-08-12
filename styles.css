@@ -1459,6 +1459,17 @@ body.touch-mode #touch-coach.show { display: block; }
 .solo-recommended h3, .settings-section h3 {
   margin: 2px 2px 0; color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: .12em;
 }
+/* 🤝 Дуель дня: хто сьогодні пройшов режим дня і за скільки */
+.duel-board {
+  display: flex; flex-direction: column; gap: 5px; margin-top: 4px; padding: 10px 12px;
+  border: 1px solid rgba(140,213,255,.28); border-radius: 14px; background: rgba(140,213,255,.07);
+}
+.duel-title { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.duel-hint { color: #b9d4e8; font-size: 12px; line-height: 1.35; }
+.duel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #eaf6ff; }
+.duel-row b { font-variant-numeric: tabular-nums; }
+.duel-row.me { color: #ffe08a; font-weight: 900; }
+.duel-row.empty { color: #b9d4e8; justify-content: flex-start; }
 .solo-category { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); overflow: clip; }
 .solo-category > summary {
   display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 10px 14px;
