@@ -3133,7 +3133,7 @@ class Game {
       // Campaign stages already contain a populated horde. Reuse it before
       // allocating new meshes so Front stays inside its +10 draw-call budget.
       const existing = level.zombies.list.filter((zombie) =>
-        !zombie.dead && !zombie.gone && !zombie.frontCommander);
+        zombie.state !== 'dead' && !zombie.gone && !zombie.frontCommander);
       for (let i = 0; i < phase.spawnBudget; i++) {
         const reused = existing[i];
         if (reused) {
@@ -4658,7 +4658,7 @@ class Game {
       if (state === 'attacked') {
         const village = level.world.layout.village || level.world.layout.SPAWN;
         level.frontPressure = level.zombies.list.filter((zombie) =>
-          !zombie.dead && !zombie.gone && !zombie.horde && !zombie.aggroed && zombie.state !== 'chase').slice(0, 3);
+          zombie.state !== 'dead' && !zombie.gone && !zombie.horde && !zombie.aggroed && zombie.state !== 'chase').slice(0, 3);
         level.frontPressure.forEach((zombie, index) => {
           const angle = index * Math.PI * 2 / level.frontPressure.length;
           zombie.x = village.x + Math.cos(angle) * 12;

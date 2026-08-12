@@ -930,7 +930,9 @@ export class Zombies {
         if (Math.hypot(pl.pos.x - z.x, pl.pos.z - z.z) <= R) this._hurt(pl, EXPLODER_DMG, z.x, z.z, 0, z.y);
       }
       // 🎯 винагорода за кайтинг: вибух добиває інших зомбі поряд (не рекурсивно — direct hp)
-      for (const o of this.list) {
+      // копія списку: _kill розділювача пушить міні-зомбі просто в this.list, і без копії
+      // ітератор побачив би новонароджених та відразу спалив би їх тими самими 120
+      for (const o of this.list.slice()) {
         if (o === z || o.state === 'dead' || o.gone) continue;
         if (Math.hypot(o.x - z.x, o.z - z.z) > R) continue;
         if (o.type === 'exploder' && !o.exploded) { this._explode(o, null); continue; } // ланцюг
@@ -989,6 +991,9 @@ export class Zombies {
   }
 
   _kill(z, dir) {
+    // гард від подвійної смерті: ланцюг підривників може дійти до того самого зомбі двічі,
+    // а лут, kills, 'zd' і zombieKilled мають нарахуватись рівно один раз
+    if (z.state === 'dead' || z.gone) return;
     z.state = 'dead';
     z.deadT = 0;
     z.rig.anim.deathSide = z.lastImpactSide || impactSide(z, dir);
