@@ -6,8 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../src/net/gadgetguard.js', import.meta.url), 'utf8');
-const { GADGET_LIMITS, GADGET_KINDS, checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard } = await import(
-  'data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const {
+  GADGET_LIMITS, GADGET_KINDS, checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard,
+  MSG_GAPS, throttleMsg,
+} = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 const hostSrc = readFileSync(new URL('../src/net/host.js', import.meta.url), 'utf8');
 const coopSrc = readFileSync(new URL('../src/net/coop.js', import.meta.url), 'utf8');
@@ -392,4 +394,97 @@ test('перепідключення гостя починає з чистого
   const after = createGadgetGuard(); // новий RemotePlayer після реконекту
   assert.equal(why(after, 'firetrail', 1001), 'nocard', 'право не успадковується');
   assert.ok(ok(after, 'wall', 1001), 'і ліміт частоти теж не успадковується');
+});
+
+// ---------- v770: гард ростера + кулдауни дешевих повідомлень ----------
+
+test('гард ростера стоїть ПЕРШИМ у _handleMessage і пускає повідомлення далі в сесію', () => {
+  const body = hostSrc.match(/_handleMessage\(from, d\) \{([\s\S]*?)\n    const level = this\.level;/);
+  assert.ok(body, 'у host.js має бути _handleMessage з гардом до розбору типу');
+  const guard = body[1].match(/if \(!this\.session\.roster\.has\(from\)\) return (\w+);/);
+  assert.ok(guard, 'перевірка «відправник у ростері?» мусить бути на вході, а не по кейсах');
+  // `false`, а не `true`: hello НОВОГО гостя ще не має рядка в ростері й мусить
+  // доїхати до сесії — з `true` приєднання посеред рівня зламалось би назавжди.
+  assert.equal(guard[1], 'false', 'непроцесоване повідомлення мусить доїхати до CoopSession');
+  assert.ok(/if \(this\.net && this\.net\.onMessage\(from, d\)\) return;/.test(coopSrc),
+    'сесія розбирає повідомлення лише тоді, коли рівень повернув false');
+  // чесний порядок: ростер наповнюється в _hostHello ДО того, як гість дізнається про старт
+  const hello = coopSrc.match(/_hostHello\(from, d\) \{([\s\S]*?)\n  \}\n/);
+  assert.ok(hello, 'у coop.js має бути _hostHello');
+  assert.ok(hello[1].indexOf('this.roster.set(from, entry)') < hello[1].indexOf("t: 'welcome'"),
+    'ростер мусить наповнюватись РАНІШЕ за welcome/start — інакше чесний гість втратить старт');
+});
+
+test('дистанц-гейти хоста fail-closed: без рига повідомлення не проходить', () => {
+  // Було «if (rp && …) return true» — при відсутньому ригу перевірка тихо вимикалась.
+  assert.ok(!/if \(rp\w* && Math\.hypot/.test(hostSrc),
+    'дистанц-гейт не має вимикатись сам собою, коли рига ще немає');
+  assert.ok(/if \(!rpN \|\| Math\.hypot/.test(hostSrc), 'граната: немає рига — немає кидка');
+  assert.ok(/if \(!rpR \|\| Math\.hypot/.test(hostSrc), 'ракета: немає рига — немає пострілу');
+  const shot = hostSrc.match(/_onShot\(from, d\) \{([\s\S]*?)\n  \}\n/);
+  assert.ok(shot && /const rp = this\.remotes\.get\(from\);\n(?:\s*\/\/.*\n)*\s*if \(!rp\) return;/.test(shot[1]),
+    'постріл: без рига гейтам нема з чим звірятись — виходимо одразу');
+});
+
+test('списки влучань обрізані спільною стелею', () => {
+  const cap = hostSrc.match(/const MAX_NET_HITS = (\d+);/);
+  assert.ok(cap, 'у host.js має бути стеля довжини списків');
+  const max = Number(cap[1]);
+  // 80 — геометрична стеля конуса вогнемета (сектор ~39 м² / ~0.5 м² на тіло)
+  assert.ok(max >= 80, 'стеля мусить бути вищою за найдовшу ЧЕСНУ чергу (конус вогнемета)');
+  assert.ok(max <= 256, 'і все ж стелею, а не декорацією');
+  for (const field of ['d.hits', 'd.bar', 'd.wl']) {
+    assert.ok(hostSrc.includes(`${field}.slice(0, MAX_NET_HITS)`), `${field} мусить обрізатись`);
+  }
+});
+
+test('кулдауни дешевих повідомлень: перше пускаємо, дубль у тому ж кадрі — ні', () => {
+  const seen = new Map();
+  for (const [type, gap] of Object.entries(MSG_GAPS)) {
+    assert.ok(throttleMsg(seen, 2, type, 1000), `${type}: перше повідомлення проходить`);
+    assert.ok(!throttleMsg(seen, 2, type, 1000), `${type}: дубль у тому ж кадрі зникає`);
+    assert.ok(!throttleMsg(seen, 2, type, 1000 + gap - 1), `${type}: раніше за інтервал — зникає`);
+    assert.ok(throttleMsg(seen, 2, type, 1000 + gap), `${type}: рівно за інтервалом — проходить`);
+  }
+  // тип без рядка в таблиці не стримується взагалі (позиція, постріл, гаджет)
+  for (const type of ['p', 'shot', 'gadget', 'use']) {
+    for (let i = 0; i < 50; i++) assert.ok(throttleMsg(seen, 2, type, 1000), `${type} не стримується`);
+  }
+  // ліміт персональний: сусід у кімнаті чужим темпом не обмежений
+  assert.ok(throttleMsg(seen, 3, 'ping', 1000), 'кулдаун рахується на кожного гостя окремо');
+});
+
+test('кулдауни мають запас над ЧЕСНИМ темпом відправника', () => {
+  // lvlready — клієнт повторює раз на 1.2с (`client.js`, this._readyT = 1.2)
+  assert.ok(MSG_GAPS.lvlready < 1200, 'чесний повтор lvlready мусить проходити');
+  assert.ok(MSG_GAPS.lvlready > 100, 'але дубль у сусідньому кадрі — ні (два captureState поспіль)');
+  // ping — анти-спам відправника 1.2с (`coop.js`, sendPing)
+  assert.ok(MSG_GAPS.ping < 1200, 'чесний пінг раз на 1.2с мусить проходити');
+  // twh — молот rpm 60, найшвидша чесна комбінація множників дає ~179 мс
+  assert.ok(MSG_GAPS.twh < 179, 'найшвидший чесний удар молота мусить проходити');
+
+  const seen = new Map();
+  let now = 0;
+  for (let i = 0; i < 40; i++) { // чесний молот у максимальному темпі, разом із дрижанням
+    now += i % 3 === 0 ? 200 : 179;
+    assert.ok(throttleMsg(seen, 2, 'twh', now), `удар ${i} не має губитись`);
+  }
+  for (let i = 0; i < 20; i++) {
+    now += 1200;
+    assert.ok(throttleMsg(seen, 2, 'ping', now), `пінг ${i} не має губитись`);
+    assert.ok(throttleMsg(seen, 2, 'lvlready', now), `lvlready ${i} не має губитись`);
+  }
+  // а флуд у 1000 повідомлень за пів секунди дає рівно одне звернення до хоста
+  let passed = 0;
+  for (let i = 0; i < 1000; i++) if (throttleMsg(seen, 4, 'lvlready', now + i * 0.5)) passed++;
+  assert.equal(passed, 1, 'спам lvlready будує рівно один captureState()');
+});
+
+test('стан кулдаунів чиститься разом із гостем', () => {
+  assert.ok(/this\._msgAt\.delete\(pid\);/.test(hostSrc), 'removeGuest мусить чистити мапу кулдаунів');
+  const rm = hostSrc.match(/removeGuest\(pid\) \{([\s\S]*?)\n  \}\n/);
+  assert.ok(rm && rm[1].includes('this._msgAt.delete(pid)'), 'і саме в removeGuest, поруч із _fountainAt');
+  // сміття на вході не має валити хоста
+  assert.ok(throttleMsg(null, 1, 'ping', 0), 'без мапи — просто пускаємо');
+  assert.ok(throttleMsg(new Map(), 1, 'ping', NaN), 'без часу — теж');
 });

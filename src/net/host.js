@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RemotePlayer } from './remoteplayer.js';
 import { r1, r2, PF, packZombieState, weaponToIdx, idxToWeapon } from './protocol.js';
 import { PING_PHRASES } from './coop.js';
-import { checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard } from './gadgetguard.js';
+import { checkGadget, createGadgetGuard, offerDraftCards, takeDraftCard, throttleMsg } from './gadgetguard.js';
 import { t } from '../i18n.js';
 import { WEAPONS } from '../player.js';
 
@@ -28,6 +28,17 @@ const clampHitMeta = (h) => ({
 });
 const isVec3 = (a) => Array.isArray(a) && a.length >= 3
   && isFinite(a[0]) && isFinite(a[1]) && isFinite(a[2]);
+// 🎯 стеля довжини списків у повідомленні `shot`: кожен елемент — це пошук цілі
+// і `damage` у кадрі хоста, тож масив довільної довжини клав би кімнату.
+// Чесну межу задає НЕ дробовик (7 шротин) і не снайперка (pierce 3), а вогнемет:
+// `_flameCone` кладе рядок на КОЖНОГО зомбі в конусі (`player.js`: range 8,
+// coneCos 0.82 → сектор ~39 м²), тобто стільки тіл, скільки туди фізично влізе.
+// Сепарація тримає зомбі на (0.42+0.42)×0.9 ≈ 0.76 од. один від одного, тож у
+// найщільнішій купі це ~80 тіл. 96 стоїть ВИЩЕ за цю геометричну стелю —
+// чесний вогнемет не обрізає, а нескінченний цикл робить константним.
+// Бочки (`bar`) і стіни (`wl`) обмежені кількістю шротин — для них це вже
+// величезний запас, але константа спільна: одна межа, одне правило.
+const MAX_NET_HITS = 96;
 
 // 🧰 Хто що ставить за повідомленням гостя. Ключі мусять збігатися з
 // `GADGET_LIMITS` (gadgetguard.js): тип без рядка в таблиці лімітів не проходить
@@ -63,6 +74,7 @@ export class HostNet {
     this._tmpV = new THREE.Vector3();
     this._hostShotCd = 0;
     this._fountainAt = new Map(); // pid -> час останнього fountain (анти-флуд декору)
+    this._msgAt = new Map();   // pid -> { тип: час } — кулдауни дешевих повідомлень (MSG_GAPS)
     // 🏠 стеля каналу гаджетів на ВСЮ кімнату: живе на рівні, а не на гості, тож
     // цикл «вийшов — зайшов із новим pid» її не скидає (персональні ліміти скидає).
     this.roomGuard = createGadgetGuard();
@@ -111,6 +123,7 @@ export class HostNet {
     }
     this.readyGuests.delete(pid);
     this._fountainAt.delete(pid);
+    this._msgAt.delete(pid);
   }
 
   _rebuildPlayers() {
@@ -157,6 +170,19 @@ export class HostNet {
   }
 
   _handleMessage(from, d) {
+    // 🚪 Один гард замість розсипаних по кейсах `if (rp && …)`: не в ростері —
+    // не в кімнаті, рівневих повідомлень від такого pid не слухаємо взагалі.
+    // Порядок подій це дозволяє: `_hostHello` кладе гостя в ростер ЩЕ ДО того, як
+    // надішле йому welcome/start, а `lvlready` гість шле лише після start — тобто
+    // чесний вхід (лобі → ростер → lvlready → p) гард не бачить.
+    // Повертаємо `false`, а не `true`: рівень цього повідомлення не обробив, і воно
+    // мусить доїхати до сесії — саме там ловиться `hello` НОВОГО гостя, якого в
+    // ростері ще немає (з `true` приєднання посеред рівня зламалось би назавжди).
+    if (!this.session.roster.has(from)) return false;
+    // ⏱️ кулдаун дешевих типів (lvlready/ping/twh). Відмова тиха — повідомлення
+    // просто зникає, як і понадлімітний гаджет: у дитячому коопі лаг звичайніший
+    // за чит, а модифікований клієнт не має дізнаватись, де проходить межа.
+    if (!throttleMsg(this._msgAt, from, d.t, performance.now())) return true;
     const level = this.level;
     switch (d.t) {
       case 'lvlready': {
@@ -165,8 +191,6 @@ export class HostNet {
         return true;
       }
       case 'p': {
-        // гість, якого вже прибрали з ростера — ігноруємо (не воскрешаємо рігів)
-        if (!this.session.roster.has(from)) return true;
         // позиція — найчастіший пакет і потрапляє у снапшот для ВСІХ; NaN/Infinity тут зламали б
         // інтерполяцію рига в усієї кімнати (JSON перетворює їх на null). Відкидаємо такий пакет —
         // як уже роблять nade/rocket через isVec3. hp/mhp теж тримаємо скінченними.
@@ -216,8 +240,11 @@ export class HostNet {
         if (!isVec3(o) || !isVec3(v)) return true;
         // F20: дистанц-гейт як у shot/gadget — граната має вилітати з-під самого гостя.
         // Без нього гість міг би кинути гранату в будь-яку точку карти.
+        // без рига гейт нема з чим звіряти — відмовляємо, а не пропускаємо: гість шле
+        // свою позицію з ПЕРШОГО ж кадру рівня (client.js, sendT = 0), тож на момент
+        // будь-якого чесного кидка риг у хоста вже є.
         const rpN = this.remotes.get(from);
-        if (rpN && Math.hypot(o[0] - rpN.pos.x, o[2] - rpN.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
+        if (!rpN || Math.hypot(o[0] - rpN.pos.x, o[2] - rpN.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
         this.spawnNetGrenade(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(v[0], v[1], v[2]), from);
         return true;
       }
@@ -226,7 +253,7 @@ export class HostNet {
         if (!isVec3(o) || !isVec3(dir)) return true;
         // F20: ракета теж стартує з-під гостя — той самий дистанц-гейт.
         const rpR = this.remotes.get(from);
-        if (rpR && Math.hypot(o[0] - rpR.pos.x, o[2] - rpR.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
+        if (!rpR || Math.hypot(o[0] - rpR.pos.x, o[2] - rpR.pos.z) > REMOTE_PROJECTILE_ORIGIN_MAX) return true;
         this.spawnNetRocket(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(dir[0], dir[1], dir[2]), clampDmg(d.dmg), from);
         return true;
       }
@@ -312,27 +339,28 @@ export class HostNet {
   _onShot(from, d) {
     const level = this.level;
     const rp = this.remotes.get(from);
+    // без рига гейти дистанції нижче тихо вимикались би («rp && …»), і постріл
+    // проходив би з будь-якої точки карти. Чесному це не заважає: позиція гостя
+    // приїжджає з першого ж кадру його рівня (client.js, sendT = 0).
+    if (!rp) return;
     const weaponId = idxToWeapon(d.w);
     const w = WEAPONS[weaponId] || WEAPONS.pistol;
     // D2: дальність зброї + 30 u лаг-маржа (hitscan max 140; shotgun pellets 45; fuel weapons use cfg.range)
     const reach = ((w.pellets ? 45 : (w.range || 140))) + 30;
     // звук + трасер для всіх (і для хоста)
-    if (rp) {
-      const muzzle = rp.muzzleWorld(this._tmpV).clone();
-      if (d.e) level.effects.tracer(muzzle, new THREE.Vector3(d.e[0], d.e[1], d.e[2]));
-      const dd = Math.hypot(rp.pos.x - level.player.pos.x, rp.pos.z - level.player.pos.z);
-      if (dd < 70) level.audio.shot(weaponId);
-    }
+    const muzzle = rp.muzzleWorld(this._tmpV).clone();
+    if (d.e) level.effects.tracer(muzzle, new THREE.Vector3(d.e[0], d.e[1], d.e[2]));
+    if (Math.hypot(rp.pos.x - level.player.pos.x, rp.pos.z - level.player.pos.z) < 70) level.audio.shot(weaponId);
     this.ev('sh', from, d.w, d.e || 0);
     // влучання: довіряємо гостю (сімейний кооп), але форму перевіряємо і шкоду санітизуємо
     if (Array.isArray(d.hits)) {
-      for (const h of d.hits) {
+      for (const h of d.hits.slice(0, MAX_NET_HITS)) {
         if (!Array.isArray(h)) continue;
         const zb = level.zombies.byNid(h[0]);
         if (!zb || zb.state === 'dead') continue;
         // D2: гейт дистанції — легітимний постріл не може влучити далі reach одиниць від гостя
-        if (rp && Math.hypot(zb.x - rp.pos.x, zb.z - rp.pos.z) > reach) continue;
-        const dir = this._tmpV.set(zb.x - (rp ? rp.pos.x : 0), 0, zb.z - (rp ? rp.pos.z : 0));
+        if (Math.hypot(zb.x - rp.pos.x, zb.z - rp.pos.z) > reach) continue;
+        const dir = this._tmpV.set(zb.x - rp.pos.x, 0, zb.z - rp.pos.z);
         if (dir.lengthSq() > 1e-4) dir.normalize();
         zb.lastHitBy = from;
         // [5..7] are additive Combat Reborn metadata; old 3/5-field hit arrays
@@ -353,21 +381,21 @@ export class HostNet {
         }
       }
     }
-    if (Array.isArray(d.bar)) for (const e of d.bar) {
+    if (Array.isArray(d.bar)) for (const e of d.bar.slice(0, MAX_NET_HITS)) {
       if (!Array.isArray(e)) continue;
       const b = level.effects.barrels && level.effects.barrels[e[0]];
       // D2: гейт дистанції для бочок
-      if (b && rp && Math.hypot(b.x - rp.pos.x, b.z - rp.pos.z) > reach) continue;
+      if (b && Math.hypot(b.x - rp.pos.x, b.z - rp.pos.z) > reach) continue;
       if (b) level.effects.damageBarrel(b, clampDmg(e[1]));
     }
-    if (Array.isArray(d.wl)) for (const e of d.wl) {
+    if (Array.isArray(d.wl)) for (const e of d.wl.slice(0, MAX_NET_HITS)) {
       if (!Array.isArray(e)) continue;
       const wall = level.gadgets.walls.find((x) => x.nid === e[0]);
       // D2: гейт дистанції для стін
-      if (wall && rp && Math.hypot(wall.x - rp.pos.x, wall.z - rp.pos.z) > reach) continue;
+      if (wall && Math.hypot(wall.x - rp.pos.x, wall.z - rp.pos.z) > reach) continue;
       if (wall) level.gadgets.damageWall(wall, clampDmg(e[1]));
     }
-    if (d.ball && level.effects.ball && rp) {
+    if (d.ball && level.effects.ball) {
       const bp = level.effects.ball.mesh.position;
       const dir = this._tmpV.set(bp.x - rp.pos.x, 0.3, bp.z - rp.pos.z).normalize();
       level.effects.kickBall(dir, 9);
