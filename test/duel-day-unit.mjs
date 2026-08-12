@@ -5,7 +5,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { cleanNickSrv } from '../worker/nick.mjs';
 import { sanitizeMapSize, sanitizeMapStyle } from '../worker/community-schema.mjs';
 
 const asData = (code) => 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
@@ -35,8 +34,7 @@ const { duelRows, duelTime } = await import(asData(lobbySrc));
 const workerDir = new URL('../worker/', import.meta.url);
 const workerSrc = readFileSync(new URL('relay-worker.js', workerDir), 'utf8')
   .replace(/ from '\.\//g, ` from '${workerDir}`);
-const { mergeDuel, DUEL_BOARD_MAX, DUEL_MS_MAX, DUEL_MODES } =
-  await import(asData(workerSrc));
+const { DUEL_MODES } = await import(asData(workerSrc));
 
 // ---------- сід дня: те, на чому стоїть чесність дуелі ----------
 
@@ -73,62 +71,13 @@ test('увесь пул дня стартує кімнатним режимом 
 });
 
 // ---------- дошка результатів у воркері ----------
-
-const merge = (board, raw) => mergeDuel(board, raw, cleanNickSrv);
+// Самі правила дошки (кому належить запис, стеля на мережу, клампи) живуть у
+// test/duel-owner-unit.mjs — там воркер без жодного клієнтського імпорту. Тут лишається
+// єдина перевірка, якій потрібні ОБИДВА боки: щоб списки режимів не розійшлись.
 
 test('білий список режимів воркера не розійшовся з пулом дня', () => {
   assert.deepEqual([...DUEL_MODES].sort(), [...DAILY_CHALLENGE_POOL].sort(),
     'DUEL_MODES у relay-worker.js — дзеркало DAILY_CHALLENGE_POOL у src/modes.js');
-});
-
-test('сміттєва спроба дошку не чіпає', () => {
-  const board = [];
-  assert.equal(merge(board, {}), board, 'без режиму — той самий масив');
-  assert.equal(merge(board, { nick: 'Влад', mode: '<script>' }), board, 'вигаданий режим відкидається');
-  assert.equal(merge(board, { nick: 'Влад' }), board, 'без режиму нічого не пишемо');
-});
-
-test('час клампиться, режим чиститься до [a-z-]', () => {
-  const [row] = merge([], { nick: 'Влад', mode: 'ZONE-defense!!', ms: 9e9, won: true });
-  assert.equal(row.m, 'zone-defense');
-  assert.equal(row.ms, DUEL_MS_MAX, 'година — стеля часу');
-  const [neg] = merge([], { nick: 'Влад', mode: 'bank', ms: -5, won: true });
-  assert.equal(neg.ms, 0, 'відʼємний час → 0');
-  const [nan] = merge([], { nick: 'Влад', mode: 'bank', ms: 'abc', won: true });
-  assert.equal(nan.ms, 0, 'нечисло → 0');
-});
-
-test('один запис на пару «нік + режим», і це КРАЩА спроба дня', () => {
-  let b = merge([], { nick: 'Влад', mode: 'bank', ms: 90_000, won: true });
-  b = merge(b, { nick: 'Влад', mode: 'bank', ms: 120_000, won: true });
-  assert.equal(b.length, 1, 'другий забіг не додає рядок');
-  assert.equal(b[0].ms, 90_000, 'слабший пізніший забіг не затирає ранковий результат');
-  b = merge(b, { nick: 'Влад', mode: 'bank', ms: 60_000, won: true });
-  assert.equal(b[0].ms, 60_000, 'швидший забіг оновлює');
-  // інший режим того самого ніка — окремий рядок (біля півночі UTC у комірці два режими)
-  b = merge(b, { nick: 'Влад', mode: 'maze', ms: 30_000, won: true });
-  assert.equal(b.length, 2);
-});
-
-test('програш не карається: спроба лишається на дошці, але перемога її замінює', () => {
-  let b = merge([], { nick: 'Влад', mode: 'bank', ms: 0, won: false });
-  assert.equal(b.length, 1, 'той, хто не пройшов, теж видно — друг має бачити, що ти грав');
-  assert.equal(b[0].w, false);
-  b = merge(b, { nick: 'Влад', mode: 'bank', ms: 70_000, won: true });
-  assert.equal(b[0].w, true, 'пройдений забіг б\'є непройдений');
-  b = merge(b, { nick: 'Влад', mode: 'bank', ms: 0, won: false });
-  assert.equal(b[0].w, true, 'наступний програш не забирає вже здобутий результат');
-});
-
-test('дошка має стелю і сортована: пройшли (швидші вгорі), потім спробували', () => {
-  let b = [];
-  for (let i = 0; i < DUEL_BOARD_MAX + 5; i++) b = merge(b, { nick: 'Гравець' + i, mode: 'bank', ms: (i + 1) * 1000, won: true });
-  assert.equal(b.length, DUEL_BOARD_MAX);
-  assert.equal(b[0].ms, 1000, 'найшвидший угорі');
-  const withLoss = merge([
-    { nick: 'А', m: 'bank', ms: 0, w: false },
-  ], { nick: 'Б', mode: 'bank', ms: 5000, won: true });
-  assert.equal(withLoss[0].nick, 'Б', 'той, хто пройшов, вище за того, хто спробував');
 });
 
 // ---------- дошка на боці клієнта ----------
@@ -153,9 +102,14 @@ test('той, хто пройшов, стоїть вище за того, хто
   assert.deepEqual(duelRows(d, 'bank').map((r) => r.nick), ['Б', 'А']);
 });
 
-test('результат словами — без принизливих формулювань', () => {
+test('результат словами — без принизливих формулювань і БЕЗ роду', () => {
   assert.equal(duelTime(83_000, true), '1:23');
-  assert.equal(duelTime(0, true), 'пройшов', 'режим без виміру часу (оборона в зоні)');
-  assert.equal(duelTime(0, false), 'спробував', 'не «програв» — це гра для дітей, а не рейтинг');
-  assert.equal(duelTime(99_000, false), 'спробував', 'час програного забігу нікого не соромить');
+  // рядок дошки читається «Соломія — пройдено», а не «Соломія — пройшов»:
+  // чіпляти чоловічий рід до чужого імені не можна
+  assert.equal(duelTime(0, true), 'пройдено', 'режим без виміру часу (оборона в зоні)');
+  assert.equal(duelTime(0, false), 'спроба', 'не «програв» — це гра для дітей, а не рейтинг');
+  assert.equal(duelTime(99_000, false), 'спроба', 'час програного забігу нікого не соромить');
+  for (const s of [duelTime(0, true), duelTime(0, false)]) {
+    assert.ok(!/(ла|в)$/.test(s), `«${s}» має рід — на дошці стоять і дівчата, і хлопці`);
+  }
 });

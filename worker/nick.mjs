@@ -27,8 +27,12 @@ export function normNick(raw) {
   return s;
 }
 
+// Нік їде в чужий браузер (лобі, дошка дуелі, тости) і подекуди в innerHTML, де
+// захист — один-єдиний esc(). Ріжемо кутові дужки ще на сервері, як у cleanTitleSrv:
+// два незалежні шари дешевші за розслідування, коли третє місце забуде esc().
+// Ріжемо ДО normNick, щоб стеля 12 рахувалась уже по чистому ніку.
 export function cleanNickSrv(raw) {
-  const s = normNick(raw);
+  const s = normNick(String(raw || '').replace(/<[^>]*>/g, '').replace(/[<>]/g, ''));
   if (!s || nickIsBad(s)) return 'Гравець';
   return s;
 }

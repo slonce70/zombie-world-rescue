@@ -334,6 +334,7 @@ export class Room {
 // перезапуститься, картина відновиться за один пінг. Нічого не платимо за сховище.
 // ============================================================
 const LOBBY_TTL = 40_000;
+const DO_DELETE_MAX = 128; // ліміт Durable Objects: storage.delete() бере 128 ключів за виклик
 // повний перелік режимів, які хост реально анонсує (MODE_ICON у src/ui/coopui.js);
 // невідомий режим коерситься в 'campaign' — радіація більше не прикидається кампанією
 const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiation', 'turretwar', 'worldboss',
@@ -350,15 +351,37 @@ const LOBBY_MODES = new Set(['campaign', 'expedition', 'storm', 'arena', 'radiat
 // щоб чесний гравець ніколи не впирався, навіть якщо клієнт шле внесок раз на забіг.
 export const SAVED_PER_PING = 60;
 // Стеля на добу з одного cid: 45 забігів по 11 людей — це вже ~4 години суцільної гри,
-// більше за реальний день дитини. Округлено до 500.
+// більше за реальний день дитини. Округлено до 500. Це стеля ЧЕСНОСТІ, а не захисту:
+// cid шле сам клієнт, і «почати заново» чи імпорт сейва дають новий рядок — тому
+// справжня стеля нижче, на мережі.
 export const SAVED_PER_DAY = 500;
+// 🛡️ Стеля доби на МЕРЕЖУ (IP) — єдине, чого клієнт не вибирає сам, тож ротація cid
+// її не обходить. Рахунок: одна дитина за добу чесно рятує щонайбільше SAVED_PER_DAY
+// = 500 людей (45 забігів × 11 — це вже ~4 години суцільної гри). За одним роутером
+// сидить кілька дітей: брат із сестрою на двох планшетах, гості, школа. Беремо запас
+// на 6 таких дітей, кожну на її ТЕОРЕТИЧНІЙ стелі: 6 × 500 = 3000. Реально дитина за
+// вечір вносить ~100–150, тож у 3000 влазить і клас на спільному вайфаї, а накрутка з
+// одного браузера впирається в 3000 за добу замість 10 800 за хвилину.
+export const SAVED_PER_DAY_IP = 3000;
 const SAVED_WEEK_DAYS = 7;
 // Скільки з цього пінгу справді зарахувати: сміття → 0, забагато → стеля,
-// вичерпана добова квота cid → 0. Чиста функція — її й перевіряє юніт.
-export function clampSaved(raw, already) {
+// вичерпана квота cid або мережі → 0. Чиста функція — її й перевіряє юніт.
+export function clampSaved(raw, already, ipAlready = 0) {
   const n = Math.floor(Number(raw));
   if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.max(0, Math.min(n, SAVED_PER_PING, SAVED_PER_DAY - Math.max(0, already | 0)));
+  const left = Math.min(SAVED_PER_DAY - Math.max(0, already | 0), SAVED_PER_DAY_IP - Math.max(0, ipAlready | 0));
+  return Math.max(0, Math.min(n, SAVED_PER_PING, left));
+}
+
+// 🗓️ «За тиждень» — це останні 7 КАЛЕНДАРНИХ діб, а не 7 останніх діб, коли хтось грав:
+// у мапі зʼявляються лише дні з грою, тож обрізання за кількістю ключів лишало б у сумі
+// травневу добу поруч зі серпневою. ISO-дати порівнюються як рядки — того й досить.
+export function trimWeek(week, day) {
+  const oldest = new Date(Date.parse(day + 'T00:00:00Z') - (SAVED_WEEK_DAYS - 1) * 86_400_000)
+    .toISOString().slice(0, 10);
+  const out = {};
+  for (const [d, n] of Object.entries(week || {})) if (d >= oldest && d <= day) out[d] = Math.max(0, n | 0);
+  return out;
 }
 
 // 🤝 Дуель дня: спільна дошка результатів режиму дня. Лежить у ТІЙ САМІЙ добовій
@@ -371,19 +394,33 @@ export const DUEL_MS_MAX = 3_600_000; // година — довше за буд
 // Без білого списку один клієнт міг би забити дошку вигаданими «режимами».
 export const DUEL_MODES = new Set(['knockout', 'defense', 'zone-defense', 'pvp', 'bank',
   'portal', 'maze', 'humans', 'soul-collector', 'radiation', 'turretwar']);
-// Один запис на пару «нік + режим», і це КРАЩА спроба дня: пройдений забіг б'є
+// 🛡️ Скільки записів на дошці може тримати одна мережа. Дошка на 16 рядків — на весь
+// світ, тож без цієї стелі один браузер із новим cid на кожен пінг витісняв би з неї
+// справжніх дітей. 4 = стільки ж, скільки гравців у кімнаті: брат, сестра і двоє гостей
+// за одним роутером на дошку потраплять, а 16 «рекордів» з одного планшета — ні.
+export const DUEL_PER_IP = 4;
+// Один запис на пару «cid + режим», і це КРАЩА спроба дня: пройдений забіг б'є
 // непройдений, серед пройдених — швидший. Слабший пізніший забіг нічого не затирає
 // (програш не карається — він просто не псує вже показаний результат).
-export function mergeDuel(board, raw, cleanNick) {
+//
+// Власник запису — cid із ТОГО САМОГО пінга (прецедент — this.rooms у лобі, де оновити
+// запис коду може лише той cid, що його анонсував). Нік — лише підпис: два соло-гравці
+// без ніка («Гравець» обидва) — це два різні рядки, а чужий рядок підмінити не можна.
+// c (cid) і ip — службові поля, у _view вони зрізаються й назовні не їдуть.
+export function mergeDuel(board, raw, cleanNick, owner) {
   const list = Array.isArray(board) ? board : [];
+  const cid = String((owner && owner.cid) || '');
+  const ip = String((owner && owner.ip) || '');
   const nick = cleanNick(raw && raw.nick);
   const mode = String((raw && raw.mode) || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 20);
-  if (!nick || !DUEL_MODES.has(mode)) return list;
+  if (!cid || !nick || !DUEL_MODES.has(mode)) return list;
   const won = !!(raw && raw.won);
   const msRaw = Math.floor(Number(raw && raw.ms));
-  const next = { nick, m: mode, ms: Number.isFinite(msRaw) ? Math.max(0, Math.min(DUEL_MS_MAX, msRaw)) : 0, w: won };
+  const next = { nick, m: mode, ms: Number.isFinite(msRaw) ? Math.max(0, Math.min(DUEL_MS_MAX, msRaw)) : 0, w: won, c: cid, ip };
   const better = (a, b) => (a.w !== b.w ? a.w : ((a.ms || Infinity) < (b.ms || Infinity)));
-  const prev = list.find((e) => e.nick === nick && e.m === mode);
+  const prev = list.find((e) => e.c === cid && e.m === mode);
+  // нова мережа бере лише свої DUEL_PER_IP місць у режимі; свій запис оновлюється завжди
+  if (!prev && list.filter((e) => e.ip === ip && e.m === mode).length >= DUEL_PER_IP) return list;
   if (prev && !better(next, prev)) return list;
   return list.filter((e) => e !== prev).concat([next])
     .sort((a, b) => (b.w ? 1 : 0) - (a.w ? 1 : 0) || ((a.ms || Infinity) - (b.ms || Infinity)))
@@ -409,10 +446,14 @@ export class Lobby {
     this._top3Loaded = false;
     // 🌍 лічильник світу: ще одне поле тієї самої добової комірки day:<UTC-дата>.
     this._saved = 0;              // скільки людей врятовано сьогодні (кеш комірки)
-    this._savedByCid = new Map(); // cid -> зараховано сьогодні; дзеркало ключів sv:<день>:<cid>
+    // cid -> зараховано сьогодні. Лише в памʼяті: cid шле клієнт, тож це стеля чесності,
+    // а не захисту — справжню (на мережу) тримає ключ sv:<день>:<ip> у storage.
+    this._savedByCid = new Map();
     this._savedWeek = {};         // день -> підсумок, останні 7 діб (щоб клієнт мав ціль тижня)
     this._savedQueue = null;      // хвіст черги внесків (див. _recordSaved)
-    this._duel = [];              // 🤝 дошка дуелі дня: [{nick, m, ms, w}] у тій самій комірці
+    // 🤝 дошка дуелі дня у тій самій комірці: [{nick, m, ms, w, c: cid, ip}].
+    // c і ip — службові поля власника, у _view зрізаються (cid — «пароль» хмарного сейва).
+    this._duel = [];
   }
 
   _dayKey(now) {
@@ -456,7 +497,14 @@ export class Lobby {
     for (const key of old.keys()) if (key !== 'day:' + day) stale.push(key);
     const oldSaved = await this.state.storage.list({ prefix: 'sv:' });
     for (const key of oldSaved.keys()) if (!key.startsWith('sv:' + day + ':')) stale.push(key);
-    if (stale.length) await this.state.storage.delete(stale);
+    // storage.delete() у Durable Objects бере МАКСИМУМ 128 ключів за виклик — на 129-му
+    // кидає виняток, і тоді вчорашнє не прибирається ніколи, а перший пінг доби віддає 400.
+    // Ріжемо пачками; сам збій прибирання не сміє валити пінг — кеш доби вже піднято вище.
+    try {
+      for (let i = 0; i < stale.length; i += DO_DELETE_MAX) {
+        await this.state.storage.delete(stale.slice(i, i + DO_DELETE_MAX));
+      }
+    } catch (e) { /* приберемо наступного разу — дитині число важливіше за чистоту сховища */ }
   }
 
   // добова комірка: топ-3 і лічильник світу лежать разом, один запис
@@ -464,43 +512,44 @@ export class Lobby {
     await this.state.storage.put('day:' + day, { top3: this._top3, saved: this._saved, duel: this._duel });
   }
 
-  // 🤝 спроба в «дуелі дня» — та сама комірка доби, той самий один запис
-  async _recordDuel(now, nick, raw) {
+  // 🤝 спроба в «дуелі дня» — та сама комірка доби, той самий один запис.
+  // Власник — cid і мережа того самого пінга, а не нік із тіла (див. mergeDuel).
+  async _recordDuel(now, owner, raw) {
     await this._loadTop3(now);
-    const next = mergeDuel(this._duel, { ...raw, nick }, cleanNickSrv);
+    const next = mergeDuel(this._duel, raw, cleanNickSrv, owner);
     if (next === this._duel) return; // сміття або гірша спроба — сховище не чіпаємо
     this._duel = next;
     await this._saveDayCell(this._dayKey(now));
   }
 
   // 🌍 внесок гравця у лічильник світу. Беремо мінімум із того, що каже клієнт,
-  // стелі на пінг і залишку добової квоти цього cid.
+  // стелі на пінг, залишку квоти cid (памʼять) і залишку квоти мережі (storage).
   // Внески йдуть ЧЕРГОЮ: квота — це read-modify-write, і конвеєр паралельних пінгів
   // прочитав би storage ще до першого запису, тобто обійшов би добову стелю.
   // ponytail: черга одна на весь DO; чесний клієнт шле внесок раз на забіг, тож дешево.
-  // Якщо колись стане вузьким місцем — черга по cid.
-  _recordSaved(now, cid, raw) {
-    const next = Promise.resolve(this._savedQueue).then(() => this._recordSavedNow(now, cid, raw));
+  // Якщо колись стане вузьким місцем — черга по IP.
+  _recordSaved(now, cid, ip, raw) {
+    const next = Promise.resolve(this._savedQueue).then(() => this._recordSavedNow(now, cid, ip, raw));
     this._savedQueue = next.catch(() => {});
     return next;
   }
 
-  async _recordSavedNow(now, cid, raw) {
+  async _recordSavedNow(now, cid, ip, raw) {
     await this._loadTop3(now);
     const day = this._dayKey(now);
-    const key = `sv:${day}:${cid}`;
-    // квоту тримаємо і в памʼяті, і в storage: памʼять — гарячий кеш,
-    // storage переживає гібернацію DO і перезапуск воркера.
-    const already = Math.max(this._savedByCid.get(cid) | 0, (await this.state.storage.get(key)) | 0);
-    const add = clampSaved(raw, already);
+    // Ключ доби — на МЕРЕЖУ, а не на cid: cid шле сам клієнт (новий cid = свіжа квота),
+    // та й ключ на кожен cid плодив сховище. IP — один ключ на роутер за добу.
+    const key = `sv:${day}:${ip}`;
+    const already = this._savedByCid.get(cid) | 0;
+    const ipAlready = (await this.state.storage.get(key)) | 0;
+    const add = clampSaved(raw, already, ipAlready);
     if (!add) return;
     if (this._savedByCid.size > 5000) this._savedByCid.clear();
     this._savedByCid.set(cid, already + add);
     this._saved += add;
+    this._savedWeek = trimWeek(this._savedWeek, day);
     this._savedWeek[day] = this._saved;
-    const days = Object.keys(this._savedWeek).sort();
-    for (const d of days.slice(0, Math.max(0, days.length - SAVED_WEEK_DAYS))) delete this._savedWeek[d];
-    await this.state.storage.put(key, already + add);
+    await this.state.storage.put(key, ipAlready + add);
     await this._saveDayCell(day);
     await this.state.storage.put('savedWeek', this._savedWeek);
   }
@@ -569,12 +618,17 @@ export class Lobby {
         code, host: r.host, mode: r.mode, country: r.country,
         n: r.n, state: r.state, build: r.build,
       }));
-    // worldSaved — сьогодні, worldSavedWeek — останні 7 діб (порожній світ виглядає
-    // сумно: клієнт показує тижневе, коли добове замале)
-    const week = Object.values(this._savedWeek).reduce((sum, n) => sum + Math.max(0, n | 0), 0);
+    // worldSaved — сьогодні, worldSavedWeek — останні 7 КАЛЕНДАРНИХ діб (порожній світ
+    // виглядає сумно: клієнт показує тижневе, коли добове замале). Обрізаємо і на читанні:
+    // якщо тиждень ніхто не грав, у мапі лежать старі доби, і сума брехала б.
+    const week = Object.values(trimWeek(this._savedWeek, this._dayKey(now)))
+      .reduce((sum, n) => sum + n, 0);
     return {
       online: this.players.size, today: this.todaySet.size, top3: this._top3,
-      worldSaved: this._saved, worldSavedWeek: week, duel: this._duel, players, profiles, rooms,
+      worldSaved: this._saved, worldSavedWeek: week,
+      // c (cid) і ip — службові поля власника запису, назовні не їдуть
+      duel: this._duel.map(({ c, ip, ...row }) => row),
+      players, profiles, rooms,
     };
   }
 
@@ -609,9 +663,12 @@ export class Lobby {
         if (d.day && typeof d.day === 'object') await this._recordDayScore(now, d.day.nick || nick, d.day.score);
         else await this._loadTop3(now); // однаково піднімаємо кеш, щоб _view повернув свіжий top3
         // 🤝 спроба в «дуелі дня»: режим дня, час і чи пройдено
-        if (d.duel && typeof d.duel === 'object') await this._recordDuel(now, d.duel.nick || nick, d.duel);
+        // нік — із ТОГО САМОГО пінга, що й cid (обидва поля тіла), запис належить cid
+        if (d.duel && typeof d.duel === 'object') {
+          await this._recordDuel(now, { cid, ip }, { ...d.duel, nick: d.duel.nick || nick });
+        }
         // 🌍 внесок у лічильник світу: скільки людей гравець урятував за забіг
-        if (d.saved) await this._recordSaved(now, cid, d.saved);
+        if (d.saved) await this._recordSaved(now, cid, ip, d.saved);
         if (this.players.size > 500) this._prune(now);
         // хост закрив кімнату — прибираємо одразу, не чекаючи TTL
         if (d.close) {
