@@ -149,6 +149,11 @@ export class SaveUI {
     document.getElementById('progress-steps').hidden = true;
     document.getElementById('progress-warn').hidden = false;
     this._status('');
+    // 📱 На телефоні (375×812) попередження вище за екран, і кнопка «Так, замінити»
+    // лишалась під згином: дитина, яка СПРАВДІ переїжджає, бачила саму лише «Ні»
+    // і не розуміла, як завершити. Підкручуємо картку рівно настільки, щоб обидві
+    // кнопки були на екрані — вибір мусить бути видимий цілком.
+    document.getElementById('btn-progress-replace').scrollIntoView({ block: 'nearest' });
   }
 
   _hideWarn() {

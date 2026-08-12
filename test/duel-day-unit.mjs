@@ -26,7 +26,7 @@ const lobbySrc = readFileSync(new URL('../src/net/lobby.js', import.meta.url), '
   .replace("from './transport.js'", `from '${stub("export const apiBase = () => 'https://relay.test';")}'`)
   .replace("from './league.js'", `from '${stub('export const ensureCid = () => "cid-1";')}'`)
   .replace("from './cloudsave.js'", `from '${stub('export const liberatedCount = () => 0;')}'`)
-  .replace("from './coop.js'", `from '${stub('export const loadNick = () => "Влад"; export const cleanNick = (s) => String(s || "");')}'`)
+  .replace("from './coop.js'", `from '${stub('let n = "Влад"; export const loadNick = () => n; export const saveNick = (v) => { n = v; }; export const cleanNick = (s) => String(s || "");')}'`)
   .replace("from '../i18n.js'", `from '${T}'`)
   .replace("from '../titles.js'", `from '${stub('export const syncTitles = () => {}; export const titleName = () => "";')}'`);
 const { duelRows, duelTime } = await import(asData(lobbySrc));
@@ -100,6 +100,21 @@ test('дошка показує ЛИШЕ режим свого дня (доба 
 test('той, хто пройшов, стоїть вище за того, хто спробував', () => {
   const d = { duel: [{ nick: 'А', m: 'bank', ms: 0, w: false }, { nick: 'Б', m: 'bank', ms: 99_000, w: true }] };
   assert.deepEqual(duelRows(d, 'bank').map((r) => r.nick), ['Б', 'А']);
+});
+
+test('«мій рядок» — це прапорець me від сервера, а не збіг ніка', () => {
+  // двоє друзів назвались однаково: за ніком дитину підсвітило б ЧУЖИМ часом,
+  // а тост «ти — так, друг — так» порівняв би її з нею ж
+  const d = { duel: [
+    { nick: 'Соломія', m: 'bank', ms: 40_000, w: true },
+    { nick: 'Соломія', m: 'bank', ms: 90_000, w: true, me: true },
+  ] };
+  const rows = duelRows(d, 'bank');
+  assert.deepEqual(rows.map((r) => !!r.me), [false, true], 'прапорець їде наскрізь і не міняє порядку');
+  assert.equal(rows.find((e) => !e.me).ms, 40_000, 'тост бере рядок ДРУГА, а не свій-однойменний');
+  // GET /lobby/state прапорця не має взагалі — тоді «свого» рядка просто немає
+  const plain = duelRows({ duel: [{ nick: 'Соломія', m: 'bank', ms: 40_000, w: true }] }, 'bank');
+  assert.equal(plain.some((e) => e.me), false, 'без cid сервер нічого не позначає — і клієнт не вгадує');
 });
 
 test('результат словами — без принизливих формулювань і БЕЗ роду', () => {

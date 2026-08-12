@@ -1470,6 +1470,16 @@ body.touch-mode #touch-coach.show { display: block; }
 .duel-row b { font-variant-numeric: tabular-nums; }
 .duel-row.me { color: #ffe08a; font-weight: 900; }
 .duel-row.empty { color: #b9d4e8; justify-content: flex-start; }
+/* ▶ вхід у режим дня просто з блока: у 7 днях з 11 його картки в «СЬОГОДНІ» немає */
+.duel-play { margin-top: 4px; font-size: 15px; padding: 9px 14px; }
+/* ✏️ імʼя питаємо тут і один раз: без нього всі солісти — один рядок на дошці */
+.duel-name { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.duel-name-label { color: #b9d4e8; font-size: 12px; line-height: 1.35; }
+.duel-name-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.duel-name-row .coop-input { flex: 1 1 130px; min-width: 0; font-size: 16px; padding: 9px 12px; }
+.duel-name-row .btn { font-size: 14px; padding: 9px 14px; }
+.duel-name .coop-error { display: block; margin-top: 0; font-size: 13px; }
+.duel-name .coop-error:empty { display: none; }
 .solo-category { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); overflow: clip; }
 .solo-category > summary {
   display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 10px 14px;
@@ -1896,10 +1906,14 @@ body.touch-mode #touch-coach.show { display: block; }
 
 /* 💾 панель «Моя гра всюди» і аварійний екран */
 .progress-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
-.progress-row .coop-input { width: 210px; text-transform: uppercase; letter-spacing: 3px; text-align: center; }
+/* 210px не вистачає навіть на підказку «КОД (8 знаків)» — і на планшеті 768 теж,
+   а не лише на телефоні. Тому не брейкпойнт, а гнучка ширина: поле займає рядок,
+   скільки лишилось від кнопки, і ніде не обрізає плейсхолдер. */
+.progress-row .coop-input {
+  flex: 1 1 240px; width: auto; min-width: 0;
+  text-transform: uppercase; letter-spacing: 2px; text-align: center;
+}
 .progress-row [hidden] { display: none; }
-/* на телефоні 210px не вистачає навіть на підказку «КОД (8 знаків)» — даємо всю ширину */
-@media (max-width: 520px) { .progress-row .coop-input { width: 100%; letter-spacing: 2px; } }
 .cloud-status { min-height: 20px; color: #bcd2e2; font-weight: 700; font-size: 14px; margin: 6px 0 2px; }
 /* код мусить читатись і виділятись пальцем: один тап по ньому — і він увесь виділений */
 .cloud-code {

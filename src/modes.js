@@ -55,7 +55,9 @@ export const MODE_RULES = {
   'overloaded-pvp': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   bank: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   portal: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
-  maze: { noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
+  // 🧩 Лабіринт у пулі дуелі дня — тож без гаджетів і бафів, як решта пулу:
+  // карта в усіх однакова, спорядження мусить бути теж (інакше час незрівнянний)
+  maze: { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   humans: { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'overloaded-humans': { noGadgets: true, noShop: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },
   'soul-collector': { noGadgets: true, noShop: true, noBuffs: true, noPickups: true, noZombiePickups: true, noCoinDrops: true },

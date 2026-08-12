@@ -37,6 +37,8 @@ function makeDoc() {
     let text = '';
     const el = {
       id, value: '', hidden: false, dataset: {}, children: [], files: null, handlers: {},
+      scrolled: false,
+      scrollIntoView() { el.scrolled = true; },
       addEventListener(type, fn) { (el.handlers[type] || (el.handlers[type] = [])).push(fn); },
       async fire(type) { for (const fn of el.handlers[type] || []) await fn(); },
       click() { return el.fire('click'); },
@@ -113,6 +115,9 @@ test('є свій прогрес: спершу попередження з ко�
     '🐾 Улюбленці: 🐶 Песик Дружок, 🐱 Кошеня Мурчик',
   ]);
   assert.match(p.el('progress-warn-ask').textContent, /Точно замінити/);
+  // 📱 на телефоні кнопка «Так, замінити» лишалась під згином картки — вибір мусить
+  // бути видимий цілком, інакше дитина, яка справді переїжджає, тисне лише «Ні»
+  assert.equal(p.el('btn-progress-replace').scrolled, true, 'картку підкручено до кнопок вибору');
 });
 
 test('скасувати можна: «Ні, залишити цю гру» повертає панель і нічого не міняє', async () => {

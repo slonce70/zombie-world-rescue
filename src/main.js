@@ -1585,22 +1585,32 @@ class Game {
     // кооп: тих самих людей бачить у себе кожен у кімнаті (netBarnOpened спавнить
     // копії гостю) — рахує лише авторитет, інакше світ «врятував» їх двічі-чотири
     if (level.net && !level.net.authority) return;
-    if (this.coop && this.coop.lobbyNet) this.coop.lobbyNet.announceSaved(civs.length);
+    const net = this.coop && this.coop.lobbyNet;
+    if (!net) return;
+    // 🌍 Відповідь на цей пінг уже містить свіже число З НАШИМ внеском — нею й малюємо
+    // глобус. Троттл ставимо ТУТ, до пінга: інакше _refreshWorldSaved нижче в тому ж
+    // endLevel стартує паралельне читання, перегонить пінг старим числом і забиває
+    // троттл на хвилину — тобто дитина свій внесок не бачить.
+    this._worldSavedT = Date.now();
+    net.announceSaved(civs.length).then((d) => this._setWorldSaved(d));
   }
 
   // 🌍 Число на глобусі. Одне читання лобі на хвилину: глобус показується після
   // кожного рівня, а лічильник світу так швидко не міняється.
   _refreshWorldSaved() {
-    const el = document.getElementById('world-saved');
-    if (!el) return;
+    if (!document.getElementById('world-saved')) return;
     const now = Date.now();
     if (this._worldSavedT && now - this._worldSavedT < 60000) return;
     this._worldSavedT = now;
-    fetchLobbyState().then((d) => {
-      const text = worldSavedText(d);
-      el.textContent = text;
-      el.hidden = !text; // без інтернету блок просто не показується
-    });
+    fetchLobbyState().then((d) => this._setWorldSaved(d));
+  }
+
+  _setWorldSaved(d) {
+    const el = document.getElementById('world-saved');
+    if (!el) return;
+    const text = worldSavedText(d);
+    el.textContent = text;
+    el.hidden = !text; // без інтернету блок просто не показується
   }
 
   _showGlobeUI(show) {
@@ -3952,11 +3962,15 @@ class Game {
     // 🎖️ пасивки звільнених країн (v750): лягають у ТІ САМІ поля, що й куплені апгрейди,
     // тому окремої системи не з'являється. Вимкнені там, де режим свідомо переписує героя
     // під свій баланс — фіксований лоадаут (нокаут, оборона, PVP, банк, портал, люди,
-    // збирач душ, оборона турелі, радіація): там нижче руками ставляться HP/броня/шкода,
-    // і пасивка або зникла б безслідно, або зламала б задуману складність кімнати.
-    // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Лабіринт, Експедиція,
+    // збирач душ, оборона турелі, радіація, лабіринт): там нижче руками ставляться
+    // HP/броня/шкода, і пасивка або зникла б безслідно, або зламала б задуману складність.
+    // 🧩 Лабіринт тут не «спецрежим із балансом», а учасник ДУЕЛІ ДНЯ: карта в усіх
+    // однакова, тож і герой мусить бути однаковий — інакше час старшого брата з
+    // базукою і трьома країнами стоїть на одній дошці з часом молодшого. Пістолет
+    // нескінченний, а бій у лабіринті необовʼязковий — забіг це не ламає.
+    // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Експедиція,
     // «Живий фронт», кастомні карти) герой іде зі своїм спорядженням — там пасивки діють.
-    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation;
+    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation || isMaze;
     const powers = fixedLoadout ? null : countryPowerMods(this.save.liberated);
     level.countryPowers = powers;
     // застосовуємо куплені прокачування
@@ -5631,13 +5645,16 @@ class Game {
 
   // 🤝 Результат дуелі дня їде наявним каналом лобі (/lobby/ping, поле `duel`) —
   // тим самим разовим пінгом, що й денний топ-3 Шторму. Нового бекенду немає.
+  //
+  // «Хто з цих рядків я» вирішує СЕРВЕР: у відповіді на пінг наш рядок позначений
+  // прапорцем me (за cid, який назовні не їде). За ніком це не вгадується — двоє
+  // друзів можуть назватись однаково, і тост порівнював би дитину з нею ж.
   _announceDuel(modeId, timeMs, won) {
     const net = this.coop && this.coop.lobbyNet;
     if (!net) return;
     const ms = Math.max(0, timeMs | 0);
     net.announceDuel(modeId, ms, won).then((d) => {
-      const me = net.nick();
-      const other = duelRows(d, modeId).find((e) => e.nick !== me);
+      const other = duelRows(d, modeId).find((e) => !e.me);
       if (!other) return;
       this.hud.toast(t('🤝 Дуель дня: ти — {me}, {nick} — {them}', {
         me: duelTime(ms, won), nick: other.nick, them: duelTime(other.ms, other.w),
@@ -5647,7 +5664,21 @@ class Game {
 
   // 🤝 Дошка дуелі в меню «Грати»: хто сьогодні пройшов режим дня і за скільки.
   // Читаємо тим самим /lobby/state, що й лічильник світу — окремого каналу немає.
-  // Без інтернету блок просто не показується.
+  //
+  // Блок робить три речі, і кожна — з рев'ю:
+  //  • ▶ кнопка «грати»: режим дня збігається зі слотами «СЬОГОДНІ» лише 4 дні з 11,
+  //    решту днів дошка кликала в режим, кнопки якого поруч немає (він у згорнутій
+  //    категорії нижче). Тепер вхід у режим дня — просто тут, у самому блоці.
+  //  • ✏️ поле імені: соліст ніка не має за конструкцією (його зберігає лише кооп),
+  //    а без імені всі такі діти — один рядок «Гравець». Питаємо ОДИН раз, тут,
+  //    де імʼя вперше комусь потрібне, і саме тому, що воно потрібне.
+  //  • 📡 без інтернету кажемо про інтернет, а не «сьогодні ще ніхто не грав».
+  //
+  // ⭐ ставимо ЛИШЕ за прапорцем me від сервера (він рахує його за cid). Тут дошка
+  // приїжджає з GET /lobby/state, де cid запитувача немає — тож зірки в меню немає
+  // взагалі, і це чесно: вгадувати «мій рядок» за збігом ніка не можна, бо двоє
+  // друзів можуть назватись однаково. Себе дитина впізнає за власним іменем —
+  // саме для цього блок його й питає.
   _refreshDuelBoard() {
     const el = document.getElementById('duel-board');
     if (!el) return;
@@ -5655,16 +5686,48 @@ class Game {
     const mode = SOLO_MODES.find((m) => m.id === modeId);
     if (!mode) return;
     const esc = (s) => String(s == null ? '' : s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
-    const me = this.coop && this.coop.lobbyNet ? this.coop.lobbyNet.nick() : '';
+    const net = this.coop && this.coop.lobbyNet;
+    const named = !!net && net.hasNick();
     fetchLobbyState().then((d) => {
       const rows = duelRows(d, modeId);
-      const rowsHtml = rows.length
-        ? rows.map((e) => `<div class="duel-row${e.nick === me ? ' me' : ''}"><span>${e.nick === me ? '⭐ ' : ''}${esc(e.nick)}</span><b>${esc(duelTime(e.ms, e.w))}</b></div>`).join('')
-        : `<div class="duel-row empty">${t('Сьогодні ще ніхто не грав — будь першим!')}</div>`;
+      const bodyHtml = !d
+        ? `<div class="duel-row empty">${t('📡 Поки без інтернету — свої часи ви побачите, щойно мережа зʼявиться')}</div>`
+        : rows.length
+          ? rows.map((e) => `<div class="duel-row${e.me ? ' me' : ''}"><span>${e.me ? '⭐ ' : ''}${esc(e.nick)}</span><b>${esc(duelTime(e.ms, e.w))}</b></div>`).join('')
+          : `<div class="duel-row empty">${t('Сьогодні ще ніхто не грав — будь першим!')}</div>`;
+      // імʼя питаємо лише коли є мережа: офлайн у полі однаково немає сенсу
+      const askName = !!d && !named;
       el.innerHTML = `<div class="duel-title">🤝 ${t('ДУЕЛЬ ДНЯ')}</div>
         <div class="duel-hint">${t('{i} {m}: сьогодні в усіх однакова карта. Пройди і порівняй з друзями!', { i: mode.icon, m: mode.name() })}</div>
-        ${rowsHtml}`;
+        ${bodyHtml}
+        ${askName ? `<div class="duel-name">
+          <label class="duel-name-label" for="duel-nick">${t('✏️ Як тебе звати? Друзі побачать це імʼя біля твого часу')}</label>
+          <div class="duel-name-row">
+            <input id="duel-nick" class="coop-input" maxlength="12" placeholder="${t('Твоє імʼя')}" autocomplete="off">
+            <button type="button" id="btn-duel-nick" class="btn">✅ ${t('Готово')}</button>
+          </div>
+          <div id="duel-nick-error" class="coop-error"></div>
+        </div>` : ''}
+        <button type="button" id="btn-duel-play" class="btn btn-primary duel-play">▶ ${t('Грати {i} {m}', { i: mode.icon, m: esc(mode.name()) })}</button>`;
       el.hidden = false;
+      document.getElementById('btn-duel-play').addEventListener('click', () => {
+        this.audio.click();
+        this._hideOverlay('overlay-solo');
+        this._startSoloMode(modeId);
+      });
+      if (!askName) return;
+      const input = document.getElementById('duel-nick');
+      const accept = () => {
+        if (!net || !net.setNick(input.value)) {
+          document.getElementById('duel-nick-error').textContent = t('Напиши імʼя — хоча б 2 звичайні букви 🙂');
+          input.focus();
+          return;
+        }
+        this.audio.click();
+        this._refreshDuelBoard();
+      };
+      document.getElementById('btn-duel-nick').addEventListener('click', accept);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') accept(); });
     });
   }
 
