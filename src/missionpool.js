@@ -65,48 +65,61 @@ export const MISSION_TYPES = {
   manor: { icon: '🏛️', slots: ['D'], reward: 350, horde: 0, kind: 'manor' },
 };
 
-// конфіги двигунів: activate — N точок, біля кожної тримай E
+// конфіги двигунів: activate — N точок, біля кожної тримай кнопку взаємодії.
+// prompt — гетер, бо interactKey() потребує живого input.touchMode: на момент
+// імпорту модуля window.__game ще немає і клавіша «E» запеклася б назавжди.
 const ACT_CFG = {
   lights: {
     n: 4, hold: 1.6, color: 0xffe066, emoji: '🔦', spread: 'village',
-    title: t('Засвіти 4 ліхтарі'), prompt: t('Тримай {k} — засвіти ліхтар', { k: interactKey() }),
+    title: t('Засвіти 4 ліхтарі'),
+    get prompt() { return t('Тримай {k} — засвіти ліхтар', { k: interactKey() }); },
     stepToast: t('🔦 Ліхтар світить ({n}/{total})!'), doneToast: t('🔦 Усі ліхтарі світять — стало затишно!'),
   },
   well: {
     n: 3, hold: 3, color: 0x4db8ff, emoji: '💧', spread: 'map',
-    title: t('Набери води з 3 колодязів'), prompt: t('Тримай {k} — набери води', { k: interactKey() }),
+    title: t('Набери води з 3 колодязів'),
+    get prompt() { return t('Тримай {k} — набери води', { k: interactKey() }); },
     stepToast: t('💧 Відро набрано ({n}/{total})!'), doneToast: t('💧 Вода є! Село каже дякую!'),
   },
   bonfire: {
     n: 3, hold: 2.5, color: 0xff8a3d, emoji: '🔥', spread: 'map',
-    title: t('Розпали 3 багаття'), prompt: t('Тримай {k} — розпали багаття', { k: interactKey() }),
+    title: t('Розпали 3 багаття'),
+    get prompt() { return t('Тримай {k} — розпали багаття', { k: interactKey() }); },
     stepToast: t('🔥 Багаття палає ({n}/{total})!'), doneToast: t('🔥 Усі багаття палають — мороз відступає!'),
   },
   convoy: {
     n: 3, hold: 1.2, color: 0xffd23f, emoji: '🚚', spread: 'map', guards: 3,
-    title: t('Розблокуй конвой: 3 вантажівки'), prompt: t('Тримай {k} — заведи вантажівку', { k: interactKey() }),
+    title: t('Розблокуй конвой: 3 вантажівки'),
+    get prompt() { return t('Тримай {k} — заведи вантажівку', { k: interactKey() }); },
     stepToast: t('🚚 Вантажівка завелась ({n}/{total})!'), doneToast: t('🚚 Конвой урятовано — їде по людей!'),
   },
 };
 
-// fetch — розкидані предмети; зібрав усі → принеси і здай (тримай E)
+// fetch — розкидані предмети; зібрав усі → принеси і здай (тримай кнопку).
+// prompt/deliverPrompt — гетери з тієї ж причини, що й в ACT_CFG.
 const FETCH_CFG = {
   balloon: {
     n: 3, hold: 2, color: 0xff6ea8, emoji: '🛢️', deliver: 'balloon', deliverEmoji: '🎈',
-    title: t('Знайди 3 балони газу для кулі'), prompt: t('Натисни {k} — візьми балон ({n}/{total})', { k: interactKey() }),
-    deliverPrompt: t('Тримай {k} — заправ кулю', { k: interactKey() }), stepToast: t('🛢️ Балон є ({n}/{total})!'),
+    title: t('Знайди 3 балони газу для кулі'),
+    get prompt() { return t('Натисни {k} — візьми балон ({n}/{total})', { k: interactKey() }); },
+    get deliverPrompt() { return t('Тримай {k} — заправ кулю', { k: interactKey() }); },
+    stepToast: t('🛢️ Балон є ({n}/{total})!'),
     foundToast: t('🎈 Усі балони зібрано — неси до кулі!'), doneToast: t('🎈 Куля летить по допомогу!'),
   },
   bazaar: {
     n: 3, hold: 2, color: 0x46c8d8, emoji: '🧶', deliver: 'grandBazaar', deliverEmoji: '🧿',
-    title: t('Поверни 3 килими на базар'), prompt: t('Натисни {k} — підбери килим ({n}/{total})', { k: interactKey() }),
-    deliverPrompt: t('Тримай {k} — розклади килими', { k: interactKey() }), stepToast: t('🧶 Килим знайдено ({n}/{total})!'),
+    title: t('Поверни 3 килими на базар'),
+    get prompt() { return t('Натисни {k} — підбери килим ({n}/{total})', { k: interactKey() }); },
+    get deliverPrompt() { return t('Тримай {k} — розклади килими', { k: interactKey() }); },
+    stepToast: t('🧶 Килим знайдено ({n}/{total})!'),
     foundToast: t('🧿 Усі килими в тебе — неси на базар!'), doneToast: t('🧿 Базар знову працює!'),
   },
   tomb: {
     n: 2, hold: 4, color: 0xd9b96a, emoji: '🪬', deliver: 'pyramids', deliverEmoji: '⚱️', ambush: 4,
-    title: t('Відкрий гробницю: 2 печатки'), prompt: t('Натисни {k} — візьми печатку ({n}/{total})', { k: interactKey() }),
-    deliverPrompt: t('Тримай {k} — відкрий гробницю', { k: interactKey() }), stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
+    title: t('Відкрий гробницю: 2 печатки'),
+    get prompt() { return t('Натисни {k} — візьми печатку ({n}/{total})', { k: interactKey() }); },
+    get deliverPrompt() { return t('Тримай {k} — відкрий гробницю', { k: interactKey() }); },
+    stepToast: t('🪬 Печатка у тебе ({n}/{total})!'),
     foundToast: t('⚱️ Печатки зібрано — до дверей гробниці!'), doneToast: t('⚱️ Гробниця відкрита! Скарб твій!'),
   },
 };
