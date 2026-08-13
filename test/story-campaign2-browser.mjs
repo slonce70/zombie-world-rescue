@@ -40,6 +40,9 @@ await page.goto(`${BASE}/?test&fresh`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
 await page.click('#btn-solo');
 await page.waitForSelector('#overlay-solo.show', { timeout: 10000 });
+// соло-меню згруповане в акордеони <details> — категорію з кампанією спершу
+// розкриваємо (як це робить гравець), інакше картка режиму лишається схованою
+await page.click('details.solo-category:has(.solo-mode[data-mode="campaign"]) > summary');
 await page.click('.solo-mode[data-mode="campaign"]');
 await page.waitForSelector('#solo-countries #country-list .country-item[data-id="UKR"] .mission-preview span', { timeout: 10000 });
 
