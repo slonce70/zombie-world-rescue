@@ -122,7 +122,9 @@ async function holdZone(zone, condFn, timeoutMs, label) {
 }
 
 // один удар інструментом по ресурсній точці: стаємо за 2.2 м, дивимось у неї
-// (промінь удару горизонтальний — цілимось у стовбур/брилу) і клікаємо
+// (промінь удару горизонтальний — цілимось у стовбур/брилу) і клікаємо.
+// Паузи множимо на SLOW: замах доводиться ігровим часом, а на софт-рендері
+// 320 мс реальних — це кілька кадрів, і удар просто не встигне розрахуватись.
 async function chopNode(index, tool) {
   await page.evaluate(([i, toolId]) => {
     const g = window.__game;
@@ -135,9 +137,9 @@ async function chopNode(index, tool) {
     p.pitch = 0;
     g.test.mouse(true);
   }, [index, tool]);
-  await page.waitForTimeout(320);
+  await page.waitForTimeout(320 * SLOW);
   await page.evaluate(() => window.__game.test.mouse(false));
-  await page.waitForTimeout(140);
+  await page.waitForTimeout(140 * SLOW);
 }
 
 const rebuild = (field) => page.evaluate((f) => {
@@ -256,16 +258,16 @@ await page.waitForTimeout(400);
 log('Місія 4: відбудова центру');
 for (const tool of await rebuild('tools')) {
   await ev('teleport', tool.x, tool.z);
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(250 * SLOW);
   await page.evaluate(() => window.__game.test.key('KeyE', true));
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(250 * SLOW);
   await page.evaluate(() => window.__game.test.key('KeyE', false));
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(200 * SLOW);
 }
 check(await waitFor(async () => (await rebuild('phase')) === 'resources', 15000, 'інструменти'),
   'сокира й кірка знайдені');
 for (const node of await rebuild('points')) {
-  for (let swing = 0; swing < 10; swing++) {
+  for (let swing = 0; swing < 20; swing++) { // точці треба 4 влучання, решта — запас
     if ((await rebuild('points'))[node.i].done) break;
     await chopNode(node.i, node.kind === 'wood' ? 'axe' : 'pickaxe');
   }
