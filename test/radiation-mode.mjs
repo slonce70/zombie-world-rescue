@@ -13,14 +13,18 @@ const meta = await page.evaluate(async () => {
   const g = window.__game;
   g.endLevel();
   g.renderSoloMenu();
-  const lockedBefore = !!document.querySelector('.solo-mode[data-mode="radiation"].locked');
+  const card = document.querySelector('.solo-mode[data-mode="radiation"]');
   const item = SHOP_ITEMS.find((i) => i.id === 'radiationcloneskin');
   return {
-    lockedBefore,
+    card: !!card,
+    locked: !!(card && card.classList.contains('locked')),
     item: item && { id: item.id, cat: item.cat, radiationPrice: item.radiationPrice, max: item.max, cloneSkin: item.cloneSkin },
   };
 });
-check(meta.lockedBefore, 'режим Радіація закритий до 12 країн', JSON.stringify(meta));
+// 🔓 v710 «відкрив каталог режимів»: Радіація більше НЕ чекає 12 звільнених країн
+// (у v741 разом з рештою *_UNLOCK_COUNTRIES прибрали й мертву константу). Перевіряємо
+// нову задумку — картка є і на порожньому сейві відкрита.
+check(meta.card && !meta.locked, 'режим Радіація відкритий одразу, без 12 країн', JSON.stringify(meta));
 check(meta.item && meta.item.cat === 'Радіація' && meta.item.radiationPrice === 150 && meta.item.max === 1 && meta.item.cloneSkin === 'radiation',
   'у розділі Радіація є скін клонів за 150 монет радіації', JSON.stringify(meta.item));
 
