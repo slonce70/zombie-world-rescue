@@ -144,6 +144,10 @@ try {
     const { Vector3 } = await import('/vendor/three.module.js');
     const host = Object.create(HostNet.prototype);
     host.level = {};
+    // v770: `_handleMessage` першим ділом питає ростер — «відправник узагалі в кімнаті?».
+    // Справжній HostNet завжди має сесію, тож голій фікстурі теж потрібен ростер,
+    // інакше тест перевіряв би падіння, а не дистанц-гейт.
+    host.session = { roster: new Map([[2, {}]]) };
     host.remotes = new Map([[2, { pos: new Vector3(0, 0, 0) }]]);
     const accepted = [];
     host.spawnNetGrenade = (pos) => accepted.push(['nade', pos.x]);

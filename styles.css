@@ -87,6 +87,11 @@ body { font-family: var(--font); user-select: none; -webkit-user-select: none; }
 #weekly-goal .wg-label { display: block; text-align: center; }
 #weekly-goal .wg-bar { margin-top: 5px; height: 6px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
 #weekly-goal .wg-fill { height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #4fd07a, #8ef0a8); transition: width .3s ease; }
+/* 🌍 лічильник світу — спільне число всіх гравців під ціллю тижня */
+#world-saved {
+  background: var(--ui-bg); border: 2px solid var(--ui-border); border-radius: 12px;
+  padding: 7px 16px; color: #ffe9a8; font-weight: 800; font-size: 14px; text-align: center;
+}
 /* 🎁 модалка подарунка: тижневий грід 7 клітинок */
 .gift-week { text-align: center; font-weight: 900; color: var(--accent); margin: 4px 0 10px; }
 .gift-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 14px; }
@@ -1454,6 +1459,27 @@ body.touch-mode #touch-coach.show { display: block; }
 .solo-recommended h3, .settings-section h3 {
   margin: 2px 2px 0; color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: .12em;
 }
+/* 🤝 Дуель дня: хто сьогодні пройшов режим дня і за скільки */
+.duel-board {
+  display: flex; flex-direction: column; gap: 5px; margin-top: 4px; padding: 10px 12px;
+  border: 1px solid rgba(140,213,255,.28); border-radius: 14px; background: rgba(140,213,255,.07);
+}
+.duel-title { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.duel-hint { color: #b9d4e8; font-size: 12px; line-height: 1.35; }
+.duel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: #eaf6ff; }
+.duel-row b { font-variant-numeric: tabular-nums; }
+.duel-row.me { color: #ffe08a; font-weight: 900; }
+.duel-row.empty { color: #b9d4e8; justify-content: flex-start; }
+/* ▶ вхід у режим дня просто з блока: у 7 днях з 11 його картки в «СЬОГОДНІ» немає */
+.duel-play { margin-top: 4px; font-size: 15px; padding: 9px 14px; }
+/* ✏️ імʼя питаємо тут і один раз: без нього всі солісти — один рядок на дошці */
+.duel-name { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.duel-name-label { color: #b9d4e8; font-size: 12px; line-height: 1.35; }
+.duel-name-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.duel-name-row .coop-input { flex: 1 1 130px; min-width: 0; font-size: 16px; padding: 9px 12px; }
+.duel-name-row .btn { font-size: 14px; padding: 9px 14px; }
+.duel-name .coop-error { display: block; margin-top: 0; font-size: 13px; }
+.duel-name .coop-error:empty { display: none; }
 .solo-category { border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.035); overflow: clip; }
 .solo-category > summary {
   display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 10px 14px;
@@ -1578,6 +1604,7 @@ body.touch-mode #touch-coach.show { display: block; }
   #gift-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #camp-quest-chip.show { padding: 8px 16px; font-size: 14px; min-height: 44px; }
   #weekly-goal { padding: 5px 12px; min-width: 0; font-size: 12px; }
+  #world-saved { padding: 5px 12px; font-size: 12px; white-space: nowrap; }
   /* ⭐ лічильник зірок (v289) подовжив рядок прогресу — на вузькому портреті
      стискаємо в один рядок, інакше блок росте і піднімає ГРАТИ над beacon-зоною */
   #globe-progress { font-size: 13px; padding: 6px 12px; white-space: nowrap; }
@@ -1600,6 +1627,7 @@ body.touch-mode #touch-coach.show { display: block; }
   #gift-chip.show { display: none; }
   #camp-quest-chip.show { display: none; }
   #weekly-goal { display: none; }
+  #world-saved { display: none; }
   #globe-progress { font-size: 14px; padding: 6px 14px; }
   .globe-play { font-size: 14px; padding: 9px 18px; }
   .country-item { padding: 5px 9px; }
@@ -1876,11 +1904,51 @@ body.touch-mode #touch-coach.show { display: block; }
   .front-operation, .front-choice { transition: none; }
 }
 
-/* 💾 панель «Мій прогрес» і аварійний екран */
+/* 💾 панель «Моя гра всюди» і аварійний екран */
 .progress-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
-.progress-row .coop-input { width: 210px; text-transform: uppercase; letter-spacing: 3px; text-align: center; }
+/* 210px не вистачає навіть на підказку «КОД (8 знаків)» — і на планшеті 768 теж,
+   а не лише на телефоні. Тому не брейкпойнт, а гнучка ширина: поле займає рядок,
+   скільки лишилось від кнопки, і ніде не обрізає плейсхолдер. */
+.progress-row .coop-input {
+  flex: 1 1 240px; width: auto; min-width: 0;
+  text-transform: uppercase; letter-spacing: 2px; text-align: center;
+}
+.progress-row [hidden] { display: none; }
 .cloud-status { min-height: 20px; color: #bcd2e2; font-weight: 700; font-size: 14px; margin: 6px 0 2px; }
-.cloud-code { font-size: 30px; font-weight: 900; letter-spacing: 5px; color: #ffd54a; min-width: 150px; }
+/* код мусить читатись і виділятись пальцем: один тап по ньому — і він увесь виділений */
+.cloud-code {
+  font-size: 30px; font-weight: 900; letter-spacing: 5px; color: #ffd54a; min-width: 150px;
+  user-select: all; -webkit-user-select: all; word-break: break-all;
+}
+
+/* переїзд на інший пристрій: два кроки, кожен зі своїм поясненням */
+.transfer-step {
+  background: rgba(255,255,255,0.05); border: 2px solid var(--ui-border);
+  border-radius: 14px; padding: 10px 14px; margin: 12px 0;
+}
+.transfer-step .step-title { color: var(--accent); font-weight: 900; font-size: 15px; letter-spacing: 1px; }
+.transfer-step .step-text { color: #cfe8ff; font-size: 14px; font-weight: 600; margin: 6px 0 2px; }
+/* файл-копія — для дорослих: та сама рамка, але тихіша */
+.transfer-extra { margin-top: 12px; opacity: 0.75; }
+.transfer-extra .step-title { color: #9fb8d4; font-weight: 800; font-size: 13px; letter-spacing: 1px; }
+.transfer-extra .progress-row { margin: 8px 0 0; }
+.transfer-extra .btn { font-size: 15px; padding: 9px 18px; }
+
+/* ✋ Попередження про заміну прогресу: найголовніший екран панелі, тому великий і червоний */
+.transfer-warn {
+  background: rgba(214, 48, 49, 0.14); border: 3px solid #e35d5d;
+  border-radius: 16px; padding: 14px 16px; margin: 12px 0 4px;
+}
+.transfer-warn[hidden] { display: none; }
+.transfer-warn .warn-title { color: #ff8f8f; font-weight: 900; font-size: 20px; letter-spacing: 1px; }
+.transfer-warn .warn-text { color: #fff; font-weight: 700; font-size: 15px; margin: 8px 0 6px; }
+.transfer-warn .warn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.transfer-warn .warn-list li {
+  background: rgba(0,0,0,.3); border-radius: 10px; padding: 8px 12px;
+  color: #ffe58f; font-weight: 800; font-size: 15px;
+}
+.transfer-warn .warn-ask { color: #fff; font-weight: 900; font-size: 17px; margin: 12px 0 2px; }
+.btn-danger { background: linear-gradient(180deg, #ff8a80, #d63031); color: #fff; box-shadow: 0 5px 0 #8e1b1b; }
 #crash-info { max-height: 90px; overflow: hidden; color: #8aa0b5; font-size: 11px; white-space: pre-wrap; text-align: left; margin: 10px 0; }
 
 /* Штаб Рятівника: Мої цифри */

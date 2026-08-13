@@ -115,7 +115,9 @@ try {
       zombies: { clearAllPuppets() {}, spawnPuppet() {} },
       effects: { clearNetItems() {}, spawnNetItem() {}, netBarrelGone() {} },
       world: { openBarn() {}, openCrate() {}, setTowerFixed() {} },
-      gadgets: { netWall() {}, netTramp() {}, netTurret() {} },
+      // v770: гість щоснапшоту кличе netSquad (напарників Загону веде хост) — макет
+      // мусить нести той самий набір мережевих методів, що й справжні Gadgets
+      gadgets: { netWall() {}, netTramp() {}, netTurret() {}, netSquad() {} },
       vehicles: { list: [] }, missions: null, superPickup: null,
     };
     const guestNet = new GuestNet(reconnectSession, reconnectLevel, {});
@@ -127,7 +129,8 @@ try {
       zombies: { list: [] },
       effects: { coins: [], barrels: [], airdrop: null },
       world: { barnOpened: false, crateOpened: false, towerFixed: false },
-      gadgets: { walls: [], tramps: [], turrets: [] }, vehicles: { list: [] },
+      // v770: captureState несе гостю напарників Загону (squadNet) — у макеті порожній список
+      gadgets: { walls: [], tramps: [], turrets: [], squadNet: () => [] }, vehicles: { list: [] },
       missions: null, megabox: null, superPickup: null,
     };
     const hostNet = new HostNet({ game: { input: { down: () => false } }, nick: 'Host', roster: new Map(), frontSnapshot: () => wire }, hostLevel);
@@ -224,7 +227,12 @@ try {
     };
   });
 
-  check(out.proto === 24, 'v700 co-op protocol is v24 (Front spec unchanged)', String(out.proto));
+  // Номер протоколу тут НЕ пінимо: він бампається щоразу, коли міняється формат
+  // кооп-повідомлень, і жорстка цифра робить цей тест червоним у кожного такого
+  // релізу без жодного звʼязку з Фронтом. Сенс перевірки — що спека Фронту їде
+  // разом із живим протоколом, а не з якоюсь своєю копією.
+  check(Number.isInteger(out.proto) && out.proto >= 24,
+    'co-op protocol is a live integer, Front spec rides along', String(out.proto));
   check(out.compact.g === 7 && out.compact.o === 'g7-UKR-evacuation' && out.compact.s === 1
     && out.compact.p === 'UKR' && out.compact.b.join(',') === 'dmg25,armor',
   'compact fr keeps generation/operation/stage/specialist/build', JSON.stringify(out.compact));

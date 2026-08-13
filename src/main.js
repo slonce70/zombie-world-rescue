@@ -67,6 +67,7 @@ import {
   HERO_BODY_TYPES, HERO_HAIR, HERO_ACCESSORIES, HERO_BACKS, PETS, makeHero, makeCivilian, setAnim, updateRig,
 } from './characters.js';
 import { CoopUI } from './ui/coopui.js';
+import { fetchLobbyState, worldSavedText, duelRows, duelTime } from './net/lobby.js';
 import { CommunityUI } from './ui/communityui.js';
 import { parseCommunityLink, makeRunId } from './net/community.js';
 import { sanitizeDiffStar } from './net/protocol.js';
@@ -108,6 +109,7 @@ import {
 import {
   SOLO_MODE_GROUPS, HARD_VARIANTS, MODE_RULES, MODIFIERS, WEEKLY_MODIFIER_POOL,
   modeIdFromOpts, MODE_START_OPTS, SOLO_MODES, DAILY_CHALLENGE_POOL, MODE_MILESTONES, COOP_MODE_IDS,
+  DUEL_MAP, DUEL_RULES, dailyChallengeFor,
 } from './modes.js';
 import { renderAlbum, skinHint, petHint } from './ui/album.js';
 import {
@@ -152,7 +154,7 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // тримати в синхроні з version.json — бампити при кожному релізі
-const APP_VERSION = 770;
+const APP_VERSION = 780;
 window.__APP_VERSION = APP_VERSION;
 
 const QUALITY_MODES = ['auto', 'high', 'fast'];
@@ -1572,6 +1574,45 @@ class Game {
     return `<div id="player-compass" class="player-compass"><b>${a.icon} ${a.title}</b><span>${a.text}</span></div>`;
   }
 
+  // 🌍 Внесок у лічильник світу. ЧЕСНА метрика: рахуємо тих, кого дитина фізично
+  // звільнила на цьому рівні — цивільні з хліва/маєтку/підземелля замку/корабля TUR
+  // виходять і йдуть за гравцем, тобто missions.civilians і є списком врятованих.
+  // Нічого не «оцінюємо» за хвилями чи вбивствами: у сейві лічильника людей немає.
+  _announceWorldSaved() {
+    const level = this.level;
+    const civs = level && level.missions && level.missions.civilians;
+    if (!civs || !civs.length) return;
+    // кооп: тих самих людей бачить у себе кожен у кімнаті (netBarnOpened спавнить
+    // копії гостю) — рахує лише авторитет, інакше світ «врятував» їх двічі-чотири
+    if (level.net && !level.net.authority) return;
+    const net = this.coop && this.coop.lobbyNet;
+    if (!net) return;
+    // 🌍 Відповідь на цей пінг уже містить свіже число З НАШИМ внеском — нею й малюємо
+    // глобус. Троттл ставимо ТУТ, до пінга: інакше _refreshWorldSaved нижче в тому ж
+    // endLevel стартує паралельне читання, перегонить пінг старим числом і забиває
+    // троттл на хвилину — тобто дитина свій внесок не бачить.
+    this._worldSavedT = Date.now();
+    net.announceSaved(civs.length).then((d) => this._setWorldSaved(d));
+  }
+
+  // 🌍 Число на глобусі. Одне читання лобі на хвилину: глобус показується після
+  // кожного рівня, а лічильник світу так швидко не міняється.
+  _refreshWorldSaved() {
+    if (!document.getElementById('world-saved')) return;
+    const now = Date.now();
+    if (this._worldSavedT && now - this._worldSavedT < 60000) return;
+    this._worldSavedT = now;
+    fetchLobbyState().then((d) => this._setWorldSaved(d));
+  }
+
+  _setWorldSaved(d) {
+    const el = document.getElementById('world-saved');
+    if (!el) return;
+    const text = worldSavedText(d);
+    el.textContent = text;
+    el.hidden = !text; // без інтернету блок просто не показується
+  }
+
   _showGlobeUI(show) {
     document.getElementById('globe-ui').style.display = show ? 'flex' : 'none';
     document.body.classList.toggle('in-level', !show);
@@ -1605,6 +1646,8 @@ class Game {
       this._refreshCampChip();
       // 🗓️ ціль тижня — оновлюємо текст/бар
       this._refreshWeeklyGoalUI();
+      // 🌍 скільки людей світ урятував — спільне число під ціллю тижня
+      this._refreshWorldSaved();
       if (this._newVersion) this._onNewVersion(this._newVersion);
       if (this.frontui) this.frontui.render(this.getFrontViewModel());
       const editorBtn = document.getElementById('btn-map-editor');
@@ -1670,7 +1713,11 @@ class Game {
     const make = MODE_START_OPTS[modeId];
     if (!make) return false;
     const countryId = arg && COUNTRIES[arg] ? arg : 'UKR';
-    return this.startLevel(countryId, make(arg));
+    // 🤝 Дуель дня: режим дня в усіх іде на ОДНАКОВІЙ карті. Розмір і стиль беремо
+    // не з налаштувань гравця (вони зсувають арену), а фіксовані — інакше двоє
+    // порівнювали б час, пройдений у різних світах.
+    const duel = modeId === this.dailyChallengeId() ? { ...DUEL_MAP, duel: 1 } : null;
+    return this.startLevel(countryId, { ...make(arg), ...duel });
   }
 
   // ---------- 🎮 меню «Грати» (соло-режими) ----------
@@ -1730,6 +1777,7 @@ class Game {
       <section class="solo-recommended" aria-labelledby="solo-recommended-title">
         <h3 id="solo-recommended-title">${t('СЬОГОДНІ')}</h3>
         ${recommendedIds.map((id) => modeHtml(byId.get(id))).join('')}
+        <div id="duel-board" class="duel-board" hidden></div>
       </section>
       ${catGroups.map((g) => `
       <details class="solo-category" data-category="${g.id}">
@@ -1738,6 +1786,7 @@ class Game {
           ${g.ids.map((id) => modeHtml(byId.get(id))).join('')}
         </section>
       </details>`).join('')}`;
+    this._refreshDuelBoard();
     const cRoot = document.getElementById('solo-countries');
     cRoot.style.display = 'none';
     cRoot.innerHTML = '';
@@ -3733,7 +3782,10 @@ class Game {
     // джерело id мутатора: соло — гейтований календарний id; кооп — id зі spec хоста
     const mutatorSrcId = coop ? (opts.mut || null) : soloWeeklyModId;
     const weeklyMutator = this._buildWeeklyMutator(mutatorSrcId, { coop, isPlayground });
-    const modeRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
+    const weekRules = wkMod && wkMod.rules ? { ...baseRules, ...wkMod.rules } : baseRules;
+    // 🤝 день дуелі доважує «без гаджетів і бафів» — інакше Лабіринт (єдиний у пулі,
+    // де вони дозволені) давав би незрівнянний час при однаковій карті
+    const modeRules = opts.duel ? { ...weekRules, ...DUEL_RULES } : weekRules;
     const noProgress = isCustom;
     const noShop = noProgress || !!modeRules.noShop;
     document.body.classList.toggle('no-shop-mode', noShop);
@@ -3913,11 +3965,15 @@ class Game {
     // 🎖️ пасивки звільнених країн (v750): лягають у ТІ САМІ поля, що й куплені апгрейди,
     // тому окремої системи не з'являється. Вимкнені там, де режим свідомо переписує героя
     // під свій баланс — фіксований лоадаут (нокаут, оборона, PVP, банк, портал, люди,
-    // збирач душ, оборона турелі, радіація): там нижче руками ставляться HP/броня/шкода,
-    // і пасивка або зникла б безслідно, або зламала б задуману складність кімнати.
-    // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Лабіринт, Експедиція,
+    // збирач душ, оборона турелі, радіація, лабіринт): там нижче руками ставляться
+    // HP/броня/шкода, і пасивка або зникла б безслідно, або зламала б задуману складність.
+    // 🧩 Лабіринт тут не «спецрежим із балансом», а учасник ДУЕЛІ ДНЯ: карта в усіх
+    // однакова, тож і герой мусить бути однаковий — інакше час старшого брата з
+    // базукою і трьома країнами стоїть на одній дошці з часом молодшого. Пістолет
+    // нескінченний, а бій у лабіринті необовʼязковий — забіг це не ламає.
+    // У решті (кампанія, Глава 2, Шторм, Арена, світовий бос, Експедиція,
     // «Живий фронт», кастомні карти) герой іде зі своїм спорядженням — там пасивки діють.
-    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation;
+    const fixedLoadout = isKnockout || isDefense || isPvp || isBank || isPortal || isHumans || isSoulCollector || isTurretWar || isRadiation || (isMaze && !!opts.duel);
     const powers = fixedLoadout ? null : countryPowerMods(this.save.liberated);
     level.countryPowers = powers;
     // застосовуємо куплені прокачування
@@ -4881,6 +4937,7 @@ class Game {
   unlockWeapon(id) { return unlockWeapon(this, id); }
 
   endLevel() {
+    this._announceWorldSaved(); // 🌍 поки рівень цілий: скільки людей на ньому звільнено
     const leavingExpedition = !!(this.level && this.level.expedition);
     const leavingFront = !!(this.level && this.level.operation);
     const leavingFrontCoop = !!(this.level && this.level.net);
@@ -5233,7 +5290,7 @@ class Game {
   }
 
   dailyChallengeId() {
-    return DAILY_CHALLENGE_POOL[this._dayIndex() % DAILY_CHALLENGE_POOL.length];
+    return dailyChallengeFor(this._dayIndex());
   }
 
   // 🎁 модалка подарунка дня: грід 7 клітинок поточного тижня, підсвічений сьогоднішній день
@@ -5488,6 +5545,20 @@ class Game {
     }
     this.audio.levelUp();
     this.saveGame();
+    // 🥚 v780 «Запрошення з нагородою»: друг прийшов за листівкою і ВПЕРШЕ пройшов з нами
+    // рівень → яйце обом. Рішення ухвалює ХОСТ (як і решта ігрових наслідків у коопі):
+    // claimInviteEgg сам перевіряє атрибуцію й одноразовість на кімнату і шле гостю `ieg`.
+    if (level.net.authority && this.coop.session.claimInviteEgg()) this._grantInviteEgg();
+  }
+
+  // 🥚 +1 яйце за приведеного друга — локально, тими самими руками в обох:
+  // хост кличе після власного рішення, гість — з події `ieg` (net/client.js).
+  // Склад нагороди — константа, з мережі не приїжджає жодне число.
+  _grantInviteEgg() {
+    this.save.eggs = (this.save.eggs || 0) + 1;
+    this.hud.banner(t('🥚 ГРАЛИ РАЗОМ — ЯЙЦЕ ОБОМ!'), t('Друг прийшов за запрошенням. Відкрий у Альбомі → 🐾 Петси'), 4.5);
+    this.audio.levelUp();
+    this.saveGame();
   }
 
   // 🏁 спільний фінал кімнатних режимів: перемоги, віхи, рекорд часу, множник дня.
@@ -5568,7 +5639,104 @@ class Game {
     if (best != null) {
       out.bestRow = `<div class="stat best"><span class="stat-icon">🏆</span><span class="stat-name">${t('Рекорд')}</span><span class="stat-val">${Math.floor(best / 60000)}:${String(Math.floor((best % 60000) / 1000)).padStart(2, '0')}</span></div>`;
     }
+    // 🤝 Дуель дня: спробу в режимі дня шлемо в лобі й одразу показуємо, як пройшли інші.
+    // Програш шлемо теж (won=false) — це не покарання, а «я сьогодні теж грав»:
+    // дитина має бачити, що друг заходив, навіть якщо не дійшов до кінця.
+    if (daily) this._announceDuel(modeId, won ? timeMs : null, won);
     return out;
+  }
+
+  // 🤝 Результат дуелі дня їде наявним каналом лобі (/lobby/ping, поле `duel`) —
+  // тим самим разовим пінгом, що й денний топ-3 Шторму. Нового бекенду немає.
+  //
+  // «Хто з цих рядків я» вирішує СЕРВЕР: у відповіді на пінг наш рядок позначений
+  // прапорцем me (за cid, який назовні не їде). За ніком це не вгадується — двоє
+  // друзів можуть назватись однаково, і тост порівнював би дитину з нею ж.
+  _announceDuel(modeId, timeMs, won) {
+    const net = this.coop && this.coop.lobbyNet;
+    if (!net) return;
+    const ms = Math.max(0, timeMs | 0);
+    net.announceDuel(modeId, ms, won).then((d) => {
+      const other = duelRows(d, modeId).find((e) => !e.me);
+      if (!other) return;
+      this.hud.toast(t('🤝 Дуель дня: ти — {me}, {nick} — {them}', {
+        me: duelTime(ms, won), nick: other.nick, them: duelTime(other.ms, other.w),
+      }));
+    });
+  }
+
+  // 🤝 Дошка дуелі в меню «Грати»: хто сьогодні пройшов режим дня і за скільки.
+  // Читаємо тим самим /lobby/state, що й лічильник світу — окремого каналу немає.
+  //
+  // Блок робить три речі, і кожна — з рев'ю:
+  //  • ▶ кнопка «грати»: режим дня збігається зі слотами «СЬОГОДНІ» лише 4 дні з 11,
+  //    решту днів дошка кликала в режим, кнопки якого поруч немає (він у згорнутій
+  //    категорії нижче). Тепер вхід у режим дня — просто тут, у самому блоці.
+  //  • ✏️ поле імені: соліст ніка не має за конструкцією (його зберігає лише кооп),
+  //    а без імені всі такі діти — один рядок «Гравець». Питаємо ОДИН раз, тут,
+  //    де імʼя вперше комусь потрібне, і саме тому, що воно потрібне.
+  //  • 📡 без інтернету кажемо про інтернет, а не «сьогодні ще ніхто не грав».
+  //
+  // ⭐ ставимо ЛИШЕ за прапорцем me від сервера (він рахує його за cid). Тут дошка
+  // приїжджає з GET /lobby/state, де cid запитувача немає — тож зірки в меню немає
+  // взагалі, і це чесно: вгадувати «мій рядок» за збігом ніка не можна, бо двоє
+  // друзів можуть назватись однаково. Себе дитина впізнає за власним іменем —
+  // саме для цього блок його й питає.
+  _refreshDuelBoard() {
+    const el = document.getElementById('duel-board');
+    if (!el) return;
+    const modeId = this.dailyChallengeId();
+    const mode = SOLO_MODES.find((m) => m.id === modeId);
+    if (!mode) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+    const net = this.coop && this.coop.lobbyNet;
+    const named = !!net && net.hasNick();
+    fetchLobbyState().then((d) => {
+      const rows = duelRows(d, modeId);
+      const bodyHtml = !d
+        ? `<div class="duel-row empty">${t('📡 Поки без інтернету — свої часи ви побачите, щойно мережа зʼявиться')}</div>`
+        : rows.length
+          ? rows.map((e) => `<div class="duel-row${e.me ? ' me' : ''}"><span>${e.me ? '⭐ ' : ''}${esc(e.nick)}</span><b>${esc(duelTime(e.ms, e.w))}</b></div>`).join('')
+          : `<div class="duel-row empty">${t('Сьогодні ще ніхто не грав — будь першим!')}</div>`;
+      // імʼя питаємо лише коли є мережа: офлайн у полі однаково немає сенсу
+      const askName = !!d && !named;
+      el.innerHTML = `<div class="duel-title">🤝 ${t('ДУЕЛЬ ДНЯ')}</div>
+        <div class="duel-hint">${t('{i} {m}: сьогодні в усіх однакова карта. Пройди і порівняй з друзями!', { i: mode.icon, m: mode.name() })}</div>
+        ${bodyHtml}
+        ${askName ? `<div class="duel-name">
+          <label class="duel-name-label" for="duel-nick">${t('✏️ Як тебе звати? Друзі побачать це імʼя біля твого часу')}</label>
+          <div class="duel-name-row">
+            <input id="duel-nick" class="coop-input" maxlength="12" placeholder="${t('Твоє імʼя')}" autocomplete="off">
+            <button type="button" id="btn-duel-nick" class="btn">✅ ${t('Готово')}</button>
+          </div>
+          <div id="duel-nick-error" class="coop-error"></div>
+        </div>` : ''}
+        <button type="button" id="btn-duel-play" class="btn btn-primary duel-play">▶ ${t('Грати {i} {m}', { i: mode.icon, m: esc(mode.name()) })}</button>`;
+      el.hidden = false;
+      // 🧷 Меню могло перемалюватись, поки летів запит у лобі: тоді `el` уже відчеплений
+      // від документа, і пошук по ВСЬОМУ документу віддає null. Тому шукаємо всередині
+      // самого `el` і мовчки виходимо, якщо його вже немає на сторінці — інакше
+      // «Cannot read properties of null» сипався б у консоль на кожному другому екрані.
+      if (!el.isConnected) return;
+      el.querySelector('#btn-duel-play').addEventListener('click', () => {
+        this.audio.click();
+        this._hideOverlay('overlay-solo');
+        this._startSoloMode(modeId);
+      });
+      if (!askName) return;
+      const input = el.querySelector('#duel-nick');
+      const accept = () => {
+        if (!net || !net.setNick(input.value)) {
+          el.querySelector('#duel-nick-error').textContent = t('Напиши імʼя — хоча б 2 звичайні букви 🙂');
+          input.focus();
+          return;
+        }
+        this.audio.click();
+        this._refreshDuelBoard();
+      };
+      el.querySelector('#btn-duel-nick').addEventListener('click', accept);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') accept(); });
+    });
   }
 
   _endStormRun() {

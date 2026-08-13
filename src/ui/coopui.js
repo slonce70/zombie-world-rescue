@@ -189,14 +189,18 @@ export class CoopUI {
     if (params.has('coophost')) {
       this._autoHost(params.get('nick') || t('Хост'));
     } else if (params.get('coopjoin')) {
-      this._autoJoin(params.get('coopjoin'), params.get('nick') || loadNick() || t('Гість'));
+      this._autoJoin(params.get('coopjoin'), params.get('nick') || loadNick() || t('Гість'), params.get('from'));
     }
   }
 
   // ---------- 📨 поклич друга ----------
   // Лінк на цю ж гру з кодом кімнати — друг тисне й одразу заходить (?coopjoin=CODE).
+  // 🎁 v780: `&from=НІК` — хто покликав. Живе лише в самому посиланні й у памʼяті кімнати:
+  // хост звіряє його зі своїм ніком і дарує яйце обом (раз на кімнату). Ніде не зберігається.
   _inviteUrl(code) {
-    return location.origin + location.pathname + '?coopjoin=' + encodeURIComponent(code);
+    const me = cleanNick(this.session.nick || loadNick());
+    return location.origin + location.pathname + '?coopjoin=' + encodeURIComponent(code)
+      + (me ? '&from=' + encodeURIComponent(me) : '');
   }
 
   async _shareInvite() {
@@ -465,9 +469,11 @@ export class CoopUI {
     } catch (e) { console.error('coophost failed', e); }
   }
 
-  async _autoJoin(code, nick) {
+  async _autoJoin(code, nick, from = null) {
     try {
       saveNick(cleanNick(nick) || t('Гість'));
+      // 🎁 хто покликав — тільки для hello цієї кімнати (session._reset її стирає)
+      this.session.invitedBy = cleanNick(from) || null;
       await this.session.join(code.toUpperCase(), nick);
       this._openLobby();
       this._syncPolling();
