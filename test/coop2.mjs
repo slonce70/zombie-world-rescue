@@ -13,6 +13,10 @@ const check = (name, ok, extra = '') => {
 };
 const SLOW = Math.max(1, parseFloat(process.env.SLOW || '1') || 1);
 const T = (ms) => Math.round(ms * SLOW);
+// ⏱️ Опитувати сторінку таймером, а не по requestAnimationFrame (типове для Playwright):
+// на runner із двома браузерами й софтверним рендером кадр іде секундами, тож очікування
+// «не бачить» уже виконаної умови (як `waitForPage` у `_browser.mjs`).
+const poll = { polling: 200 };
 
 
 const LAUNCH = {
@@ -47,7 +51,9 @@ try {
   await A.evaluate(() => window.__game.test.coopStartLevel());
   await A.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
   await B.waitForFunction(() => window.__game.state === 'level', null, { timeout: T(30000) });
-  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { timeout: T(15000) });
+  // зомбі їдуть до гостя мережею і зʼявляються в його кадрі — бюджет як у сусідніх
+  // очікувань рівня (15 с тут були найменші у файлі й падали під навантаженням)
+  await B.waitForFunction(() => window.__game.test.coopState().aliveZombies > 10, null, { ...poll, timeout: T(30000) });
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
   check('кімната і рівень готові', true, `код ${code}`);
@@ -163,9 +169,6 @@ try {
   check('гість справді кинув гранату', thrown === true);
   // Намір гранати їде з кадром гостя, а хост його теж обробляє в кадрі — на CI це
   // десятки секунд. Тому тут не свій куций таймаут, а спільний для файлу (T(60000)).
-  // І опитуємо таймером: за замовчуванням waitForFunction дивиться на сторінку по
-  // requestAnimationFrame, а на runner з двома браузерами кадр іде секундами.
-  const poll = { polling: 200 };
   const gidA = await A.waitForFunction(() => window.__guestNadeGid, null, poll)
     .then((h) => h.jsonValue()).catch(() => null);
   const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA, poll)
