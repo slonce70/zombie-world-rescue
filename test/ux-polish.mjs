@@ -203,7 +203,12 @@ console.log('▸ UX polish: tiny landscape shop shows a product');
     (await page.evaluate(() => window.__game && window.__game.state)) === 'level',
   30000, 'level');
   await page.click('#tb-shop');
-  await page.waitForTimeout(300);
+  // ⏱️ Чекаємо на сам товар і на два кадри розкладки, а не на 300 фіксованих
+  // мілісекунд: на софтверному рендері CI вітрина за цей час не встигає ні
+  // намалюватись, ні доїхати анімацією, і замір getBoundingClientRect ловив
+  // магазин на півдорозі.
+  await page.waitForSelector('#shop-grid .shop-item', { state: 'visible', timeout: 30000 });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const shop = await page.evaluate(() => {
     const item = document.querySelector('#shop-grid .shop-item');
     const r = item.getBoundingClientRect();

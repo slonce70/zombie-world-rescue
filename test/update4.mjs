@@ -174,12 +174,17 @@ const megaOpen = await page.evaluate(async () => {
   const g = window.__game;
   const mb = g.level.megabox;
   g.test.teleport(mb.x + 1, mb.z);
-  const t0 = performance.now();
-  while (performance.now() - t0 < 6000 && !mb.opened) {
+  // ⏱️ Тиснемо E покадрово. `input.pressed('KeyE')` — це ФРОНТ натиску, який гра
+  // читає рівно в одному кадрі (`justPressed` чиститься в `postUpdate`). На
+  // софтверному рендері CI 6 реальних секунд можуть не дати й кількох кадрів, і
+  // жодне натискання не потрапляє в гру. Настінний час лишається ЛИШЕ запобіжником
+  // від повністю зупиненої сторінки.
+  const wall = performance.now();
+  for (let i = 0; i < 300 && !mb.opened && performance.now() - wall < 60000; i++) {
     g.test.key('KeyE', true);
-    await new Promise((r) => setTimeout(r, 350));
-    g.test.key('KeyE', false);
+    await new Promise((r) => requestAnimationFrame(r));
   }
+  g.test.key('KeyE', false);
   return { opened: mb.opened };
 });
 check(megaOpen.opened, 'Мегабокс відкривається клавішею E біля нього');
