@@ -12,8 +12,9 @@ let failed = 0;
 const check = makeCheck(() => failed++);
 
 // DEU і TUR — найширші ріки і найкрутіші схили під селом; UKR ганяє той самий
-// код на вужчому потічку (див. test/terrain-geometry.mjs).
-for (const country of ['DEU', 'TUR']) {
+// код на вужчому потічку (див. test/terrain-geometry.mjs). CHN — без ріки, але
+// з Великою стіною на хребті.
+for (const country of ['DEU', 'TUR', 'CHN']) {
   await page.goto(`${BASE}/?test&fresh&country=${country}`);
   await page.waitForFunction(() => window.__game && window.__game.state === 'level', null, { timeout: 60000 });
 
@@ -82,21 +83,43 @@ for (const country of ['DEU', 'TUR']) {
       }
       gaps.push({ x: h.x, z: h.z, gap: Math.round((lowMesh - lowGround) * 100) / 100 });
     }
+    // 3️⃣ Велика стіна Китаю — та сама хвороба на ландмарку: суцільна коробка
+    // 22 × 7 × 4 плюс башта 6 × 6 на кінці, і все на позначці центру.
+    let wall = null;
+    const gw = (w.map.landmarks || []).includes('greatwall') && w.map.landmarkParams.greatwall;
+    if (gw) {
+      let lowMesh = Infinity, lowGround = Infinity;
+      for (let i = 0; i < pos.length; i += 3) {
+        if (Math.abs(pos[i] - gw.x) <= 11.1 && Math.abs(pos[i + 2] - gw.z) <= 2.1) {
+          lowMesh = Math.min(lowMesh, pos[i + 1]);
+        }
+      }
+      for (let i = -11; i <= 11; i++) {
+        for (const dz of [-2, 0, 2]) lowGround = Math.min(lowGround, w.groundH(gw.x + i, gw.z + dz));
+      }
+      wall = { gap: Math.round((lowMesh - lowGround) * 100) / 100 };
+    }
+
     return {
-      inWater, scattered, wet, rivers: w.rivers.length,
+      inWater, scattered, wet, rivers: w.rivers.length, wall,
       worstGap: gaps.reduce((m, g) => (g.gap > m.gap ? g : m), { gap: -99 }),
       houses: gaps.length,
     };
   });
 
-  check(res.rivers > 0, `${country}: у карті є ріка`);
   check(res.scattered > 300, `${country}: декорації розсипані`, `(${res.scattered})`);
-  check(res.inWater === 0, `${country}: жодна декорація не стоїть у воді`, res.wet.join(' '));
+  if (res.rivers) {
+    check(res.inWater === 0, `${country}: жодна декорація не стоїть у воді`, res.wet.join(' '));
+  }
   check(res.houses > 0, `${country}: будинки села побудовані`, `(${res.houses})`);
   // 0.06 — допуск на товщину плити (низ фундаменту на 0.1 нижче за землю)
   check(res.worstGap.gap <= 0.06,
     `${country}: фундамент дістає до землі під усім будинком`,
     `найгірший (${res.worstGap.x},${res.worstGap.z}) щілина ${res.worstGap.gap}м`);
+  if (res.wall) {
+    check(res.wall.gap <= 0, `${country}: Велика стіна вросла в хребет, а не висить`,
+      `щілина ${res.wall.gap}м`);
+  }
 }
 
 await closeTest();

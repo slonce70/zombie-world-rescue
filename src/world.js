@@ -191,11 +191,18 @@ export class World {
   // 🧱 Сегмент Великої стіни: масивний мур із зубчастим парапетом + сторожова башта.
   // Суцільний орієнтир — крізь стіну не пройти. НЕ мутуємо спільні матеріали.
   _lmGreatWall({ x, z }) {
-    const gy = this.groundH(x, z);
     const stoneM = toonMat(0x9a8e78);
     const trimM = toonMat(0x847862);
     const roofM = toonMat(0xc0392b);
     const LEN = 22, H = 7, T = 4; // довжина / висота / товщина муру
+    // Мур стоїть на хребті, а це суцільні коробки на ОДНІЙ позначці: за висотою
+    // центру нижній кінець і башта висіли в повітрі. Беремо найнижчу землю під
+    // усім муром — верх опускається, зате основа скрізь у ґрунті.
+    // (крок 1 м уздовж усього муру і башти на кінці — 6×6, тому dz до ±3)
+    let gy = Infinity;
+    for (let i = -LEN / 2; i <= LEN / 2 + 4; i += 1) {
+      for (const dz of [-3, 0, 3]) gy = Math.min(gy, this.groundH(x + i, z + dz));
+    }
     const wall = new THREE.Mesh(new THREE.BoxGeometry(LEN, H, T), stoneM);
     wall.position.set(x, gy + H / 2, z);
     wall.castShadow = true;
