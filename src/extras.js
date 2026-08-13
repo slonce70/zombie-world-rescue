@@ -2077,7 +2077,10 @@ export class Gadgets {
         // кіл-кредит іде ВЛАСНИКУ напарника, як у турелі (placeTurretAt/ownerPid).
         // Соло і клон гаджета: ownerPid немає або він 1 — рівно як було.
         target.lastHitBy = c.ownerPid || 1;
-        const dmg = c.squad === 'fighter' ? SQUAD_ARCHETYPES.fighter.damage : (melee ? 10 : 5);
+        // dmg — це шкода МЕЛІ; постріл здалека завжди половина від неї (клон: 10 / 5).
+        // Раніше тут стояло `(melee ? 10 : 5)`, і половина бралася ВДРУГЕ: пістолет клона
+        // тихо просів з 5 до 3, хоча картка гаджета обіцяє «пістолет 5 здалека».
+        const dmg = c.squad === 'fighter' ? SQUAD_ARCHETYPES.fighter.damage : 10;
         target.damage(melee ? dmg : Math.round(dmg * 0.5), new THREE.Vector3(dx, 0, dz).normalize(), false);
         setAnim(c.rig, melee ? 'attack' : 'aim');
         // 🌐 біт для снапшота: у гостя саме з нього народжуються трасер і звук
