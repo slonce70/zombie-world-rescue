@@ -157,26 +157,18 @@ export function friendThanksPending(save, dayKey) {
 // карти, подалі від старту. Це і тримає перф-бюджет (далекий кут фрустум-калиться на
 // кадрі-заміру спавну), і прибирає клітку зі стартового поля бою. Стабільно між забігами;
 // Швеція на карті Польщі працює автоматично (читаємо country.map).
-function pickCageSite(country, rng) {
+// Повертаємо ВЕСЬ список від найдальшого до найближчого: якщо довкола першого
+// якоря сама вода (Туреччина, rescueShore — це берег Босфору), спавн бере наступний.
+function cageSites(country) {
   const map = country && country.map;
-  if (!map) return null;
+  if (!map) return [];
   const sites = map.storySites || map.sites || {};
   const arena = sites.arena || (map.sites && map.sites.arena) || null;
   const ref = map.spawn || arena || { x: 0, z: 0 };
-  const keys = Object.keys(sites).filter((k) => k !== 'arena' && sites[k]);
-  if (!keys.length) return null;
-  let best = null;
-  let bestD = -1;
-  for (const k of keys) {
-    const s = sites[k];
-    const d = Math.hypot(s.x - ref.x, s.z - ref.z);
-    if (d > bestD) { bestD = d; best = s; }
-  }
-  if (!best) {
-    const f = rng && rng.f ? rng.f() : Math.random();
-    best = sites[keys[Math.floor(f * keys.length) % keys.length]];
-  }
-  return best ? { x: best.x, z: best.z, r: best.r || 8 } : null;
+  return Object.keys(sites)
+    .filter((k) => k !== 'arena' && sites[k])
+    .map((k) => ({ x: sites[k].x, z: sites[k].z, r: sites[k].r || 8 }))
+    .sort((a, b) => Math.hypot(b.x - ref.x, b.z - ref.z) - Math.hypot(a.x - ref.x, a.z - ref.z));
 }
 
 const FREE_TIME = 2.0;      // 2с прогрес звільнення
@@ -211,13 +203,36 @@ export class HiddenRescue {
 
   _spawn() {
     const level = this.level;
-    const site = pickCageSite(level.country, level.rng);
-    if (!site) return;
+    const sites = cageSites(level.country);
+    if (!sites.length) return;
     const rng = level.rng;
     const ang = rng.range ? rng.range(0, Math.PI * 2) : Math.random() * Math.PI * 2;
     const off = 4 + (rng.range ? rng.range(0, 3) : Math.random() * 3);
-    const x = site.x + Math.cos(ang) * off;
-    const z = site.z + Math.sin(ang) * off;
+    // 🌊 друг у клітці під водою — саме те, що бачить дитина: у Туреччині
+    // найдальший якір (rescueShore) лежить у самому Босфорі, і клітка тонула
+    // в руслі. Обходимо коло кутами по 45°, а якщо весь круг мокрий — беремо
+    // наступний за дальністю якір. Кут і відступ уже витягнуті з rng, тож потік
+    // випадковості не зсувається для країн, де перше ж місце сухе.
+    // Прути стоять по колу R=1.35, тож міряємо і край клітки, а не лише центр.
+    const wet = (px, pz) => {
+      const w = level.world;
+      if (!w || !w.inWater) return false;
+      return [[0, 0], [1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]]
+        .some(([dx, dz]) => w.inWater(px + dx, pz + dz));
+    };
+    let spot = null;
+    for (const site of sites) {
+      for (let i = 0; i < 8 && !spot; i++) {
+        const a = ang + i * (Math.PI / 4);
+        const px = site.x + Math.cos(a) * off;
+        const pz = site.z + Math.sin(a) * off;
+        if (!wet(px, pz)) spot = { x: px, z: pz };
+      }
+      if (spot) break;
+    }
+    // усе мокре (такої карти немає, але хай буде) — лишаємось на першому якорі
+    const x = spot ? spot.x : sites[0].x + Math.cos(ang) * off;
+    const z = spot ? spot.z : sites[0].z + Math.sin(ang) * off;
     const y = level.world && level.world.groundH ? level.world.groundH(x, z) : 0;
     this.cageX = x; this.cageZ = z; this.cageY = y;
 
