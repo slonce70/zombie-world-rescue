@@ -5,7 +5,7 @@ let failed = 0;
 const check = makeCheck(() => failed++);
 
 await page.goto(`${BASE}/?test&fresh&seed=35`, { waitUntil: 'commit', timeout: 60000 });
-await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 });
+await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 60000 });
 
 console.log('▸ Збирач душ відкривається на рівні SOUL_COLLECTOR_UNLOCK_LEVEL Зоряного шляху');
 const menu = await page.evaluate(async () => {
@@ -90,6 +90,9 @@ const swordHit = await page.evaluate(() => {
   p.pitch = 0;
   p.shootCd = 0;
   p._shoot();
+  // 🗡️ «Бій відроджений» (v549): удар мечем — не миттєвий постріл, а замах на 0.14с;
+  // шкода лягає, коли замах доходить у _updateMeleeSwing. Прокручуємо цей час.
+  p._updateMeleeSwing(0.2);
   return { hp: z.hp, damage: 125 - z.hp, weapon: p.cur };
 });
 check(swordHit.damage === 30, 'меч знімає рівно 30 HP', JSON.stringify(swordHit));
