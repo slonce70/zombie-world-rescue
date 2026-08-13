@@ -84,9 +84,10 @@ const res = await page.evaluate(async () => {
   if (laterTab) laterTab.click();
   const laterCard = document.querySelector('.shop-item[data-id="skinbox"]');
   g.shop.close();
-  const beforeLater = { crystals: g.save.crystals, coins: g.save.coins, skins: g.save.skins.length };
-  g.test.shopBuy('skinbox');
-  const afterLater = { crystals: g.save.crystals, coins: g.save.coins, skins: g.save.skins.length };
+  // 🎲 Ролл фіксуємо, як і в усіх кейсах вище. Без цього тут була ставка на випадковість:
+  // у 40% роллів бокс повертає 3 кристали, тобто 15 → 3, а не 15 → 0, і кожен другий-третій
+  // прогін падав, хоча покупка проходила справно. 0.39 — гілка «50 монет», перевірена вище.
+  const later = buyWithRoll(0.39);
 
   return {
     item: SHOP_ITEMS.find((i) => i.id === 'skinbox'),
@@ -102,8 +103,10 @@ const res = await page.evaluate(async () => {
     metas: Object.fromEntries(['cactus', 'traveler', 'rainbow', 'gardener', 'zombie'].map((id) => [id, HERO_SKINS[id] && HERO_SKINS[id].name])),
     built,
     laterVisible: !!laterCard,
-    laterBought: afterLater.crystals === beforeLater.crystals - 15,
-    laterDebug: { before: beforeLater, after: afterLater },
+    // ціна списалась І виграш зарахувався — на фіксованому роллі це рівно 15 💎 → 50 ₴
+    laterBought: later.after.crystals === later.before.crystals - 15
+      && later.after.coins === later.before.coins + 50,
+    laterDebug: later,
   };
 });
 
