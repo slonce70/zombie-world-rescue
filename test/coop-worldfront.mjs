@@ -403,7 +403,12 @@ try {
     session._tryReconnect = async () => { window.__frontResumePending = true; };
     session.transport.ws.close();
   });
-  await page.waitForFunction(() => window.__game.coop.session.roster.size === 1, null, { timeout: 15000 * SLOW });
+  // ⏱️ Той самий випадок, що й з підняттям вище: чекаємо на подію з мережі, поки
+  // на runner-і крутяться ДВА браузери в рівні, тож кадр іде секундами. Опитуємо
+  // таймером, а не по requestAnimationFrame, і даємо бюджет як у сусіда нижче
+  // (теж очікування ростера всередині рівня). Саме тут CI падав із
+  // `Timeout 15000ms exceeded` — останній 15-секундний бюджет у цьому файлі.
+  await page.waitForFunction(() => window.__game.coop.session.roster.size === 1, null, { polling: 200, timeout: 30000 * SLOW });
   const dropped = await page.evaluate(() => ({
     size: window.__game.coop.session.roster.size,
     started: window.__game.coop.session.frontStartedOperationId,

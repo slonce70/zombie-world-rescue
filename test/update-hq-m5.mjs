@@ -110,6 +110,11 @@ try {
   check('оверлей пінгів відкрито', open === true);
   // клік по фразі #1 шле пінг і закриває оверлей
   await hostPage.evaluate(() => { window.__pings = []; const h = window.__game.hud; const o = h.toast.bind(h); h.toast = (m) => { window.__pings.push(m); return o(m); }; });
+  // ⏱️ анти-спам стікерів — 1.2 с по НАСТІННОМУ годиннику (sendPing у net/coop.js),
+  // а хост щойно сам відправив пінг у кроці 6. Коли труби вже прогріті, тост гостю
+  // доїжджає за 0.3 с (саме так було на CI), клік потрапляє всередину вікна — і пінг
+  // мовчки зʼїдається, хоча кнопка спрацювала. Чекаємо, поки вікно вийде.
+  await sleep(1300);
   await hostPage.evaluate(() => document.querySelectorAll('#ping-wheel .ping-btn')[1].click());
   const sent = await waitFor(async () => (await hostPage.evaluate(() => window.__pings || [])).some((m) => /Ти:/.test(m)), 4000, 'click sent ping');
   check('клік по фразі шле пінг', sent);

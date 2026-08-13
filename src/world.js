@@ -2496,17 +2496,23 @@ export class World {
     // 🌊 у воді декораціям не місце: кущ або дерево посеред ріки — найпомітніше
     // «недороблено» (Німеччина, Туреччина, Україна). Єдина точка, через яку
     // проходить УСЯ розсипка пропів, тому одна перевірка закриває всі виклики.
-    // Ріжемо лише там, де земля НИЖЧА за ватерлінію: сухий берег поруч із водою
-    // лишається зарослим, як і був.
+    if (this.inWater(x, z)) return false;
+    return true;
+  }
+
+  // 🌊 Точка під водою? У коридорі русла І земля під нею НИЖЧА за ватерлінію.
+  // Сухий берег поруч із водою лишається придатним — тому запас лише 0.4 м.
+  // Одна точка правди: нею користується і розсипка пропів, і клітка з другом.
+  inWater(x, z) {
     for (const rv of this.rivers) {
       let d = Infinity;
       for (const s of rv.segs) {
         const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
         if (v < d) d = v;
       }
-      if (d < rv.width * RIVER_BANK && this.groundH(x, z) < rv.level + 0.4) return false;
+      if (d < rv.width * RIVER_BANK && this.groundH(x, z) < rv.level + 0.4) return true;
     }
-    return true;
+    return false;
   }
 
   _buildVegetation() {

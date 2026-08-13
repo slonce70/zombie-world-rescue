@@ -30,14 +30,26 @@ for (const country of ['DEU', 'TUR', 'CHN']) {
 
     // 1️⃣ Декорації у воді. Проп «у воді» = він у коридорі русла І земля під ним
     // нижча за ватерлінію. RIVER_BANK у world.js = 1.37 ширини.
+    //
+    // Рахуємо ЛИШЕ нерухомі пропси. Дим із димаря, листя, сніжинки, блискітки й
+    // бойові FX — це частинки, які літають довкола гравця щокадру, і пролітати
+    // над рікою для них нормально (дим із прирічкового будинку в Німеччині саме
+    // це й робить). Усі вони позначені DynamicDrawUsage, статична розсипка — ні.
+    const DYNAMIC = 35048; // THREE.DynamicDrawUsage === gl.DYNAMIC_DRAW
+    // Матриці інстансів локальні (клітки друзів, наприклад, лежать у зсунутій
+    // групі) — переводимо в світові координати повною матрицею обʼєкта.
+    w.scene.updateMatrixWorld(true);
     let inWater = 0, scattered = 0;
     const wet = [];
     w.scene.traverse((o) => {
       if (!o.isInstancedMesh || !o.count) return;
+      if (o.instanceMatrix.usage === DYNAMIC) return;
       const arr = o.instanceMatrix.array;
+      const e = o.matrixWorld.elements;
       for (let i = 0; i < o.count; i++) {
-        const x = arr[i * 16 + 12] + o.position.x;
-        const z = arr[i * 16 + 14] + o.position.z;
+        const lx = arr[i * 16 + 12], ly = arr[i * 16 + 13], lz = arr[i * 16 + 14];
+        const x = e[0] * lx + e[4] * ly + e[8] * lz + e[12];
+        const z = e[2] * lx + e[6] * ly + e[10] * lz + e[14];
         scattered++;
         for (const rv of w.rivers) {
           let d = Infinity;
