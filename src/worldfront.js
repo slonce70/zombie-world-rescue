@@ -63,6 +63,13 @@ const SPAIN_REBUILD_STAGES = Object.freeze([
   'spain-defend-fireworks',
 ]);
 
+// v606: сюжетні ланцюжки країн (Іспанія/Польща/Німеччина) — безперервні:
+// проміжна перемога веде просто в наступний етап, без проміжного екрана.
+// Одне правило на гру й на тести, щоб вони не розʼїхались.
+export function isCountryChainStage(missionPreset) {
+  return /^(spain|pol|deu)-/.test(missionPreset || '');
+}
+
 function operationStages(front, operation) {
   if (operation.country === 'ESP' && front.world.countries.ESP?.damage >= 3) {
     return SPAIN_REBUILD_STAGES;

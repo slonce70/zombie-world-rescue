@@ -7,6 +7,13 @@ import { BIOMES } from './countries.js';
 
 const GKEY = (cx, cz) => (cx + 512) * 4096 + (cz + 512);
 
+// 🌊 Ріки. Вода — ПЛАСКА стрічка на rv.level (корабель у Туреччині тримається
+// ватерлінії), тому дно мусить бути пласким під УСІЄЮ стрічкою: інакше берег
+// ріже воду навскіс, а там, де рельєф проседає, стрічка висить над землею.
+// Обидва числа — частки rv.width; тримати їх поруч, бо вони мусять збігатися.
+const RIVER_HALF = 0.82;               // піврозмір водної стрічки і плаского дна
+const RIVER_BANK = RIVER_HALF + 0.55;  // далі берег плавно зливається з рельєфом
+
 export class World {
   constructor(scene, seed = 1377, biome = null, map = null, quality = null) {
     this.scene = scene;
@@ -2043,7 +2050,7 @@ export class World {
         const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
         if (v < d) d = v;
       }
-      const w = smoothstep(rv.width, rv.width * 0.45, d);
+      const w = smoothstep(rv.width * RIVER_BANK, rv.width * RIVER_HALF, d);
       if (w > 0) h = lerp(h, rv.level - rv.depth, w);
     }
     return h;
@@ -2314,7 +2321,8 @@ export class World {
           const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
           if (v < d) d = v;
         }
-        if (d < rv.width + 2) tmp.lerp(cBed, smoothstep(rv.width + 2, rv.width * 0.5, d) * 0.85);
+        const bedR = rv.width * RIVER_BANK + 2;
+        if (d < bedR) tmp.lerp(cBed, smoothstep(bedR, rv.width * RIVER_HALF, d) * 0.85);
       }
       const roadD = this.roadDist(x, z);
       if (roadD < 3.4) tmp.lerp(cDirt, smoothstep(3.4, 2.0, roadD));
@@ -2338,7 +2346,7 @@ export class World {
     if (!this.rivers.length) return;
     for (const rv of this.rivers) {
       const positions = [];
-      const half = rv.width * 0.82;
+      const half = rv.width * RIVER_HALF;
       const pushWaterVertex = (x, z) => positions.push(x, rv.level, z);
       for (let s = 0; s < rv.pts.length - 1; s++) {
         const [ax, az] = rv.pts[s];
