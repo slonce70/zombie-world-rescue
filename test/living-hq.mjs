@@ -110,12 +110,18 @@ await page.waitForFunction(() => window.__game && window.__game.state === 'globe
 check(await page.evaluate(() => window.__game.state) === 'globe', 'вихід кнопкою повертає на глобус');
 check(await page.evaluate(() => window.__game.hqbase.debugState().children) === 0, 'сцену очищено при виході');
 
-await page.evaluate(() => {
+// 🎯 З v752 ціль магазину стоїть НИЖЧЕ кроку кампанії: 🎯 на товарі більше не
+// веде дитину у вітрину замість наступної країни. Компас перебиває лише майже
+// зібрана ціль — коли в кишені вже ≥80% ціни. Саме такий стан і ставимо, щоб
+// перевірити, що при повторному вході компас перечитується, а не кешується.
+await page.evaluate(async () => {
   const g = window.__game;
+  const { goalInfo } = await import('/src/shop.js');
   g.save.coins = 0;
   g.save.crystals = 0;
   g.save.upgrades.maxhp = 0;
   g.save.goal = 'maxhp';
+  g.save.coins = Math.ceil(goalInfo(g).need * 0.85);
   g.saveGame();
 });
 
