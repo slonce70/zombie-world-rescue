@@ -106,28 +106,41 @@ try {
   check('гість отримав нагороду місії (+80)', missionB.coins >= 130, `монет: ${missionB.coins}`);
 
   // ---- 2. граната гостя вибухає в усіх ----
+  // ⏱️ Дві пастки на CPU-задушеному runner, обидві полагоджені тут:
+  //  1) запал гранати — 2 ІГРОВІ секунди (`spawnGrenade`, fuse 2.0) = 40 кадрів хоста;
+  //     при частці кадру на секунду це хвилини реального часу. Прискорюємо запал САМЕ
+  //     цієї гранати одразу в момент спавну (а не після двох очікувань, як було) —
+  //     мережний шлях (хост `_explodeAt` → `bm` → гість `netExplosion`) лишається
+  //     продакшн-кодом і перевіряється чесно;
+  //  2) `waitForFunction` опитує сторінку по rAF, тож між двома опитуваннями на CI
+  //     проходять десятки секунд — одиночна змінна «останній gid» встигала змінитись.
+  //     Складаємо ВСІ gid у список: подія більше не може проскочити повз перевірку.
   await A.evaluate(() => {
     const net = window.__game.level.net;
     const effects = window.__game.level.effects;
     window.__guestNadeGid = null;
-    window.__guestNadeExplodedGid = null;
+    window.__explodedGids = [];
     const spawn = net.spawnNetGrenade.bind(net);
     net.spawnNetGrenade = (pos, vel, pid) => {
       const gid = net._nextId;
       const result = spawn(pos, vel, pid);
-      if (pid === 2) window.__guestNadeGid = gid;
+      if (pid === 2) {
+        window.__guestNadeGid = gid;
+        const nade = effects.grenadesLive.find((g) => g.gid === gid);
+        if (nade) nade.fuse = 0.05;
+      }
       return result;
     };
     const explode = effects._explodeAt.bind(effects);
     effects._explodeAt = (pos, radius, damage, meta) => {
-      if (meta && meta.gid) window.__guestNadeExplodedGid = meta.gid;
+      if (meta && meta.gid) window.__explodedGids.push(meta.gid);
       return explode(pos, radius, damage, meta);
     };
   });
   await B.evaluate(() => {
     const effects = window.__game.level.effects;
     window.__guestNadeGid = null;
-    window.__guestNadeExplodedGid = null;
+    window.__explodedGids = [];
     const spawn = effects.spawnNetGrenade.bind(effects);
     effects.spawnNetGrenade = (gid, ...args) => {
       window.__guestNadeGid = gid;
@@ -135,7 +148,7 @@ try {
     };
     const explode = effects.netExplosion.bind(effects);
     effects.netExplosion = (x, y, z, radius, gid, barrels) => {
-      window.__guestNadeExplodedGid = gid;
+      window.__explodedGids.push(gid);
       return explode(x, y, z, radius, gid, barrels);
     };
   });
@@ -148,20 +161,16 @@ try {
     return window.__game.test.throwGrenade();
   });
   check('гість справді кинув гранату', thrown === true);
-  const gidA = await A.waitForFunction(() => window.__guestNadeGid, null, { timeout: T(20000) })
+  // Намір гранати їде з кадром гостя, а хост його теж обробляє в кадрі — на CI це
+  // десятки секунд. Тому тут не свій куций таймаут, а спільний для файлу (T(60000)).
+  const gidA = await A.waitForFunction(() => window.__guestNadeGid)
     .then((h) => h.jsonValue()).catch(() => null);
-  const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA, { timeout: T(20000) })
+  const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA)
     .then(() => gidA).catch(() => null);
   check('конкретна граната гостя зʼявилась на обох екранах', !!gidA && gidB === gidA, `A:${gidA} B:${gidB}`);
-  // Не чекаємо дві секунди game-time на CPU-задушеному runner: прискорюємо fuse
-  // саме цієї гранати, а мережний bm/explosion шлях лишається production-кодом.
-  await A.evaluate((gid) => {
-    const nade = window.__game.level.effects.grenadesLive.find((g) => g.gid === gid);
-    if (nade) nade.fuse = 0.05;
-  }, gidA);
-  const explodedA = await A.waitForFunction((gid) => window.__guestNadeExplodedGid === gid, gidA, { timeout: T(20000) })
+  const explodedA = await A.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA)
     .then(() => true).catch(() => false);
-  const explodedB = await B.waitForFunction((gid) => window.__guestNadeExplodedGid === gid, gidA, { timeout: T(20000) })
+  const explodedB = await B.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA)
     .then(() => true).catch(() => false);
   check('вибух конкретного gid дійшов на обидві сторони', explodedA && explodedB, `A:${explodedA} B:${explodedB}`);
 

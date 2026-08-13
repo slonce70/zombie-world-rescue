@@ -42,22 +42,30 @@ try {
   });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
-  await sleep(400);
+  // ⏱️ Вхід у кімнату — мережа, а не 400 фіксованих мілісекунд: якщо ростер ще не
+  // зійшовся, хост міняє режим у порожню кімнату, і оновлення гостю нема кому везти.
+  await A.waitForFunction(() => window.__game.coop.session.roster.size === 2);
+  await B.waitForFunction(() => window.__game.coop.session.roster.size === 2);
 
   // 1. режим «Шторм» у лобі
   await A.evaluate(() => {
     window.__game.test.coopSetMode('storm');
     window.__game.test.coopSetCountry('UKR');
   });
-  await sleep(500);
-  const modeB = await B.evaluate(() => window.__game.coop.session.mode);
-  check('гість бачить режим «Шторм»', modeB === 'storm');
+  // ⏱️ І тут чекаємо саму подію, а не 500 мс: на завантаженому CI пачка з режимом
+  // долітала пізніше, і перевірка читала ще старий режим (наступна за нею «обидва у
+  // Штормі» при цьому зеленіла — старт везе режим у своєму спеці).
+  const modeB = await B.waitForFunction(() => window.__game.coop.session.mode === 'storm')
+    .then(() => 'storm')
+    .catch(async () => B.evaluate(() => window.__game.coop.session.mode));
+  check('гість бачить режим «Шторм»', modeB === 'storm', modeB);
 
   // 2. старт: обидва у штормі
   await A.evaluate(() => window.__game.test.coopStartLevel());
   await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
   await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
-  check('обидва у Штормі', true);
+  const stormBoth = await Promise.all([A, B].map((p) => p.evaluate(() => !!window.__game.level.storm)));
+  check('обидва у Штормі', stormBoth.every(Boolean), JSON.stringify(stormBoth));
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
 
