@@ -124,12 +124,19 @@ check(haveToroInWorld, 'toro присутній у списку зомбі рі�
 
 // ===== 👑 МАТАДОР-бос =====
 console.log('▸ 👑 МАТАДОР-бос');
-await page.evaluate(() => {
+// 🏛️ ESP отримала ЧЕТВЕРТУ сюжетну ціль — зачистку маєтку. Трьох класичних слотів
+// (rescue/tower/warehouse) для арени вже мало: сумісний вигляд `missions` знає лише
+// їх, а арену відмикає повний список `objectives`. Закриваємо цілі по черзі —
+// сюжет тримає активною рівно одну.
+const espGoals = await page.evaluate(() => {
   const g = window.__game;
-  g.test.completeMission('rescue');
-  g.test.completeMission('tower');
-  g.test.completeMission('warehouse');
+  const ms = g.level.missions;
+  const list = (ms.objectives || ms.missions).map((o) => ({ id: o.id, kind: o.kind || o.type }));
+  for (const o of list) g.test.completeMission(o.id);
+  return list;
 });
+check(espGoals.some((o) => o.kind === 'manor'),
+  '🏛️ маєток — сюжетна ціль ESP', JSON.stringify(espGoals));
 // відбиваємо орди, поки арена боса не відкриється
 let bossUnlocked = false;
 const tH = Date.now();
