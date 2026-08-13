@@ -41,25 +41,30 @@ check(so && so.id === 'headshots' && so.target === 10 && so.done === false, 'for
 console.log('▸ ⭐2 трекається (10 хедшотів) і тікає до done');
 const tracked = await page.evaluate(() => {
   const g = window.__game;
+  const chip = () => {
+    g.hud.update(0.016);
+    const el = document.getElementById('mission-list');
+    const c = el ? el.querySelector('.mission.secondary') : null;
+    return { has: !!c, text: c ? c.textContent.replace(/\s+/g, ' ').trim() : '' };
+  };
   for (let i = 0; i < 9; i++) g.level.bus.emit('hitmarker', true);
   const at9 = g.test.secondaryState();
+  const chip9 = chip();
   g.level.bus.emit('hitmarker', true); // 10-й
   const at10 = g.test.secondaryState();
-  return { at9, at10 };
+  const chip10 = chip();
+  return { at9, at10, chip9, chip10 };
 });
 check(tracked.at9.progress === 9 && !tracked.at9.done, 'після 9 хедшотів — 9/10, ще не done', JSON.stringify(tracked.at9));
 check(tracked.at10.progress === 10 && tracked.at10.done, 'після 10 — done', JSON.stringify(tracked.at10));
 
-console.log('▸ HUD показує чип вторинної цілі (і жодного «easy mode» тексту)');
-const hud = await page.evaluate(() => {
-  const g = window.__game;
-  g.hud.update(0.016);
-  const el = document.getElementById('mission-list');
-  const chip = el ? el.querySelector('.mission.secondary') : null;
-  return { has: !!chip, text: chip ? chip.textContent.trim() : '', done: chip ? chip.classList.contains('done') : false };
-});
-check(hud.has && /10\/10/.test(hud.text), 'чип ⭐2 у mission-list з прогресом', JSON.stringify(hud));
-check(hud.done, 'чип позначено виконаним (✅)', JSON.stringify(hud));
+// HUD (1383d5c «show one active mission objective») показує лише АКТИВНІ цілі:
+// чип живе, поки ціль не виконана,
+// і зникає, щойно вона зарахована — на екрані не висить історія зроблених місій.
+console.log('▸ HUD показує чип активної ⭐2 і прибирає його після зарахування');
+check(tracked.chip9.has && /9\/10/.test(tracked.chip9.text), 'чип ⭐2 у mission-list з прогресом 9/10', JSON.stringify(tracked.chip9));
+check(/хедшот/i.test(tracked.chip9.text), 'чип підписаний текстом цілі', JSON.stringify(tracked.chip9));
+check(!tracked.chip10.has, 'виконана ⭐2 зникає з mission-list', JSON.stringify(tracked.chip10));
 
 // ---------- ⭐1 + ⭐2 + ⭐3 на перемозі (flawless, ціль виконана) ----------
 console.log('▸ Перемога: ⭐1 + ⭐2 (ціль done) + ⭐3 (без смертей) = 3');

@@ -118,19 +118,44 @@ const compass = await page.evaluate(async () => {
   const g = window.__game;
   g.endLevel();
   const { CAMPAIGN_ORDER } = await import('/src/countries.js');
+  const { seasonSteps, seasonIndex, seasonState } = await import('/src/season.js');
   for (const id of CAMPAIGN_ORDER) g.save.liberated[id] = true;
   g.save.liberated.LOST = true;
   g.save.liberated.LAB = true; // Глава 3 пройдена — інакше компас веде в неї, не у тиждень
   g.save.infected = { cleared: { A: 1, B: 1, C: 1 }, done: true };
   g.quests.list.forEach((q) => { q.done = true; }); // завдання дня виконані — інакше компас (v277) веде в них, а не у тиждень
+  // 🗓️ сезон (v730) стоїть у компасі ВИЩЕ за тиждень і день: поки є незакрита або
+  // незабрана сходинка, компас кличе туди. Закриваємо сезон чесно — тими самими
+  // лічильниками сейва, з яких він рахує прогрес, — і забираємо всі нагороди.
+  const sIdx = seasonIndex(g._weekIndex());
+  const defs = seasonSteps(sIdx);
+  g.save.modeWins = g.save.modeWins || {};
+  g.save.stats = g.save.stats || {};
+  g.save.friends = g.save.friends || {};
+  for (const d of defs) {
+    if (d.metric === 'mode') g.save.modeWins[d.mode] = Math.max(g.save.modeWins[d.mode] | 0, d.target);
+    else if (d.metric === 'kills') g.save.stats.killed = Math.max(g.save.stats.killed | 0, d.target);
+    else if (d.metric === 'friends') for (let i = 0; i < d.target; i++) g.save.friends['season' + i] = true;
+  }
+  // base = {} означає «сезон стартував з нуля», тож лічильники вище рахуються повністю
+  g.save.season = { i: sIdx, base: {}, claimed: defs.map((d) => d.id), carry: [] };
+  const season = seasonState(g.save, g._weekIndex());
   g.dailyChallengeId = () => 'knockout';
   const after = g._nextActionInfo(); // W1000:mode вже стоїть → мусить бути daily
   delete g.save.weekly['W1000:mode'];
   const before = g._nextActionInfo();
-  return { beforeIcon: before.icon, afterIcon: after.icon };
+  return {
+    before: { icon: before.icon, title: before.title },
+    after: { icon: after.icon, title: after.title },
+    seasonNext: season.next, seasonClaimable: season.claimable,
+  };
 });
-check(compass.beforeIcon === '🗓️', 'компас кличе у випробування тижня, поки нагороду не взято', compass.beforeIcon);
-check(compass.afterIcon === '🎯', 'після недільної нагороди компас повертається до дня', compass.afterIcon);
+check(compass.seasonNext === null && compass.seasonClaimable === 0,
+  'сезон закрито — компас доходить до тижня й дня', JSON.stringify({ next: compass.seasonNext, claimable: compass.seasonClaimable }));
+check(compass.before.icon === '🗓️' && /тижн|недел|Weekly/i.test(compass.before.title),
+  'компас кличе у випробування тижня, поки нагороду не взято', JSON.stringify(compass.before));
+check(compass.after.icon === '🎯' && /дня|Daily/i.test(compass.after.title),
+  'після недільної нагороди компас повертається до дня', JSON.stringify(compass.after));
 
 // бейджі: картка режиму тижня 🗓️ ×3, картка кампанії — чип мутатора
 const badges = await page.evaluate(() => {

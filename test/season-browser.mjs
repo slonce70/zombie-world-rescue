@@ -80,7 +80,10 @@ const compass = await page.evaluate(async () => {
 check(/сезону|сезона|Season step/i.test(compass.title),
   'компас кличе забрати готову сходинку', JSON.stringify(compass));
 
-console.log('▸ Новий сезон обнуляє сходинки без втрати нагород');
+// Сходинка НЕ згорає (v752, 0da6656): свої 12 сходинок новий сезон починає з нуля,
+// а виконана й НЕзабрана сходинка переїжджає в нього окремим рядком і чекає клейму.
+// У блоці вище сходинку `pending` виконано, але нагороду не забрано — саме вона й має переїхати.
+console.log('▸ Новий сезон обнуляє свої сходинки, але переносить незабрану нагороду');
 const rollover = await page.evaluate(async () => {
   const g = window.__game;
   const { seasonState, SEASON_WEEKS } = await import('/src/season.js');
@@ -88,10 +91,18 @@ const rollover = await page.evaluate(async () => {
   g._weekIndex = () => week + SEASON_WEEKS;
   const st = seasonState(g.save, g._weekIndex());
   g._weekIndex = () => week;
-  return { index: st.index, claimed: st.steps.filter((s) => s.claimed).length, progress: st.steps.filter((s) => s.progress > 0).length };
+  return {
+    index: st.index,
+    claimed: st.steps.filter((s) => s.claimed).length,
+    progress: st.steps.filter((s) => !s.carried && s.progress > 0).length,
+    carried: st.steps.filter((s) => s.carried).map((s) => s.id),
+    claimable: st.claimable,
+  };
 });
 check(rollover.claimed === 0 && rollover.progress === 0,
-  'наступний сезон стартує з чистого аркуша', JSON.stringify(rollover));
+  'власні сходинки наступного сезону стартують з чистого аркуша', JSON.stringify(rollover));
+check(rollover.carried.length === 1 && rollover.carried[0].endsWith(compass.pending) && rollover.claimable === 1,
+  'виконана й незабрана сходинка переїхала в новий сезон', JSON.stringify(rollover));
 
 check(errors.length === 0, 'у браузері немає JS-помилок', errors.join(' | '));
 
