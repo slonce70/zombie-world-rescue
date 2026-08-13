@@ -219,31 +219,36 @@ try {
         front.restored[country] = 3;
       }
       if (wanted === 'attacked') {
-        const snapshot = (zombie) => ({
+        // Зомбі спавняться і зникають між знімком і відновленням, тому пари
+        // тримаємо за стабільним nid, а не за місцем у списку. Ті, що зʼявились
+        // пізніше, стоять однаково в обох кадрах і в різниці викликів зникають.
+        const snapshot = (list) => new Map(list.map((zombie) => [zombie.nid, {
           x: zombie.x, y: zombie.y, z: zombie.z,
           position: zombie.rig.group.position.toArray(),
           horde: zombie.horde, aggroed: zombie.aggroed, state: zombie.state,
-        });
-        const restore = (zombie, value) => {
+        }]));
+        const restore = (list, saved) => list.forEach((zombie) => {
+          const value = saved.get(zombie.nid);
+          if (!value) return;
           Object.assign(zombie, { x: value.x, y: value.y, z: value.z, horde: value.horde, aggroed: value.aggroed, state: value.state });
           zombie.rig.group.position.fromArray(value.position);
-        };
+        });
         const originalDamage = game._addFrontDamage;
         game._addFrontDamage = (level, damage) => {
-          game.__frontBaseline = { level, damage, actors: level.zombies.list.map(snapshot) };
+          game.__frontBaseline = { level, damage, actors: snapshot(level.zombies.list) };
         };
         game.__prepareFrontBaseline = () => {
           const baseline = game.__frontBaseline;
-          baseline.presented = baseline.level.zombies.list.map(snapshot);
+          baseline.presented = snapshot(baseline.level.zombies.list);
           baseline.frontPressure = baseline.level.frontPressure;
-          baseline.level.zombies.list.forEach((zombie, index) => restore(zombie, baseline.actors[index]));
+          restore(baseline.level.zombies.list, baseline.actors);
           baseline.level.frontPressure = null;
           game._addFrontDamage = originalDamage;
         };
         game.__applyFrontPresentation = () => {
           const baseline = game.__frontBaseline;
           originalDamage.call(game, baseline.level, baseline.damage);
-          baseline.level.zombies.list.forEach((zombie, index) => restore(zombie, baseline.presented[index]));
+          restore(baseline.level.zombies.list, baseline.presented);
           baseline.level.frontPressure = baseline.frontPressure;
         };
       }
