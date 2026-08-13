@@ -29,7 +29,8 @@ import {
   sanitizeSpecialistXp, specialistModifiers, specialistRank,
 } from './specialists.js';
 import {
-  applyFrontEvent, createFront, frontCountryState, frontStageConfig, frontViewModel, sanitizeFront,
+  applyFrontEvent, createFront, frontCountryState, frontStageConfig, frontViewModel,
+  isCountryChainStage, sanitizeFront,
 } from './worldfront.js';
 import { encounterPlan, specialistEffects } from './worldevents.js';
 import { Globe } from './globe.js';
@@ -2922,7 +2923,7 @@ class Game {
       countryId: level.countryId, won, terminal, before, after,
     };
     const continueCountryOperation = won && !terminal
-      && /^(spain|pol|deu)-/.test(level.operation.missionPreset || '');
+      && isCountryChainStage(level.operation.missionPreset);
     const session = level.net && level.net.authority && this.coop && this.coop.session;
     if (session && session.syncFront) session.syncFront(this.save.front, effects, continueCountryOperation ? null : result);
     if (continueCountryOperation) {

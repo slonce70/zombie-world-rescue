@@ -116,7 +116,7 @@ try {
   await page.evaluate(({ operationId }) => window.__game.startFrontOperation(operationId, 'UKR'), { operationId: initial.id });
   for (let stage = 0; stage < 3; stage++) {
     await page.waitForFunction(() => window.__game.state === 'level' && window.__game.level && window.__game.level.operation, null, { timeout: 30_000 });
-    const stageState = await page.evaluate(() => {
+    const stageState = await page.evaluate(async () => {
       const game = window.__game;
       const level = game.level;
       game.renderer.render(level.scene, level.player.camera);
@@ -142,6 +142,7 @@ try {
         pressureBudget: level.frontDirector.plan.phases[1].spawnBudget,
         rewardDrop: level.frontRewardDrop,
         drawDelta: game.renderer.info.render.calls - callsBefore,
+        countryChain: (await import('/src/worldfront.js')).isCountryChainStage(level.operation.missionPreset),
       };
     });
     check(stageState.stage === stage, `stage ${stage + 1} restores canonical index`);
@@ -169,6 +170,13 @@ try {
         return !game.save.front.active && game.save.front.claims.some((id) => id.endsWith(':operation'));
       });
       check(commanderFinished, 'defeating the final commander completes and claims the operation reward once');
+    } else if (stageState.countryChain) {
+      // v606: сюжетний ланцюжок країни йде без проміжного екрана — перемога
+      // на етапі одразу веде в наступний.
+      await page.waitForFunction((nextStage) => window.__game.state === 'level'
+        && window.__game.level && window.__game.level.operation.stage === nextStage, stage + 1, { timeout: 30_000 });
+      check(await page.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
+        'country chain continues into the next stage without a checkpoint screen');
     } else {
       await page.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 5_000 });
       check(await page.evaluate(() => window.__game.victoryShown), 'Front result suspends the completed level');
