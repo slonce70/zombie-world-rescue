@@ -12,6 +12,11 @@ async function loadCountry(id) {
   await page.waitForTimeout(900);
 }
 
+// Вода в ріках — ПЛАСКА стрічка на rv.level (корабель у Туреччині тримається
+// ватерлінії, тому вода більше не драпірується по рельєфу, як до v520). Отже
+// перевіряємо новий інваріант: ватерлінія одна на всю ріку, а дно вирізане
+// пласко під УСІЄЮ стрічкою — рівно на rv.depth нижче. Інакше берег ріже воду
+// навскіс або стрічка висить над проседанням рельєфу.
 for (const country of ['UKR', 'DEU']) {
   await loadCountry(country);
   const river = await page.evaluate(() => {
@@ -24,30 +29,40 @@ for (const country of ['UKR', 'DEU']) {
         waterMeshes.push(obj);
       }
     });
-    let maxAboveGround = -Infinity;
-    let minAboveGround = Infinity;
+    let surfaceSpread = 0;   // наскільки ватерлінія не пласка
+    let depthError = 0;      // наскільки дно під стрічкою відхиляється від rv.depth
+    let minGap = Infinity;   // найменший просвіт «вода над дном»
+    let matched = true;
     for (const mesh of waterMeshes) {
       const pos = mesh.geometry.attributes.position;
+      const rv = w.rivers.find((r) => Math.abs(r.level - (pos.getY(0) + mesh.position.y)) < 0.01);
+      if (!rv) { matched = false; continue; }
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i) + mesh.position.x;
         const y = pos.getY(i) + mesh.position.y;
         const z = pos.getZ(i) + mesh.position.z;
-        const diff = y - w.groundH(x, z);
-        maxAboveGround = Math.max(maxAboveGround, diff);
-        minAboveGround = Math.min(minAboveGround, diff);
+        surfaceSpread = Math.max(surfaceSpread, Math.abs(y - rv.level));
+        const gap = y - w.groundH(x, z);
+        depthError = Math.max(depthError, Math.abs(gap - rv.depth));
+        minGap = Math.min(minGap, gap);
       }
     }
     return {
       meshCount: waterMeshes.length,
-      maxAboveGround: Math.round(maxAboveGround * 100) / 100,
-      minAboveGround: Math.round(minAboveGround * 100) / 100,
+      matched,
+      surfaceSpread: Math.round(surfaceSpread * 1000) / 1000,
+      depthError: Math.round(depthError * 100) / 100,
+      minGap: Math.round(minGap * 100) / 100,
     };
   });
   check(river.meshCount > 0, `${country}: river water mesh exists`);
-  check(river.maxAboveGround <= 0.35,
-    `${country}: river water follows terrain, max +${river.maxAboveGround}m`);
-  check(river.minAboveGround >= 0.15,
-    `${country}: river water stays visibly above terrain, min ${river.minAboveGround}m`);
+  check(river.matched, `${country}: every water ribbon sits on a declared river waterline`);
+  check(river.surfaceSpread <= 0.001,
+    `${country}: river surface is one flat waterline (spread ${river.surfaceSpread}m)`);
+  check(river.depthError <= 0.05,
+    `${country}: riverbed is carved flat under the whole ribbon, off by ${river.depthError}m`);
+  check(river.minGap >= 0.15,
+    `${country}: river water stays visibly above its bed, min ${river.minGap}m`);
 }
 
 await loadCountry('UKR');
