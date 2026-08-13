@@ -170,7 +170,7 @@ const rebuild = (field) => page.evaluate((f) => {
   return f === 'points'
     ? m.points.map((p, i) => ({ i, kind: p.kind, done: p.done }))
     : f === 'tools'
-    ? m.tools.map((t) => ({ x: t.x, z: t.z }))
+    ? m.tools.map((t) => ({ x: t.x, z: t.z, kind: t.kind }))
     : f === 'dest'
     ? { x: m.dest.x, z: m.dest.z }
     : m[f];
@@ -279,13 +279,28 @@ await page.waitForTimeout(400);
 // --- МІСІЯ 4: відбудова центру села ---
 // сюжетна ціль «ukr-rebuild»: сокира+кірка → 120 дерева і 50 каменю → будівництво
 log('Місія 4: відбудова центру');
+// ⏱️ Інструмент забирається в КАДРІ, у якому гра побачила натиск (`input.pressed`),
+// а `justPressed` живе рівно один кадр. Тест тиснув E раз на 250 реальних мілісекунд —
+// на повільному рендері між телепортами до двох інструментів могло не статись жодного
+// кадру, і єдиний натиск зараховувався вже біля ДРУГОГО (перший лишався лежати).
+// Тому тиснемо покадрово й чекаємо самої ознаки — `tool.taken`.
 for (const tool of await rebuild('tools')) {
-  await ev('teleport', tool.x, tool.z);
-  await page.waitForTimeout(250 * SLOW);
-  await page.evaluate(() => window.__game.test.key('KeyE', true));
-  await page.waitForTimeout(250 * SLOW);
-  await page.evaluate(() => window.__game.test.key('KeyE', false));
-  await page.waitForTimeout(200 * SLOW);
+  await page.evaluate(async ([x, z, kind]) => {
+    const g = window.__game;
+    const item = g.level.missions.delegate.get('rebuild').tools.find((t) => t.kind === kind);
+    const wall = performance.now();
+    let left = 300;
+    await new Promise((resolve) => {
+      const tick = () => {
+        g.test.teleport(x, z);
+        g.test.key('KeyE', true);
+        if (item.taken || left-- <= 0 || performance.now() - wall > 60000) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    g.test.key('KeyE', false);
+  }, [tool.x, tool.z, tool.kind]);
 }
 check(await waitFor(async () => (await rebuild('phase')) === 'resources', 15000, 'інструменти'),
   'сокира й кірка знайдені');
