@@ -1529,6 +1529,19 @@ class Game {
         text: t('{f} {n}: звільни країну', { f: c.flag, n: c.name }),
       };
     }
+    // 📖 Глави 2–3 — це ПРОДОВЖЕННЯ кампанії, а не «після» неї: коли всі країни
+    // звільнено, наступний крок історії — заражені країни, Острів, Лігво. Тому вони
+    // стоять вище цілі магазину й сезону: інакше ці три підказки не показуються
+    // ніколи (сходинка сезону майже завжди є) і фінал гри лишається схованим.
+    if (!(this.save.infected && this.save.infected.done)) {
+      return { icon: '🧟', title: t('Далі'), text: t('Глава 2: очисти заражені країни') };
+    }
+    if (!lib.LOST) {
+      return { icon: '🦖', title: t('Далі'), text: t('Острів Динозаврів чекає фінальний бій') };
+    }
+    if (!lib.LAB) {
+      return { icon: '🧪', title: t('Далі'), text: t('Глава 3: знайди Лігво Вірусу') };
+    }
     if (gi && !gi.done) return goalTip();
     // 🗓️ кампанію пройдено — веде сезон: він розганяє по режимах
     if (season.next) {
@@ -1539,15 +1552,6 @@ class Game {
           i: season.next.icon, t: season.next.title, a: season.next.progress, b: season.next.target,
         }),
       };
-    }
-    if (!(this.save.infected && this.save.infected.done)) {
-      return { icon: '🧟', title: t('Далі'), text: t('Глава 2: очисти заражені країни') };
-    }
-    if (!lib.LOST) {
-      return { icon: '🦖', title: t('Далі'), text: t('Острів Динозаврів чекає фінальний бій') };
-    }
-    if (!lib.LAB) {
-      return { icon: '🧪', title: t('Далі'), text: t('Глава 3: знайди Лігво Вірусу') };
     }
     // 🎯 кампанія пройдена, але лишились невиконані завдання дня — кличемо туди
     const qLeft = this.quests.list.filter((q) => !q.done).length;

@@ -19,9 +19,15 @@ async function speedrun() {
   await page.evaluate(() => {
     const g = window.__game;
     g.test.god();
-    g.test.completeMission('rescue');
-    g.test.completeMission('tower');
-    g.test.completeMission('warehouse');
+    // сюжетна кампанія: цілей у країни може бути більше за три легасі-слоти
+    // (Україна отримала 4-ту — «віднови центр міста»), і вони виконуються
+    // ПО ЧЕРЗІ. Беремо повний список цілей рівня, а не три зашитих id:
+    // інакше арена боса не відкриється, бо остання ціль лишиться активною.
+    const ms = g.level.missions;
+    const ids = ms.objectives && ms.objectives.length
+      ? ms.objectives.map((o) => o.id)
+      : ['rescue', 'tower', 'warehouse'];
+    for (const id of ids) g.test.completeMission(id);
   });
   await waitFor(async () => {
     await page.evaluate(() => window.__game.test.finishHorde());

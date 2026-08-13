@@ -22,24 +22,36 @@ const waitFor = (fn, timeoutMs, label) => waitForAsync(fn, timeoutMs * SLOW, lab
 console.log('▸ Глобус: реальний клік');
 await page.goto(BASE + '/?test&fresh');
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state === 'globe' && window.__game.globe.ready)), 20000, 'глобус готовий');
-// Україна відцентрована — шукаємо її на екрані через picking (з ретраями)
+// Україна відцентрована — шукаємо її на екрані через picking (з ретраями).
+// Камера глобуса повільно «дихає» по вертикалі, тож ПЕРШИЙ знайдений піксель —
+// це верхній край України, тобто кордон з Білоруссю: поки тест наведе мишу й
+// клікне, точка вже над сусідом і рівень не стартує. Беремо центр усіх
+// українських пікселів — від дихання камери він не з'їжджає.
 let clickPos = null;
 for (let attempt = 0; attempt < 5 && !clickPos; attempt++) {
   await page.waitForTimeout(800);
   clickPos = await page.evaluate(() => {
     const g = window.__game.globe;
-    for (let sy = 0.25; sy <= 0.7; sy += 0.025) {
-      for (let sx = 0.3; sx <= 0.7; sx += 0.02) {
-        const ndc = { x: sx * 2 - 1, y: -(sy * 2 - 1) };
-        g.raycaster.setFromCamera(ndc, g.camera);
-        const hits = g.raycaster.intersectObject(g.sphere);
-        if (hits.length) {
-          const c = g.pickCountry(hits[0].uv);
-          if (c && c.id === 'UKR') return { x: sx * innerWidth, y: sy * innerHeight };
-        }
+    const pickAt = (px, py) => {
+      g.raycaster.setFromCamera({ x: (px / innerWidth) * 2 - 1, y: -(py / innerHeight) * 2 + 1 }, g.camera);
+      const hits = g.raycaster.intersectObject(g.sphere);
+      return hits.length ? g.pickCountry(hits[0].uv) : null;
+    };
+    const pts = [];
+    for (let sy = 0.25; sy <= 0.7; sy += 0.005) {
+      for (let sx = 0.3; sx <= 0.7; sx += 0.005) {
+        const px = sx * innerWidth, py = sy * innerHeight;
+        const c = pickAt(px, py);
+        if (c && c.id === 'UKR') pts.push({ x: px, y: py });
       }
     }
-    return null;
+    if (!pts.length) return null;
+    const mid = {
+      x: pts.reduce((a, p) => a + p.x, 0) / pts.length,
+      y: pts.reduce((a, p) => a + p.y, 0) / pts.length,
+    };
+    const at = pickAt(mid.x, mid.y);
+    return at && at.id === 'UKR' ? mid : pts[Math.floor(pts.length / 2)];
   });
 }
 check(clickPos !== null, `знайшли Україну на екрані: ${JSON.stringify(clickPos)}`);
@@ -82,8 +94,14 @@ check(deathHidden, 'оверлей смерті зник');
 console.log('▸ Перезапуск бою з босом');
 await page.evaluate(() => {
   const g = window.__game;
-  g.test.completeMission('tower');
-  g.test.completeMission('warehouse');
+  // 'rescue' уже виконано вище; решту сюжетних цілей закриваємо ПО ЧЕРЗІ —
+  // в України їх чотири (додалась «віднови центр міста»), і поки остання
+  // активна, арена боса не відкриється
+  const ms = g.level.missions;
+  const ids = ms.objectives && ms.objectives.length
+    ? ms.objectives.map((o) => o.id)
+    : ['tower', 'warehouse'];
+  for (const id of ids) g.test.completeMission(id);
 });
 await waitFor(async () => {
   await page.evaluate(() => window.__game.test.finishHorde());

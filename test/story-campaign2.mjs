@@ -5,10 +5,14 @@ const sourcePath = new URL('../src/story/countryStories.js', import.meta.url);
 const tmpModulePath = new URL('./.tmp-countryStories.mjs', import.meta.url);
 
 const source = await readFile(sourcePath, 'utf8');
-const moduleSource = source.replace(
-  "import { t } from '../i18n.js';",
-  'const t = (key) => key;',
-);
+// стабимо ВЕСЬ імпорт з i18n.js: набір хелперів там росте (t, interactKey, …),
+// тож ловимо список імен регуляркою, а не одним фіксованим рядком
+const I18N_IMPORT = /import \{([^}]+)\} from '\.\.\/i18n\.js';/;
+assert.match(source, I18N_IMPORT, 'countryStories.js імпортує хелпери з i18n.js');
+const moduleSource = source.replace(I18N_IMPORT, (_m, names) => names
+  .split(',')
+  .map((name) => `const ${name.trim()} = (key) => key;`)
+  .join('\n'));
 
 let storyModule;
 try {
