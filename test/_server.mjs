@@ -2,7 +2,12 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { spawn } from 'child_process';
 
 
-export async function ensureWebServer({ port = 8741, quiet = true } = {}) {
+// 🔌 Порт можна перекрити змінною ZR_PORT. Навіщо: `ensureWebServer` перевикористовує
+// вже піднятий сервер, тож два прогони на одній машині мовчки їли б ОДНЕ дерево —
+// і тест бачив би чужі правки. Своя змінна = свій порт = свій репозиторій.
+const ENV_PORT = Number(process.env.ZR_PORT) || 0;
+
+export async function ensureWebServer({ port = ENV_PORT || 8741, quiet = true } = {}) {
   const base = `http://localhost:${port}`;
   const ready = async () => {
     try {
