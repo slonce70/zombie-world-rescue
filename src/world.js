@@ -2486,6 +2486,19 @@ export class World {
     for (const f of this.map.flats || []) {
       if (Math.hypot(x - f.x, z - f.z) < f.r + pad) return false;
     }
+    // 🌊 у воді декораціям не місце: кущ або дерево посеред ріки — найпомітніше
+    // «недороблено» (Німеччина, Туреччина, Україна). Єдина точка, через яку
+    // проходить УСЯ розсипка пропів, тому одна перевірка закриває всі виклики.
+    // Ріжемо лише там, де земля НИЖЧА за ватерлінію: сухий берег поруч із водою
+    // лишається зарослим, як і був.
+    for (const rv of this.rivers) {
+      let d = Infinity;
+      for (const s of rv.segs) {
+        const v = distToSeg(x, z, s[0], s[1], s[2], s[3]);
+        if (v < d) d = v;
+      }
+      if (d < rv.width * RIVER_BANK && this.groundH(x, z) < rv.level + 0.4) return false;
+    }
     return true;
   }
 
@@ -2772,6 +2785,25 @@ export class World {
     }
   }
 
+  // 🧱 Фундамент будинку: на схилі коробка ГЛИБШАЄ вниз, бо будинок ставиться на
+  // висоту свого ЦЕНТРУ — і нижній кут інакше висить у повітрі з щілиною під
+  // стіною (найпомітніше: Туреччина 48,6 і Іспанія -50,36). Верх лишається на
+  // 0.4, вниз плита сягає найнижчої землі під футпринтом.
+  _makeFoundation(x, z, ry, w, d, gy) {
+    const c = Math.cos(ry), s = Math.sin(ry);
+    let low = gy;
+    for (const lx of [-w / 2 - 0.2, 0, w / 2 + 0.2]) {
+      for (const lz of [-d / 2 - 0.2, 0, d / 2 + 0.2]) {
+        const h = this.groundH(x + lx * c + lz * s, z - lx * s + lz * c);
+        if (h < low) low = h;
+      }
+    }
+    const drop = gy - low;
+    const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.5 + drop, d + 0.4), toonMat(0x9aa3ad));
+    found.position.y = 0.15 - drop / 2;
+    return found;
+  }
+
   _makeEnterableHouse(x, z, ry, opts = {}) {
     if (this.map.moon) return this._makeMoonHabitat(x, z, ry, opts);
     const rng = this.rng;
@@ -2789,8 +2821,7 @@ export class World {
     const doorW = 1.35;
 
     // підлога і фундамент
-    const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.5, d + 0.4), toonMat(0x9aa3ad));
-    found.position.y = 0.15;
+    const found = this._makeFoundation(x, z, ry, w, d, gy);
     const floor = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.1, d - 0.1), toonMat(0xb08d57));
     floor.position.y = 0.45;
     g.add(found, floor);
@@ -3019,8 +3050,7 @@ export class World {
     const g = new THREE.Group();
     const gy = this.groundH(x, z);
 
-    const found = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.5, d + 0.4), toonMat(0x9aa3ad));
-    found.position.y = 0.15;
+    const found = this._makeFoundation(x, z, ry, w, d, gy);
     const walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toonMat(wallC));
     walls.position.y = 0.4 + h / 2;
     walls.castShadow = true;
