@@ -105,13 +105,31 @@ await waitFor(page, () => window.__game.state === 'level' && window.__game.level
 await page.evaluate(() => window.__game.test.god());
 await page.waitForTimeout(300);
 
-const espWin = await page.evaluate(() => {
-  const g = window.__game;
-  g.test.completeMission('rescue');
-  g.test.completeMission('tower');
-  g.test.completeMission('warehouse');
-  return g.save.coins;
+// Іспанія тепер сюжетна глава (StoryMissions). Арену боса відкривають СЮЖЕТНІ цілі
+// (`objectives`), а не три легасі-слоти `missions` — цілей у глави більше, і зайва
+// (esp-manor) у легасі-вигляд просто не влазить. Тому закриваємо їх по черзі, доки
+// лишаються активні, а не фіксовану трійку 'rescue/tower/warehouse'.
+const objectivesOf = () => page.evaluate(() => {
+  const M = window.__game.level.missions;
+  const list = M.objectives || M.missions;
+  return list.map((m) => ({ id: m.id || m.type, state: m.state }));
 });
+const closedObjectives = [];
+for (let pass = 0; pass < 12; pass++) {
+  const active = await page.evaluate(() => {
+    const M = window.__game.level.missions;
+    const list = M.objectives || M.missions;
+    const now = list.filter((m) => m.state === 'active').map((m) => m.id || m.type);
+    for (const id of now) M._complete(id);
+    return now;
+  });
+  if (!active.length) break;
+  closedObjectives.push(...active);
+  await page.waitForTimeout(250); // наступна ціль глави відмикається слідом за попередньою
+}
+const espLeft = (await objectivesOf()).filter((m) => m.state !== 'done');
+check(closedObjectives.length > 0 && espLeft.length === 0,
+  `усі сюжетні цілі ESP закриті (${closedObjectives.join(',')})`, JSON.stringify(espLeft));
 // відбиваємо орди → арена → бос → перемога
 let unlocked = false;
 const tH = Date.now();

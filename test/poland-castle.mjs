@@ -253,7 +253,11 @@ try {
     player.pos.set(dungeon.tunnelStartX + 3, dungeon.surfaceY - 2, dungeon.entranceZ);
     player.inCastleDungeon = true;
     player.health = 10000;
-    for (const wizard of castle.dungeonWizards) wizard.summonCd = 0;
+    // 🧙 AI чаклуна працює лише при z.aggroed, а підземелля розтягнуте на 50 м: дальні
+    // чаклуни гравця з входу не чують і не призивають нікого. Без цього кількість
+    // прислужників — лотерея (скільки чаклунів встигло аґритись), тож аґримо всіх:
+    // перевіряємо, що прислужники ПІДЗЕМНІ, а не скільки їх нападало випадково.
+    for (const wizard of castle.dungeonWizards) { wizard.summonCd = 0; wizard.aggroed = true; }
     for (let i = 0; i < 80; i++) g.level.zombies.update(0.05);
     const dungeonEnemies = g.level.zombies.list.filter((z) => z.zone === 'castle-dungeon' && z.state !== 'dead');
     const enemiesContained = dungeonEnemies.every((z) => (

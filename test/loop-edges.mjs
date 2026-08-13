@@ -110,8 +110,10 @@ check(afterRevenge.deathT === -1, 'реванш: deathT === -1', JSON.stringify(
 check(afterRevenge.deathOverlayShown === false, 'реванш: overlay-death схований', JSON.stringify(afterRevenge));
 check(afterRevenge.dCoins === 0 && afterRevenge.dXp === 0, 'реванш: без подвійної нагороди (дельта 0)', JSON.stringify(afterRevenge));
 
-console.log('▸ _nextActionInfo: завдання дня / weekly / fallback');
-const infoA = await page.evaluate(() => {
+console.log('▸ _nextActionInfo: сезон / завдання дня / weekly / fallback');
+// Компас веде до найдешевшої наступної дії. Пройдена кампанія відкриває сезон, і поки
+// в сезоні лишилась незакрита сходинка — саме він, а НЕ завдання дня, головна ціль.
+const infoSeason = await page.evaluate(() => {
   const g = window.__game;
   if (g.level) g.endLevel();
   const ids = ['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN', 'LOST', 'LAB'];
@@ -122,14 +124,34 @@ const infoA = await page.evaluate(() => {
   for (const q of g.quests.list) q.done = false;
   return g._nextActionInfo();
 });
-check(infoA.icon === '🎯', '_nextActionInfo: невиконані завдання дня → 🎯', JSON.stringify(infoA));
+check(infoSeason.icon === '🗓️' && /Сезон/.test(infoSeason.title),
+  '_nextActionInfo: незакритий сезон веде поперед завдань дня → 🗓️ Сезон', JSON.stringify(infoSeason));
+
+// Закриваємо сезон повністю (усі сходинки виконані І забрані) — далі компас має
+// падати у хвіст ланцюжка: завдання дня → випробування тижня → випробування дня.
+const infoA = await page.evaluate(async () => {
+  const { ensureSeason, seasonSteps } = await import('/src/season.js');
+  const g = window.__game;
+  const season = ensureSeason(g.save, g._weekIndex());
+  season.base = {};                       // рахуємо від нуля
+  season.carry = [];
+  g.save.stats = { ...(g.save.stats || {}), killed: 99999 };
+  g.save.friends = { a: true, b: true, c: true };
+  g.save.modeWins = { ...(g.save.modeWins || {}) };
+  for (const step of seasonSteps(season.i)) if (step.mode) g.save.modeWins[step.mode] = 99;
+  season.claimed = seasonSteps(season.i).map((step) => step.id);
+  return g._nextActionInfo();
+});
+check(infoA.icon === '🎯' && /Завдання дня/.test(infoA.title),
+  '_nextActionInfo: сезон закрито, невиконані завдання дня → 🎯', JSON.stringify(infoA));
 
 const infoB = await page.evaluate(() => {
   const g = window.__game;
   for (const q of g.quests.list) q.done = true;
   return g._nextActionInfo();
 });
-check(infoB.icon === '🗓️', '_nextActionInfo: всі завдання done → weekly-гілка 🗓️', JSON.stringify(infoB));
+check(infoB.icon === '🗓️' && /Випробування тижня/.test(infoB.title),
+  '_nextActionInfo: всі завдання done → weekly-гілка 🗓️', JSON.stringify(infoB));
 
 const infoC = await page.evaluate(() => {
   const g = window.__game;

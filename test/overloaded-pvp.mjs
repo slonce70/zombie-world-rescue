@@ -179,6 +179,9 @@ const mechanics = await page.evaluate(() => {
   p.shootCd = 0;
   p.reloading = 0;
   p._shoot();
+  // 🗡️ «Бій відроджений» (v549): меч б'є не миттєво, а замахом на 0.14с — шкода лягає
+  // в _updateMeleeSwing. Без прокрутки цього часу удару просто ще не сталося.
+  p._updateMeleeSwing(0.2);
   const sword = { damage: 3000 - z.hp, mag: String(p.ammo.sword.mag) };
 
   let flash = 0, shell = 0, shot = 0;
@@ -195,6 +198,7 @@ const mechanics = await page.evaluate(() => {
   p.shootCd = 0;
   p.reloading = 0;
   p._shoot();
+  p._updateMeleeSwing(0.2); // і сам замах теж не має ні спалаху, ні гільзи, ні звуку пострілу
   g.level.effects.muzzleFlash = oldFlash;
   g.level.effects.ejectShell = oldShell;
   g.level.audio.shot = oldShot;

@@ -25,8 +25,13 @@ check(cfg.type === 'boxer' && cfg.ztype === 'boxer', 'spawn(boxer) будує з
 check(cfg.hp === 125 && cfg.maxHp === 125, 'має 125 HP', JSON.stringify(cfg));
 check(cfg.dmg === 7 && cfg.punchEvery === 3 && cfg.punchPush === 5, '7 шкоди, кожна 3 атака відштовхує на 5м', JSON.stringify(cfg));
 
+// 🧭 «Бій відроджений» (v549): мелі влучає лише в конус ПЕРЕД зомбі, а спавн ставить
+// випадковий кут. У грі зомбі доганяє ціль і повертається сам; тест же вмикає атаку
+// синтетично з першого кадру, тож розвертаємо зомбі на ціль руками — інакше перший
+// удар «мимо» не через баланс, а через випадковий кут спавну.
 console.log('▸ Третя атака відштовхує гравця');
 const playerHit = await page.evaluate(() => {
+  const face = (z, tx, tz) => { z.rig.group.rotation.y = Math.atan2(-(tx - z.x), -(tz - z.z)); };
   const g = window.__game;
   const Z = g.level.zombies;
   const p = g.level.player;
@@ -34,6 +39,7 @@ const playerHit = await page.evaluate(() => {
   g.test.teleport(0, 0);
   p.maxHealth = 300; p.health = 300; p.armor = 0; p.gadgetShield = 0; p.respawnProtect = 0; p.vel.set(0, 0, 0);
   const z = g.test.spawnZombie('boxer', 0, -1.4);
+  face(z, p.pos.x, p.pos.z);
   const hit = () => { z.state = 'attack'; z.attackT = 0; z.didHit = false; Z.update(0.3); };
   const z0 = p.pos.z;
   hit(); hit();
@@ -48,6 +54,7 @@ check(playerHit.hp === 279 && playerHit.after3 - playerHit.after2.z >= 4.8 && pl
 
 console.log('▸ Третя атака відштовхує клона');
 const cloneHit = await page.evaluate(() => {
+  const face = (z, tx, tz) => { z.rig.group.rotation.y = Math.atan2(-(tx - z.x), -(tz - z.z)); };
   const g = window.__game;
   const Z = g.level.zombies;
   for (const z of Z.list) z.state = 'dead';
@@ -55,6 +62,7 @@ const cloneHit = await page.evaluate(() => {
   const clone = { x: 0, y: g.level.world.groundH(0, 0), z: 0, hp: 100, takeDamage(d) { this.hp -= d; } };
   g.level.gadgets.clones = [clone];
   const z = g.test.spawnZombie('boxer', 0, -1.4);
+  face(z, clone.x, clone.z);
   const hit = () => { z.state = 'attack'; z.attackT = 0; z.didHit = false; Z.update(0.3); };
   hit(); hit();
   const after2 = { hp: clone.hp, z: clone.z };
