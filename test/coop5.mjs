@@ -44,8 +44,10 @@ try {
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
   // ⏱️ Вхід у кімнату — мережа, а не 400 фіксованих мілісекунд: якщо ростер ще не
   // зійшовся, хост міняє режим у порожню кімнату, і оновлення гостю нема кому везти.
-  await A.waitForFunction(() => window.__game.coop.session.roster.size === 2);
-  await B.waitForFunction(() => window.__game.coop.session.roster.size === 2);
+  // (опитуємо таймером, а не по кадрах: на CI сторінка малює кадр секундами)
+  const poll = { polling: 200 };
+  await A.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, poll);
+  await B.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, poll);
 
   // 1. режим «Шторм» у лобі
   await A.evaluate(() => {
@@ -55,7 +57,7 @@ try {
   // ⏱️ І тут чекаємо саму подію, а не 500 мс: на завантаженому CI пачка з режимом
   // долітала пізніше, і перевірка читала ще старий режим (наступна за нею «обидва у
   // Штормі» при цьому зеленіла — старт везе режим у своєму спеці).
-  const modeB = await B.waitForFunction(() => window.__game.coop.session.mode === 'storm')
+  const modeB = await B.waitForFunction(() => window.__game.coop.session.mode === 'storm', null, poll)
     .then(() => 'storm')
     .catch(async () => B.evaluate(() => window.__game.coop.session.mode));
   check('гість бачить режим «Шторм»', modeB === 'storm', modeB);

@@ -381,8 +381,14 @@ try {
     && campaignDowned.active === 'active' && !campaignDowned.defense && !campaignDowned.portal,
   'guest death in a campaign Front stage stays downed without a terminal result', JSON.stringify(campaignDowned));
   await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
+  // ⏱️ Єдині два очікування у файлі без власного бюджету — на одному з них CI і
+  // падав (`Timeout 30000ms exceeded`). Підняття прилітає повідомленням (миттєво),
+  // але побачити його можна лише в опитуванні, а waitForFunction за замовчуванням
+  // опитує по requestAnimationFrame: на runner з двома браузерами і софтверним
+  // рендером кадр іде секундами, тож 30 с — це одиниці спроб. Опитуємо таймером
+  // (як `waitForPage` у `_browser.mjs`) і даємо бюджет, як у сусідів файлу.
   await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
-    && !document.getElementById('overlay-death').classList.contains('show'));
+    && !document.getElementById('overlay-death').classList.contains('show'), null, { polling: 200, timeout: 60000 * SLOW });
   check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
     'campaign Front guest revive returns to the same active stage');
   await guestPage.evaluate(() => {
@@ -450,8 +456,14 @@ try {
     && defenseDowned.active === 'active' && (defenseDowned.defense || defenseDowned.portal),
   'guest death in a defense/portal Front stage stays downed without a terminal result', JSON.stringify(defenseDowned));
   await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
+  // ⏱️ Єдині два очікування у файлі без власного бюджету — на одному з них CI і
+  // падав (`Timeout 30000ms exceeded`). Підняття прилітає повідомленням (миттєво),
+  // але побачити його можна лише в опитуванні, а waitForFunction за замовчуванням
+  // опитує по requestAnimationFrame: на runner з двома браузерами і софтверним
+  // рендером кадр іде секундами, тож 30 с — це одиниці спроб. Опитуємо таймером
+  // (як `waitForPage` у `_browser.mjs`) і даємо бюджет, як у сусідів файлу.
   await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
-    && !document.getElementById('overlay-death').classList.contains('show'));
+    && !document.getElementById('overlay-death').classList.contains('show'), null, { polling: 200, timeout: 60000 * SLOW });
   check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
     'defense/portal Front guest revive returns to the same active stage');
 

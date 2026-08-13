@@ -163,14 +163,17 @@ try {
   check('гість справді кинув гранату', thrown === true);
   // Намір гранати їде з кадром гостя, а хост його теж обробляє в кадрі — на CI це
   // десятки секунд. Тому тут не свій куций таймаут, а спільний для файлу (T(60000)).
-  const gidA = await A.waitForFunction(() => window.__guestNadeGid)
+  // І опитуємо таймером: за замовчуванням waitForFunction дивиться на сторінку по
+  // requestAnimationFrame, а на runner з двома браузерами кадр іде секундами.
+  const poll = { polling: 200 };
+  const gidA = await A.waitForFunction(() => window.__guestNadeGid, null, poll)
     .then((h) => h.jsonValue()).catch(() => null);
-  const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA)
+  const gidB = await B.waitForFunction((gid) => window.__guestNadeGid === gid, gidA, poll)
     .then(() => gidA).catch(() => null);
   check('конкретна граната гостя зʼявилась на обох екранах', !!gidA && gidB === gidA, `A:${gidA} B:${gidB}`);
-  const explodedA = await A.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA)
+  const explodedA = await A.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA, poll)
     .then(() => true).catch(() => false);
-  const explodedB = await B.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA)
+  const explodedB = await B.waitForFunction((gid) => window.__explodedGids.includes(gid), gidA, poll)
     .then(() => true).catch(() => false);
   check('вибух конкретного gid дійшов на обидві сторони', explodedA && explodedB, `A:${explodedA} B:${explodedB}`);
 
