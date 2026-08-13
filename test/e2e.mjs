@@ -99,6 +99,58 @@ async function fightUntil(condFn, timeoutMs, label) {
   return false;
 }
 
+// оборона зони: стріляємо, НЕ сходячи з місця — таймер місії йде лише поки
+// гравець у колі, тож звичайний fightUntil (він телепортується до зомбі) не годиться
+async function holdZone(zone, condFn, timeoutMs, label) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs * SLOW) {
+    if (await condFn()) return true;
+    await page.evaluate(([zx, zz]) => {
+      const g = window.__game;
+      const p = g.level.player;
+      g.test.teleport(zx, zz); // відкидання від ударів не має виштовхнути із зони
+      g.test.aimAtNearestZombie();
+      if (p.curAmmo.mag === 0 && p.reloading <= 0) p.startReload();
+      if (p.reloading <= 0) g.test.mouse(true);
+    }, [zone.x, zone.z]);
+    await page.waitForTimeout(100);
+    await page.evaluate(() => window.__game.test.mouse(false));
+    await page.waitForTimeout(60);
+  }
+  log(`⚠️ Таймаут: ${label}`);
+  return false;
+}
+
+// один удар інструментом по ресурсній точці: стаємо за 2.2 м, дивимось у неї
+// (промінь удару горизонтальний — цілимось у стовбур/брилу) і клікаємо
+async function chopNode(index, tool) {
+  await page.evaluate(([i, toolId]) => {
+    const g = window.__game;
+    const p = g.level.player;
+    const node = g.level.missions.delegate.get('rebuild').points[i];
+    p.switchWeapon(toolId);
+    g.test.teleport(node.x + 2.2, node.z);
+    const dx = node.x - p.pos.x, dz = node.z - p.pos.z;
+    p.yaw = Math.atan2(-dx, -dz);
+    p.pitch = 0;
+    g.test.mouse(true);
+  }, [index, tool]);
+  await page.waitForTimeout(320);
+  await page.evaluate(() => window.__game.test.mouse(false));
+  await page.waitForTimeout(140);
+}
+
+const rebuild = (field) => page.evaluate((f) => {
+  const m = window.__game.level.missions.delegate.get('rebuild');
+  return f === 'points'
+    ? m.points.map((p, i) => ({ i, kind: p.kind, done: p.done }))
+    : f === 'tools'
+    ? m.tools.map((t) => ({ x: t.x, z: t.z }))
+    : f === 'dest'
+    ? { x: m.dest.x, z: m.dest.z }
+    : m[f];
+}, field);
+
 log('=== ПОВНЕ ПРОХОДЖЕННЯ ===');
 await page.goto(BASE + '/?test&fresh');
 await waitFor(async () => (await page.evaluate(() => window.__game && window.__game.state)) === 'globe', 20000, 'глобус');
@@ -161,24 +213,21 @@ check(await waitFor(async () => (await state()).hordeActive, 30000, 'почат�
 await ev('finishHorde');
 await waitFor(async () => !(await state()).hordeActive, 15000, 'кінець орди 2');
 
-// --- МІСІЯ 3: склад ---
-log('Місія 3: склад зброї');
-await ev('teleport', 128, 38);
-const warehouseCleared = await fightUntil(async () => (await page.evaluate(() =>
-  window.__game.level.zombies.countAliveInZone('warehouse'))) === 0, 240000, 'склад');
-check(warehouseCleared, 'склад зачищено в реальному бою');
-await shot('e2e-30-warehouse-cleared');
-await ev('teleport', 126, 49.5);
-await page.waitForTimeout(400);
-await page.evaluate(() => window.__game.test.key('KeyE', true));
-await page.waitForTimeout(250);
-await page.evaluate(() => window.__game.test.key('KeyE', false));
-await waitFor(async () => (await state()).missions.find((m) => m.id === 'warehouse').state === 'done', 15000, 'місія 3');
+// --- МІСІЯ 3: оборона сільської площі ---
+// (до v750 тут був склад зі зброєю; сюжетна ціль «ukr-defense» тепер грає
+//  оборону зони на тому ж місці карти — див. STORY_DELEGATE_MATCHES)
+log('Місія 3: оборона площі');
+const zone = await page.evaluate(() => {
+  const m = window.__game.level.missions.delegate.get('defense');
+  return { x: m.zone.x, z: m.zone.z, r: m.zone.r };
+});
+await ev('teleport', zone.x, zone.z);
+const defenseHeld = await holdZone(zone, async () => (await page.evaluate(() =>
+  window.__game.level.missions.delegate.get('defense').state)) === 'done', 180000, 'оборона зони');
+check(defenseHeld, 'зону втримано в реальному бою');
+await shot('e2e-30-zone-held');
 s = await state();
 check(s.missions.find((m) => m.id === 'warehouse').state === 'done', 'місія 3 виконана');
-check(s.player.weapons.includes('rifle'), 'автомат отримано');
-check(s.player.cur === 'rifle', 'автомат у руках');
-await shot('e2e-31-rifle');
 check(await waitFor(async () => (await state()).hordeActive, 30000, 'початок орди 3'), 'орда №3 почалась');
 await ev('finishHorde');
 await waitFor(async () => !(await state()).hordeActive, 15000, 'кінець орди 3');
@@ -202,12 +251,52 @@ check(hpAfter === 125, `макс. здоров'я тепер ${hpAfter}`);
 await page.keyboard.press('KeyB');
 await page.waitForTimeout(400);
 
+// --- МІСІЯ 4: відбудова центру села ---
+// сюжетна ціль «ukr-rebuild»: сокира+кірка → 120 дерева і 50 каменю → будівництво
+log('Місія 4: відбудова центру');
+for (const tool of await rebuild('tools')) {
+  await ev('teleport', tool.x, tool.z);
+  await page.waitForTimeout(250);
+  await page.evaluate(() => window.__game.test.key('KeyE', true));
+  await page.waitForTimeout(250);
+  await page.evaluate(() => window.__game.test.key('KeyE', false));
+  await page.waitForTimeout(200);
+}
+check(await waitFor(async () => (await rebuild('phase')) === 'resources', 15000, 'інструменти'),
+  'сокира й кірка знайдені');
+for (const node of await rebuild('points')) {
+  for (let swing = 0; swing < 10; swing++) {
+    if ((await rebuild('points'))[node.i].done) break;
+    await chopNode(node.i, node.kind === 'wood' ? 'axe' : 'pickaxe');
+  }
+}
+const res = await page.evaluate(() => {
+  const m = window.__game.level.missions.delegate.get('rebuild');
+  return { wood: m.wood, stone: m.stone, need: m.required, phase: m.phase };
+});
+check(res.wood >= res.need.wood && res.stone >= res.need.stone,
+  `ресурси здобуто інструментами: дерево ${res.wood}/${res.need.wood}, камінь ${res.stone}/${res.need.stone}`);
+await shot('e2e-32-resources');
+const dest = await rebuild('dest');
+await ev('teleport', dest.x, dest.z);
+await page.waitForTimeout(300);
+await page.evaluate(() => window.__game.test.key('KeyE', true));
+const rebuilt = await waitFor(async () => {
+  await ev('teleport', dest.x, dest.z); // хвилі під час будівництва не мають виштовхнути з кола
+  return (await rebuild('state')) === 'done';
+}, 120000, 'відбудова центру');
+await page.evaluate(() => window.__game.test.key('KeyE', false));
+check(rebuilt, 'місія 4 виконана (центр відбудовано)');
+await shot('e2e-33-rebuilt');
+// після відбудови в руках лишається кірка — перед ареною беремо зброю назад
+// (дитина зробила б це колесом зброї), інакше бос «розстрілювався» б киркою
+await page.evaluate(() => window.__game.level.player.switchWeapon('pistol'));
+
 // --- БОС ---
 log('Бос');
-check(await waitFor(async () => {
-  const st = await state();
-  return st.missions.every((m) => m.state === 'done');
-}, 10000, 'всі місії'), 'усі 3 місії виконані');
+check(await waitFor(async () => (await page.evaluate(() =>
+  window.__game.level.missions.objectives.every((o) => o.state === 'done'))), 10000, 'всі цілі'),
+  'усі сюжетні цілі виконані');
 await waitFor(async () => (await page.evaluate(() => window.__game.level.missions.bossUnlocked)), 20000, 'арена відкрита');
 await ev('teleport', -10, -150);
 await page.waitForTimeout(600);
@@ -223,6 +312,16 @@ check(await fightUntil(async () => {
 }, 240000, 'бос'), 'боса переможено');
 check(await waitFor(async () => (await state()).victoryShown, 20000, 'екран перемоги'), 'екран перемоги показано');
 await shot('e2e-60-victory');
+// 🔫 нагорода країни: раніше автомат видавав ящик місії «склад» і одразу вкладав
+// у руки, але сюжетна Україна цієї місії більше не має — зброю дає саме звільнення
+// країни (showVictory), назавжди у сейв і в набір, БЕЗ перемикання посеред перемоги
+const rifle = await page.evaluate(() => ({
+  saved: (window.__game.save.weapons || []).includes('rifle'),
+  loadout: window.__game._weaponLoadout().includes('rifle'),
+  inHands: window.__game.level.player.weapons.includes('rifle'),
+}));
+check(rifle.saved, 'автомат отримано назавжди');
+check(rifle.loadout && rifle.inHands, 'автомат у наборі зброї', JSON.stringify(rifle));
 
 // --- Повернення на глобус ---
 await page.click('#btn-victory-globe');
