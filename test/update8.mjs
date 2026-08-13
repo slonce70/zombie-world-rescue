@@ -164,18 +164,39 @@ check(dawn === 0, `світанок повертає день (nightK ${dawn})`)
 
 // ===== кампанія тягнеться до Туреччини і Єгипту =====
 console.log('▸ Порядок кампанії');
-const order = await page.evaluate(() => {
+await page.evaluate(() => {
   const g = window.__game;
   g.save.liberated = { UKR: true, POL: true, DEU: true, FRA: true };
   g.saveGame();
-  return null;
 });
-void order;
 await page.goto(`${BASE}/?test`);
 await page.waitForFunction(() => window.__game && window.__game.state === 'globe', null, { timeout: 30000 * SLOW });
-const target = await page.evaluate(() => window.__game.globe.targetId);
-// після UKR→POL→DEU→FRA наступна незвільнена в CAMPAIGN_ORDER — Іспанія (далі PRT→ITA→TUR→SWE→EGY)
-check(target === 'ESP', `після Франції ціль — Іспанія (${target})`);
+// 🧭 Порядок кампанії дитина читає з КОМПАСА. Маяк глобуса (`globe.targetId`) для цього
+// більше не годиться: щойно звільнено першу країну, вмикається Живий фронт і промінь
+// свідомо веде в рекомендовану операцію порятунку (`src/globe.js:110`, це закріплено в
+// `test/globe-front.mjs`), а не в наступну країну CAMPAIGN_ORDER. Раніше перевірка ловила
+// маяк у вузьке вікно до першого `globe.update()` і зеленіла випадково.
+const order = await page.evaluate(() => {
+  const g = window.__game;
+  const saved = g.save.liberated;
+  const tip = (ids) => {
+    g.save.liberated = Object.fromEntries(ids.map((id) => [id, true]));
+    return g._nextActionInfo().text;
+  };
+  const out = {
+    reloaded: { ...saved },
+    afterFRA: tip(['UKR', 'POL', 'DEU', 'FRA']),
+    afterITA: tip(['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA']),
+    afterSWE: tip(['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE']),
+  };
+  g.save.liberated = saved;
+  return out;
+});
+check(order.reloaded.FRA && !order.reloaded.ESP, 'звільнені країни пережили перезавантаження');
+// CAMPAIGN_ORDER: UKR→POL→DEU→FRA→ESP→PRT→ITA→TUR→SWE→EGY→JPN→CHN
+check(order.afterFRA.includes('Іспанія'), `після Франції компас кличе в Іспанію (${order.afterFRA})`);
+check(order.afterITA.includes('Туреччина'), `після Італії — у Туреччину (${order.afterITA})`);
+check(order.afterSWE.includes('Єгипет'), `після Швеції — у Єгипет (${order.afterSWE})`);
 
 console.log('');
 const realErrors = errors.filter((e) => !e.includes('favicon'));

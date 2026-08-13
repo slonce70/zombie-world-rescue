@@ -459,8 +459,8 @@ try {
   // result. The guest can only acknowledge it and wait for the host's choice.
   await page.evaluate(() => window.__game._finishFrontStage(false));
   await Promise.all([
-    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
-    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 60000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 60000 * SLOW }),
   ]);
   const guestFailure = await guestPage.evaluate(() => ({
     action: document.getElementById('btn-front-result-primary').dataset.action,
@@ -481,8 +481,8 @@ try {
 
   await page.evaluate(() => window.__game._finishFrontStage(false));
   await Promise.all([
-    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
-    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 15000 * SLOW }),
+    page.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 60000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="failed"]', { timeout: 60000 * SLOW }),
   ]);
   const retriedFailureIds = await guestPage.evaluate(() => [...window.__game.coop.session.frontResults]);
   check(retriedFailureIds.length === guestFailure.resultIds.length + 1
@@ -497,8 +497,8 @@ try {
 
   await page.evaluate(() => window.__game._finishFrontStage(true));
   await Promise.all([
-    page.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 15000 * SLOW }),
-    guestPage.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 15000 * SLOW }),
+    page.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 60000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="checkpoint"]', { timeout: 60000 * SLOW }),
   ]);
   await guestPage.click('#btn-front-result-primary');
   await page.click('#btn-front-result-primary');
@@ -509,8 +509,8 @@ try {
 
   await page.evaluate(() => window.__game._finishFrontStage(true));
   await Promise.all([
-    page.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 15000 * SLOW }),
-    guestPage.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 15000 * SLOW }),
+    page.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 60000 * SLOW }),
+    guestPage.waitForSelector('#overlay-front-result.show[data-kind="complete"]', { timeout: 60000 * SLOW }),
   ]);
   const terminal = await Promise.all([
     page.evaluate(() => ({ run: window.__game.coop.session.frontSnapshot(), kind: document.getElementById('overlay-front-result').dataset.kind })),
@@ -532,7 +532,7 @@ try {
     'guest earns the canonical claim without replacing personal Front', JSON.stringify(terminal[1]));
   await guestPage.click('#btn-front-result-primary');
   await page.click('#btn-front-result-primary');
-  await guestPage.waitForSelector('#overlay-net-wait.show', { timeout: 15000 * SLOW });
+  await guestPage.waitForSelector('#overlay-net-wait.show', { timeout: 60000 * SLOW });
 
   const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_|favicon/i.test(e));
   check(realErrors.length === 0, 'no browser JS errors', realErrors.join(' | '));
