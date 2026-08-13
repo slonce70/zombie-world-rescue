@@ -106,16 +106,30 @@ try {
   }, null, { timeout: T(15000) });
 
   // 6. хост піднімає — гра триває
-  await A.evaluate(() => window.__game.test.key('KeyE', true));
-  const t0 = Date.now();
-  let revived = false;
-  while (Date.now() - t0 < T(15000)) {
-    await sleep(300);
-    const hp = await B.evaluate(() => window.__game.level.player.health);
-    if (hp > 0) { revived = true; break; }
-  }
-  await A.evaluate(() => window.__game.test.key('KeyE', false));
-  check('хост підняв гостя у штормі', revived);
+  // ⏱️ Підняття коштує 3 ІГРОВІ секунди утримання E (`_revProg += dt * 1/3`), тобто
+  // 60 кадрів хоста при клампі dt=0.05. Тест міряв це 15 РЕАЛЬНИМИ секундами — на
+  // завантаженій машині (і на runner з двома браузерами) стільки кадрів туди не влазить.
+  // Тримаємо E і рахуємо КАДРИ хоста (запас ×5), настінний час — лише від мертвої сторінки.
+  const hostSawRevive = await A.evaluate(async () => {
+    const g = window.__game;
+    g.test.key('KeyE', true);
+    const wall = performance.now();
+    let left = 300;
+    await new Promise((resolve) => {
+      const tick = () => {
+        const guest = g.level.net.remotes.get(2);
+        if ((guest && guest.health > 0) || left-- <= 0 || performance.now() - wall > 180000) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    g.test.key('KeyE', false);
+    const guest = g.level.net.remotes.get(2);
+    return !!(guest && guest.health > 0);
+  });
+  const revived = await B.waitForFunction(() => window.__game.level.player.health > 0, null, { ...poll, timeout: T(20000) })
+    .then(() => true).catch(() => false);
+  check('хост підняв гостя у штормі', revived, `хост бачить гостя живим: ${hostSawRevive}`);
 
   // 7. всі впали → фінал у ОБОХ
   await B.evaluate(() => {
