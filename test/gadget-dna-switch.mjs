@@ -75,20 +75,34 @@ const effect = await page.evaluate(() => {
   const ally = g.test.spawnZombie('walker', 0, -3);
   const target = g.test.spawnZombie('walker', 0, -4.1);
   ally.aggroed = true;
-  target.aggroed = true;
   ally.stats.dmg = 10;
   ally.confusedT = 0;
+  // 🎯 ціль знешкоджуємо так само, як у гіпер-блоці нижче: сама вона не агриться і бʼє
+  // на нуль. Інакше «гравець не втратив HP» вимірювало б НЕ плутаного зомбі — раніше
+  // ціль сама гамселила гравця (100 → 50 за вікно контролю), і перевірка лише
+  // випадково не встигала це побачити за 1.2с.
+  target.aggroed = false;
+  target.stats.dmg = 0;
   target.hp = target.maxHp = 100;
   const used = g.test.useGadget();
   const afterUse = { used, cd: g.level.gadgets.cd, confusedT: ally.confusedT, playerHp: p.health, targetHp: target.hp };
-  for (let i = 0; i < 6; i++) Z.update(0.2);
-  const afterFight = { playerHp: p.health, allyConfusedT: ally.confusedT, targetHp: target.hp, targetState: target.state };
+  // ⏱️ Combat Reborn (7804cfe) додав до мелі перевірку напрямку і лінії вогню, тож
+  // перший замах може піти в молоко — фіксовані 1.2с більше не гарантія влучання.
+  // Крутимо РІВНО вікно контролю (6с = 30 кроків по 0.2) і зупиняємось на першому
+  // влучанні. Мінімум HP гравця стежимо покроково, а не лише наприкінці.
+  let minPlayerHp = p.health;
+  let steps = 0;
+  for (; steps < 30 && target.hp === 100; steps++) {
+    Z.update(0.2);
+    minPlayerHp = Math.min(minPlayerHp, p.health);
+  }
+  const afterFight = { minPlayerHp, steps, allyConfusedT: ally.confusedT, targetHp: target.hp, targetState: target.state };
   Z.update(6.2);
   return { afterUse, afterFight, afterExpire: { allyConfusedT: ally.confusedT } };
 });
 check(effect.afterUse.used && effect.afterUse.cd === 50 && effect.afterUse.confusedT > 5.8,
   'гаджет спрацьовує, дає 6с контролю і ставить 50с cooldown', JSON.stringify(effect.afterUse));
-check(effect.afterFight.playerHp === 100 && effect.afterFight.targetHp < 100,
+check(effect.afterFight.minPlayerHp === 100 && effect.afterFight.targetHp < 100,
   'контрольований зомбі не бʼє гравця і шкодить іншому зомбі', JSON.stringify(effect.afterFight));
 check(effect.afterExpire.allyConfusedT === 0, 'контроль минає після 6 секунд', JSON.stringify(effect.afterExpire));
 
@@ -134,15 +148,23 @@ const hyperEffect = await page.evaluate(() => {
     target.stats.dmg = 0;
     target.aggroed = false;
   }
-  for (let i = 0; i < 6; i++) Z.update(0.2);
+  // ⏱️ те саме, що й у базовому блоці: крутимо вікно контролю (9с = 45 кроків),
+  // доки КОЖЕН із трьох не дістав по зубах, замість фіксованих 1.2с.
+  let minPlayerHp = p.health;
+  let steps = 0;
+  for (; steps < 45 && targets.some((z) => z.hp === 100); steps++) {
+    Z.update(0.2);
+    minPlayerHp = Math.min(minPlayerHp, p.health);
+  }
   const targetHp = targets.map((z) => z.hp);
-  return { afterUse, afterFight: { playerHp: p.health, targetHp, minTargetHp: Math.min(...targetHp), allyTimers: allies.map((z) => z.confusedT) } };
+  return { afterUse, afterFight: { minPlayerHp, steps, targetHp, allyTimers: allies.map((z) => z.confusedT) } };
 });
 check(hyperEffect.afterUse.used && hyperEffect.afterUse.cd === 50 && hyperEffect.afterUse.confused === 3,
   'гіпер-ДНК перемикає 3 зомбі і ставить 50с cooldown', JSON.stringify(hyperEffect.afterUse));
 check(hyperEffect.afterUse.bonuses.every((n) => n === 5),
   'усі 3 плутані зомбі отримують +5 шкоди', JSON.stringify(hyperEffect.afterUse));
-check(hyperEffect.afterFight.playerHp === 100 && hyperEffect.afterFight.minTargetHp <= 85,
+check(hyperEffect.afterFight.minPlayerHp === 100
+  && hyperEffect.afterFight.targetHp.every((hp) => hp < 100 && (100 - hp) % 15 === 0),
   'гіпер-плутані зомбі бʼють інших зомбі на 15 HP, не гравця', JSON.stringify(hyperEffect.afterFight));
 
 console.log('▸ Боси не стають ціллю контролю');

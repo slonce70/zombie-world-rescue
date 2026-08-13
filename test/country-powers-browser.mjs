@@ -72,11 +72,15 @@ check(withShop.damageMult === 1.523 && withShop.helmetMult === 0.808,
   'шкода 1.45×1.05 і шолом 0.85×0.95 — одні поля, а не другий комплект', JSON.stringify(withShop));
 
 console.log('▸ Покупка в магазині посеред забігу пасивку не стирає');
+// 🧾 Забіг починаємо ЧЕСНО: шість країн, нуль апгрейдів — гравець сам приходить із
+// 1.04/1.05, і `_baseMult` збігається зі значенням поля. Руками ці множники більше не
+// виставляємо: з `8b65b4a` applyBaseMults зберігає ЗДОБУТЕ забігом як відношення
+// p[key] / p._baseMult, тож підкинуте 1.04 поверх бази 1.352 читалось як «забіг
+// порізав швидкість до 0.77×», і покупка чесно повертала цю частку назад.
+await runStats({ liberated: ALL_SIX });
 const afterBuy = await page.evaluate(() => {
   const g = window.__game;
-  g.save.upgrades = {};
   const p = g.level.player;
-  p.speedMult = 1.04; p.damageMult = 1.05;
   g.save.coins = 5000;
   g.shop.buy('speed');   // перераховує speedMult з нуля
   g.shop.buy('damage');  // перераховує damageMult з нуля
