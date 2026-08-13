@@ -105,6 +105,10 @@ jobs:
       - name: Daily duel
         timeout-minutes: 4
         run: node test/daily-duel.mjs
+      # ~15с: декорації не ростуть у воді, будинки не висять над схилом
+      - name: World props
+        timeout-minutes: 4
+        run: node test/world-props.mjs
 
   e2e:
     if: github.event_name == 'workflow_dispatch'
