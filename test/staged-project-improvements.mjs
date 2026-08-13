@@ -17,13 +17,24 @@ let compass = await page.textContent('#player-compass').catch(() => '');
 check(/Україна/.test(compass || ''), 'новому гравцю компас радить Україну', compass || '');
 
 console.log('▸ Mission preview does not mutate missionRuns');
+// Каталог режимів живе у згорнутих <details> (крім слотів «СЬОГОДНІ», а вони від дати):
+// розгортаємо категорію з кампанією, інакше картка є в DOM, але невидима для кліку.
+const campaignShown = await page.evaluate(() => {
+  const el = document.querySelector('.solo-mode[data-mode="campaign"]');
+  if (!el) return false;
+  const box = el.closest('details');
+  if (box) box.open = true;
+  return true;
+});
+check(campaignShown, 'картка кампанії є в меню режимів');
 await page.click('.solo-mode[data-mode="campaign"]');
 let preview = await page.evaluate(() => ({
   missionRuns: { ...window.__game.save.missionRuns },
   chips: [...document.querySelectorAll('#country-list .country-item[data-id="UKR"] .mission-preview span')].map((el) => el.textContent.trim()),
   expected: window.__game.test.rollMissions('UKR', 1234, 0),
 }));
-check(preview.chips.join('') === '🆘📡🛡️🛡️', 'preview показує всі 4 місії України', JSON.stringify(preview));
+// 4-та ціль України — сюжетна «віднови центр міста» (🏗️ ukr-rebuild), а не друга оборона
+check(preview.chips.join('') === '🆘📡🛡️🏗️', 'preview показує всі 4 місії України', JSON.stringify(preview));
 check(preview.expected.join(',') === 'rescue,repair,clear', 'динамічний roll для UKR лишається доступним test API', JSON.stringify(preview.expected));
 check(JSON.stringify(preview.missionRuns) === '{}', 'preview не змінює actual missionRuns', JSON.stringify(preview.missionRuns));
 
@@ -58,6 +69,8 @@ await page.evaluate(() => {
 compass = await page.textContent('#player-compass').catch(() => '');
 check(/Польща/.test(compass || ''), 'після України компас радить наступну країну', compass || '');
 
+// 🎯 ціль магазину стоїть НИЖЧЕ кроку кампанії: поки в кишені менше 80% ціни,
+// компас веде далі по кампанії й не тягне дитину у вітрину.
 await page.evaluate(() => {
   const g = window.__game;
   g.save.goal = 'shield';
@@ -65,16 +78,46 @@ await page.evaluate(() => {
   g.renderSoloMenu();
 });
 compass = await page.textContent('#player-compass').catch(() => '');
-check(/ще\s+\d+/.test(compass || '') && /Щит|ціл/i.test(compass || ''), 'активна shop-ціль показує залишок', compass || '');
+check(/Польща/.test(compass || ''), 'ціль магазину на початку збору не перебиває крок кампанії', compass || '');
 
-await page.evaluate(() => {
+// …а коли зібрано ≥80% ціни — лишився один забіг, і компас нагадує саме про ціль
+const goalNear = await page.evaluate(async () => {
   const g = window.__game;
-  g.save.goal = null;
-  g.save.liberated = Object.fromEntries(['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'].map((id) => [id, true]));
+  const { goalInfo } = await import('/src/shop.js');
+  g.save.coins = Math.ceil(goalInfo(g).need * 0.8);
   g.renderSoloMenu();
+  return { need: goalInfo(g).need, have: goalInfo(g).have, remaining: goalInfo(g).remaining };
 });
 compass = await page.textContent('#player-compass').catch(() => '');
-check(/Глава 2|Острів Динозаврів/.test(compass || ''), 'після кампанії компас радить Chapter 2 або Dinosaur Island', compass || '');
+check(new RegExp(`ще\\s+${goalNear.remaining}\\b`).test(compass || '') && /Щит|ціл/i.test(compass || ''),
+  'зібрано ≥80% ціни — компас показує залишок до цілі', `${compass || ''} | ${JSON.stringify(goalNear)}`);
+
+const seasonClosed = await page.evaluate(async () => {
+  const g = window.__game;
+  const { seasonSteps, seasonIndex, seasonState } = await import('/src/season.js');
+  g.save.goal = null;
+  g.save.liberated = Object.fromEntries(['UKR', 'POL', 'DEU', 'FRA', 'ESP', 'PRT', 'ITA', 'TUR', 'SWE', 'EGY', 'JPN', 'CHN'].map((id) => [id, true]));
+  // 🗓️ сезон (v730) у компасі стоїть вище за Главу 2: закриваємо його тими самими
+  // лічильниками сейва, з яких він рахує прогрес, і забираємо всі нагороди
+  const sIdx = seasonIndex(g._weekIndex());
+  const defs = seasonSteps(sIdx);
+  g.save.modeWins = g.save.modeWins || {};
+  g.save.stats = g.save.stats || {};
+  g.save.friends = g.save.friends || {};
+  for (const d of defs) {
+    if (d.metric === 'mode') g.save.modeWins[d.mode] = Math.max(g.save.modeWins[d.mode] | 0, d.target);
+    else if (d.metric === 'kills') g.save.stats.killed = Math.max(g.save.stats.killed | 0, d.target);
+    else if (d.metric === 'friends') for (let i = 0; i < d.target; i++) g.save.friends['season' + i] = true;
+  }
+  // base = {} означає «сезон стартував з нуля», тож лічильники вище рахуються повністю
+  g.save.season = { i: sIdx, base: {}, claimed: defs.map((d) => d.id), carry: [] };
+  const st = seasonState(g.save, g._weekIndex());
+  g.renderSoloMenu();
+  return st.next === null && st.claimable === 0;
+});
+check(seasonClosed, 'сезон закрито — компас доходить до Глави 2');
+compass = await page.textContent('#player-compass').catch(() => '');
+check(/Глава 2|Острів Динозаврів|Chapter 2|Dinosaur/i.test(compass || ''), 'після кампанії компас радить Chapter 2 або Dinosaur Island', compass || '');
 
 console.log('');
 const realErrors = errors.filter((e) => !/Failed to load resource|status of \d{3}|net::|ERR_/i.test(e));
