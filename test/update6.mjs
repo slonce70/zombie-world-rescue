@@ -86,20 +86,39 @@ const defenseRes = await page.evaluate(async () => {
   const m = g.level.missions.missions[1];
   const out = { type: m.type };
   const zx = m.zone.x, zz = m.zone.z; // координати зони (зникає після завершення)
+  // ⏱️ Терпіння міряємо КАДРАМИ гри, а не настінним годинником. Оборона рахує все у
+  // симульованих секундах (`_up_defense`: m.waveT = 1.5 і m.timer зменшуються тим самим
+  // dt), а один кадр — це рівно один крок цієї симуляції. Під навантаженням CI кадри
+  // голодують, і фіксовані 12 РЕАЛЬНИХ секунд можуть не дати грі й 1.5 симульованої —
+  // саме на цьому тест хитався. 900 кадрів ≈ 15с гри навіть на 60 fps, тобто запас
+  // десятикратний і від швидкості машини не залежить. Настінний час лишається ЛИШЕ
+  // запобіжником від повністю зупиненої сторінки, а не мірою очікування.
+  const waitFrames = (frames, done) => new Promise((resolve) => {
+    const wall = performance.now();
+    let left = frames;
+    const tick = () => {
+      if (done() || left-- <= 0 || performance.now() - wall > 120000) resolve();
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   g.test.teleport(zx, zz);
-  const t0 = performance.now();
-  while (performance.now() - t0 < 8000 && !m.started) await new Promise((r) => setTimeout(r, 250));
+  await waitFrames(600, () => m.started);
   out.started = m.started;
-  // хвиля повинна заспавнитись
-  const t1 = performance.now();
-  while (performance.now() - t1 < 12000 && g.level.zombies.list.filter((z) => z.aggroed && z.state !== 'dead').length === 0) {
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  out.waveCame = g.level.zombies.list.some((z) => z.aggroed && z.state !== 'dead');
+  // 🧟 Хвиля повинна прийти. Раніше тут стояло «хоч один агрений зомбі на карті» — цю
+  // умову задовольняв будь-хто з мапи, кого розбудив сам телепорт, тож перевірка хвилі
+  // не бачила ВЗАГАЛІ: з вимкненим `_towerWave` вона лишалась зеленою. Кількість теж не
+  // підходить — за час оборони поруч і без хвилі опиняється два десятки нових агрених.
+  // Єдиний сигнал, що належить САМЕ хвилі, — її оголошення («Зомбі почули шум»), яке
+  // `_towerWave` шле одразу після висадки зомбі. Його дитина й бачить на екрані.
+  const toasts = [];
+  g.level.bus.on('toast', (txt) => toasts.push(String(txt)));
+  const announced = () => toasts.some((s) => s.includes('почули шум'));
+  await waitFrames(900, announced);
+  out.waveCame = announced();
   // пришвидшуємо таймер
   m.timer = 0.4;
-  const t2 = performance.now();
-  while (performance.now() - t2 < 8000 && m.state !== 'done') await new Promise((r) => setTimeout(r, 250));
+  await waitFrames(600, () => m.state === 'done');
   out.done = m.state === 'done';
   g.test.killZombiesNear(zx, zz, 60);
   return out;
