@@ -99,6 +99,12 @@ try {
     g.level.specialist.charge = 100;
     g.input.justPressed.add('KeyC');
     g.level.gadgets.update(0, g.input, true);
+    // 🧹 Прибираємо за собою: justPressed чистить КАДР гри (input.js), а між двома
+    // page.evaluate кадр може й не встигнути. Забутий тут KeyC доїжджав до
+    // наступного блоку і спрацьовував РАЗОМ з KeyX — а super обробляється перед
+    // гіперзарядом, тож заряд згорав на звичайний удар, і Hyper-Суперкулак потім
+    // діставав відмову «Super: 0%». Решта блоків файлу вже чистять за собою.
+    g.input.justPressed.delete('KeyC');
     return {
       fist,
       charged,
