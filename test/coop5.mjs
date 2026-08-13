@@ -42,22 +42,32 @@ try {
   });
   const code = await A.evaluate(() => window.__game.test.coopCreate('Тато'));
   await B.evaluate((c) => window.__game.test.coopJoin(c, 'Влад'), code);
-  await sleep(400);
+  // ⏱️ Вхід у кімнату — мережа, а не 400 фіксованих мілісекунд: якщо ростер ще не
+  // зійшовся, хост міняє режим у порожню кімнату, і оновлення гостю нема кому везти.
+  // (опитуємо таймером, а не по кадрах: на CI сторінка малює кадр секундами)
+  const poll = { polling: 200 };
+  await A.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, poll);
+  await B.waitForFunction(() => window.__game.coop.session.roster.size === 2, null, poll);
 
   // 1. режим «Шторм» у лобі
   await A.evaluate(() => {
     window.__game.test.coopSetMode('storm');
     window.__game.test.coopSetCountry('UKR');
   });
-  await sleep(500);
-  const modeB = await B.evaluate(() => window.__game.coop.session.mode);
-  check('гість бачить режим «Шторм»', modeB === 'storm');
+  // ⏱️ І тут чекаємо саму подію, а не 500 мс: на завантаженому CI пачка з режимом
+  // долітала пізніше, і перевірка читала ще старий режим (наступна за нею «обидва у
+  // Штормі» при цьому зеленіла — старт везе режим у своєму спеці).
+  const modeB = await B.waitForFunction(() => window.__game.coop.session.mode === 'storm', null, poll)
+    .then(() => 'storm')
+    .catch(async () => B.evaluate(() => window.__game.coop.session.mode));
+  check('гість бачить режим «Шторм»', modeB === 'storm', modeB);
 
   // 2. старт: обидва у штормі
   await A.evaluate(() => window.__game.test.coopStartLevel());
   await A.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
   await B.waitForFunction(() => window.__game.state === 'level' && window.__game.level.storm, null, { timeout: T(40000) });
-  check('обидва у Штормі', true);
+  const stormBoth = await Promise.all([A, B].map((p) => p.evaluate(() => !!window.__game.level.storm)));
+  check('обидва у Штормі', stormBoth.every(Boolean), JSON.stringify(stormBoth));
   await A.evaluate(() => window.__game.test.god());
   await B.evaluate(() => window.__game.test.god());
 
@@ -96,16 +106,30 @@ try {
   }, null, { timeout: T(15000) });
 
   // 6. хост піднімає — гра триває
-  await A.evaluate(() => window.__game.test.key('KeyE', true));
-  const t0 = Date.now();
-  let revived = false;
-  while (Date.now() - t0 < T(15000)) {
-    await sleep(300);
-    const hp = await B.evaluate(() => window.__game.level.player.health);
-    if (hp > 0) { revived = true; break; }
-  }
-  await A.evaluate(() => window.__game.test.key('KeyE', false));
-  check('хост підняв гостя у штормі', revived);
+  // ⏱️ Підняття коштує 3 ІГРОВІ секунди утримання E (`_revProg += dt * 1/3`), тобто
+  // 60 кадрів хоста при клампі dt=0.05. Тест міряв це 15 РЕАЛЬНИМИ секундами — на
+  // завантаженій машині (і на runner з двома браузерами) стільки кадрів туди не влазить.
+  // Тримаємо E і рахуємо КАДРИ хоста (запас ×5), настінний час — лише від мертвої сторінки.
+  const hostSawRevive = await A.evaluate(async () => {
+    const g = window.__game;
+    g.test.key('KeyE', true);
+    const wall = performance.now();
+    let left = 300;
+    await new Promise((resolve) => {
+      const tick = () => {
+        const guest = g.level.net.remotes.get(2);
+        if ((guest && guest.health > 0) || left-- <= 0 || performance.now() - wall > 180000) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    g.test.key('KeyE', false);
+    const guest = g.level.net.remotes.get(2);
+    return !!(guest && guest.health > 0);
+  });
+  const revived = await B.waitForFunction(() => window.__game.level.player.health > 0, null, { ...poll, timeout: T(20000) })
+    .then(() => true).catch(() => false);
+  check('хост підняв гостя у штормі', revived, `хост бачить гостя живим: ${hostSawRevive}`);
 
   // 7. всі впали → фінал у ОБОХ
   await B.evaluate(() => {

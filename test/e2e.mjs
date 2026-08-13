@@ -170,7 +170,7 @@ const rebuild = (field) => page.evaluate((f) => {
   return f === 'points'
     ? m.points.map((p, i) => ({ i, kind: p.kind, done: p.done }))
     : f === 'tools'
-    ? m.tools.map((t) => ({ x: t.x, z: t.z }))
+    ? m.tools.map((t) => ({ x: t.x, z: t.z, kind: t.kind }))
     : f === 'dest'
     ? { x: m.dest.x, z: m.dest.z }
     : m[f];
@@ -279,13 +279,28 @@ await page.waitForTimeout(400);
 // --- МІСІЯ 4: відбудова центру села ---
 // сюжетна ціль «ukr-rebuild»: сокира+кірка → 120 дерева і 50 каменю → будівництво
 log('Місія 4: відбудова центру');
+// ⏱️ Інструмент забирається в КАДРІ, у якому гра побачила натиск (`input.pressed`),
+// а `justPressed` живе рівно один кадр. Тест тиснув E раз на 250 реальних мілісекунд —
+// на повільному рендері між телепортами до двох інструментів могло не статись жодного
+// кадру, і єдиний натиск зараховувався вже біля ДРУГОГО (перший лишався лежати).
+// Тому тиснемо покадрово й чекаємо самої ознаки — `tool.taken`.
 for (const tool of await rebuild('tools')) {
-  await ev('teleport', tool.x, tool.z);
-  await page.waitForTimeout(250 * SLOW);
-  await page.evaluate(() => window.__game.test.key('KeyE', true));
-  await page.waitForTimeout(250 * SLOW);
-  await page.evaluate(() => window.__game.test.key('KeyE', false));
-  await page.waitForTimeout(200 * SLOW);
+  await page.evaluate(async ([x, z, kind]) => {
+    const g = window.__game;
+    const item = g.level.missions.delegate.get('rebuild').tools.find((t) => t.kind === kind);
+    const wall = performance.now();
+    let left = 300;
+    await new Promise((resolve) => {
+      const tick = () => {
+        g.test.teleport(x, z);
+        g.test.key('KeyE', true);
+        if (item.taken || left-- <= 0 || performance.now() - wall > 60000) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    g.test.key('KeyE', false);
+  }, [tool.x, tool.z, tool.kind]);
 }
 check(await waitFor(async () => (await rebuild('phase')) === 'resources', 15000, 'інструменти'),
   'сокира й кірка знайдені');
@@ -311,29 +326,40 @@ const dest = await rebuild('dest');
 // Заразом тримаємо гравця в колі КОЖЕН кадр, а не раз на 200 мс: прогрес іде лише
 // поки `d < m.dest.r`, а хвилі відкидають — між рідкими телепортами гра встигала
 // зупинити будівництво.
-const rebuilt = await page.evaluate(async ([x, z]) => {
+// 🔫 І головне: під час будівництва ВІДСТРІЛЮЄМОСЬ, як зробила б дитина. Місія
+// свідомо кличе хвилі кожні 10 ігрових секунд (`m.buildWaveT`), і якщо їх не
+// вбивати, зомбі накопичуються без стелі: заміряно покадровим пробником — 66 → 137
+// живих за 55 ігрових секунд, кадр важчає з 0.18 с до 0.85 с, і будівництво впирається
+// не в кадри, а в настінний запобіжник (91% за 300 с; на повільнішому CI — ті самі 36%).
+// З відстрілом популяція тримається на 60–98, а прохід закривається за 651 кадр / 198 с.
+// Дискримінація не змінилась: прогрес росте виключно від утримання E в колі.
+const rebuilt = await page.evaluate(async ([x, z, slow]) => {
   const g = window.__game;
   const m = g.level.missions.delegate.get('rebuild');
+  const p = g.level.player;
+  p.switchWeapon('pistol'); // у руках лишалась кірка — від хвиль нею не відбитись
   g.test.teleport(x, z);
   g.test.key('KeyE', true);
   const wall = performance.now();
-  let left = 3000;
+  let left = 3000, n = 0;
   await new Promise((resolve) => {
     const tick = () => {
       g.test.teleport(x, z); // хвилі під час будівництва не мають виштовхнути з кола
-      if (m.state === 'done' || left-- <= 0 || performance.now() - wall > 300000) resolve();
+      g.test.aimAtNearestZombie();
+      if (p.curAmmo.mag === 0 && p.reloading <= 0) p.startReload();
+      g.test.mouse((n++ & 1) === 0); // пістолет напівавтомат: постріл на кожен новий натиск
+      if (m.state === 'done' || left-- <= 0 || performance.now() - wall > 300000 * slow) resolve();
       else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
+  g.test.mouse(false);
   g.test.key('KeyE', false);
-  return { done: m.state === 'done', progress: Math.round(m.buildProgress * 100), fps: g.fps };
-}, [dest.x, dest.z]);
-check(rebuilt.done, `місія 4 виконана (центр відбудовано, прогрес ${rebuilt.progress}%, ${rebuilt.fps} fps)`);
+  return { done: m.state === 'done', progress: Math.round(m.buildProgress * 100), waves: m.buildWaves, fps: g.fps };
+}, [dest.x, dest.z, SLOW]);
+check(rebuilt.done,
+  `місія 4 виконана (центр відбудовано, прогрес ${rebuilt.progress}%, хвиль ${rebuilt.waves}, ${rebuilt.fps} fps)`);
 await shot('e2e-33-rebuilt');
-// після відбудови в руках лишається кірка — перед ареною беремо зброю назад
-// (дитина зробила б це колесом зброї), інакше бос «розстрілювався» б киркою
-await page.evaluate(() => window.__game.level.player.switchWeapon('pistol'));
 
 // --- БОС ---
 log('Бос');

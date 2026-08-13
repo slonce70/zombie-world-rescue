@@ -380,9 +380,21 @@ try {
   check(campaignDowned.deathT > 0 && campaignDowned.death && !campaignDowned.result
     && campaignDowned.active === 'active' && !campaignDowned.defense && !campaignDowned.portal,
   'guest death in a campaign Front stage stays downed without a terminal result', JSON.stringify(campaignDowned));
+  await guestPage.evaluate(() => {
+    window.__coopRevived = false;
+    window.__game.level.bus.on('playerRevived', (e) => { if (e && e.kind === 'coop') window.__coopRevived = true; });
+  });
   await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
-  await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
-    && !document.getElementById('overlay-death').classList.contains('show'));
+  // 💚 Чекаємо саме ПІДНЯТТЯ ДРУГОМ: `applyRevive` шле в шину `playerRevived` з
+  // kind 'coop', а автовідродження за таймером смерті (20 ігрових секунд) — 'respawn'.
+  // Без цієї позначки очікування здавалось зеленим і з ПОВНІСТЮ заглушеною подією
+  // 'revived' у гостя (перевірено на злам) — воно ловило звичайне автовідродження.
+  // ⏱️ Опитуємо таймером, а не по requestAnimationFrame (типове для Playwright):
+  // на runner із двома браузерами кадр іде секундами, і саме на цьому очікуванні
+  // CI падав із `Timeout 30000ms exceeded`. Бюджет — як у сусідів файлу.
+  await guestPage.waitForFunction(() => window.__coopRevived && window.__game.deathT < 0
+    && window.__game.level.player.health > 0
+    && !document.getElementById('overlay-death').classList.contains('show'), null, { polling: 200, timeout: 60000 * SLOW });
   check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
     'campaign Front guest revive returns to the same active stage');
   await guestPage.evaluate(() => {
@@ -449,9 +461,21 @@ try {
   check(defenseDowned.deathT > 0 && defenseDowned.death && !defenseDowned.result
     && defenseDowned.active === 'active' && (defenseDowned.defense || defenseDowned.portal),
   'guest death in a defense/portal Front stage stays downed without a terminal result', JSON.stringify(defenseDowned));
+  await guestPage.evaluate(() => {
+    window.__coopRevived = false;
+    window.__game.level.bus.on('playerRevived', (e) => { if (e && e.kind === 'coop') window.__coopRevived = true; });
+  });
   await page.evaluate((pid) => window.__game.level.net.sendRevive(pid), guestPid);
-  await guestPage.waitForFunction(() => window.__game.deathT < 0 && window.__game.level.player.health > 0
-    && !document.getElementById('overlay-death').classList.contains('show'));
+  // 💚 Чекаємо саме ПІДНЯТТЯ ДРУГОМ: `applyRevive` шле в шину `playerRevived` з
+  // kind 'coop', а автовідродження за таймером смерті (20 ігрових секунд) — 'respawn'.
+  // Без цієї позначки очікування здавалось зеленим і з ПОВНІСТЮ заглушеною подією
+  // 'revived' у гостя (перевірено на злам) — воно ловило звичайне автовідродження.
+  // ⏱️ Опитуємо таймером, а не по requestAnimationFrame (типове для Playwright):
+  // на runner із двома браузерами кадр іде секундами, і саме на цьому очікуванні
+  // CI падав із `Timeout 30000ms exceeded`. Бюджет — як у сусідів файлу.
+  await guestPage.waitForFunction(() => window.__coopRevived && window.__game.deathT < 0
+    && window.__game.level.player.health > 0
+    && !document.getElementById('overlay-death').classList.contains('show'), null, { polling: 200, timeout: 60000 * SLOW });
   check(await guestPage.evaluate(() => !document.getElementById('overlay-front-result').classList.contains('show')),
     'defense/portal Front guest revive returns to the same active stage');
 
