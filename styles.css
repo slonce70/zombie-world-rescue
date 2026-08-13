@@ -1642,8 +1642,7 @@ body.touch-mode #touch-coach.show { display: block; }
      вони згорталися у ТРИ ряди (заміряно 97px з 299px картки), і перший товар
      обрізався сіткою — дитина мусила скролити, щоб його натиснути */
   #shop-tabs { gap: 5px; margin-top: 6px; flex-wrap: nowrap; overflow-x: auto; }
-  .shop-tab { flex: 0 0 auto; }
-  .shop-tab { font-size: 12px; padding: 5px 9px; }
+  .shop-tab { flex: 0 0 auto; font-size: 12px; padding: 5px 9px; }
   .shop-goal,
   .shop-hint { display: none; }
   #shop-grid { flex: 1 1 auto; max-height: none; margin-top: 6px; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
