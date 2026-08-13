@@ -122,24 +122,47 @@ async function holdZone(zone, condFn, timeoutMs, label) {
 }
 
 // один удар інструментом по ресурсній точці: стаємо за 2.2 м, дивимось у неї
-// (промінь удару горизонтальний — цілимось у стовбур/брилу) і клікаємо.
-// Паузи множимо на SLOW: замах доводиться ігровим часом, а на софт-рендері
-// 320 мс реальних — це кілька кадрів, і удар просто не встигне розрахуватись.
-async function chopNode(index, tool) {
-  await page.evaluate(([i, toolId]) => {
+// (промінь удару горизонтальний — цілимось у стовбур/брилу) і тиснемо кнопку.
+// ⏱️ Чекаємо не настінний годинник, а САМ ЗАМАХ: `player.meleeSwing` зʼявляється в
+// кадрі пострілу і зникає, коли `_updateMeleeSwing` довів його ігровим часом
+// (`meleeSwing.t -= dt`). На софтверному рендері CI 320 реальних мілісекунд — це
+// часом жодного кадру, і удар просто не встигав розрахуватись: звідси «дерево
+// 40/120» на грі, яка локально зелена. Чекання по замаху коштує ті самі ~10 кадрів
+// і на швидкій, і на повільній машині — фіксований бюджет кадрів так не вміє: удар
+// повз ціль (а поруч постійно лізуть зомбі, і промінь ловить їх) з'їдав би його весь.
+// Настінний час лишається ЛИШЕ запобіжником від повністю зупиненої сторінки.
+// Повертає true, якщо точка справді отримала удар.
+function chopNode(index, tool) {
+  return page.evaluate(async ([i, toolId]) => {
     const g = window.__game;
     const p = g.level.player;
     const node = g.level.missions.delegate.get('rebuild').points[i];
+    const hp0 = node.hp;
+    const landed = () => node.done || node.hp < hp0;
+    const waitFrames = (frames, done = () => false) => new Promise((resolve) => {
+      const wall = performance.now();
+      let left = frames;
+      const tick = () => {
+        if (done() || left-- <= 0 || performance.now() - wall > 30000) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     p.switchWeapon(toolId);
     g.test.teleport(node.x + 2.2, node.z);
     const dx = node.x - p.pos.x, dz = node.z - p.pos.z;
     p.yaw = Math.atan2(-dx, -dz);
     p.pitch = 0;
     g.test.mouse(true);
+    await waitFrames(30, () => p.meleeSwing || landed()); // замах почався
+    g.test.mouse(false);
+    await waitFrames(30, () => !p.meleeSwing);            // замах доведено
+    const hit = landed();
+    // пара кадрів із відпущеною кнопкою: інструмент не автоматичний,
+    // наступному удару потрібен новий натиск
+    await waitFrames(2);
+    return hit;
   }, [index, tool]);
-  await page.waitForTimeout(320 * SLOW);
-  await page.evaluate(() => window.__game.test.mouse(false));
-  await page.waitForTimeout(140 * SLOW);
 }
 
 const rebuild = (field) => page.evaluate((f) => {
@@ -280,15 +303,33 @@ check(res.wood >= res.need.wood && res.stone >= res.need.stone,
   `ресурси здобуто інструментами: дерево ${res.wood}/${res.need.wood}, камінь ${res.stone}/${res.need.stone}`);
 await shot('e2e-32-resources');
 const dest = await rebuild('dest');
-await ev('teleport', dest.x, dest.z);
-await page.waitForTimeout(300);
-await page.evaluate(() => window.__game.test.key('KeyE', true));
-const rebuilt = await waitFor(async () => {
-  await ev('teleport', dest.x, dest.z); // хвилі під час будівництва не мають виштовхнути з кола
-  return (await rebuild('state')) === 'done';
-}, 120000, 'відбудова центру');
-await page.evaluate(() => window.__game.test.key('KeyE', false));
-check(rebuilt, 'місія 4 виконана (центр відбудовано)');
+// ⏱️ Будівництво коштує 30 ІГРОВИХ секунд (`m.buildProgress += dt / m.buildSeconds`),
+// а dt у грі клампиться до 0.05 (`_frame`). Тобто при 5 fps одна реальна секунда дає
+// чверть ігрової, і фіксовані 120 реальних секунд не докручують прогрес — саме тому
+// відбудова гине на CI. Рахуємо КАДРИ: 30 с / 0.05 = 600 кадрів у найгіршому разі,
+// беремо пʼятикратний запас. Настінний час — лише запобіжник від мертвої сторінки.
+// Заразом тримаємо гравця в колі КОЖЕН кадр, а не раз на 200 мс: прогрес іде лише
+// поки `d < m.dest.r`, а хвилі відкидають — між рідкими телепортами гра встигала
+// зупинити будівництво.
+const rebuilt = await page.evaluate(async ([x, z]) => {
+  const g = window.__game;
+  const m = g.level.missions.delegate.get('rebuild');
+  g.test.teleport(x, z);
+  g.test.key('KeyE', true);
+  const wall = performance.now();
+  let left = 3000;
+  await new Promise((resolve) => {
+    const tick = () => {
+      g.test.teleport(x, z); // хвилі під час будівництва не мають виштовхнути з кола
+      if (m.state === 'done' || left-- <= 0 || performance.now() - wall > 300000) resolve();
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  g.test.key('KeyE', false);
+  return { done: m.state === 'done', progress: Math.round(m.buildProgress * 100), fps: g.fps };
+}, [dest.x, dest.z]);
+check(rebuilt.done, `місія 4 виконана (центр відбудовано, прогрес ${rebuilt.progress}%, ${rebuilt.fps} fps)`);
 await shot('e2e-33-rebuilt');
 // після відбудови в руках лишається кірка — перед ареною беремо зброю назад
 // (дитина зробила б це колесом зброї), інакше бос «розстрілювався» б киркою
